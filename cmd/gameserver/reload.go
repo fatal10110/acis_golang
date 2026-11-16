@@ -101,11 +101,11 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 			return nil
 		},
 		WalkerRoutes: func() error {
-			fresh, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
+			fresh, loaded, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
 			if err != nil {
 				return err
 			}
-			walker.SetRoutes(fresh)
+			walker.SetRoutes(fresh, loaded)
 			return nil
 		},
 		Teleports: func() (travel.TeleportTable, travel.InstantTable, error) {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -207,7 +208,8 @@ func (l *GameClientLink) findAccount(gm *livePlayer, name string) {
 }
 
 // findDualbox opens the addresses at least multibox connected players
-// share, in address order.
+// share, in the order a hash table of the addresses lists them, put in as
+// players taken by object id reach multibox.
 func (l *GameClientLink) findDualbox(gm *livePlayer, multibox int) {
 	perIP := map[string]int{}
 	var shared []string
@@ -220,7 +222,7 @@ func (l *GameClientLink) findDualbox(gm *livePlayer, multibox int) {
 			shared = append(shared, p.remoteIP)
 		}
 	}
-	slices.Sort(shared)
+	hashorder.SortMap(shared, hashorder.TextHash)
 	var b strings.Builder
 	for _, ip := range shared {
 		// Each address shows the threshold it reached, not its count.
@@ -284,11 +286,11 @@ func (l *GameClientLink) findItems(gm *livePlayer, page int, search string) bool
 }
 
 // findNPCs opens page of the named NPC templates search matches, by name
-// then id, seven to a page, each with spawn and spawn-list buttons. It
+// then in listing order, seven to a page, each with spawn and spawn-list buttons. It
 // reports false, sending nothing, for a page below 1 when NPCs are found.
 func (l *GameClientLink) findNPCs(gm *livePlayer, page int, search string) bool {
 	var found []*npc.Template
-	for _, tpl := range l.npcs.All() {
+	for _, tpl := range l.npcs.Listed() {
 		if tpl.Name != "" && searchMatches(tpl.Name, search) {
 			found = append(found, tpl)
 		}

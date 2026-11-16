@@ -110,30 +110,47 @@ type walkerNPCElement struct {
 	Nodes []attrsElement `xml:"node"`
 }
 
-// LoadWalkerRoutes parses walking NPC route nodes.
-func LoadWalkerRoutes(path string) (route.WalkerRoutes, error) {
+// LoadWalkerRoutes parses walking NPC route nodes, with the order the
+// routes and their NPCs were put in (see route.WalkerRoutes.Listing). A
+// route or NPC named again replaces the earlier one in its place.
+func LoadWalkerRoutes(path string) (route.WalkerRoutes, []route.WalkerKey, error) {
 	var doc walkerRouteFile
 	if err := readXML(path, &doc); err != nil {
-		return nil, fmt.Errorf("walker routes: %w", err)
+		return nil, nil, fmt.Errorf("walker routes: %w", err)
 	}
 
 	routes := make(route.WalkerRoutes, len(doc.Routes))
+	var names []string
+	npcNames := make(map[string][]string, len(doc.Routes))
 	for _, routeEl := range doc.Routes {
+		if _, ok := routes[routeEl.Name]; !ok {
+			names = append(names, routeEl.Name)
+		}
+		npcNames[routeEl.Name] = nil
 		byNPC := make(map[string][]route.WalkerLocation, len(routeEl.NPCs))
 		for _, npcEl := range routeEl.NPCs {
 			nodes := make([]route.WalkerLocation, 0, len(npcEl.Nodes))
 			for _, node := range npcEl.Nodes {
 				loc, err := buildWalkerLocation(newAttrValues(foldAttrs(node.Attrs), "route: walker location"))
 				if err != nil {
-					return nil, fmt.Errorf("xml: %s: route %q npc %q: %w", path, routeEl.Name, npcEl.Name, err)
+					return nil, nil, fmt.Errorf("xml: %s: route %q npc %q: %w", path, routeEl.Name, npcEl.Name, err)
 				}
 				nodes = append(nodes, loc)
+			}
+			if _, ok := byNPC[npcEl.Name]; !ok {
+				npcNames[routeEl.Name] = append(npcNames[routeEl.Name], npcEl.Name)
 			}
 			byNPC[npcEl.Name] = nodes
 		}
 		routes[routeEl.Name] = byNPC
 	}
-	return routes, nil
+	var loaded []route.WalkerKey
+	for _, name := range names {
+		for _, npc := range npcNames[name] {
+			loaded = append(loaded, route.WalkerKey{Route: name, NPC: npc})
+		}
+	}
+	return routes, loaded, nil
 }
 
 // buildWalkerLocation builds one walker route <node>. x, y and z are

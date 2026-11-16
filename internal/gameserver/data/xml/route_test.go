@@ -2,6 +2,7 @@ package xml
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -49,7 +50,7 @@ func TestLoadWalkerRoutes(t *testing.T) {
 	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "walkerRoutes.xml"))
 
-	routes, err := LoadWalkerRoutes(path)
+	routes, _, err := LoadWalkerRoutes(path)
 	if err != nil {
 		t.Fatalf("LoadWalkerRoutes(%q) error: %v", path, err)
 	}
@@ -93,7 +94,7 @@ func TestLoadWalkerRoutesDuplicateKeysKeepLast(t *testing.T) {
 		</route>
 	</list>`)
 
-	routes, err := LoadWalkerRoutes(path)
+	routes, loaded, err := LoadWalkerRoutes(path)
 	if err != nil {
 		t.Fatalf("LoadWalkerRoutes(%q) error: %v", path, err)
 	}
@@ -110,6 +111,10 @@ func TestLoadWalkerRoutesDuplicateKeysKeepLast(t *testing.T) {
 	if got, want := routes["b"]["b1"][0].X, 3; got != want {
 		t.Fatalf(`routes["b"]["b1"][0].X = %d, want %d`, got, want)
 	}
+	// The replacing route keeps the place of the first.
+	if want := []route.WalkerKey{{Route: "a", NPC: "a1"}, {Route: "b", NPC: "b1"}}; !slices.Equal(loaded, want) {
+		t.Fatalf("loaded = %v, want %v", loaded, want)
+	}
 }
 
 func TestLoadWalkerRoutesDuplicateNPCWithinRouteKeepsLast(t *testing.T) {
@@ -123,7 +128,7 @@ func TestLoadWalkerRoutesDuplicateNPCWithinRouteKeepsLast(t *testing.T) {
 		</route>
 	</list>`)
 
-	routes, err := LoadWalkerRoutes(path)
+	routes, loaded, err := LoadWalkerRoutes(path)
 	if err != nil {
 		t.Fatalf("LoadWalkerRoutes(%q) error: %v", path, err)
 	}
@@ -132,6 +137,10 @@ func TestLoadWalkerRoutesDuplicateNPCWithinRouteKeepsLast(t *testing.T) {
 	}
 	if got, want := routes["a"]["a2"][0].X, 2; got != want {
 		t.Fatalf(`routes["a"]["a2"][0].X = %d, want %d (sibling npc preserved)`, got, want)
+	}
+	// The replacing NPC keeps the place of the first.
+	if want := []route.WalkerKey{{Route: "a", NPC: "a1"}, {Route: "a", NPC: "a2"}}; !slices.Equal(loaded, want) {
+		t.Fatalf("loaded = %v, want %v", loaded, want)
 	}
 }
 

@@ -1316,7 +1316,19 @@ func (s *Server) SeedCharacterForAt(tb testing.TB, account, name string, level, 
 // wantChars). The primary client keeps using Server.Client.
 func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsupport.ScriptedClient {
 	t.Helper()
-	c := testsupport.Dial(t, s.addr.String())
+	return s.logIn(t, testsupport.Dial(t, s.addr.String()), account, wantChars)
+}
+
+// DialClientFrom is DialClient connecting from the loopback address local
+// (any 127.0.0.0/8 address), so the account plays from that address.
+func (s *Server) DialClientFrom(t *testing.T, account string, wantChars int, local string) *testsupport.ScriptedClient {
+	t.Helper()
+	return s.logIn(t, testsupport.DialFrom(t, s.addr.String(), local), account, wantChars)
+}
+
+// logIn runs the handshake and AuthLogin of DialClient on c.
+func (s *Server) logIn(t *testing.T, c *testsupport.ScriptedClient, account string, wantChars int) *testsupport.ScriptedClient {
+	t.Helper()
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
