@@ -21,12 +21,21 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+// handleMagicSkillUse answers RequestMagicSkillUse. An out-of-control caster
+// (confused included) gets ActionFailed alone before the skill is even looked
+// up; the ground request carries no such gate, so a confused player may still
+// cast a ground skill.
 func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
-	if live == nil {
+	if live == nil || liveOutOfControl(live) {
 		sendMagicActionFailed(live)
 		return
 	}
+	l.requestMagicSkill(live, req)
+}
 
+// requestMagicSkill runs a skill request, plain or ground, that its own
+// request gate let through.
+func (l *GameClientLink) requestMagicSkill(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
 	selected := live.Target()
 	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
 	castable := known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle)
@@ -340,11 +349,12 @@ func (l *GameClientLink) applyItemCastHit(live *livePlayer, handlers actorcast.E
 
 // attemptMagicSkill runs a player's skill request through the pre-attempt
 // gate ahead of the swing queue, the approach walk and the cast itself. A
-// dead caster and a request with no final target get a bare ActionFailed;
-// a gate failure gets its reason and ActionFailed. It reports whether the
-// request may go on.
+// caster that cannot act (dead, teleporting, held by an effect, or running a
+// store) and a request with no final target get a bare ActionFailed; a gate
+// failure gets its reason and ActionFailed. It reports whether the request
+// may go on.
 func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def *modelskill.Definition, selected world.Tracked) bool {
-	if live.Character.Dead() {
+	if live.DenyAIAction() {
 		sendMagicActionFailed(live)
 		return false
 	}
@@ -685,7 +695,7 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 		z = int(l.geo.Height(int(req.X), int(req.Y), int(req.Z)))
 	}
 	live.Character.SetGroundTarget(int(req.X), int(req.Y), z)
-	l.handleMagicSkillUse(live, clientpackets.RequestMagicSkillUse{
+	l.requestMagicSkill(live, clientpackets.RequestMagicSkillUse{
 		SkillID:      req.SkillID,
 		CtrlPressed:  req.CtrlPressed,
 		ShiftPressed: req.ShiftPressed,
