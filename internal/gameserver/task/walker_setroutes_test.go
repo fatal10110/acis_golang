@@ -30,7 +30,7 @@ func TestWalkerSetRoutes(t *testing.T) {
 			}
 		}
 	}()
-	w.SetRoutes(fresh)
+	w.SetRoutes(fresh, nil)
 	wg.Wait()
 
 	nodes, err := w.nodes("r", "n")

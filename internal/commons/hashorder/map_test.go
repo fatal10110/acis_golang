@@ -24,3 +24,23 @@ func TestMapIndex(t *testing.T) {
 		}
 	}
 }
+
+// TestTextHash: a text key hashes over its UTF-16 code units, 31 times the
+// hash so far plus the unit, wrapping at 32 bits.
+func TestTextHash(t *testing.T) {
+	for _, tc := range []struct {
+		s    string
+		want int32
+	}{
+		{"", 0},
+		{"a", 97},
+		{"ab", 97*31 + 98},
+		{"127.0.0.1", 1505998205},
+		{"gordon", -1240158087},
+		{"\U0001F600", 0xd83d*31 + 0xde00}, // a surrogate pair is two units
+	} {
+		if got := TextHash(tc.s); got != tc.want {
+			t.Errorf("TextHash(%q) = %d, want %d", tc.s, got, tc.want)
+		}
+	}
+}

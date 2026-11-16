@@ -2,9 +2,12 @@ package route
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -167,6 +170,61 @@ func NewWalkerLocation(loc location.Location, delaySeconds, npcStringID, socialI
 
 // WalkerRoutes stores walking routes keyed by route name then npc name.
 type WalkerRoutes map[string]map[string][]WalkerLocation
+
+// WalkerKey names one NPC's walking route: the route and the NPC.
+type WalkerKey struct {
+	Route, NPC string
+}
+
+// WalkerRow is one NPC's walking route in a listing of every route.
+type WalkerRow struct {
+	WalkerKey
+	Nodes []WalkerLocation
+}
+
+// Listing lists every NPC route of r the way a hash table of routes keyed
+// by name, each a hash table of NPCs keyed by name, lists them: routes in
+// the order hashorder.SortMap gives their names, each route's NPCs likewise.
+// loaded is the order the routes and their NPCs were put in, which names
+// sharing a bucket keep; names loaded does not hold follow by name.
+func (r WalkerRoutes) Listing(loaded []WalkerKey) []WalkerRow {
+	var names []string
+	npcs := make(map[string][]string, len(r))
+	add := func(k WalkerKey) {
+		byNPC, ok := r[k.Route]
+		if !ok {
+			return
+		}
+		if _, seen := npcs[k.Route]; !seen {
+			names = append(names, k.Route)
+			npcs[k.Route] = []string{}
+		}
+		if _, ok := byNPC[k.NPC]; ok && !slices.Contains(npcs[k.Route], k.NPC) {
+			npcs[k.Route] = append(npcs[k.Route], k.NPC)
+		}
+	}
+	for _, k := range loaded {
+		add(k)
+	}
+	for _, name := range slices.Sorted(maps.Keys(r)) {
+		if _, seen := npcs[name]; !seen {
+			names = append(names, name)
+			npcs[name] = []string{}
+		}
+		for _, npc := range slices.Sorted(maps.Keys(r[name])) {
+			add(WalkerKey{name, npc})
+		}
+	}
+	hashorder.SortMap(names, hashorder.TextHash)
+	var rows []WalkerRow
+	for _, name := range names {
+		hashorder.SortMap(npcs[name], hashorder.TextHash)
+		for _, npc := range npcs[name] {
+			rows = append(rows, WalkerRow{WalkerKey{name, npc}, r[name][npc]})
+		}
+	}
+	return rows
+}
 
 // NPCCount returns how many named NPC route entries are loaded.
 func (r WalkerRoutes) NPCCount() int {

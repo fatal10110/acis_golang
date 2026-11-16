@@ -85,8 +85,9 @@ func (p GeoPath) HasPath(origin, target location.Location) bool {
 // on the one-second task tick. All methods are safe for concurrent use; mu
 // guards entries, their per-actor route state, and carried.
 type Walker struct {
-	// routes are the loaded walker routes; //reload npcwalker swaps them.
-	routes atomic.Pointer[route.WalkerRoutes]
+	// routes are the loaded walker routes and their listing; //reload
+	// npcwalker swaps them.
+	routes atomic.Pointer[walkerRoutes]
 	path   WalkerPath
 	now    func() time.Time
 	state  *world.State
@@ -97,6 +98,12 @@ type Walker struct {
 	// carried holds, by object id, the route node and direction an actor
 	// comes back with from an earlier life, until it takes up a route.
 	carried map[int32]carriedWalk
+}
+
+// walkerRoutes is one load of the walker routes with their listing.
+type walkerRoutes struct {
+	byName  route.WalkerRoutes
+	listing []route.WalkerRow
 }
 
 // carriedWalk is the route node an actor headed for and its direction.
@@ -118,7 +125,8 @@ type walkerEntry struct {
 	left bool
 }
 
-// NewWalker returns a route walker over loaded walkerRoutes.xml data. A nil
+// NewWalker returns a route walker over loaded walkerRoutes.xml data,
+// listing names that share a bucket by name (see SetRoutes). A nil
 // state treats every walker as active. When state is non-nil, registered
 // actors must already be spawned into it; off-grid actors are not ticked.
 func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time, state *world.State) (*Walker, error) {
@@ -135,19 +143,24 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time,
 		entries: make(map[int32]*walkerEntry),
 		carried: make(map[int32]carriedWalk),
 	}
-	w.SetRoutes(routes)
+	w.SetRoutes(routes, nil)
 	return w, nil
 }
 
-// SetRoutes replaces the walker routes with routes. A walker looks its
-// route up at every node, so one already on a route takes its next node
-// from the new routes.
-func (w *Walker) SetRoutes(routes route.WalkerRoutes) {
-	w.routes.Store(&routes)
+// SetRoutes replaces the walker routes with routes, put in in the order
+// loaded gives (see route.WalkerRoutes.Listing). A walker looks its route
+// up at every node, so one already on a route takes its next node from the
+// new routes.
+func (w *Walker) SetRoutes(routes route.WalkerRoutes, loaded []route.WalkerKey) {
+	w.routes.Store(&walkerRoutes{byName: routes, listing: routes.Listing(loaded)})
 }
 
 // Routes returns the loaded walker routes. The caller must not modify them.
-func (w *Walker) Routes() route.WalkerRoutes { return *w.routes.Load() }
+func (w *Walker) Routes() route.WalkerRoutes { return w.routes.Load().byName }
+
+// Listing returns every NPC route of the loaded walker routes in listing
+// order. The caller must not modify it.
+func (w *Walker) Listing() []route.WalkerRow { return w.routes.Load().listing }
 
 // Walking reports, for the actor of object id id, the index of the route
 // node it heads for and whether it walks its route backwards, or those it
@@ -431,7 +444,7 @@ func (w *Walker) moveToNextPoint(entry *walkerEntry) error {
 }
 
 func (w *Walker) nodes(routeName, npcName string) ([]route.WalkerLocation, error) {
-	byNPC, ok := (*w.routes.Load())[routeName]
+	byNPC, ok := w.routes.Load().byName[routeName]
 	if !ok {
 		return nil, fmt.Errorf("task: walker route %q not found", routeName)
 	}

@@ -78,6 +78,7 @@ type gameData struct {
 	CursedWeapons *entity.CursedWeaponTable
 	Zones         *zone.Index
 	Routes        route.WalkerRoutes
+	RoutesLoaded  []route.WalkerKey // the order Routes were loaded in
 	NPCs          *npc.Table
 	SummonItems   *item.SummonItemTable
 	Doors         *door.Table
@@ -169,7 +170,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		return nil, err
 	}
 	applyTownCombatRule(zones, cfg.TownCombatRule)
-	routes, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
+	routes, routesLoaded, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
 	if err != nil {
 		return nil, err
 	}
@@ -280,6 +281,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		CursedWeapons:    cursedWeapons,
 		Zones:            zones,
 		Routes:           routes,
+		RoutesLoaded:     routesLoaded,
 		NPCs:             npcs,
 		SummonItems:      summonItems,
 		SoulCrystals:     soulCrystals,

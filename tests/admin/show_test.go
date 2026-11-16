@@ -298,8 +298,9 @@ func TestAdminShowWalker(t *testing.T) {
 		gameservertest.WithAITask(),
 	)
 	const pages = `<table width=280 bgcolor=000000><tr><td FIXWIDTH=22 align=center>`
-	unspawned := `<table width=280 bgcolor=000000><tr><td width=150><a action="bypass admin_teleport 110 20 50">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td><td width=40 align=right><a action="bypass admin_show walker 1 porter_remy">Show</a></td></tr></table><img src="L2UI.SquareGray" width=280 height=1>` +
-		`<table width=280><tr><td width=150><a action="bypass admin_teleport 7 8 9">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td><td width=40 align=right><a action="bypass admin_show walker 1 ghost">Show</a></td></tr></table><img src="L2UI.SquareGray" width=280 height=1>` +
+	// "zeta" lists before "porter_remy" (TestAdminShowWalkerListingOrder).
+	unspawned := `<table width=280 bgcolor=000000><tr><td width=150><a action="bypass admin_teleport 7 8 9">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td><td width=40 align=right><a action="bypass admin_show walker 1 ghost">Show</a></td></tr></table><img src="L2UI.SquareGray" width=280 height=1>` +
+		`<table width=280><tr><td width=150><a action="bypass admin_teleport 110 20 50">Unspawned</a></td><td width=40>-</td><td width=50 align=right>-</td><td width=40 align=right><a action="bypass admin_show walker 1 porter_remy">Show</a></td></tr></table><img src="L2UI.SquareGray" width=280 height=1>` +
 		strings.Repeat("<img height=20>", 13) + pages
 	frames := exchangeZones(t, gm, encodeBuildCmd("show walker"))
 	if len(frames) != 1 || !strings.Contains(htmlBody(t, frames[0]), unspawned) {
@@ -335,7 +336,7 @@ func TestAdminShowWalker(t *testing.T) {
 		}
 	}
 	drain(t, gm)
-	walking := `<table width=280 bgcolor=000000><tr><td width=150><a action="bypass admin_teleport 110 20 50">Porter Remy</a></td><td width=40>0 / 2</td><td width=50 align=right>Regular</td><td width=40 align=right><a action="bypass admin_show walker 1 porter_remy">Show</a></td></tr></table>`
+	walking := `<table width=280><tr><td width=150><a action="bypass admin_teleport 110 20 50">Porter Remy</a></td><td width=40>0 / 2</td><td width=50 align=right>Regular</td><td width=40 align=right><a action="bypass admin_show walker 1 porter_remy">Show</a></td></tr></table>`
 	frames = exchangeZones(t, gm, encodeBuildCmd("show walker 1"))
 	if len(frames) != 1 || !strings.Contains(htmlBody(t, frames[0]), walking) {
 		t.Fatalf("//show walker with the porter walking = %x, want the row\n%s\ngot\n%s", opcodes(frames), walking, htmlBody(t, frames[0]))
