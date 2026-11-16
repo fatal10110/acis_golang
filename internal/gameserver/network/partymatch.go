@@ -36,7 +36,8 @@ func (l *GameClientLink) requestListPartyWaiting(live *livePlayer, req clientpac
 }
 
 // requestManagePartyRoom opens a room live leads, taking its party members
-// in with it, or revises the room live leads. A player off the waiting
+// in with it, or revises the room live leads. Terms out of bounds are
+// refused with ActionFailed and change nothing. A player off the waiting
 // list opens nothing, and a revision of a room live does not lead changes
 // nothing; neither answers, the room window having sent the request and
 // waiting on nothing.
@@ -47,6 +48,10 @@ func (l *GameClientLink) requestManagePartyRoom(live *livePlayer, req clientpack
 		MaxLevel:   req.MaxLevel,
 		Loot:       req.Loot,
 		Title:      req.Title,
+	}
+	if !settings.Valid(int32(l.levels.RealMaxLevel())) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
 	}
 	if req.RoomID > 0 {
 		l.applyRoomNotices(l.rooms.Revise(live, req.RoomID, settings, l.roomLocation(live)))
