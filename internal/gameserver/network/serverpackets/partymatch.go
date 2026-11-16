@@ -1,6 +1,9 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/commons/wire"
+import (
+	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+)
 
 // Party-matching packet opcodes.
 const (
@@ -42,8 +45,11 @@ type PartyRoom struct {
 	LeaderName string
 }
 
-// FramePartyMatchList lists the rooms a player may browse.
+// FramePartyMatchList lists the rooms a player may browse. Rooms past the
+// ones that fit one frame are left off the list, so the list always
+// reaches the player.
 func FramePartyMatchList(rooms []PartyRoom) wire.Frame {
+	rooms = roomsInFrame(rooms)
 	w := newFrameWriter(OpcodePartyMatchList)
 	w.WriteInt32(boolInt32(len(rooms) > 0))
 	w.WriteInt32(int32(len(rooms)))
@@ -58,6 +64,21 @@ func FramePartyMatchList(rooms []PartyRoom) wire.Frame {
 		w.WriteString(r.LeaderName)
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// roomsInFrame returns the leading rooms whose rows fit one PartyMatchList
+// frame.
+func roomsInFrame(rooms []PartyRoom) []PartyRoom {
+	const head = wire.FrameHeaderSize + 1 + 4 + 4 // opcode, flag, count
+	const ints = 6 * 4
+	size := head
+	for i, r := range rooms {
+		size += ints + 2*(commons.UTF16Len(r.Title)+1) + 2*(commons.UTF16Len(r.LeaderName)+1)
+		if size > wire.MaxFrameLength {
+			return rooms[:i]
+		}
+	}
+	return rooms
 }
 
 // PartyRoomTerms are a room's terms, as its window shows them.
