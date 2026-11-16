@@ -29,7 +29,14 @@ func (a PlayerActor) AttackSpeed(magic bool) int {
 	return a.Character.AttackSpeed()
 }
 
-func (PlayerActor) ReuseRate(bool) float64 { return 1 }
+// ReuseRate reports the caster's reuse-delay multiplier for a magic or
+// physical skill, its live mReuse or pReuse stat.
+func (a PlayerActor) ReuseRate(magic bool) float64 {
+	if a.Character == nil {
+		return 1
+	}
+	return a.Character.CalcStat(reuseStat(magic), 1)
+}
 
 func (a PlayerActor) MP() int {
 	if a.Character == nil {
@@ -152,9 +159,15 @@ func (a PlayerActor) PhysicalMuted() bool {
 	return a.Character != nil && a.Character.EffectList().IsAffected(effect.FlagPhysicalMuted)
 }
 
-func (PlayerActor) SpiritshotCharged() bool { return false }
+// SpiritshotCharged and BlessedSpiritshotCharged report the charges on the
+// player's active weapon.
+func (a PlayerActor) SpiritshotCharged() bool {
+	return a.Character != nil && a.Character.SpiritshotCharged()
+}
 
-func (PlayerActor) BlessedSpiritshotCharged() bool { return false }
+func (a PlayerActor) BlessedSpiritshotCharged() bool {
+	return a.Character != nil && a.Character.BlessedSpiritshotCharged()
+}
 
 func (a PlayerActor) SkillMastery(def *modelskill.Definition) bool {
 	if a.Character == nil || def.SkillType == "FISHING" {
