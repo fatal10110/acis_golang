@@ -54,11 +54,11 @@ type makerGroup struct {
 	// that leaves after a DeleteAll takes the count below the NPCs in the
 	// world. Guarded by n.mu.
 	orphansAlive int
-	// left counts the drops in g's alive count other than by DespawnAll:
-	// each of its NPCs leaving the world, or deleted, and each orphan a
-	// DeleteAll stops counting. An NPC-deleted hook reads its alive count
-	// against it. Guarded by n.mu.
-	left int
+	// leaving are the NPCs of g that left the world, in leave order, whose
+	// leaves g has yet to take; draining is set while a goroutine takes
+	// them (see Npcs.leaveGroup). Guarded by n.mu.
+	leaving  []groupLeave
+	draining bool
 	// tickers are the tickers armed through g, stopped once DespawnAll or
 	// RespawnAll retires it. Guarded by n.mu.
 	tickers []*sim.Ticker
@@ -232,8 +232,6 @@ func (g *makerGroup) DeleteAll() { g.deleteAll(nil) }
 // deleteAll is DeleteAll run by a hook in scope; a nil scope for none.
 func (g *makerGroup) deleteAll(scope *hookScope) {
 	g.n.mu.Lock()
-	g.left += g.orphansAlive
-	scope.ownLocked(g, g.orphansAlive)
 	g.orphansAlive = 0
 	g.n.mu.Unlock()
 	for i := range g.def.Entries {
@@ -261,8 +259,6 @@ func (g *makerGroup) deleteEntry(i int, scope *hookScope) {
 			ids = append(ids, slot.liveID)
 			delete(n.live, slot.liveID)
 			n.liveCount--
-			g.left++
-			scope.ownLocked(g, 1)
 		}
 		n.dropSlotLocked(key)
 		if slot.dbName != "" {
@@ -419,11 +415,9 @@ func (c groupNPC) Delete() {
 		return
 	}
 	c.n.deleteLive(slot.liveID)
-	c.n.mu.Lock()
-	if _, still := c.n.live[slot.liveID]; !still {
-		c.scope.ownLocked(slot.group, 1)
+	if slot.group != nil {
+		c.n.leaveNowIn(slot.group, slot.liveID, c.scope)
 	}
-	c.n.mu.Unlock()
 }
 
 // ScheduleRespawn arms the slot's respawn. A slot that a DeleteAll or a

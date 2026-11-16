@@ -38,7 +38,7 @@ const (
 
 // lastNPCProbe records the script events the next room hears, and has the
 // first guard to leave make the other one leave on another goroutine while
-// it is out of the room's alive count but before its maker hook runs.
+// its own decay runs, before the room takes its leave.
 type lastNPCProbe struct {
 	srv   atomic.Pointer[gameservertest.Server]
 	first atomic.Bool

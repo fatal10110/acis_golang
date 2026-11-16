@@ -189,6 +189,23 @@ func countAttackFrames(t *testing.T, srv *gameservertest.Server, period time.Dur
 	return swings
 }
 
+// countSwingsUpTo lets swing periods pass until want Attack broadcasts have
+// gone out, or one period more than want has passed, and returns the
+// broadcasts counted. Each swing follows the previous one's end, so on the
+// wall clock every swing lands a little later than a whole number of
+// periods after the first: the spare period keeps the last one in.
+func countSwingsUpTo(t *testing.T, srv *gameservertest.Server, period time.Duration, want int) int {
+	t.Helper()
+	swings := 0
+	for range want + 1 {
+		swings += countAttackFrames(t, srv, period, 1)
+		if swings >= want {
+			break
+		}
+	}
+	return swings
+}
+
 // TestConfusedMonsterKeepsSwinging pins the finished swing's think past
 // runAI's out-of-control gate: runAI selects nothing for a confused
 // monster, but the finished attack's think still steps its current attack,
@@ -202,10 +219,10 @@ func TestConfusedMonsterKeepsSwinging(t *testing.T) {
 	}
 	drainUntilQuiet(t, srv.Client)
 
-	// Few enough periods that the low-level player outlives the swings.
-	const periods = 3
-	if got := countAttackFrames(t, srv, attackTime+10*time.Millisecond, periods); got < periods {
-		t.Fatalf("Attack broadcasts over %d swing periods while confused = %d, want at least %d", periods, got, periods)
+	// Few enough swings that the low-level player outlives them.
+	const swings = 3
+	if got := countSwingsUpTo(t, srv, attackTime+10*time.Millisecond, swings); got < swings {
+		t.Fatalf("Attack broadcasts over %d swing periods while confused = %d, want at least %d", swings+1, got, swings)
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
 		t.Fatalf("CurrentIntention() after swinging while confused = %v, want %v", got, ai.IntentionAttack)
