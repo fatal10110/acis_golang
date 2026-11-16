@@ -3,6 +3,7 @@
 package macro
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -108,22 +109,24 @@ func NewList() *List {
 }
 
 // Restore fills an empty list from rows, in row order. A row whose command
-// text holds a non-numeric type or id stops the restore there: the rows
-// before it are kept, that row and every later one are not, and the error
-// says why.
+// column is NULL or does not decode is left out and every later row is
+// still restored; the error names each row left out.
 func Restore(rows []Row) (*List, error) {
 	l := NewList()
+	var errs []error
 	for _, row := range rows {
 		if !row.CommandsValid {
-			return l, errNullCommands(row.ID)
+			errs = append(errs, errNullCommands(row.ID))
+			continue
 		}
 		cmds, err := DecodeCommands(row.Commands)
 		if err != nil {
-			return l, err
+			errs = append(errs, fmt.Errorf("macro %d: %w", row.ID, err))
+			continue
 		}
 		l.put(Macro{ID: row.ID, Icon: row.Icon, Name: row.Name, Description: row.Description, Acronym: row.Acronym, Commands: cmds})
 	}
-	return l, nil
+	return l, errors.Join(errs...)
 }
 
 // Len reports how many macros the list holds.
@@ -229,8 +232,12 @@ func (l *List) NextRevision() int32 {
 
 // EncodeCommands serializes cmds into the persisted command text: each line
 // as type,d1,d2 then ",text" when it has text, closed by ';', and the whole
-// cut to 255 UTF-16 code units. A cut through a surrogate pair leaves
-// U+FFFD in its place.
+// cut to 255 UTF-16 code units. In the text, ',' and ';' are written as
+// "\," and "\;", and a backslash that would read as an escape (one before
+// '\', ',' or ';', or ending the text) as "\\"; text without them is
+// written as is. A cut never keeps the backslash of an escape without the
+// character it escapes. A cut through a surrogate pair leaves U+FFFD in its
+// place.
 func EncodeCommands(cmds []Command) string {
 	var sb strings.Builder
 	for _, c := range cmds {
@@ -241,18 +248,61 @@ func EncodeCommands(cmds []Command) string {
 		sb.WriteString(strconv.Itoa(int(c.D2)))
 		if c.Text != "" {
 			sb.WriteByte(',')
-			sb.WriteString(c.Text)
+			writeEscaped(&sb, c.Text)
 		}
 		sb.WriteByte(';')
 	}
-	return commons.UTF16Cut(sb.String(), maxStoredCommands)
+	full := sb.String()
+	return trimSplitEscape(commons.UTF16Cut(full, maxStoredCommands), full)
+}
+
+// writeEscaped writes text with its separators escaped. A backslash is
+// escaped only where it would otherwise start an escape, so the stored
+// form of text that holds no separator does not change.
+func writeEscaped(sb *strings.Builder, text string) {
+	for i := 0; i < len(text); i++ {
+		b := text[i]
+		switch {
+		case b == ',' || b == ';':
+			sb.WriteByte(escape)
+		case b == escape && (i+1 == len(text) || escapable(text[i+1])):
+			sb.WriteByte(escape)
+		}
+		sb.WriteByte(b)
+	}
+}
+
+// trimSplitEscape drops the last byte of cut, a prefix of full, when it is
+// the backslash of an escape whose escaped character the cut left out.
+func trimSplitEscape(cut, full string) string {
+	if len(cut) == len(full) || !strings.HasSuffix(cut, string(escape)) {
+		return cut
+	}
+	for i := 0; i < len(cut); i++ {
+		if cut[i] == escape && i+1 < len(full) && escapable(full[i+1]) {
+			if i+1 == len(cut) {
+				return cut[:i]
+			}
+			i++
+		}
+	}
+	return cut
+}
+
+// escape starts a two-byte escape of the next byte when that byte is
+// escapable; anywhere else it is a literal backslash.
+const escape = '\\'
+
+func escapable(b byte) bool {
+	return b == escape || b == ',' || b == ';'
 }
 
 // DecodeCommands parses persisted command text. Lines are split on ';' and
-// fields on ','; empty pieces are skipped either way. A line with fewer
-// than three fields is skipped; its fourth field, if any, is its text and
-// any later field is lost. A type, d1 or d2 that is not a decimal int32
-// fails the whole decode.
+// fields on ','; an escaped separator splits nothing, and empty pieces are
+// skipped either way. A line with fewer than three fields is skipped; its
+// fourth field, if any, is its text, unescaped, and any later field is
+// lost. A type, d1 or d2 that is not a decimal int32 fails the whole
+// decode.
 func DecodeCommands(s string) ([]Command, error) {
 	var out []Command
 	for _, line := range tokens(s, ';') {
@@ -270,11 +320,26 @@ func DecodeCommands(s string) ([]Command, error) {
 		}
 		c := Command{Type: nums[0], D1: nums[1], D2: nums[2]}
 		if len(fields) > 3 {
-			c.Text = fields[3]
+			c.Text = unescape(fields[3])
 		}
 		out = append(out, c)
 	}
 	return out, nil
+}
+
+// unescape replaces each escape in s with the byte it escapes.
+func unescape(s string) string {
+	if !strings.ContainsRune(s, escape) {
+		return s
+	}
+	var sb strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == escape && i+1 < len(s) && escapable(s[i+1]) {
+			i++
+		}
+		sb.WriteByte(s[i])
+	}
+	return sb.String()
 }
 
 func errNullCommands(id int32) error {
@@ -285,12 +350,20 @@ func errBadCommand(line string, err error) error {
 	return fmt.Errorf("macro command %q: %w", line, err)
 }
 
-// tokens splits s on sep and drops the empty pieces.
+// tokens splits s on every sep that is not escaped and drops the empty
+// pieces. Escapes stay in the pieces.
 func tokens(s string, sep byte) []string {
 	var out []string
-	for piece := range strings.SplitSeq(s, string(sep)) {
-		if piece != "" {
-			out = append(out, piece)
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		switch {
+		case i == len(s) || s[i] == sep:
+			if i > start {
+				out = append(out, s[start:i])
+			}
+			start = i + 1
+		case s[i] == escape && i+1 < len(s) && escapable(s[i+1]):
+			i++
 		}
 	}
 	return out

@@ -56,9 +56,21 @@ func TestAdminKick(t *testing.T) {
 
 	exchange(t, gm, encodeBuildCmd("kick all"))
 	expectKicked(t, third)
-	// Game masters stay.
+	// Game masters stay. A kicked player leaves the world after its
+	// ServerClose, so its DeleteObject may still reach a GM late.
 	drain(t, otherGM)
-	assertGMs(t, exchange(t, otherGM, encodeGmList()), "Admin", "OtherGM")
+	assertGMs(t, withoutDeletes(exchange(t, otherGM, encodeGmList())), "Admin", "OtherGM")
 	drain(t, gm)
-	assertGMs(t, exchange(t, gm, encodeGmList()), "Admin", "OtherGM")
+	assertGMs(t, withoutDeletes(exchange(t, gm, encodeGmList())), "Admin", "OtherGM")
+}
+
+// withoutDeletes drops the DeleteObject frames from frames.
+func withoutDeletes(frames [][]byte) [][]byte {
+	kept := frames[:0:0]
+	for _, f := range frames {
+		if f[0] != serverpackets.OpcodeDeleteObject {
+			kept = append(kept, f)
+		}
+	}
+	return kept
 }
