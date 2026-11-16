@@ -116,8 +116,9 @@ func (n *NPC) SetXYZ(at Place) {
 // TeleportPlayersInTerritory teleports every player in the world standing
 // in the territory of the spawn that placed n (NPC.InSpawnTerritory) to
 // at, up to offset away on each axis, as Player.TeleportTo does: each on
-// its own queue, once the calling task is done. The territory of a private
-// holds every player.
+// its own queue, once the calling task is done. A player whose own
+// teleport is still landing is arriving there, and its move is dropped.
+// The territory of a private holds every player.
 func (s *Script) TeleportPlayersInTerritory(n *NPC, at Place, offset int) {
 	if s.env == nil || s.env.World == nil {
 		return
@@ -128,7 +129,7 @@ func (s *Script) TeleportPlayersInTerritory(n *NPC, at Place, offset int) {
 			continue
 		}
 		if p := PlayerOf(self); n.InSpawnTerritory(p) {
-			p.TeleportTo(at, offset)
+			p.sweep(at, offset)
 		}
 	}
 }

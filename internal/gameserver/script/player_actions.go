@@ -62,6 +62,20 @@ func (p *Player) TeleportTo(at Place, offset int) {
 	c.ForceTeleport(loc.X, loc.Y, loc.Z, offset, c.OnOwnQueue())
 }
 
+// sweep is TeleportTo for a move a script makes to every player it finds
+// standing somewhere. One refused while the player's own teleport is still
+// landing is dropped: that player is arriving there, not one the sweep
+// meant to move.
+func (p *Player) sweep(at Place, offset int) {
+	loc := at.loc()
+	c := p.character()
+	if c.OnOwnQueue() {
+		c.TeleportOnQueue(loc.X, loc.Y, loc.Z, offset)
+		return
+	}
+	c.TeleportTo(loc.X, loc.Y, loc.Z, offset)
+}
+
 // After runs fn on the player's queue once d has passed, as a hook on that
 // queue. Nothing runs for a player leaving the world: its queue drops what
 // is still pending.
