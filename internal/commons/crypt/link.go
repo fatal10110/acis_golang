@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 )
 
 // linkBootstrapKey is the fixed Blowfish key that protects the login-to-
@@ -18,15 +19,19 @@ var linkBootstrapKey = []byte{
 // Every packet, inbound and outbound, is padded to a Blowfish block
 // boundary, checksummed, and encrypted with the link's current key: the
 // static bootstrap key until the game server supplies a session key via
-// SetKey, and that session key for the rest of the connection.
+// SetKey, and that session key for the rest of the connection. SetKey may
+// run while other goroutines encrypt or decrypt: each call works under the
+// one key current when it starts.
 type LinkCrypt struct {
-	cipher *BlowfishCipher
+	cipher atomic.Pointer[BlowfishCipher]
 }
 
 // NewLinkCrypt builds a LinkCrypt using the link's static bootstrap key.
 func NewLinkCrypt() *LinkCrypt {
 	cipher, _ := NewBlowfishCipher(linkBootstrapKey) // fixed-length constant key, always valid
-	return &LinkCrypt{cipher: cipher}
+	c := &LinkCrypt{}
+	c.cipher.Store(cipher)
+	return c
 }
 
 // DecryptDynamicKey RSA-decrypts an encrypted dynamic link key with no
@@ -67,7 +72,7 @@ func (c *LinkCrypt) SetKey(key []byte) error {
 	if err != nil {
 		return fmt.Errorf("link session key: %w", err)
 	}
-	c.cipher = cipher
+	c.cipher.Store(cipher)
 	return nil
 }
 
@@ -81,7 +86,7 @@ func (c *LinkCrypt) Encrypt(payload []byte) []byte {
 	}
 	copy(buf, payload)
 	AppendChecksum(buf)
-	EncryptBlocks(c.cipher, buf)
+	EncryptBlocks(c.cipher.Load(), buf)
 	return buf
 }
 
@@ -93,7 +98,7 @@ func (c *LinkCrypt) Decrypt(payload []byte) error {
 	if len(payload) == 0 || len(payload)%BlockSize != 0 {
 		return fmt.Errorf("link packet length %d is not a positive multiple of %d", len(payload), BlockSize)
 	}
-	DecryptBlocks(c.cipher, payload)
+	DecryptBlocks(c.cipher.Load(), payload)
 	if !VerifyChecksum(payload) {
 		return fmt.Errorf("link packet checksum verification failed")
 	}

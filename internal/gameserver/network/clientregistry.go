@@ -27,6 +27,14 @@ func (r *ClientRegistry) Take(accountName string, client *Client) (evicted *Clie
 	return prev, ok
 }
 
+// Lookup returns the connection currently claiming accountName, if any.
+func (r *ClientRegistry) Lookup(accountName string) (*Client, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	client, ok := r.clients[accountName]
+	return client, ok
+}
+
 // Release drops client's claim on accountName, but only while client is
 // still the registered owner: a stale caller's cleanup must not undo a later
 // Take that already replaced it.

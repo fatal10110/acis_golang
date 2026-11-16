@@ -198,7 +198,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.Server
 			}
 
 			filename := fmt.Sprintf("hexid(server %d).txt", id)
-			if err := writeHexID(filepath.Join(dir, filename), id, model.HexKeyText(key)); err != nil {
+			if err := model.WriteHexIDFile(filepath.Join(dir, filename), id, key, time.Now()); err != nil {
 				fmt.Fprintf(out, "Failed to save hex ID to '%s' file: %v\n", filename, err)
 				continue
 			}
@@ -206,14 +206,6 @@ func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.Server
 			fmt.Fprintln(out, "Put this file in /config gameserver folder and rename it 'hexid.txt'.")
 		}
 	}
-}
-
-// writeHexID writes the server id and signed-hex auth key as a properties
-// file the game server loads at boot.
-func writeHexID(path string, id int, hexText string) error {
-	content := fmt.Sprintf("#the hexID to auth into login\n#%s\nServerID=%d\nHexID=%s\n",
-		time.Now().Format("Mon Jan 02 15:04:05 MST 2006"), id, hexText)
-	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 // sortedIDs returns the registered server ids in ascending order.

@@ -258,9 +258,15 @@ func (l *GameServerLink) handleConnection(ctx context.Context, conn net.Conn) {
 
 // onBlowFishKey installs the dynamic Blowfish key the game server presents.
 // A key that cannot be decrypted or installed leaves the link unusable, so
-// the connection is dropped. It reports false when the connection must
-// close.
+// the connection is dropped, as is a key presented once the server has
+// registered: the key is set once, before registration, and a registered
+// link never switches keys under the roster's sends. It reports false when
+// the connection must close.
 func (l *GameServerLink) onBlowFishKey(c *gameServerConn, payload []byte) bool {
+	if c.authed {
+		l.log.Warn().Str("ip", c.remoteIP.String()).Int("server_id", c.id).Msg("gameserver link: drop connection on blowfish key after registration")
+		return false
+	}
 	key, err := link.DecodeBlowFishKey(payload, c.key)
 	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link: drop connection on undecryptable blowfish key")

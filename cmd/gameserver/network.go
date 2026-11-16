@@ -51,6 +51,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
@@ -338,19 +339,30 @@ func onlineAccounts(state *world.State) []string {
 	return out
 }
 
-// playerAuthResponseHandler reports a successfully authed account to the
-// login server before resolving the waiting game client, so the online
-// roster grows before the client proceeds into the world. An approval no
-// client waits on any more (evicted, timed out) reports nothing.
-func playerAuthResponseHandler(links *loginLinkState, validator *network.SessionValidator, log zerolog.Logger) func(string, bool) {
-	return func(account string, ok bool) {
-		validator.ResolveThen(account, ok, func() {
-			if link := links.get(); link != nil {
-				if err := link.SendPlayerInGame([]string{account}); err != nil {
-					log.Debug().Err(err).Str("account", account).Msg("notify player in game")
-				}
+// onLoginLink returns what runs each time the login link comes up: it
+// publishes the link, writes the registration the login server confirmed
+// to the hexid file the next boot reads, and reports every account in the
+// world as the online roster, in as many messages as it needs. A failed
+// hexid write is logged and keeps the link.
+func onLoginLink(links *loginLinkState, status *network.LoginStatus, state *world.State, hexIDPath string, hexID []byte, log zerolog.Logger) func(*network.LoginLink) {
+	return func(link *network.LoginLink) {
+		links.set(link)
+		status.Registered(link.ServerName)
+		if err := model.WriteHexIDFile(hexIDPath, int(link.ServerID), hexID, time.Now()); err != nil {
+			log.Error().Err(err).Str("path", hexIDPath).Msg("save hexid")
+		}
+		if accounts := onlineAccounts(state); len(accounts) > 0 {
+			if err := link.SendPlayerInGame(accounts); err != nil {
+				log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")
+			} else {
+				log.Info().Int("accounts", len(accounts)).Msg("online roster sent to loginserver")
 			}
-		})
+		}
+		go func() {
+			<-link.Done()
+			links.clear(link)
+		}()
+		log.Info().Int("server_id", int(link.ServerID)).Str("name", link.ServerName).Msg("linked to loginserver")
 	}
 }
 
@@ -393,7 +405,7 @@ func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, 
 	})
 }
 
-func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, status *network.LoginStatus, clients *network.GameClientLink, state *world.State, bans *clientBans, log zerolog.Logger) {
+func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, paths gameServerPaths, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, status *network.LoginStatus, clients *network.GameClientLink, state *world.State, bans *clientBans, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
@@ -406,23 +418,9 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 				defer wg.Done()
 				auth := func() network.LoginServerAuth { return status.Auth(cfg.Auth) }
 				network.Maintain(runCtx, cfg.LoginAddr, auth, network.LoginLinkHandlers{
-					PlayerAuthResponse: playerAuthResponseHandler(links, validator, log),
-				}, network.DefaultReconnectDelay, func(link *network.LoginLink) {
-					links.set(link)
-					status.Registered(link.ServerName)
-					if accounts := onlineAccounts(state); len(accounts) > 0 {
-						if err := link.SendPlayerInGame(accounts); err != nil {
-							log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")
-						} else {
-							log.Info().Int("accounts", len(accounts)).Msg("online roster sent to loginserver")
-						}
-					}
-					go func() {
-						<-link.Done()
-						links.clear(link)
-					}()
-					log.Info().Int("server_id", int(link.ServerID)).Str("name", link.ServerName).Msg("linked to loginserver")
-				}, log)
+					PlayerAuthResponse: network.PlayerAuthAnswers(validator, links.get, log),
+					KickPlayer:         clients.KickPlayer,
+				}, network.DefaultReconnectDelay, onLoginLink(links, status, state, paths.HexIDPath, cfg.Auth.HexID, log), log)
 			}()
 
 			ln, err := net.Listen("tcp", cfg.ListenAddr)
