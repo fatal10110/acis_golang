@@ -1,9 +1,7 @@
 package npc
 
 import (
-	"cmp"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -236,9 +234,6 @@ func (t *Table) GetByName(name string) (*Template, bool) {
 // templates sharing a name share a bucket of the shipped data.
 func (t *Table) Listed() []*Template {
 	all := t.All() // ascending id
-	n := len(all)
-	slices.SortStableFunc(all, func(a, b *Template) int {
-		return cmp.Compare(hashorder.MapIndex(int32(a.ID), n), hashorder.MapIndex(int32(b.ID), n))
-	})
+	hashorder.SortMap(all, func(tpl *Template) int32 { return int32(tpl.ID) })
 	return all
 }
