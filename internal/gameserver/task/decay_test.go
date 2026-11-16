@@ -249,6 +249,43 @@ func TestDecayCancelStopsPendingDecay(t *testing.T) {
 	}
 }
 
+func TestDecayForceDecayRunsPendingDecayAtOnce(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayFakeEffects{}
+	decay, _ := NewDecay(effects, func() time.Time { return now })
+
+	actor := &decayFakeActor{id: 100}
+	if decay.ForceDecay(actor) {
+		t.Fatal("ForceDecay() = true for an untracked actor")
+	}
+	testLoop.Run()
+	if got := effects.take(); len(got) != 0 {
+		t.Fatalf("ForceDecay of an untracked actor decayed %v", got)
+	}
+
+	decay.Add(actor, time.Hour)
+	if !decay.ForceDecay(actor) {
+		t.Fatal("ForceDecay() = false for a tracked actor")
+	}
+	if decay.Tracked(actor) {
+		t.Fatal("actor still tracked after ForceDecay")
+	}
+	testLoop.Run()
+	if got, want := effects.take(), []string{"decay 100"}; !slices.Equal(got, want) {
+		t.Fatalf("ForceDecay = %v, want %v", got, want)
+	}
+	if decay.ForceDecay(actor) {
+		t.Fatal("ForceDecay() = true twice for one corpse")
+	}
+
+	now = now.Add(2 * time.Hour)
+	decay.Tick()
+	testLoop.Run()
+	if got := effects.take(); len(got) != 0 {
+		t.Fatalf("Tick after ForceDecay = %v, want none", got)
+	}
+}
+
 func TestDecayAddReplacesExistingDeadline(t *testing.T) {
 	now := time.UnixMilli(0)
 	effects := &decayFakeEffects{}
