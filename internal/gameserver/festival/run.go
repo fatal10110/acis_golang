@@ -10,9 +10,9 @@ import (
 // run is the state of the festivals' runs, guarded by Manager.mu.
 type run struct {
 	// participants are the parties signed up for the next festival, and
-	// previous the parties of the festival that ended last, who may
-	// register their scores until the next signup period ends; both by
-	// side.
+	// previous the parties of the festival that ended last waiting to
+	// register their scores, each once, until the next signup period
+	// ends; both by side.
 	participants, previous [2]roster
 	// started is set once a festival schedule has started.
 	started bool

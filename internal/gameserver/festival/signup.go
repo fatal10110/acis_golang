@@ -106,38 +106,52 @@ func commandTail(command string, from int) (string, bool) {
 
 // registerScore answers "Festival 3": the leader of a party that ran g's
 // festival last registers its score, five points per blood offering it
-// holds, all of them destroyed. Refused during seal validation (page 3a);
-// while a festival is under way; for a player in no party, or who did not
-// lead a party of g's last festival (3b); for a player holding no blood
-// offering. The score beats the cabal's best of the cycle (3c) or not
-// (3d); either way the player's contribution score is said to rise by it.
+// holds, all of them destroyed. Each run registers once: the party stops
+// waiting as its leader registers, best (3c) or not (3d), so a run's worth
+// of festival score cannot be won again with more offerings. Refused
+// during seal validation (page 3a); while a festival is under way; for a
+// player in no party, or who does not lead a party waiting to register
+// g's last festival (3b); for a player holding no blood offering. A
+// registration that registers nothing leaves the party waiting. The score
+// beats the cabal's best of the cycle (3c) or not (3d); either way the
+// player's contribution score is said to rise by it.
 func (m *Manager) registerScore(g Guide, t GuideTalker) GuideReply {
 	if m.calendar.CurrentPeriod() == sevensigns.SealValidation {
 		return m.chatWindow(g, 3, "a", false)
 	}
+	// The party is claimed under the lock it is checked under, so two
+	// registrations of one run cannot both pass the check.
 	m.mu.Lock()
 	inProgress := m.inProgress
-	previous := m.previous[side(g.Cabal)][g.FestivalID]
+	waiting := m.previous[side(g.Cabal)]
+	members := waiting[g.FestivalID]
+	leads := t.Party != nil && len(members) > 0 && members[0].ObjectID == t.ObjectID
+	if !inProgress && leads {
+		delete(waiting, g.FestivalID)
+	}
 	m.mu.Unlock()
 	if inProgress {
 		return GuideReply{Message: scoreDuringFestivalText}
 	}
-	if t.Party == nil || len(previous) == 0 || previous[0].ObjectID != t.ObjectID {
+	if !leads {
 		return m.chatWindow(g, 3, "b", false)
 	}
 	count, held, taken := t.TakeOfferings()
 	if !held {
+		m.unclaim(waiting, g.FestivalID, members)
 		return GuideReply{Message: noOfferingsText}
 	}
 	if !taken {
 		// Offerings that could not be destroyed register nothing, as
 		// silently as their destruction failed; the dialog's release
 		// still answers the command.
+		m.unclaim(waiting, g.FestivalID, members)
 		return GuideReply{}
 	}
 	score := int(int32(count) * offeringScoreValue)
-	best, ok := m.setFinalScore(g.Cabal, g.FestivalID, score)
+	best, ok := m.setFinalScore(g.Cabal, g.FestivalID, score, members)
 	if !ok {
+		m.unclaim(waiting, g.FestivalID, members)
 		return GuideReply{Aborted: true}
 	}
 	suffix := "d"
@@ -149,14 +163,26 @@ func (m *Manager) registerScore(g Guide, t GuideTalker) GuideReply {
 	return reply
 }
 
-// setFinalScore registers score for festival id of cabal, set by the party
-// of its last festival. It beats the cabal's best of the cycle unless the
+// unclaim lets the party claimed from waiting for festival id register
+// again, its registration having registered nothing. Once the signup
+// period has ended a new roster has replaced waiting, and the party, no
+// longer waiting, stays out of it.
+func (m *Manager) unclaim(waiting roster, id int, members []Member) {
+	m.mu.Lock()
+	if _, ok := waiting[id]; !ok {
+		waiting[id] = members
+	}
+	m.mu.Unlock()
+}
+
+// setFinalScore registers score for festival id of cabal, set by members,
+// the party of its last festival. It beats the cabal's best of the cycle unless the
 // rival's best is higher still: then the cycle's best of the cabal becomes
 // score, dated now and naming the party, the cabal gains the festival's
 // worth in festival score, and both the scores and the Seven Signs status
 // are saved. best reports whether it did; ok is false when no best score
 // of the cycle is kept.
-func (m *Manager) setFinalScore(cabal sevensigns.Cabal, id, score int) (best, ok bool) {
+func (m *Manager) setFinalScore(cabal sevensigns.Cabal, id, score int, members []Member) (best, ok bool) {
 	m.mu.Lock()
 	dawn, okDawn := m.highestScoreLocked(sevensigns.Dawn, id)
 	dusk, okDusk := m.highestScoreLocked(sevensigns.Dusk, id)
@@ -172,9 +198,8 @@ func (m *Manager) setFinalScore(cabal sevensigns.Cabal, id, score int) (best, ok
 		m.mu.Unlock()
 		return false, true
 	}
-	previous := m.previous[side(cabal)][id]
-	names := make([]string, len(previous))
-	for i, p := range previous {
+	names := make([]string, len(members))
+	for i, p := range members {
 		names[i] = p.Name
 	}
 	own.Date, own.Score, own.Members = m.nowMillis(), score, strings.Join(names, ",")
