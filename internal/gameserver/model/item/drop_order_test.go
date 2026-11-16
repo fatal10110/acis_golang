@@ -1,6 +1,7 @@
 package item
 
 import (
+	"math"
 	"slices"
 	"testing"
 )
@@ -33,6 +34,10 @@ func TestDropMergerFollowsReferenceMapOrder(t *testing.T) {
 		{name: "held-key merge resizes too", merges: [][2]int32{{1870, 1}, {1868, 1}, {1868, 1}, {1872, 1}}, want: []rolledDrop{{1872, 1}, {1868, 2}, {1870, 1}}},
 		// Ids at or above 65536 spread their high half into the bucket.
 		{name: "high bits spread", merges: [][2]int32{{65536, 1}, {1, 1}}, want: []rolledDrop{{1, 1}, {65536, 1}}},
+		// A sum past the int32 range saturates instead of wrapping: one
+		// 14,000,000 roll merged 154 times stays at the maximum.
+		{name: "sum saturates", merges: slices.Repeat([][2]int32{{AdenaID, 14_000_000}}, 154), want: []rolledDrop{{AdenaID, math.MaxInt32}}},
+		{name: "sum reaches the maximum", merges: [][2]int32{{AdenaID, math.MaxInt32 - 1}, {AdenaID, 1}, {AdenaID, 1}}, want: []rolledDrop{{AdenaID, math.MaxInt32}}},
 	} {
 		var m dropMerger
 		for _, mg := range tc.merges {
