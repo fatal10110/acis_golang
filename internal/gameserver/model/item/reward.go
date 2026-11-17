@@ -14,8 +14,9 @@ type KillDrop struct {
 // order.
 //
 //   - A spoil category only rolls once the monster already carries a spoil
-//     marker (pool.IsSpoiled), and its results merge into pool, in
-//     dropMerger's order, rather than the returned drops.
+//     marker (pool.IsSpoiled), and its results go into pool, in
+//     dropMerger's order, rather than the returned drops: an item an
+//     earlier spoil category already put there takes the later amount.
 //   - A herb category's results are split per SplitHerbDrop into herb
 //     pickups.
 //   - Every other category (currency, normal item) returns its results as
@@ -43,7 +44,7 @@ func RollKillReward(categories []DropCategory, pool *SpoilPool, levelMultiplier 
 			// The pool keeps the order items are added in within a bucket,
 			// which Sweep reads; add them in the roll's merged order.
 			for _, d := range rolled {
-				pool.Add(d.ItemID, d.Count)
+				pool.Put(d.ItemID, d.Count)
 			}
 		case DropHerb:
 			for _, d := range rolled {

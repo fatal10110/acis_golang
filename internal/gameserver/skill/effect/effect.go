@@ -441,14 +441,29 @@ func (e *Effect) stopTaskThunk() func() {
 	return func() { e.OnStopTask(e) }
 }
 
+// identical reports whether other is the same effect as e: same skill, same
+// coarse effect type (see sameEffectType) and same stack type and order.
 func (e *Effect) identical(other *Effect) bool {
 	if e == nil || other == nil {
 		return false
 	}
 	return e.Skill.ID == other.Skill.ID &&
-		e.Type == other.Type &&
+		e.Type.sameEffectType() == other.Type.sameEffectType() &&
 		e.Template.StackOrder == other.Template.StackOrder &&
 		e.Template.StackType == other.Template.StackType
+}
+
+// sameEffectType folds the kinds that count as one effect type when two
+// effects are matched as identical: every plain buff kind is a buff, and both
+// sit-down kinds are one. Every other kind is its own type.
+func (t Type) sameEffectType() Type {
+	switch t {
+	case TypeBigHead, TypeGrow, TypeImmobilizeEffector, TypeImmobilizePetBuff, TypeRecovery:
+		return TypeBuff
+	case TypeChameleonRest:
+		return TypeRelax
+	}
+	return t
 }
 
 func (e *Effect) stackType() string {

@@ -98,8 +98,11 @@ func (n *NPC) PlayersInRadius(radius int) []*Player {
 
 // SystemMessageInRadius sends m to the players within radius of the NPC,
 // bodies included, however far that reaches past the players that know
-// it. A handle on nothing panics.
+// it; a negative radius is 600. A handle on nothing panics.
 func (n *NPC) SystemMessageInRadius(m SiegeMessage, radius int) {
+	if radius < 0 {
+		radius = 600
+	}
 	e := event.NpcSystemMessage{ID: m.ID, Text: m.Text, CastleID: m.CastleID, Number: m.Number, HasNumber: m.HasNumber, Radius: radius}
 	switch o := n.combatant().(type) {
 	case *npc.Hostile:

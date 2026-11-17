@@ -62,14 +62,16 @@ func (p *SpoilPool) Mark(spoilerID int32) bool {
 	return true
 }
 
-// Add merges quantity into itemID's pooled amount, as rolled by a spoil
-// drop category.
-func (p *SpoilPool) Add(itemID, quantity int32) {
+// Put sets itemID's pooled amount to quantity, as rolled by a spoil drop
+// category. An item already pooled keeps its place and takes the new amount:
+// a later category rolling the same item replaces what an earlier one
+// rolled, it does not add to it.
+func (p *SpoilPool) Put(itemID, quantity int32) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for i := range p.items {
 		if p.items[i].ItemID == itemID {
-			p.items[i].Count += quantity
+			p.items[i].Count = quantity
 			return
 		}
 	}

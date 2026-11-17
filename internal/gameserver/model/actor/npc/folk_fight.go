@@ -28,7 +28,7 @@ const (
 	// folkAttackDesireRange is the 3D distance past which an attack desire is
 	// dropped while the NPC is in control.
 	folkAttackDesireRange = 1500
-	// The follow step: a follower more than folkFollowLooseRadius away from
+	// The follow step: a follower folkFollowLooseRadius or more away from
 	// its target walks to a random point within folkFollowScatter of it; one
 	// whose path finding failed folkFollowGeoFailLimit times in a row jumps
 	// to within folkFollowTeleportOffset of it instead.
@@ -367,7 +367,7 @@ func (f *Folk) thinkFollow(d *ai.Desire) {
 		return
 	}
 	pos := combatantLocation(target)
-	if f.location().Distance2D(pos) <= folkFollowLooseRadius || f.followRoll(100) <= 50 || f.IsMoving() {
+	if f.location().Distance2D(pos) < folkFollowLooseRadius || f.followRoll(100) <= 50 || f.IsMoving() {
 		return
 	}
 	distance := math.Sqrt(float64(f.followRoll(1000000))/1000000) * folkFollowScatter

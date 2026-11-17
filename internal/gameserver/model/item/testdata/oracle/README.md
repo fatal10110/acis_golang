@@ -14,8 +14,8 @@ Lines (rows are `<item id>x<quantity>`, comma separated; `-` is an empty map):
   times, the order of the map it returns.
 - `sweep <name> <categories> <result>`: the categories (`;` separated) rolled
   in turn into one spoil state, each result put into it, then the order a sweep
-  iterates it in. No two categories roll the same item: the reference replaces
-  the value of an item put twice.
+  iterates it in. An item two categories roll keeps the amount the later one
+  puts and the place the first one took.
 
 Regenerate with `run.sh` (set `ACIS_JAVA` when the reference is not next to the
 Go repository).
