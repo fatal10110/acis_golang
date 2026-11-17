@@ -27,6 +27,8 @@ func teleportTarget(frames [][]byte) (location.Location, bool) {
 // opening; a free ride takes nothing; a talker holding less than the price
 // is told it has not enough adena and stays; a command short of a
 // coordinate or the price, or naming one that is no number, does nothing.
+// No shipped page links the command, so it is sent from a page that admits
+// every command.
 func TestSignsPriestHuntingGroundTeleport(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
