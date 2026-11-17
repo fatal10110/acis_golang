@@ -54,16 +54,19 @@ func (h Holder) manipulable(inst *item.Instance, tmpl *item.Template, count int)
 // quest item, not the pet's collar, the selected enchant scroll or what the
 // last cast consumes, and tradable unless allowNonTradable.
 func (h Holder) available(inst *item.Instance, tmpl *item.Template, allowNonTradable bool) bool {
-	if inst.Equipped() || inst.QuestItem(tmpl) || h.petCollar(inst.ObjectID) {
-		return false
-	}
-	if h.EnchantScroll != 0 && inst.ObjectID == h.EnchantScroll {
-		return false
-	}
-	if h.CastConsumeID != 0 && inst.TemplateID == h.CastConsumeID {
+	if inst.Equipped() || inst.QuestItem(tmpl) || h.Hidden(inst.ObjectID, inst.TemplateID) {
 		return false
 	}
 	return allowNonTradable || inst.Tradable(tmpl)
+}
+
+// Hidden reports whether the item objectID of item id templateID is one the
+// holder's lists leave out: the pet's collar, the selected enchant scroll or
+// what the last cast consumes.
+func (h Holder) Hidden(objectID, templateID int32) bool {
+	return h.petCollar(objectID) ||
+		(h.EnchantScroll != 0 && objectID == h.EnchantScroll) ||
+		(h.CastConsumeID != 0 && templateID == h.CastConsumeID)
 }
 
 // DepositableItems lists the items of inv a warehouse deposit window offers,
