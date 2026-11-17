@@ -39,7 +39,7 @@ func TestIsFacing(t *testing.T) {
 		{"seam, heading just below 360 narrow", 65535, 1000, 10, 1, false},
 		{"full circle sees behind", east, -100, 0, 360, true},
 		{"wider than full circle sees behind", east, -100, 0, 720, true},
-		{"zero cone sees nothing", east, 100, 0, 0, false},
+		{"zero cone excludes an off-axis target", east, 100, 1, 0, false},
 		{"negative cone sees nothing", east, 100, 0, -10, false},
 		{"180 cone includes the side", east, 0, 100, 180, true},
 		{"180 cone excludes behind", east, -100, 1, 180, false},
