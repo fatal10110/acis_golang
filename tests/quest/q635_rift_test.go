@@ -413,6 +413,9 @@ func (w *q635World) enter(t *testing.T, who string) []string {
 // guardians' watch.
 func (w *q635World) advance(t *testing.T, d time.Duration) {
 	t.Helper()
+	if !w.srv.DrivesClock() && d > 30*time.Second {
+		t.Skipf("waiting %v on the wall clock; the driven clock covers it", d)
+	}
 	for passed := time.Duration(0); passed < d; passed += 10 * time.Second {
 		w.tick(t)
 	}

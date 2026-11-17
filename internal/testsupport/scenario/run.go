@@ -43,6 +43,29 @@ import (
 // Ext is the scenario file extension RunDir reads.
 const Ext = ".scenario"
 
+// poolKillBudget is the most wall time the kill steps of one scenario may
+// wait on the real pool: a hunt of dozens of kills runs on the driven clock
+// only.
+const poolKillBudget = 15 * time.Second
+
+// killTime is how long the scenario's kill steps wait in all.
+func (sc *Scenario) killTime() time.Duration {
+	kills := 0
+	for _, st := range sc.Steps {
+		switch st.Verb {
+		case "killspawn":
+			kills++
+		case "kill":
+			n := 1
+			if len(st.Args) == 2 {
+				n, _ = killCount(st.Args[1])
+			}
+			kills += n
+		}
+	}
+	return time.Duration(kills) * killWait
+}
+
 // killWait is how long a kill step lets pass after each lethal hit, so the
 // dead NPC's dying hooks (three seconds after the death) have run: the
 // reference probe's seven 500 ms ticks.
@@ -447,6 +470,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	}
 	if r.sc.HasClock && !r.srv.DrivesClock() {
 		t.Skipf("%s: the clock line needs the driven clock; the real pool runs on the wall clock", r.sc.Name)
+	}
+	if wait := r.sc.killTime(); wait > poolKillBudget && !r.srv.DrivesClock() {
+		t.Skipf("%s: its kill steps wait %v on the wall clock, over the %v a real-pool pass spends on one scenario; the driven clock covers it", r.sc.Name, wait, poolKillBudget)
 	}
 	if r.sc.Creates() {
 		return

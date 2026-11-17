@@ -213,6 +213,9 @@ func TestQ229HitOnOrimsZeruel(t *testing.T) {
 	zeruel := w.calledHostile(t, "zeruel", q229Zeruel, q229OrimZeruelAt)
 	w.stepTo(t, q229OrimZeruelAt)
 	w.strike(t, zeruel, modelskill.Definition{})
+	if !w.srv.DrivesClock() {
+		t.Skip("the leave is pinned to the millisecond after the hit, which the wall clock does not meet")
+	}
 	lines := w.advance(t, 999*time.Millisecond)
 	if !slices.Contains(lines, say("zeruel", q229Zeruel, 22934)) {
 		t.Fatalf("lines %q, want the Zeruel's 22934", lines)

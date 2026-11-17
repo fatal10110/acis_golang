@@ -86,11 +86,16 @@ func TestQ231TomaButtonCallsThreeBugbears(t *testing.T) {
 		t.Fatalf("broken teleport devices %d, want 1", n)
 	}
 
-	w.advance(t, 4999*time.Millisecond)
-	if n := len(npcsOf(w.srv, q231Bugbear)); n != 0 {
-		t.Fatalf("%d bugbears 4999 ms after the button, want 0", n)
+	if w.srv.DrivesClock() {
+		w.advance(t, 4999*time.Millisecond)
+		if n := len(npcsOf(w.srv, q231Bugbear)); n != 0 {
+			t.Fatalf("%d bugbears 4999 ms after the button, want 0", n)
+		}
+		w.advance(t, 2*time.Millisecond)
+	} else {
+		// On the wall clock the 5 s mark is not met to the millisecond.
+		w.srv.AdvanceUntil(t, "the bugbears' call", func() bool { return len(npcsOf(w.srv, q231Bugbear)) == len(q231BugbearAt) })
 	}
-	w.advance(t, 2*time.Millisecond)
 	for _, at := range q231BugbearAt {
 		called := calledAt(w, q231Bugbear, at)
 		if len(called) != 1 {
