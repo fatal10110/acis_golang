@@ -22,15 +22,19 @@ import (
 // WithDoors spawns tmpls at boot through the production world-object owner,
 // with the production door sinks, so a suite can target a door and observe
 // its state changes on the wire. Each door stands on flat geodata at its
-// template Z; the door timer task is never started, so no auto open/close
-// fires during a test.
+// template Z; the door timer task is never started, so an auto open/close
+// fires only as AdvanceDoorTimers moves its clock.
 func WithDoors(tmpls ...*door.Template) Option {
 	return func(o *options) { o.doors = append(o.doors, tmpls...) }
 }
 
-type idleDoorTimers struct{}
+// doorTimerChanges applies a due door-timer change to the world objects
+// built after the timers, as the production composition root's hook does.
+type doorTimerChanges struct{ objs *gamemanager.WorldObjects }
 
-func (idleDoorTimers) ToggleDoor(int) {}
+func (c *doorTimerChanges) SetDoorOpen(id int, open bool) bool {
+	return c.objs.SetDoorOpen(id, open)
+}
 
 func bootDoors(t *testing.T, tmpls []*door.Template, ids *sequentialIDs, state *world.State) (*gamemanager.WorldObjects, *doorHarness) {
 	t.Helper()
@@ -55,29 +59,35 @@ func bootDoors(t *testing.T, tmpls []*door.Template, ids *sequentialIDs, state *
 	if err != nil {
 		t.Fatalf("static object table: %v", err)
 	}
-	timers, err := task.NewDoor(idleDoorTimers{}, time.Now)
+	changes := &doorTimerChanges{}
+	timerClock := &autosaveClock{now: time.Now()}
+	timers, err := task.NewDoor(changes, timerClock.Now)
 	if err != nil {
 		t.Fatalf("door timers: %v", err)
 	}
-	h := &doorHarness{geo: geo, clock: &autosaveClock{now: time.Now()}, timers: timers}
+	h := &doorHarness{geo: geo, clock: &autosaveClock{now: time.Now()}, timerClock: timerClock, timers: timers}
 	h.regen = task.NewDoorRegen(h.clock.Now)
 	objs, err := gamemanager.NewWorldObjects(doors, statics, ids, geo, state, timers, h.regen, network.DoorSinks(state), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("world objects: %v", err)
 	}
+	changes.objs = objs
 	return objs, h
 }
 
-// doorHarness keeps the geodata WithDoors' doors block, and their production
+// doorHarness keeps the geodata WithDoors' doors block, their production
 // regeneration schedule on a clock (the mutex-guarded harness clock autosave
-// uses too) that only AdvanceDoorRegen moves and sweeps, instead of a
-// ticker.
+// uses too) that only AdvanceDoorRegen moves and sweeps, and their
+// production auto open/close timers on a clock of their own that only
+// AdvanceDoorTimers moves and sweeps, instead of tickers.
 type doorHarness struct {
 	geo   *engine.Engine
 	clock *autosaveClock
 	regen *task.DoorRegen
-	// timers are the doors' auto open/close timers, never started.
-	timers *task.Door
+	// timers are the doors' auto open/close timers, never started; they
+	// read timerClock.
+	timers     *task.Door
+	timerClock *autosaveClock
 }
 
 // DoorGeo returns the geodata engine WithDoors' doors stand on.
@@ -99,6 +109,19 @@ func (s *Server) AdvanceDoorRegen(tb testing.TB, d time.Duration) {
 	}
 	s.doors.clock.Advance(d)
 	s.doors.regen.Tick(s.WorldObjects)
+}
+
+// AdvanceDoorTimers lets d pass on the door-timer clock and runs one sweep
+// of the doors' auto open/close timers, applying every change due by then
+// through the world objects that own the doors. A change one of them
+// schedules waits for the next call.
+func (s *Server) AdvanceDoorTimers(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	if s.doors == nil {
+		tb.Fatal("AdvanceDoorTimers needs WithDoors")
+	}
+	s.doors.timerClock.Advance(d)
+	s.doors.timers.Tick()
 }
 
 // DoorRegenerating reports whether doorID's door has a regeneration tick

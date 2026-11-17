@@ -30,7 +30,6 @@ type WorldObjects struct {
 	newSink    func(*door.Object) event.Sink
 	ids        idAllocator
 	log        zerolog.Logger
-	now        func() time.Time
 	// strife is the Seven Signs state door defences read, installed on
 	// every door built, at boot and by ReloadDoors. Guarded by doorMu.
 	strife door.Strife
@@ -113,7 +112,6 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 		newSink:    newSink,
 		ids:        ids,
 		log:        log,
-		now:        time.Now,
 	}
 	set, err := w.newDoors(doors)
 	if err != nil {
@@ -284,8 +282,10 @@ func (w *WorldObjects) setHPUpgrade(id, ratio int) {
 // SetDoorOpen changes a door's open state, applies the matching geodata,
 // broadcasts the change to known observers, runs the door's watchers
 // (WatchDoor), propagates the same state to a linked controller door
-// (Template.TriggeredID), and reschedules the door's next auto open/close
-// timer from its template's openTime/closeTime/randomTime.
+// (Template.TriggeredID), and schedules the door's auto change back from its
+// template's openTime/closeTime/randomTime. It implements task.DoorEffects:
+// a scheduled change that finds the door already in its state does nothing
+// and schedules nothing.
 func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
@@ -299,8 +299,8 @@ func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 // changeDoorState opens or closes obj as open says; the caller
 // holds doorMu. A broken door keeps its state. triggered is true only for a
 // cascaded change propagated from another door's Template.TriggeredID, and
-// suppresses this door's own auto-timer reschedule so the linked door's
-// cascade doesn't double-schedule it. The door's watchers run as run says,
+// schedules no auto change back for this door; any other change does, on
+// top of those already pending. The door's watchers run as run says,
 // after its broadcast and before the linked door changes; run inline
 // releases doorMu around them, so another change may land meanwhile, and a
 // door a reload replaced meanwhile gets no timer.
@@ -322,22 +322,10 @@ func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool, r
 	}
 	if !triggered {
 		if current, ok := w.Door(obj.DoorID()); ok && current == obj {
-			w.scheduleDoorTimer(obj)
+			w.scheduleDoorTimer(obj, open)
 		}
 	}
 	return true
-}
-
-// ToggleDoor implements task.DoorEffects: it flips id's door to the opposite
-// of its current state once a scheduled timer fires.
-func (w *WorldObjects) ToggleDoor(id int) {
-	w.doorMu.Lock()
-	defer w.doorMu.Unlock()
-	obj, ok := w.Door(id)
-	if !ok {
-		return
-	}
-	w.changeDoorState(obj, !obj.Opened(), false, inlineDoorRun())
 }
 
 // ReduceDoorHP implements door.StateOwner: it takes amount off id's door HP
@@ -526,23 +514,26 @@ func (w *WorldObjects) breakDoor(obj *door.Object) {
 	}
 }
 
-// scheduleDoorTimer schedules obj's next auto transition: closeTime after an
-// open, openTime after a close, jittered by a uniform [0, randomTime) delay.
-// A total delay of zero or less leaves the door with no pending timer.
-func (w *WorldObjects) scheduleDoorTimer(obj *door.Object) {
+// scheduleDoorTimer schedules obj's auto change back from the change to
+// open that was made: a close closeTime after an open, an open openTime
+// after a close, jittered by a uniform [0, randomTime) delay. Both come from
+// open, not from the door's state now, which a watcher or another goroutine
+// may already have changed. The change keeps that target whatever happens
+// to the door meanwhile, and no change already pending is dropped. A total
+// delay of zero or less schedules nothing.
+func (w *WorldObjects) scheduleDoorTimer(obj *door.Object, open bool) {
 	tmpl := obj.Template
 	delay := tmpl.CloseTime
-	if !obj.Opened() {
+	if !open {
 		delay = tmpl.OpenTime
 	}
 	if tmpl.RandomTime > 0 {
 		delay += rnd.Get(tmpl.RandomTime)
 	}
 	if delay <= 0 {
-		w.doorTimers.Cancel(obj.DoorID())
 		return
 	}
-	w.doorTimers.Add(obj.DoorID(), w.now().Add(time.Duration(delay)*time.Second))
+	w.doorTimers.Schedule(obj.DoorID(), !open, time.Duration(delay)*time.Second)
 }
 
 // newDoors builds a door for every template of doors, not yet spawned. A
@@ -661,7 +652,7 @@ func (w *WorldObjects) spawnDoor(obj *door.Object) {
 	if !obj.Opened() {
 		w.geo.AddObject(obj)
 	}
-	w.scheduleDoorTimer(obj)
+	w.scheduleDoorTimer(obj, obj.Opened())
 }
 
 // doorSight runs a door's line-of-sight queries on the world geodata.
