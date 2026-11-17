@@ -328,24 +328,70 @@ func statusAt(cfg Config, now time.Time) Status {
 // of the minute with now's milliseconds: the approve time for a modifiable
 // manor, the next day's when today's has passed; the end of today's
 // maintenance for one under maintenance; today's refresh time for an
-// approved one. A time already passed is due at once.
+// approved one. A time already passed is due at once. Clock times resolve
+// with wallClockAt, and the next day keeps the wall-clock time with
+// sameTimeNextDay.
 func nextChangeAt(cfg Config, status Status, now time.Time) time.Time {
 	y, mo, d := now.Date()
 	ms := now.Nanosecond() / int(time.Millisecond) * int(time.Millisecond)
-	at := func(day, hour, minute int) time.Time {
-		return time.Date(y, mo, day, hour, minute, 0, ms, now.Location())
+	at := func(hour, minute int) time.Time {
+		return wallClockAt(time.Date(y, mo, d, hour, minute, 0, ms, time.UTC), now.Location())
 	}
 	switch status {
 	case StatusModifiable:
-		next := at(d, cfg.ApproveHour, cfg.ApproveMin)
+		next := at(cfg.ApproveHour, cfg.ApproveMin)
 		if next.Before(now) {
-			next = at(d+1, cfg.ApproveHour, cfg.ApproveMin)
+			next = sameTimeNextDay(next)
 		}
 		return next
 	case StatusMaintenance:
-		return at(d, cfg.RefreshHour, cfg.RefreshMin+cfg.MaintenanceMin)
+		return at(cfg.RefreshHour, cfg.RefreshMin+cfg.MaintenanceMin)
 	}
-	return at(d, cfg.RefreshHour, cfg.RefreshMin)
+	return at(cfg.RefreshHour, cfg.RefreshMin)
+}
+
+// wallClockAt is the instant whose reading on loc's clock is wall, given as a
+// UTC time: the reading falls in the offset period that started last on the
+// wall clock. A reading the clock skips forward over therefore keeps the
+// offset in force before the change (02:30 in a 02:00 to 03:00 jump is 03:30
+// after it), and one the clock repeats resolves to its second occurrence.
+func wallClockAt(wall time.Time, loc *time.Location) time.Time {
+	sec := func(offset int) time.Duration { return time.Duration(offset) * time.Second }
+	period := time.Date(wall.Year(), wall.Month(), wall.Day(), wall.Hour(), wall.Minute(), wall.Second(), wall.Nanosecond(), loc)
+	for {
+		start, end := period.ZoneBounds()
+		_, offset := period.Zone()
+		if !end.IsZero() {
+			if _, nextOffset := end.Zone(); !end.Add(sec(nextOffset)).After(wall) {
+				period = end
+				continue
+			}
+		}
+		if !start.IsZero() && start.Add(sec(offset)).After(wall) {
+			period = start.Add(-time.Nanosecond)
+			continue
+		}
+		return wall.Add(-sec(offset)).In(loc)
+	}
+}
+
+// sameTimeNextDay moves t one day forward on its clock: 24 hours on, then
+// corrected by the offset change between the two when the corrected instant
+// still falls on the next calendar day.
+func sameTimeNextDay(t time.Time) time.Time {
+	next := t.Add(24 * time.Hour)
+	_, before := t.Zone()
+	_, after := next.Zone()
+	if before == after {
+		return next
+	}
+	adjusted := next.Add(time.Duration(before-after) * time.Second)
+	y, mo, d := t.Date()
+	wy, wmo, wd := time.Date(y, mo, d+1, 0, 0, 0, 0, time.UTC).Date()
+	if ay, amo, ad := adjusted.Date(); ay == wy && amo == wmo && ad == wd {
+		return adjusted
+	}
+	return next
 }
 
 // scheduleLocked schedules the next mode change. Runs under mu.

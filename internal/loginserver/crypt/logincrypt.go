@@ -15,11 +15,21 @@ import (
 const sessionKeySize = 16
 
 // NewSessionKey returns a fresh random Blowfish key for one client
-// connection's dynamic (post-Init) encryption.
+// connection's dynamic (post-Init) encryption. Every byte is uniform in
+// 1..255: the client expects a key with no zero byte.
 func NewSessionKey() ([]byte, error) {
 	key := make([]byte, sessionKeySize)
 	if _, err := cryptorand.Read(key); err != nil {
 		return nil, fmt.Errorf("generate session Blowfish key: %w", err)
+	}
+	var redraw [1]byte
+	for i := range key {
+		for key[i] == 0 {
+			if _, err := cryptorand.Read(redraw[:]); err != nil {
+				return nil, fmt.Errorf("generate session Blowfish key: %w", err)
+			}
+			key[i] = redraw[0]
+		}
 	}
 	return key, nil
 }
