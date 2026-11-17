@@ -292,7 +292,7 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	switch {
 	case partnerLeft:
 		// A partner who left with the window open is answered like any
-		// absent partner. Once the id is back online the specified flow
+		// absent partner. Once the id is back online the flow
 		// goes on to confirm, whose re-check of the departed partner then fails:
 		// Confirm reports that below.
 		if !ok {

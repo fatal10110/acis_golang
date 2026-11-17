@@ -210,20 +210,6 @@ func (h *Hostile) SetChargedShot(kind item.ShotKind, charged bool) {
 	}
 }
 
-// CurrentSoulshotCount reports the remaining per-spawn soulshot charges.
-func (h *Hostile) CurrentSoulshotCount() int {
-	h.shotsMu.RLock()
-	defer h.shotsMu.RUnlock()
-	return h.currentSoulshots
-}
-
-// CurrentSpiritshotCount reports the remaining per-spawn spiritshot charges.
-func (h *Hostile) CurrentSpiritshotCount() int {
-	h.shotsMu.RLock()
-	defer h.shotsMu.RUnlock()
-	return h.currentSpiritshots
-}
-
 // RechargeShots charges the requested NPC shot types once, consuming their
 // per-spawn counters and showing the matching animation to observers within
 // 600 units.

@@ -10,6 +10,14 @@ import (
 // in a ThreatTable entry.
 const maxThreatValue = 999999999
 
+// randomizeHateBonus lifts a randomly chosen attacker this far above the
+// most hated one's hate.
+const randomizeHateBonus = 200
+
+// reconsiderHateBonus is the flat hate a reconsidered target gains when no
+// attacker was most hated.
+const reconsiderHateBonus = 2000
+
 // Threat is one attacker's accumulated standing against a ThreatTable's
 // owner: the damage it has dealt and the hate weight driving target
 // selection, both capped at maxThreatValue, plus when it last dealt damage.
@@ -154,7 +162,7 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 	})
 
 	chosen := candidates[pick(len(candidates))]
-	chosen.Hate = min(chosen.Hate+(mostHated.Hate-chosen.Hate)+200, maxThreatValue)
+	chosen.Hate = min(chosen.Hate+(mostHated.Hate-chosen.Hate)+randomizeHateBonus, maxThreatValue)
 	chosen.Timestamp = t.now()
 	return true
 }
@@ -226,7 +234,7 @@ func (t *ThreatTable) ReconsiderTarget(inRange func(Combatant) bool, valid func(
 	picked.Timestamp = t.now()
 
 	if mostHated == nil {
-		picked.Hate = min(picked.Hate+2000, maxThreatValue)
+		picked.Hate = min(picked.Hate+reconsiderHateBonus, maxThreatValue)
 		return nil, picked.Attacker, true
 	}
 

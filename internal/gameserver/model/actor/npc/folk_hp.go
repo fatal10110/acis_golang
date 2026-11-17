@@ -91,7 +91,7 @@ func (f *Folk) SkillAttacked(caster attackable.Combatant, def modelskill.Definit
 	if caster == nil {
 		return
 	}
-	value := max(120, def.AggroPoints)
+	value := max(skillAggroFloor, def.AggroPoints)
 	f.raiseAttacked(caster, int32(value), skillRef(def))
 	propagatePartyAttacked(f, caster, value, false)
 }

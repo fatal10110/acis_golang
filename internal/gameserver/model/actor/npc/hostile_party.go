@@ -20,6 +20,10 @@ func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 	raiseClanAttacked(h.scripts, h.world, h, source, int32(power), skill.Ref{}, clanAttackedByAggression)
 }
 
+// skillAggroFloor is the least damage an offensive skill landing on an NPC
+// reports to its attacked hooks, whatever the skill's own aggro points.
+const skillAggroFloor = 120
+
 // SkillAttacked is caster's offensive skill sk landing on this NPC, once
 // its effects applied, for a skill that is a debuff or carries aggro
 // points. The attacked hooks run with max(120, aggro points) as the damage,
@@ -30,7 +34,7 @@ func (h *Hostile) SkillAttacked(caster attackable.Combatant, sk skill.Definition
 	if caster == nil {
 		return
 	}
-	value := max(120, sk.AggroPoints)
+	value := max(skillAggroFloor, sk.AggroPoints)
 	ref := skill.Ref{ID: sk.ID, Level: sk.Level}
 	h.raiseAttacked(caster, int32(value), ref)
 	propagatePartyAttacked(h, caster, value, false)

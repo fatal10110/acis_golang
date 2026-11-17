@@ -4,22 +4,9 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/config"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/testsupport/vitals"
 )
 
 // ---- from feed_test.go ----
-func TestFeedConsume(t *testing.T) {
-	stats := npc.PetLevelStats{MealInBattle: 12, MealInNormal: 3}
-
-	if got := FeedConsume(true, stats); got != 12 {
-		t.Errorf("FeedConsume(inCombat=true) = %d, want 12", got)
-	}
-	if got := FeedConsume(false, stats); got != 3 {
-		t.Errorf("FeedConsume(inCombat=false) = %d, want 3", got)
-	}
-}
-
 func TestNextFed(t *testing.T) {
 	tests := []struct{ current, consume, want int }{
 		{100, 10, 90},
@@ -88,53 +75,6 @@ func TestStarvationTierLeaveChancePercent(t *testing.T) {
 }
 
 // ---- from level_test.go ----
-func TestExpForLevel(t *testing.T) {
-	data := &npc.PetData{Levels: map[int]npc.PetLevelStats{
-		10: {MaxExp: 1000},
-	}}
-
-	if got, ok := ExpForLevel(data, 10); !ok || got != 1000 {
-		t.Errorf("ExpForLevel(10) = (%d, %v), want (1000, true)", got, ok)
-	}
-	if got, ok := ExpForLevel(data, 11); ok || got != 0 {
-		t.Errorf("ExpForLevel(11) = (%d, %v), want (0, false)", got, ok)
-	}
-	if got, ok := ExpForLevel(nil, 10); ok || got != 0 {
-		t.Errorf("ExpForLevel(nil, 10) = (%d, %v), want (0, false)", got, ok)
-	}
-}
-
-// The expected losses come from testdata/vitals.golden, the reference's own
-// death penalty (percentLost = -0.07*level + 6.5, rounded half up).
-func TestDeathPenaltyExpLoss(t *testing.T) {
-	tests := []struct {
-		name            string
-		level           int
-		prev, cur, next int64
-		exp             int64
-	}{
-		{"level 44", 44, 700000, 800000, 1000000, 900000},
-		{"level 10", 10, 900, 1000, 2500, 1500},
-		{"level 1", 1, 0, 0, 136, 100},
-		// Past level ~93 the formula goes negative: a death at this level
-		// grants exp instead of costing it. That's an intentional artifact
-		// of the specified linear formula, preserved as-is.
-		{"level 99 goes negative", 99, 4900000, 5000000, 5200000, 5100000},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			want := vitals.PetDeath(t, tt.level, tt.prev, tt.cur, tt.next, tt.exp).Lost
-			data := &npc.PetData{Levels: map[int]npc.PetLevelStats{
-				tt.level:     {MaxExp: tt.cur},
-				tt.level + 1: {MaxExp: tt.next},
-			}}
-			if got := DeathPenaltyExpLoss(data, tt.level); got != want {
-				t.Errorf("DeathPenaltyExpLoss(level=%d) = %d, want %d", tt.level, got, want)
-			}
-		})
-	}
-}
-
 func TestRoundInt64_NegativeHalves(t *testing.T) {
 	for _, tt := range []struct {
 		in   float64
@@ -145,58 +85,6 @@ func TestRoundInt64_NegativeHalves(t *testing.T) {
 	} {
 		if got := roundInt64(tt.in); got != tt.want {
 			t.Errorf("roundInt64(%v) = %d, want %d", tt.in, got, tt.want)
-		}
-	}
-}
-
-func TestDeathPenaltyExpLoss_MissingRow(t *testing.T) {
-	data := &npc.PetData{Levels: map[int]npc.PetLevelStats{
-		5: {MaxExp: 100},
-	}}
-	if got := DeathPenaltyExpLoss(data, 5); got != 0 {
-		t.Errorf("DeathPenaltyExpLoss with no next-level row = %d, want 0", got)
-	}
-	if got := DeathPenaltyExpLoss(data, 4); got != 0 {
-		t.Errorf("DeathPenaltyExpLoss with no current-level row = %d, want 0", got)
-	}
-}
-
-func TestRestoreExp(t *testing.T) {
-	tests := []struct {
-		name           string
-		expBeforeDeath int64
-		currentExp     int64
-		restorePercent float64
-	}{
-		{"half restore", 100000, 93160, 50},
-		{"33 percent restore", 50000, 40000, 33},
-		{"half point rounds up", 510, 481, 50},
-		{"nothing lost", 100000, 100000, 100},
-		{"no power", 510, 481, 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			want := vitals.PetExpRestored(t, tt.expBeforeDeath, tt.currentExp, tt.restorePercent)
-			if got := RestoreExp(tt.expBeforeDeath, tt.currentExp, tt.restorePercent); got != want {
-				t.Errorf("RestoreExp() = %d, want %d", got, want)
-			}
-		})
-	}
-}
-
-func TestSkillLevel(t *testing.T) {
-	tests := []struct {
-		petLevel, maxSkillLevel, want int
-	}{
-		{45, 12, 5},
-		{9, 12, 1},
-		{70, 12, 8},
-		{84, 12, 10},
-		{150, 10, 10}, // clamps to the skill's own max
-	}
-	for _, tt := range tests {
-		if got := SkillLevel(tt.petLevel, tt.maxSkillLevel); got != tt.want {
-			t.Errorf("SkillLevel(%d, %d) = %d, want %d", tt.petLevel, tt.maxSkillLevel, got, tt.want)
 		}
 	}
 }

@@ -10,6 +10,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+// silentMoveDetectRange is how close a silently moving player must come
+// before an NPC notices it.
+const silentMoveDetectRange = 250
+
 // Aggressive reports whether this NPC attacks nearby targets on sight,
 // independent of any hate already built against it. A Monster-family NPC is
 // aggressive when its template has an aggro range; a FestivalMonster or
@@ -242,7 +246,7 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 		return false
 	}
 
-	if actingPlayer.SilentMoving() && !h.withinDistance(actingPlayer, 250) {
+	if actingPlayer.SilentMoving() && !h.withinDistance(actingPlayer, silentMoveDetectRange) {
 		return false
 	}
 
@@ -268,10 +272,9 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 // auto-attack-valid candidate, granting it 1 hate to simulate an
 // aggro-range entrance. Reports the new target and whether one was found.
 //
-// Nothing in the specified server actually calls target reconsideration,
-// although its documentation describes the immobilize use case (verified:
-// zero call sites); this ships as the same available, unwired API — see
-// acis_golang#977.
+// No live path calls target reconsideration yet, although the immobilize
+// case is its intended use; it ships as an available, unwired API (see
+// acis_golang#977).
 func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
 	valid := h.CanAutoAttack
 	inRange := func(target attackable.Combatant) bool {

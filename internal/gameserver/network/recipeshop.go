@@ -82,7 +82,7 @@ func sendRecipeShopItemInfo(live, crafter *livePlayer, recipeID int32) {
 
 // showWorkshopRecipe answers RequestRecipeShopMakeInfo with a workshop's
 // craft window for the recipe asked. A crafter not running a workshop gets
-// nothing, as specified; the window only asks again on the next click.
+// nothing by design; the window only asks again on the next click.
 func (l *GameClientLink) showWorkshopRecipe(live *livePlayer, req clientpackets.RequestRecipeShopMakeInfo) {
 	crafter, ok := l.livePlayerByID(req.CrafterID)
 	if !ok || crafter.OperateType() != privatestore.OperateManufacture {
@@ -93,7 +93,7 @@ func (l *GameClientLink) showWorkshopRecipe(live *livePlayer, req clientpackets.
 
 // showWorkshopOf answers RequestRecipeShopManagePrev, the craft window's
 // back button: live's target's workshop list. A dead player is released
-// with ActionFailed; a target that is no player gets nothing, as specified.
+// with ActionFailed; a target that is no player gets nothing by design.
 func (l *GameClientLink) showWorkshopOf(live *livePlayer) {
 	if live.AlikeDead() {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -109,7 +109,7 @@ func (l *GameClientLink) showWorkshopOf(live *livePlayer) {
 // orderWorkshopCraft answers RequestRecipeShopMakeItem: live orders a craft
 // from a workshop within reach. The craft runs with the workshop held, so
 // orders on one workshop never overlap and its list cannot change under
-// one. Requests specified to drop without a word stay silent: the craft
+// one. Requests refused without a word stay silent: the craft
 // window only asks again on the next click.
 func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.RequestRecipeShopMakeItem) {
 	crafter, ok := l.livePlayerByID(req.CrafterID)

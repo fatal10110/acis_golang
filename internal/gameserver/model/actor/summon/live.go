@@ -166,9 +166,8 @@ type Owner interface {
 // by statusMu; HP, MP, and dead are guarded by vitals.mu. Both are safe to
 // read from any goroutine,
 // including the world-visibility goroutine driving Discover. The remaining
-// fields are mutated by the goroutine handling the owner connection or by the
-// actor's own tick callback, so callers must serialize command and tick calls
-// per actor.
+// fields are owned by the summon's queue (see Queue and Post): commands and
+// its own tick callbacks run there one at a time.
 type Actor struct {
 	world.Presence
 

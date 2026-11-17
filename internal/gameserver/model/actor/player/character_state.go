@@ -444,7 +444,7 @@ func (c *Character) Now() time.Time {
 	if live := c.liveLocked(); live != nil {
 		return live.Now()
 	}
-	// ponytail: wall-clock default serves only never-attached fixtures; #2488 drops it.
+	// The wall clock serves only a character never attached to a queue.
 	return time.Now()
 }
 

@@ -3,6 +3,10 @@
 // a servitor's timed lifetime.
 package summon
 
+// petOwnerLevelGap is how many levels a pet may stand above its owner and
+// still obey commands and use its skills.
+const petOwnerLevelGap = 20
+
 // Command identifies an owner-issued instruction targeting their active
 // pet or servitor.
 type Command int
@@ -143,7 +147,7 @@ func resolveAttack(req Request) Outcome {
 	if req.OutOfControl {
 		return OutcomeRefusedOutOfControl
 	}
-	if req.IsPet && req.SummonLevel-req.OwnerLevel > 20 {
+	if req.IsPet && req.SummonLevel-req.OwnerLevel > petOwnerLevelGap {
 		return OutcomeRefusedLevelGap
 	}
 	return OutcomeApplied

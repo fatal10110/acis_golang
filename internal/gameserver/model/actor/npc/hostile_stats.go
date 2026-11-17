@@ -182,6 +182,10 @@ func (h *Hostile) calcFor(s stat.Stat, base float64, target conditions.Actor, sk
 	} else {
 		value = passives.Calc(s, defaultBuiltin(s), actor, base, target, skill)
 	}
+	// A non-positive result floors at one even when no modifier or builtin
+	// applies to s, where the base would otherwise pass through unchanged.
+	// Nothing reads such a stat at zero: shield defence is read only after a
+	// successful block, and every shield carries its own defence.
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}

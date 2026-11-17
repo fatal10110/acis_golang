@@ -1,17 +1,5 @@
 package pet
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-
-// FeedConsume returns how many meal points a single feeding tick consumes
-// from a pet's gauge, given its growth-table row for the current level.
-// Meals burn faster while the pet's owner is in combat.
-func FeedConsume(inCombat bool, levelStats npc.PetLevelStats) int {
-	if inCombat {
-		return levelStats.MealInBattle
-	}
-	return levelStats.MealInNormal
-}
-
 // NextFed returns the meal gauge after a feeding tick consumes consume
 // points from current, floored at zero.
 func NextFed(current, consume int) int {

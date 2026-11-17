@@ -160,8 +160,8 @@ func (l *GameClientLink) raiseItemUse(live *livePlayer, inst *item.Instance, tmp
 // equipment a player puts on or takes off: a bow takes its arrows into the
 // left hand by itself, and a lure only goes on over a fishing rod,
 // replacing the lure worn, with no message and no toggle off. Anything else
-// answers ActionFailed, as UseItem does for any item nothing uses (the
-// specified behavior drops it silently).
+// answers ActionFailed, as UseItem does for any item nothing uses, so
+// the click never stays pending.
 func (l *GameClientLink) useOffHandItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) bool {
 	if tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemLure || !wieldsFishingRod(inv) {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -622,8 +622,8 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
 		return
 	default:
-		// The specified behavior ignores these requests without an answer;
-		// ActionFailed releases the drag without a message.
+		// These requests change nothing; ActionFailed releases the drag
+		// without a message.
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

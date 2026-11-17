@@ -32,14 +32,20 @@ func (h *Hostile) Invul() bool { return h != nil && h.Live != nil && h.Live.Invu
 // Invulnerable reports whether h ignores direct resource effects.
 func (h *Hostile) Invulnerable() bool { return h.Invul() }
 
-// Lethalable reports whether h may receive lethal strikes.
-func (h *Hostile) Lethalable() bool {
-	switch h.Instance.Template.ID {
-	case 22215, 22216, 22217, 35062, 35410, 35368, 35375, 35629:
-		return false
-	}
-	return true
+// lethalImmune are the NPCs a lethal strike never lands on.
+var lethalImmune = map[int]bool{
+	22215: true, // Tyrannosaurus
+	22216: true, // Tyrannosaurus
+	22217: true, // Tyrannosaurus
+	35062: true, // Headquarters
+	35368: true, // Bloody Lord Nurka
+	35375: true, // Bloody Lord Nurka
+	35410: true, // Gustav
+	35629: true, // Lidia von Hellmann
 }
+
+// Lethalable reports whether h may receive lethal strikes.
+func (h *Hostile) Lethalable() bool { return !lethalImmune[h.Instance.Template.ID] }
 
 // PAtk returns this NPC's physical attack stat, truncated to a whole number.
 func (h *Hostile) PAtk() float64 { return hostileSkillStats{h: h}.PAtk() }
