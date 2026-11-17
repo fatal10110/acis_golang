@@ -13,7 +13,9 @@ type fakeSpouse struct {
 	adena  int
 	// payFails makes Pay fail although Adena reports enough: the adena
 	// left between the manager's check and the payment.
-	payFails  bool
+	payFails bool
+	// leaving refuses WhileAttached: the player is leaving the world.
+	leaving   bool
 	under     bool
 	requester int32
 	paid      int
@@ -41,6 +43,14 @@ func (s *fakeSpouse) Pay(count int) bool {
 func (s *fakeSpouse) Refund(count int) {
 	s.adena += count
 	s.refunded += count
+}
+
+func (s *fakeSpouse) WhileAttached(fn func()) bool {
+	if s.leaving {
+		return false
+	}
+	fn()
+	return true
 }
 
 // fakeIDs hands out next, or err when set, and records released ids.
@@ -260,6 +270,27 @@ func TestFormatNumber(t *testing.T) {
 	} {
 		if got := formatNumber(tc.n); got != tc.want {
 			t.Errorf("formatNumber(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
+// TestAnswerToLeavingRequesterIsIgnored: a requester leaving the world is
+// answered as if offline, accepted or not: nobody pays, no couple forms,
+// and the request stays as it was.
+func TestAnswerToLeavingRequesterIsIgnored(t *testing.T) {
+	for _, accepted := range []bool{true, false} {
+		m := NewManager(testConfig(), &fakeIDs{next: 1}, nil)
+		requester, partner := pair()
+		asked(t, m, requester, partner)
+		requester.leaving = true
+		if out := m.Answer(partner, accepted, onlineOf(requester, partner)); out.Outcome != AnswerIgnored {
+			t.Fatalf("accepted=%v: outcome %v, want ignored", accepted, out.Outcome)
+		}
+		if requester.paid != 0 || partner.paid != 0 || m.CoupleID(requester.id) != 0 {
+			t.Fatalf("accepted=%v: paid %d/%d, couple %d; want nothing", accepted, requester.paid, partner.paid, m.CoupleID(requester.id))
+		}
+		if !partner.under || partner.requester != requester.id {
+			t.Fatalf("accepted=%v: the partner's request was cleared", accepted)
 		}
 	}
 }

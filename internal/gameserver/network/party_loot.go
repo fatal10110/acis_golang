@@ -11,12 +11,12 @@ import (
 )
 
 // partyLootEligible accepts a member that may take one itemID from origin
-// under a random or by-turn loot rule: alive, with room for it, and within
-// partyRange of origin, body to body in 3D.
+// under a random or by-turn loot rule: alive, not leaving the world, with
+// room for it, and within partyRange of origin, body to body in 3D.
 func partyLootEligible(partyRange int, itemID int32, origin party.LootOrigin) func(*livePlayer) bool {
 	return func(m *livePlayer) bool {
 		inv := m.Inventory()
-		return !m.Dead() && inv != nil && inv.ValidateCapacityByItemID(itemID, 1) && party.InRange(partyRange, origin, m)
+		return !m.Dead() && !m.Detaching() && inv != nil && inv.ValidateCapacityByItemID(itemID, 1) && party.InRange(partyRange, origin, m)
 	}
 }
 
@@ -30,14 +30,15 @@ func (l *GameClientLink) partyMembers(p *livePlayer) ([]*livePlayer, bool) {
 }
 
 // shareAdena splits adena evenly among members within party range of
-// origin whose adena is not already at its cap; the remainder of the
-// division is lost. Each one hears what it earned, even nothing.
+// origin whose adena is not already at its cap and that are not leaving
+// the world; the remainder of the division is lost. Each one hears what it
+// earned, even nothing.
 func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin party.LootOrigin) {
 	partyRange := l.killRewards.PartyRange()
 	var rewarded []*livePlayer
 	for _, m := range members {
 		inv := m.Inventory()
-		if inv == nil || inv.Adena() == math.MaxInt32 || !party.InRange(partyRange, origin, m) {
+		if inv == nil || m.Detaching() || inv.Adena() == math.MaxInt32 || !party.InRange(partyRange, origin, m) {
 			continue
 		}
 		rewarded = append(rewarded, m)
@@ -107,10 +108,16 @@ func (l *GameClientLink) lootForParty(picker *livePlayer, itemID int32, count in
 	if !ok {
 		return false
 	}
+	var added bool
 	if spoil {
-		looter.AddEarnedItem(itemID, count, l.nextObjectID)
+		added = looter.AddEarnedItem(itemID, count, l.nextObjectID)
 	} else {
-		looter.AddRewardItem(itemID, count, rewards.MultipleItemDrop, l.nextObjectID)
+		added = looter.AddRewardItem(itemID, count, rewards.MultipleItemDrop, l.nextObjectID)
+	}
+	if !added {
+		// The looter began leaving the world since it was picked: the
+		// item stays the caller's.
+		return false
 	}
 	sendPartyLootNotice(members, looter, spoil, itemID, count, 0)
 	return true
