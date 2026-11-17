@@ -62,6 +62,18 @@ func selectPlayer(t *testing.T, gm, user *testsupport.ScriptedClient, id int32) 
 }
 
 // storedColumn waits for the characters column of objID to read want.
+// storedNow reads column of objID's characters row once every queued
+// write landed.
+func storedNow(t *testing.T, srv *gameservertest.Server, objID int32, column string) string {
+	t.Helper()
+	srv.FlushPersistence(t)
+	var got string
+	if err := srv.DB.QueryRowContext(context.Background(), "SELECT CAST("+column+" AS CHAR) FROM characters WHERE obj_Id = ?", objID).Scan(&got); err != nil {
+		t.Fatalf("read %s: %v", column, err)
+	}
+	return got
+}
+
 func storedColumn(t *testing.T, srv *gameservertest.Server, objID int32, column, want string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -178,7 +190,8 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	settle(t, gm)
 
 	// title: the first word, UserInfo then TitleUpdate to the player,
-	// TitleUpdate to the GM around it, stored.
+	// TitleUpdate to the GM around it, stored with the next save
+	// (Player.setTitle changes memory only; storeCharBase writes title).
 	sent = exchange(t, gm, encodeBuildCmd("set title Hero Of Old"))
 	frames = settle(t, user)
 	if got := opcodes(frames); !slices.Equal(got, []byte{serverpackets.OpcodeUserInfo, serverpackets.OpcodeTitleUpdate}) {
@@ -193,6 +206,10 @@ func TestAdminSetPlayerFields(t *testing.T) {
 		t.Fatalf("GM frames after //set title = %x, want TitleUpdate, the message", got)
 	}
 	assertTexts(t, gmFrames[1:], "You successfully set your target's title to Hero.")
+	if got := storedNow(t, srv, userID, "title"); got == "Hero" {
+		t.Fatal("title stored before the next save")
+	}
+	srv.TickAutosave(t)
 	storedColumn(t, srv, userID, "title", "Hero")
 
 	// noble: toggled, the noble skills granted then taken away, SkillList
@@ -236,7 +253,9 @@ func TestAdminSetPlayerFields(t *testing.T) {
 }
 
 // TestAdminRemove pins //remove (AdminEditChar.java admin_remove) on the
-// selected player: clan_penalty lifts the named clan penalty and is stored,
+// selected player: clan_penalty lifts the named clan penalty, stored with
+// the next save (the command changes memory only; storeCharBase writes the
+// penalty columns),
 // death_penalty lifts the death penalty (DEATH_PENALTY_LIFTED, then
 // EtcStatusUpdate), skill_reuse ends every reuse delay and resends
 // SkillCoolTime; a missing or unknown kind answers the usage.
@@ -256,9 +275,14 @@ func TestAdminRemove(t *testing.T) {
 	if target.ClanJoinExpiryTime() != 0 || target.ClanCreateExpiryTime() == 0 {
 		t.Fatalf("clan penalties = %d %d, want the join one lifted only", target.ClanJoinExpiryTime(), target.ClanCreateExpiryTime())
 	}
-	storedColumn(t, srv, userID, "clan_join_expiry_time", "0")
-	storedColumn(t, srv, userID, "clan_create_expiry_time", future)
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("remove clan_penalty create")), "Clan penalty is successfully removed for Player.")
+	for _, column := range []string{"clan_join_expiry_time", "clan_create_expiry_time"} {
+		if got := storedNow(t, srv, userID, column); got != future {
+			t.Fatalf("stored %s before the next save = %s, want %s", column, got, future)
+		}
+	}
+	srv.TickAutosave(t)
+	storedColumn(t, srv, userID, "clan_join_expiry_time", "0")
 	storedColumn(t, srv, userID, "clan_create_expiry_time", "0")
 
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("remove death_penalty")), "Player's Death Penalty has been lifted.")

@@ -1,8 +1,6 @@
 package network
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -59,16 +57,11 @@ func (l *GameClientLink) requestGiveNickName(live *livePlayer, req clientpackets
 }
 
 // giveTitle sets live's title to title, cut to 16 characters, on live's
-// queue: live is told its title changed, it and the players around it see
-// the new title, and the title is stored at once, on live's persistence
-// lane, as the periodic character store does not write it.
+// queue: live is told its title changed, and it and the players around it
+// see the new title. It reaches the character row with live's next save.
 func (l *GameClientLink) giveTitle(live *livePlayer, title string) {
 	title = trimTitle(title)
 	live.SetTitle(title)
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTitleChanged))
 	l.broadcastTitleInfo(live)
-	id := live.ObjectID()
-	l.storeCharacterEdit(id, "store title", func(ctx context.Context, s characterEditStore) error {
-		return s.SetTitle(ctx, id, title)
-	})
 }

@@ -133,10 +133,6 @@ func (l *GameClientLink) adminRemove(gm *livePlayer, line string) {
 			case strings.Contains(param, "join"):
 				target.SetClanJoinExpiryTime(0)
 			}
-			// Stored at once, not with the next save: the save does not
-			// carry the clan penalty columns the clan rows also write
-			// (#5299).
-			l.storeClanPenalties(target)
 			sendText(gm, "Clan penalty is successfully removed for "+target.CharacterName()+".")
 		})
 	case "death_penalty":

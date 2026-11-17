@@ -15,8 +15,6 @@ import (
 // once rather than with the character's next save.
 type characterEditStore interface {
 	SetNoble(ctx context.Context, objectID int32, noble bool) error
-	SetTitle(ctx context.Context, objectID int32, title string) error
-	SetClanPenalties(ctx context.Context, objectID int32, joinExpiry, createExpiry int64) error
 	SetSex(ctx context.Context, objectID int32, sex byte) error
 	SetName(ctx context.Context, objectID int32, name string) error
 	// NameTaken reports whether a character, online or not, is named name,
@@ -220,9 +218,6 @@ func (l *GameClientLink) adminSetTitle(gm *livePlayer, title string, hasTitle bo
 		title := trimTitle(title)
 		target.SetTitle(title)
 		l.broadcastTitleInfo(target)
-		l.storeCharacterEdit(target.ObjectID(), "store title", func(ctx context.Context, s characterEditStore) error {
-			return s.SetTitle(ctx, target.ObjectID(), title)
-		})
 		sendText(gm, "You successfully set your target's title to "+title+".")
 	})
 }
@@ -256,14 +251,6 @@ func (l *GameClientLink) toggleNoble(live *livePlayer) {
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	l.storeCharacterEdit(live.ObjectID(), "store noble", func(ctx context.Context, s characterEditStore) error {
 		return s.SetNoble(ctx, live.ObjectID(), noble)
-	})
-}
-
-// storeClanPenalties stores the clan penalties live serves now.
-func (l *GameClientLink) storeClanPenalties(live *livePlayer) {
-	join, create := live.ClanJoinExpiryTime(), live.ClanCreateExpiryTime()
-	l.storeCharacterEdit(live.ObjectID(), "store clan penalties", func(ctx context.Context, s characterEditStore) error {
-		return s.SetClanPenalties(ctx, live.ObjectID(), join, create)
 	})
 }
 

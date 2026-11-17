@@ -60,11 +60,8 @@ func (l *GameClientLink) applyLoadedAccessLevel(c *player.Character) {
 
 // setAccessLevel moves live, on live's queue, to the access level level
 // reads as. The damage permission, title, colors and game-master roster
-// follow, and live and its observers are shown the change. The level reaches
-// the character row with live's next save, as every value that save carries
-// does; a title the change gives is stored at once, as every title change
-// is, since the save does not carry the title the clan rows also write
-// (#5299).
+// follow, and live and its observers are shown the change. The level and
+// title reach the character row with live's next save.
 func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
 	access := l.resolveAccessLevel(live.Character, level)
 	live.access.Store(&access)
@@ -80,12 +77,6 @@ func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
 		l.gms.Remove(live)
 	}
 	l.broadcastCharacterInfo(live)
-	if level > 0 {
-		id, title := live.ObjectID(), live.Title()
-		l.storeCharacterEdit(id, "store title", func(ctx context.Context, s characterEditStore) error {
-			return s.SetTitle(ctx, id, title)
-		})
-	}
 }
 
 // storeLeavingAccessLevel stores the level and title setAccessLevel would

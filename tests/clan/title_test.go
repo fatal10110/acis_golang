@@ -115,10 +115,12 @@ func titleUpdate(t *testing.T, frames [][]byte) (int32, string) {
 	return r.ReadInt32(), r.ReadString()
 }
 
-// storedTitle reads objectID's stored title once every queued write landed.
+// storedTitle reads objectID's stored title once an autosave stored the
+// characters in the world and every queued write landed: a title given
+// reaches the row with the character's next save.
 func storedTitle(t *testing.T, w *clanWorld, objectID int32) string {
 	t.Helper()
-	w.srv.FlushPersistence(t)
+	w.srv.TickAutosave(t)
 	var title string
 	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT title FROM characters WHERE obj_Id = ?`, objectID).Scan(&title); err != nil {
 		t.Fatalf("read title of %d: %v", objectID, err)
