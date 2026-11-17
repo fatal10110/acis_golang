@@ -1,0 +1,42 @@
+# Test of the Searcher (Q225), cond 2: Luther, asked while the player works for the others, says so (30690-07)
+# Hand-written from the quest script (no reference trace).
+character Waiter 39
+class 54
+quest Q225_TestOfTheSearcher <cond>=2 <state>=STARTED
+script quest.Q225_TestOfTheSearcher
+item 2784 2785 2786 2787 2788 2789 2790 2791 2792 2793 2794 2795 2796 2797 2798 2799 2800 2801 2802 2803 2804 2805 2806 2807 2808 2809 7562
+page trainer/30690.htm
+page guard/30291.htm
+page default/30728.htm
+page default/30729.htm
+page merchant/30420.htm
+page default/30730.htm
+page default/30627.htm
+page default/30628.htm
+page script/quest/Q225_TestOfTheSearcher/
+npc luther 30690 Trainer 10 0 0
+npc alex 30291 Guard -10 0 0
+npc leirynn 30728 Folk 0 10 0
+npc borys 30729 Folk 0 -10 0
+npc tyra 30420 Merchant 10 10 0
+npc jax 30730 Folk -10 10 0
+npc tree 30627 Folk 10 -10 0
+npc chest 30628 Folk -10 -10 0
+npc deluShaman 20781 Monster 40 0 0
+npc kalkis 27093 Monster -40 0 0
+npc neer 27092 Monster 0 40 0
+npc fungus 20555 Monster 0 -40 0
+npc scavenger 20551 Monster 40 40 0
+npc hangman 20144 Monster -40 40 0
+
+action luther
+action luther
+  S ActionFailed
+  S NpcHtmlMessage obj=luther item=0 page=trainer/30690.htm
+  S ActionFailed
+bypass npc_{luther}_Quest
+  S NpcHtmlMessage obj=luther item=0 page=script/quest/Q225_TestOfTheSearcher/30690-07.htm
+  S ActionFailed
+  S ActionFailed
+  state Q225_TestOfTheSearcher STARTED
+  rows Q225_TestOfTheSearcher <cond>=2 <state>=STARTED
