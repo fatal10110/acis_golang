@@ -16,6 +16,9 @@ const (
 	maxUnknownPerMin    = 5
 )
 
+// packetCountWindow is the span of those sliding abuse counters.
+const packetCountWindow = time.Minute
+
 // Client is one connected game client: its framed, encrypted session plus
 // its position in the connect-to-in-world state machine described by
 // State. state, accountName, and sessionKey are guarded by mu, since a
@@ -130,7 +133,7 @@ func countInWindow(mu *sync.RWMutex, count *int, windowStart *time.Time, max int
 	defer mu.Unlock()
 
 	tick := time.Now()
-	if tick.Sub(*windowStart) > 60*time.Second {
+	if tick.Sub(*windowStart) > packetCountWindow {
 		*windowStart = tick
 		*count = 1
 		return false

@@ -286,11 +286,6 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 	return rt, nil
 }
 
-// Path returns the opened file path for sink.
-func (r *Runtime) Path(sink Sink) string {
-	return r.paths[sink]
-}
-
 // Close closes all opened log files. It is safe to call more than once.
 func (r *Runtime) Close() error {
 	r.once.Do(func() {

@@ -107,8 +107,7 @@ func (f *Fields) IntPairs(key, def string) []IntPair {
 	if f.err != nil {
 		return nil
 	}
-	v, _ := f.props.IntPairs(key, def)
-	return v
+	return f.props.IntPairs(key, def)
 }
 
 // IntPairsComma returns pairs parsed from a comma-separated list of

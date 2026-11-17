@@ -39,9 +39,8 @@ func TestIntPairsTakesEntriesAsWritten(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := p.IntPairs("items", "57-1")
-		if err != nil || !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("IntPairs(%q) = (%v, %v), want (%v, nil)", tc.value, got, err, tc.want)
+		if got := p.IntPairs("items", "57-1"); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("IntPairs(%q) = %v, want %v", tc.value, got, tc.want)
 		}
 	}
 
@@ -50,9 +49,8 @@ func TestIntPairsTakesEntriesAsWritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := p.IntPairs("OlyClassedReward", "6651-50")
-	if err != nil || !reflect.DeepEqual(got, []IntPair{{6651, 50}}) {
-		t.Errorf("IntPairs(absent) = (%v, %v), want the default pair", got, err)
+	if got := p.IntPairs("OlyClassedReward", "6651-50"); !reflect.DeepEqual(got, []IntPair{{6651, 50}}) {
+		t.Errorf("IntPairs(absent) = %v, want the default pair", got)
 	}
 	if strings.Contains(output.String(), "config property missing") {
 		t.Errorf("IntPairs logged an absent key: %q", output.String())

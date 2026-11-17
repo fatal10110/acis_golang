@@ -33,6 +33,10 @@ const linkPublicExponent = 65537
 // to Maintain between failed or ended link attempts.
 const DefaultReconnectDelay = 10 * time.Second
 
+// linkWriteTimeout bounds one write to the login server: a peer that stops
+// reading fails the write instead of blocking the sender forever.
+const linkWriteTimeout = time.Minute
+
 // generateDynamicKey reads a dynamicKeySize-byte Blowfish key from src,
 // redrawing if the first byte is zero. The login server recovers this key by
 // RSA-decrypting it with no padding and stripping leading zero bytes from
@@ -165,6 +169,10 @@ func (l *LoginLink) handshake(auth LoginServerAuth) error {
 	if err != nil {
 		return err
 	}
+	// A revision mismatch fails the dial, so the maintain loop logs it and
+	// redials every reconnect delay. This is deliberate: the alternative of
+	// keeping the socket open without a session key leaves the game server
+	// unlisted with no retry, and an operator would see only one log line.
 	if revision != link.ProtocolRevision {
 		return fmt.Errorf("login server protocol revision %#x, want %#x", revision, link.ProtocolRevision)
 	}
@@ -303,7 +311,7 @@ func (l *LoginLink) send(payload []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := l.conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
+	if err := l.conn.SetWriteDeadline(time.Now().Add(linkWriteTimeout)); err != nil {
 		return err
 	}
 	if _, err := l.conn.Write(frame); err != nil {

@@ -19,11 +19,6 @@ var packetWriterPool = sync.Pool{
 	},
 }
 
-// newWriter starts a game server packet with its opcode byte.
-func newWriter(opcode byte) *wire.Writer {
-	return wire.NewPacketWriter(opcode)
-}
-
 func newFrameWriter(opcode byte) *wire.Writer {
 	w := packetWriterPool.Get().(*wire.Writer)
 	w.ResetFrame(packetWriterCapacity)

@@ -81,7 +81,6 @@ func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountSto
 		fmt.Fprintln(out, "3 - Delete existing account")
 		fmt.Fprintln(out, "4 - List accounts and access levels")
 		fmt.Fprintln(out, "5 - Exit")
-		fmt.Fprintln(out)
 
 		mode, ok := choose("Your choice: ", "1", "2", "3", "4", "5")
 		if !ok {

@@ -1,8 +1,7 @@
 package clientpackets
 
-// Wire-safe in-game packet opcodes for M4/M5 systems whose full behavior is
-// still being ported. The dispatcher accepts these so the client is not
-// disconnected while movement, combat, and item systems are incomplete.
+// In-game client packet opcodes the dispatcher accepts and routes to their
+// handlers.
 const (
 	OpcodeAction                  = 0x04
 	OpcodeAttackRequest           = 0x0a

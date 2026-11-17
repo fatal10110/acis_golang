@@ -1203,9 +1203,14 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
-	maxConnections, _, err := serverProps.OptionalInt("MaxConnections")
+	maxConnections, set, err := serverProps.OptionalInt("MaxConnections")
 	if err != nil {
 		return gameServerConfig{}, err
+	}
+	// An absent key keeps the default pool size; a present one must name a
+	// usable pool.
+	if set && maxConnections < 1 {
+		return gameServerConfig{}, fmt.Errorf("MaxConnections %d must be at least 1", maxConnections)
 	}
 	deleteCharAfterDays, err := serverProps.Int("DeleteCharAfterDays", 7)
 	if err != nil {

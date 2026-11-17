@@ -69,6 +69,12 @@ func (s *Set) index(id int32) int {
 }
 
 // Add puts id in the set; an id already in it keeps its place.
+//
+// Re-adding a present id returns before any table maintenance. The modelled
+// table also counts the bin it walked on a re-put and, past setTreeifyAt
+// entries, grows or treeifies it, which can change iteration order; this
+// set skips that. No caller keeps a bin that long (clan skills sit at two or
+// fewer per bin), so the orders never differ today.
 func (s *Set) Add(id int32) {
 	if s.table == nil {
 		s.table = make([]bucket, setMinTable)
