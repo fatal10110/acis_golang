@@ -17,11 +17,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// The clan hall manager's pages and the date its function pages show.
+// The clan hall manager's pages and the function a page shows as none.
 const (
-	hallManagerPages  = "data/html/clanHallManager/"
-	hallFeeDateLayout = "02-01-2006 15:04"
-	hallFunctionNone  = "none"
+	hallManagerPages = "data/html/clanHallManager/"
+	hallFunctionNone = "none"
 )
 
 // supportCastWeight is the weight of a clan hall manager's support magic
@@ -222,7 +221,7 @@ func (d hallDialog) manageVault(v clanhall.HallView) {
 	if d.hall.IsSiegable() {
 		file = "vault-sch.htm"
 	}
-	d.sendFilled(file, "%rent%", strconv.Itoa(d.hall.Lease), "%date%", auctionTime(v.PaidUntil, hallFeeDateLayout), "%objectId%", objID(d.f))
+	d.sendFilled(file, "%rent%", strconv.Itoa(d.hall.Lease), "%date%", auctionTime(v.PaidUntil, hallDateLayout), "%objectId%", objID(d.f))
 }
 
 // door answers "door open" and "door close", which open or close the
@@ -300,6 +299,11 @@ func (d hallDialog) npcCommand(command string, tokens []string) {
 		}
 		d.l.departFromNpc(d.live, d.l.gatekeeper.Teleport(d.live.Character, d.f.NpcID(), int(index)))
 	default:
+		// A deliberate simplification: an unknown command is logged, not
+		// handed on to the generic NPC commands. No client reaches it: the
+		// bypass whitelist admits only commands of the last page sent, and
+		// every command the shipped clan hall manager pages link has a case
+		// above.
 		d.l.log.Debug().Int("npc_id", d.f.NpcID()).Str("command", command).Msg("bypass: clan hall manager command not modeled")
 	}
 }
@@ -693,7 +697,7 @@ func (d hallDialog) change(c hallChange, args []string) {
 func (d hallDialog) rentedLine(fn clanhall.Function, prefix, sep string) (rented, period string) {
 	days := d.l.hallFunctions.Decos().Days(fn.Type, clanhall.DecoLevel(fn.Type, fn.Level, d.hall.IsSiegable()))
 	rented = prefix + "</font>" + sep + `(<font color="FFAABB">` + strconv.Itoa(fn.Lease) + "</font> Adena / " + strconv.Itoa(days) + " day(s))"
-	return rented, "Next fee at " + auctionTime(fn.EndTime, hallFeeDateLayout)
+	return rented, "Next fee at " + auctionTime(fn.EndTime, hallDateLayout)
 }
 
 // fillFunction fills key's three placeholders on page for the hall's

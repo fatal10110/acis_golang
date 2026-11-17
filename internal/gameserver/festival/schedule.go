@@ -205,7 +205,7 @@ func (m *Manager) NextFestivalNotice() string {
 		return `<font color="FF0000">This is the Seal Validation period. Festivals will resume next week.</font>`
 	}
 	m.mu.Lock()
-	minutes := int(float32((m.nextFestivalStart-m.nowMillis())/60000)) + 1
+	minutes := m.minutesToNextFestivalLocked()
 	m.mu.Unlock()
 	return `<font color="FF0000">The next festival will begin in ` + strconv.Itoa(minutes) + ` minute(s).</font>`
 }

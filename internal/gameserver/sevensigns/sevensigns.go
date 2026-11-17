@@ -90,6 +90,15 @@ const (
 	periodMinorLength = 15 * time.Minute
 )
 
+// The seal stones, the Seven Signs' currency, and the certificate of
+// approval a castle lord hands out for joining Dawn.
+const (
+	BlueStoneID             int32 = 6360
+	GreenStoneID            int32 = 6361
+	RedStoneID              int32 = 6362
+	CertificateOfApprovalID int32 = 6388
+)
+
 // StatusRow is the persisted Seven Signs status: the current cycle and
 // period, when the status was last written, the last competition's winner,
 // the cabals' scores, and each seal's owner and votes. The per-seal arrays
@@ -532,9 +541,9 @@ func (s *State) scheduleLocked() {
 
 // nextPeriodChange computes when period ends, given it is active at now. A
 // major period ends at 18:00 local on the next Monday — today counts when it
-// is Monday before 18:00. A minor period ends fifteen minutes after it
-// began, measured from now: a restart during such a short interval grants it
-// its full length again rather than resuming the previous countdown.
+// is Monday before 18:00. A minor period ends fifteen minutes after now; at
+// a restart a saved minor period is already due (see changeAlreadyDue), so
+// it ends at once instead of running fifteen minutes again.
 func nextPeriodChange(period Period, now time.Time) time.Time {
 	switch period {
 	case Competition, SealValidation:
@@ -542,16 +551,23 @@ func nextPeriodChange(period Period, now time.Time) time.Time {
 		if days == 0 && (now.Hour() > periodStartHour || (now.Hour() == periodStartHour && now.Minute() >= periodStartMin)) {
 			days = 7
 		}
-		target := time.Date(now.Year(), now.Month(), now.Day(), periodStartHour, periodStartMin, 0, 0, now.Location())
-		return target.AddDate(0, 0, days)
+		return periodBoundary(now, days)
 	default:
 		return now.Add(periodMinorLength)
 	}
 }
 
+// periodBoundary is the time of day a major period changes, 18:00 local,
+// on the date days after now's.
+func periodBoundary(now time.Time, days int) time.Time {
+	return time.Date(now.Year(), now.Month(), now.Day(), periodStartHour, periodStartMin, 0, 0, now.Location()).AddDate(0, 0, days)
+}
+
 // changeAlreadyDue reports whether the active period ended while the server
 // was down, i.e. whether its scheduled end lies before the last status save.
-// A never-saved row (the schema default) never qualifies.
+// A never-saved row (the schema default) never qualifies. A minor period's
+// end is measured from the last save itself, so every saved minor period
+// qualifies: a restart during one ends it at once.
 func changeAlreadyDue(row StatusRow, now time.Time) bool {
 	if row.LastSave.IsZero() || row.LastSave.UnixMilli() <= 7 {
 		return false
@@ -560,7 +576,7 @@ func changeAlreadyDue(row StatusRow, now time.Time) bool {
 	switch row.Period {
 	case Competition, SealValidation:
 		offset := (int(now.Weekday()) - int(time.Monday) + 7) % 7
-		thisMonday := time.Date(now.Year(), now.Month(), now.Day(), periodStartHour, periodStartMin, 0, 0, now.Location()).AddDate(0, 0, -offset)
+		thisMonday := periodBoundary(now, -offset)
 		if now.Before(thisMonday) {
 			// A week of elapsed hours back, not a calendar week: across a
 			// daylight saving change the boundary lands an hour off 18:00.

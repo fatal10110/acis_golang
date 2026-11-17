@@ -38,9 +38,6 @@ const (
 	DiaryCastleTaken = 3
 )
 
-// lastClassID is the highest profession id.
-const lastClassID = 118
-
 // Hero is one heroes row, with the clan and alliance its entry shows.
 type Hero struct {
 	Name    string
@@ -321,7 +318,7 @@ func (m *Manager) Elect(ctx context.Context) {
 		classID  int
 	}
 	var picks []pick
-	for classID := range lastClassID + 1 {
+	for classID := range player.MaxClassID + 1 {
 		if level, ok := player.ClassLevel(classID); !ok || level != 3 {
 			continue
 		}

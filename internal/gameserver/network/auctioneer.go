@@ -14,10 +14,10 @@ import (
 // auctionPageLimit is how many halls one page of the auction list shows.
 const auctionPageLimit = 15
 
-// The auction pages' date formats: an auction's end, and the list's end
-// dates and bid times.
+// The clan hall pages' date formats: an auction's end or a fee's due
+// date, and the auction list's end dates and bid times.
 const (
-	auctionEndLayout = "02-01-2006 15:04"
+	hallDateLayout   = "02-01-2006 15:04"
 	auctionDayLayout = "2006-01-02"
 )
 
@@ -136,7 +136,7 @@ func (l *GameClientLink) saleCommand(live *livePlayer, f *npc.Folk, cl *clan.Cla
 		}
 		page := fillPage(l.setPage("data/html/auction/AgitSale3.htm"),
 			"%x%", tokens[1],
-			"%AGIT_AUCTION_END%", auctionTime(end, auctionEndLayout),
+			"%AGIT_AUCTION_END%", auctionTime(end, hallDateLayout),
 			"%AGIT_AUCTION_MINBID%", strconv.Itoa(v.AuctionMin),
 			"%AGIT_AUCTION_MIN%", strconv.FormatInt(minBid, 10),
 			"%AGIT_AUCTION_DESC%", v.Description,
@@ -159,6 +159,10 @@ func (l *GameClientLink) saleCommand(live *livePlayer, f *npc.Folk, cl *clan.Cla
 			"%objectId%", objID(f))
 		l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitSale2.htm", page, 0)
 	default:
+		// A deliberate simplification: an unknown command is logged, not
+		// handed on to the generic NPC commands. No client reaches it: the
+		// bypass whitelist admits only commands of the last page sent, and
+		// every command the shipped auction pages link has a case above.
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: auctioneer command not modeled")
 	}
 }
@@ -336,7 +340,7 @@ func (l *GameClientLink) showRebidForm(live *livePlayer, f *npc.Folk, cl *clan.C
 	page := fillPage(l.setPage("data/html/auction/AgitBid2.htm"),
 		"%AGIT_AUCTION_BID%", strconv.Itoa(b.Bid),
 		"%AGIT_AUCTION_MINBID%", strconv.Itoa(v.AuctionMin),
-		"%AGIT_AUCTION_END%", auctionTime(v.EndDate, auctionEndLayout),
+		"%AGIT_AUCTION_END%", auctionTime(v.EndDate, hallDateLayout),
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+objID(f)+"_selectedItems",
 		"npc_%objectId%_bid1", "npc_"+objID(f)+"_bid1 "+strconv.Itoa(int(v.ID)))
 	l.sendFilePage(live, f.ObjectID(), "data/html/auction/AgitBid2.htm", page, 0)
@@ -413,7 +417,7 @@ func (l *GameClientLink) showAuctionInfo(live *livePlayer, f *npc.Folk, val stri
 		"%AGIT_SIZE%", strconv.Itoa(v.Size),
 		"%AGIT_LEASE%", strconv.Itoa(v.Lease),
 		"%AGIT_LOCATION%", v.Town,
-		"%AGIT_AUCTION_END%", auctionTime(v.EndDate, auctionEndLayout),
+		"%AGIT_AUCTION_END%", auctionTime(v.EndDate, hallDateLayout),
 		"%AGIT_AUCTION_REMAIN%", auctionRemaining(v.EndDate-l.auctionNow()),
 		"%AGIT_AUCTION_MINBID%", strconv.Itoa(v.MinBid),
 		"%AGIT_AUCTION_COUNT%", strconv.Itoa(len(v.Bidders)),
@@ -449,7 +453,7 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 			"%AGIT_SIZE%", strconv.Itoa(v.Size),
 			"%AGIT_LEASE%", strconv.Itoa(v.Lease),
 			"%AGIT_LOCATION%", v.Town,
-			"%AGIT_AUCTION_END%", auctionTime(v.EndDate, auctionEndLayout),
+			"%AGIT_AUCTION_END%", auctionTime(v.EndDate, hallDateLayout),
 			"%AGIT_AUCTION_REMAIN%", auctionRemaining(v.EndDate-l.auctionNow()),
 			"%AGIT_AUCTION_MYBID%", strconv.Itoa(b.Bid),
 			"%AGIT_AUCTION_DESC%", v.Description,
@@ -476,7 +480,7 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 				"%AGIT_SIZE%", strconv.Itoa(v.Size),
 				"%AGIT_LEASE%", strconv.Itoa(v.Lease),
 				"%AGIT_LOCATION%", v.Town,
-				"%AGIT_AUCTION_END%", auctionTime(v.EndDate, auctionEndLayout),
+				"%AGIT_AUCTION_END%", auctionTime(v.EndDate, hallDateLayout),
 				"%AGIT_AUCTION_REMAIN%", auctionRemaining(v.EndDate-l.auctionNow()),
 				"%AGIT_AUCTION_MINBID%", strconv.Itoa(v.Seller.Bid),
 				"%AGIT_AUCTION_BIDCOUNT%", strconv.Itoa(len(v.Bidders)),

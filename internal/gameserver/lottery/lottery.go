@@ -346,12 +346,11 @@ func (l *Lottery) startRound() {
 // later when from is itself a Saturday. The milliseconds of from are kept.
 func nextDrawing(from int64, loc *time.Location) int64 {
 	t := time.UnixMilli(from).In(loc)
-	y, m, d := t.Date()
-	ms := t.Nanosecond() / int(time.Millisecond) * int(time.Millisecond)
+	next := commons.WeekdayAt(t, 0, time.Saturday, drawHour).UnixMilli()
 	if t.Weekday() == time.Saturday {
-		return time.Date(y, m, d, drawHour, 0, 0, ms, loc).UnixMilli() + weekMillis
+		next += weekMillis
 	}
-	return time.Date(y, m, d+int(time.Saturday-t.Weekday()), drawHour, 0, 0, ms, loc).UnixMilli()
+	return next
 }
 
 // closeSales stops ticket sales ahead of the drawing. Runs under run.
