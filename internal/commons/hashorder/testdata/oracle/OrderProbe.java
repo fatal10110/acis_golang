@@ -282,5 +282,26 @@ public final class OrderProbe
 			ops.add("+" + 14 * 256);
 			play(ops);
 		}
+
+		// Wars declared again while already at war change nothing: the id keeps its place
+		// in a chain, in a tree bucket and after the table doubled, and an id that was
+		// ended and declared again goes last in its bucket.
+		for (int stride : new int[] { 1, 16, 256 })
+		{
+			final List<String> ops = new ArrayList<>();
+			for (int k = 0; k < 12; k++)
+				ops.add("+" + k * stride);
+			for (int k : new int[] { 0, 5, 11, 3, 5 })
+				ops.add("+" + k * stride);
+			for (int k : new int[] { 4, 4, 9 })
+				ops.add("-" + k * stride);
+			for (int k : new int[] { 9, 4, 4, 0, 9 })
+				ops.add("+" + k * stride);
+			for (int offset = 100; offset < 190; offset++)
+				ops.add("+" + offset);
+			for (int k : new int[] { 0, 7, 11, 4, 9 })
+				ops.add("+" + k * stride);
+			play(ops);
+		}
 	}
 }

@@ -20,3 +20,20 @@ From the repository root, with the datapack next to the Go repository (or
 ```
 internal/commons/testdata/oracle/run.sh
 ```
+
+## Number and placeholder formatting oracle
+
+`../format.golden` is the expected output of `TestFormatMatchesReferenceProbe`
+(`../../format_oracle_test.go`), written by `FormatProbe.java` (same `run.sh`).
+Lines (strings as hex of UTF-8, `-` for the empty string):
+
+- `double <raw bits hex> <Double.toString>`
+- `float <raw bits hex> <Float.toString>`
+- `fixed <raw bits hex> <decimals> <String.format(Locale.ENGLISH, "%.Nf")>`
+- `html <value hex> <hex of "%a%".replaceAll("%a%", value.replaceAll("\\$", "\\\\\\$"))>`, the
+  expression of `NpcHtmlMessage.replace(String, String)`, or `EXC` when the
+  replacement grammar rejects the value (a backslash ending it)
+
+Subnormal values are not probed: the JDK prints a subnormal whose shortest
+decimal has one digit with the closest two-digit decimal (`Double.MIN_VALUE`
+is `4.9E-324`, Go writes `5.0E-324`); no game value reaches them.
