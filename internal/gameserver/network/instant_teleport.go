@@ -13,7 +13,8 @@ import (
 // instant teleport does: the landing is grounded unless live
 // flies or it lies in water; live and its observers get the jump without
 // its fade; live stays in its region until its next position update, so
-// what knows it and what it knows are unchanged. live then goes idle, and,
+// what knows it and what it knows are unchanged. live then goes idle, it and
+// everything around that region see each other afresh, and,
 // once the teleport lock is released (their see-creature hooks may move
 // live again), the NPCs around the region live is still held in that see
 // the landing notice it. A player already in a teleport is left to it.
@@ -40,13 +41,17 @@ func (l *GameClientLink) jumpLivePlayer(live *livePlayer, j location.Jump) bool 
 	})
 	l.placeLivePlayer(live, target, heading, true)
 	live.goIdle()
+	if l.world != nil {
+		l.world.RefreshKnown(live)
+	}
 	return true
 }
 
 // instantTeleportSummon moves actor in one step to where j lands, on its
 // queue: the landing is grounded unless it lies in water, its observers
 // get the jump without its fade, it stays in its region until it next
-// moves and follows its owner again, and the NPCs around the region it is
+// moves and follows its owner again, the players around that region see
+// it afresh, and the NPCs around the region it is
 // still held in that see the landing notice it. A summon in a teleport
 // already, or gone from the world, is left as it is.
 func (l *GameClientLink) instantTeleportSummon(actor *summon.Actor, j location.Jump) {

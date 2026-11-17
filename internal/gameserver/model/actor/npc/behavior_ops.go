@@ -67,7 +67,8 @@ func (inst *Instance) spawnTerritoryContains(at location.Location) bool {
 // unless it lies in water: the observers see the jump without its fade,
 // and the NPC's geo-path fail streak restarts. The NPC stays in its region
 // until it next moves, so what knows it, what it knows and the zones it is
-// in are unchanged. Unlike TeleportTo it aborts nothing and forgets no one.
+// in are unchanged, and the players around that region see it afresh.
+// Unlike TeleportTo it aborts nothing and forgets no one.
 func (h *Hostile) InstantTeleportTo(j location.Jump) {
 	target := j.To
 	if h.Live != nil {
@@ -79,6 +80,7 @@ func (h *Hostile) InstantTeleportTo(j location.Jump) {
 	}
 	if h.world != nil {
 		h.world.SetPosition(h, target.X, target.Y, target.Z)
+		h.world.RefreshKnown(h)
 	}
 	h.ResetGeoPathFailCount()
 	h.aiSleep.wakeOutOfTerritory(h)

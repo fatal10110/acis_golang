@@ -810,7 +810,12 @@ func (c *Controller) PositionUpdate() bool {
 		}
 		return c.move.Moving() || c.tracksFollowLocked()
 	}
-	c.self.SyncPosition(u.ev.Origin)
+	// An off-queue teleport aborts the walk under this lock and only then
+	// places the actor, so a step it overtook is dropped here rather than
+	// synced over the landing.
+	if c.move.stepCurrent(u) {
+		c.self.SyncPosition(u.ev.Origin)
+	}
 	return true
 }
 
