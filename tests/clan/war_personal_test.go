@@ -63,9 +63,12 @@ func TestPersonalSurrenderRefusals(t *testing.T) {
 // TestPersonalSurrenderEndsWar has the founder of Knights, at mutual war
 // with Rivals, surrender personally while Sentry, its other member, is
 // online: it loses a full death's experience, is told under the name it
-// typed, and, every member but one now wanting peace, both wars end: each
-// clan is shown its header out of war and its stop notice, Knights keeps
-// the five-day penalty and Rivals' war on it is gone. The flag is stored.
+// typed, and, every member but one now wanting peace, the war ends: each
+// clan is shown its header out of war and its stop notice, and Knights
+// keeps the five-day penalty. Rivals' own war on Knights ends in memory
+// only: Knights still lists Rivals among its attackers and Rivals' stored
+// row stays, to come back on restart (ClanTable.checkSurrender,
+// deleteClansWars, restoreWars). The flag is stored.
 func TestPersonalSurrenderEndsWar(t *testing.T) {
 	t.Parallel()
 	w := bootSurrenderWorld(t, warStmt(knightsClanID, rivalsClanID), warStmt(rivalsClanID, knightsClanID))
@@ -99,13 +102,30 @@ func TestPersonalSurrenderEndsWar(t *testing.T) {
 		}
 	}
 
+	sentry.Send(encodeRequestPledgeWarList(0, 1))
+	lists := extended(drainFrames(t, sentry), serverpackets.OpcodeExPledgeReceiveWarList)
+	if len(lists) != 1 {
+		t.Fatalf("Knights attacker lists = %d, want 1", len(lists))
+	}
+	if _, _, count, names := warList(t, lists[0]); count != 1 || !slices.Equal(names, []string{"Rivals"}) {
+		t.Fatalf("Knights attackers = %d %v, want Rivals still", count, names)
+	}
+	w.member.Send(encodeRequestPledgeWarList(0, 0))
+	lists = extended(drainFrames(t, w.member), serverpackets.OpcodeExPledgeReceiveWarList)
+	if len(lists) != 1 {
+		t.Fatalf("Rivals war lists = %d, want 1", len(lists))
+	}
+	if _, _, count, names := warList(t, lists[0]); count != 0 || len(names) != 0 {
+		t.Fatalf("Rivals wars = %d %v, want none", count, names)
+	}
+
 	w.leaveWorld(t, w.leader)
 	expiry := queryInt(t, w, `SELECT expiry_time FROM clan_wars WHERE clan1 = ? AND clan2 = ?`, knightsClanID, rivalsClanID)
 	if day := int64(24 * time.Hour / time.Millisecond); expiry < before+5*day || expiry > time.Now().UnixMilli()+5*day {
 		t.Fatalf("stored Knights penalty = %d, want five days from the surrender", expiry)
 	}
-	if got := queryInt(t, w, `SELECT COUNT(*) FROM clan_wars WHERE clan1 = ? AND clan2 = ?`, rivalsClanID, knightsClanID); got != 0 {
-		t.Fatalf("stored Rivals wars on Knights = %d, want 0", got)
+	if got := queryInt(t, w, `SELECT COUNT(*) FROM clan_wars WHERE clan1 = ? AND clan2 = ? AND expiry_time = 0`, rivalsClanID, knightsClanID); got != 1 {
+		t.Fatalf("stored Rivals wars on Knights = %d, want its row kept", got)
 	}
 	if got := queryInt(t, w, `SELECT wantspeace FROM characters WHERE obj_Id = ?`, w.leaderID); got != 1 {
 		t.Fatalf("stored wantspeace = %d, want 1", got)
