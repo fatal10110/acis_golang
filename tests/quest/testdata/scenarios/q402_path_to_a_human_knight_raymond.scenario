@@ -42,28 +42,59 @@ bypass npc_{raymond}_Quest
   S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-01.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q402_PathToAHumanKnight 30289-02.htm
+  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-02.htm
+  S ActionFailed
 bypass Quest Q402_PathToAHumanKnight 30289-03.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1170
+  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-03.htm
+  S ActionFailed
 action raymond
   S ActionFailed
   S NpcHtmlMessage obj=raymond item=0 page=villagemaster/30289.htm
   S ActionFailed
 bypass npc_{raymond}_Quest
-  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-01.htm
+  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-04.htm
   S ActionFailed
   S ActionFailed
 kill priest x12
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1171
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
 action raymond
   S ActionFailed
   S NpcHtmlMessage obj=raymond item=0 page=villagemaster/30289.htm
@@ -73,7 +104,11 @@ action raymond
   S NpcHtmlMessage obj=raymond item=0 page=villagemaster/30289.htm
   S ActionFailed
 bypass npc_{raymond}_Quest
-  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-01.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1171 6:12
+  S SystemMessage id=302 3:1170
+  S SystemMessage id=54 3:1163
+  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-05.htm
   S ActionFailed
   S ActionFailed
 action raymond
@@ -81,6 +116,6 @@ action raymond
   S NpcHtmlMessage obj=raymond item=0 page=villagemaster/30289.htm
   S ActionFailed
 bypass npc_{raymond}_Quest
-  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-01.htm
+  S NpcHtmlMessage obj=raymond item=0 page=script/quest/Q402_PathToAHumanKnight/30289-06.htm
   S ActionFailed
   S ActionFailed

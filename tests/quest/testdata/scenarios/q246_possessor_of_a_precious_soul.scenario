@@ -84,6 +84,7 @@ bypass npc_{ossian}_Quest
 
 # A hand-in bypass the last page does not offer is refused, and the quest stays where it is.
 bypass Quest Q246_PossessorOfAPreciousSoul 31741-05.htm
+  rejected
   rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
 
 # A Pilgrim of Splendor leaves the Waterbinder (draw 0, under 2 of 10); a second one, nothing more;
@@ -130,6 +131,7 @@ bypass Quest Q246_PossessorOfAPreciousSoul 31741-05.htm
 
 # A Rain Song hand-in bypass before Barakiel is refused too.
 bypass Quest Q246_PossessorOfAPreciousSoul 31741-08.htm
+  rejected
   rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=4
 
 # Barakiel's death gives the Rain Song to the killer, alone and on cond 4.

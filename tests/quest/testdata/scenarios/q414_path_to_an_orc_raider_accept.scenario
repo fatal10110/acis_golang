@@ -37,7 +37,9 @@ bypass Quest Q414_PathToAnOrcRaider 30570-05.htm
   items 1579=1
   state Q414_PathToAnOrcRaider STARTED
   rows Q414_PathToAnOrcRaider <cond>=1 <state>=STARTED
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q414_PathToAnOrcRaider 30570-06.htm
+  rejected
 relog
   items 1579=1
   state Q414_PathToAnOrcRaider STARTED

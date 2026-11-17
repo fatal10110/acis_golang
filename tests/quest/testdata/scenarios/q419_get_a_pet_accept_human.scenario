@@ -24,7 +24,18 @@ bypass npc_{martin}_Quest
   S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-02.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q419_GetAPet 30731-03.htm
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-03.htm
+  S ActionFailed
 bypass Quest Q419_GetAPet task
+  S QuestList 419:0x80000001
+  S ExShowQuestMark quest=419
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3418
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-04.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | <state> | STARTED
+  Q upsert Q419_GetAPet | <cond> | 1
 relog
 action martin
 action martin
@@ -32,6 +43,6 @@ action martin
   S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
   S ActionFailed
 bypass npc_{martin}_Quest
-  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-02.htm
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-09.htm
   S ActionFailed
   S ActionFailed

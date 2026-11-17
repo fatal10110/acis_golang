@@ -25,11 +25,21 @@ bypass npc_{monument}_Quest HeroWeapon
   S NpcHtmlMessage obj=monument item=0 page=script/feature/HeroWeapon/weapon_list.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest HeroWeapon 6610
+  rejected
+# A link the page on screen does not offer: the server drops it.
 bypass Quest HeroWeapon 6622
+  rejected
+# A link the page on screen does not offer: the server drops it.
 bypass Quest HeroWeapon abc
+  rejected
+# A link the page on screen does not offer: the server drops it.
 bypass Quest HeroWeapon 57
+  rejected
+# A link the page on screen does not offer: the server drops it.
 bypass Quest HeroWeapon 4294973907
+  rejected
   items 6611=0
 bypass Quest HeroWeapon 6611
   S SystemMessage id=54 3:6611

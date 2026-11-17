@@ -124,15 +124,20 @@ action udan
   S ActionFailed
 # The no-alliance pages carry no blessing, withdrawal or teleport link, so each answers nothing.
 bypass Quest VarkaSilenosSupport 0
+  rejected
 action hagos
 action hagos
   S ActionFailed
   S NpcHtmlMessage obj=hagos item=0 page=script/feature/VarkaSilenosSupport/31381-no.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest VarkaSilenosSupport Withdraw
+  rejected
 action teranu
 action teranu
   S ActionFailed
   S NpcHtmlMessage obj=teranu item=0 page=script/feature/VarkaSilenosSupport/31383-no.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest VarkaSilenosSupport Teleport
+  rejected

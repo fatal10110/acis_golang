@@ -27,7 +27,6 @@ npc ratman 20389 Monster 40 0 0
 npc leader 20390 Monster 50 0 0
 npc thief 20017 Monster 60 0 0
 
-bypass Quest Q418_PathToAnArtisan 31963-10.htm
 action hitchi
 action hitchi
   S ActionFailed
@@ -37,3 +36,6 @@ bypass npc_{hitchi}_Quest
   S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-08.htm
   S ActionFailed
   S ActionFailed
+# The page on screen does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+bypass Quest Q418_PathToAnArtisan 31963-10.htm
+  rejected

@@ -169,7 +169,7 @@ bypass Quest Q120_PavelsResearch 32041-22.htm
 action east
 action east
   S ActionFailed
-  S NpcHtmlMessage obj=east item=0 page=default/32043.htm
+  S NpcHtmlMessage obj=east item=0 page=default/32042.htm
   S ActionFailed
 bypass npc_{east}_Quest
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-01.htm
@@ -244,24 +244,46 @@ bypass Quest Q120_PavelsResearch 32043-15.htm
 bypass Quest Q120_PavelsResearch 32043-18.htm
   S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-21.htm
   S ActionFailed
-bypass Quest Q120_PavelsResearch 32043-25.htm
-bypass Quest Q120_PavelsResearch 32043-28.htm
-bypass Quest Q120_PavelsResearch 32043-25.htm
+bypass Quest Q120_PavelsResearch 32043-22.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-22.htm
+  S ActionFailed
 bypass Quest Q120_PavelsResearch 32043-15.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-15.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32043-25.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-25.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32043-28.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-28.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | talk1 | 1
+bypass Quest Q120_PavelsResearch 32043-25.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-25.htm
+  S ActionFailed
+bypass Quest Q120_PavelsResearch 32043-15.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-29.htm
+  S ActionFailed
 action east
   S ActionFailed
   S NpcHtmlMessage obj=east item=0 page=default/32042.htm
   S ActionFailed
 bypass npc_{east}_Quest
-  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-06.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-29.htm
   S ActionFailed
   S ActionFailed
 bypass Quest Q120_PavelsResearch 32043-30.htm
+  S QuestList 114:0x00000000 120:0x8007ffff
+  S ExShowQuestMark quest=120
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-30.htm
+  S ActionFailed
+  Q upsert Q120_PavelsResearch | <cond> | 19
+  Q upsert Q120_PavelsResearch | talk | 0
+  Q upsert Q120_PavelsResearch | talk1 | 0
 action east
   S ActionFailed
   S NpcHtmlMessage obj=east item=0 page=default/32042.htm
   S ActionFailed
 bypass npc_{east}_Quest
-  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-06.htm
+  S NpcHtmlMessage obj=east item=0 page=script/quest/Q120_PavelsResearch/32043-30.htm
   S ActionFailed
   S ActionFailed

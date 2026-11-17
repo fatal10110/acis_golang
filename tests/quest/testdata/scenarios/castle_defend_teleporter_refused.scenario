@@ -14,4 +14,6 @@ action gatekeeper
   S ActionFailed
   S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/CastleDefendTeleporter/first_group_1_no.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest CastleDefendTeleporter 0
+  rejected

@@ -48,6 +48,7 @@ bypass npc_{rath}_Quest
 
 # The report link is not on Rath's last page: the bypass is dropped silently.
 bypass Quest Q300_HuntingLetoLizardman 30126-05.htm
+  rejected
   state Q300_HuntingLetoLizardman STARTED
   rows Q300_HuntingLetoLizardman <cond>=1 <state>=STARTED
 

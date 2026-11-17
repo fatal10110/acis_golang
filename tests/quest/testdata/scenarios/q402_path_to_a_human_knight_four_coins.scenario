@@ -45,4 +45,17 @@ bypass npc_{klaus}_Quest
   S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-11.htm
   S ActionFailed
   S ActionFailed
-bypass Quest Q402_PathToAHumanKnight 30417-14.htm
+bypass Quest Q402_PathToAHumanKnight 30417-13.htm
+  S SystemMessage id=302 3:1162
+  S SystemMessage id=302 3:1163
+  S SystemMessage id=302 3:1164
+  S SystemMessage id=302 3:1165
+  S SystemMessage id=302 3:1271
+  S SystemMessage id=54 3:1161
+  S SystemMessage id=95 1:3200 1:3420
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-13.htm
+  S ActionFailed
+  Q delete-quest Q402_PathToAHumanKnight

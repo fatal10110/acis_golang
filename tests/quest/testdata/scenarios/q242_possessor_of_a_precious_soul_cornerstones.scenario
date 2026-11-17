@@ -92,7 +92,9 @@ bypass Quest Q242_PossessorOfAPreciousSoul 30759-02.htm
   S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-02.htm
   S ActionFailed
   Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 7
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q242_PossessorOfAPreciousSoul 30759-05.htm
+  rejected
   rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=7
 action kalis
   S ActionFailed
@@ -167,7 +169,9 @@ bypass npc_{cornerstone}_Quest
   S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-01.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q242_PossessorOfAPreciousSoul 31748-03.htm
+  rejected
   rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9
 
 # A Restrainer of Glory leaves an orb, which binds the first cornerstone; the cornerstone leaves the world.

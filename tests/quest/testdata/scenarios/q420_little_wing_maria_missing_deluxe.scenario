@@ -21,7 +21,9 @@ bypass npc_{maria}_Quest
   S NpcHtmlMessage obj=maria item=0 page=script/quest/Q420_LittleWing/30608-01.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q420_LittleWing 30608-05.htm
+  rejected
   items 3817=0 3819=1
 
   state Q420_LittleWing STARTED
