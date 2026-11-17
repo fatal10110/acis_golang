@@ -117,7 +117,8 @@ func (c *creature) loc() Loc { return locOf(c) }
 // ground plane.
 func (n *NPC) Distance2D(at Place) float64 {
 	a, b := locOf(n), at.loc()
-	return math.Hypot(float64(a.X-b.X), float64(a.Y-b.Y))
+	dx, dy := float64(a.X-b.X), float64(a.Y-b.Y)
+	return math.Sqrt(dx*dx + dy*dy)
 }
 
 // InRadius2D reports whether c stands strictly within radius of the NPC on

@@ -17,7 +17,7 @@ type Location struct {
 func (l Location) Distance2D(other Location) float64 {
 	dx := float64(l.X - other.X)
 	dy := float64(l.Y - other.Y)
-	return math.Hypot(dx, dy)
+	return math.Sqrt(dx*dx + dy*dy)
 }
 
 // Distance3D returns the straight-line distance between l and other.

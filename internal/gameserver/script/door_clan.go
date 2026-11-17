@@ -20,12 +20,6 @@ const (
 
 var _ door.ClanCall = (*Registry)(nil)
 
-// doorBody is a door as the range of its call measures it: widened by its
-// collision radius, as an NPC's by its own.
-type doorBody struct{ *door.Object }
-
-func (doorBody) CollisionRadius() float64 { return door.CollisionRadius }
-
 // clanNPC is an NPC a door's call reaches: a hostile or a civilian NPC.
 type clanNPC interface {
 	attackable.Combatant
@@ -43,7 +37,7 @@ func (r *Registry) DoorAttacked(d *door.Object, attacker attackable.Combatant, d
 		return
 	}
 	var near []clanNPC
-	r.world.ForEachKnownInRadius(doorBody{d}, doorClanRange, func(o world.Tracked) {
+	r.world.ForEachKnownInRadius(d, doorClanRange, func(o world.Tracked) {
 		switch n := o.(type) {
 		case *npc.Hostile:
 			near = append(near, n)
