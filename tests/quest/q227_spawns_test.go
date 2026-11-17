@@ -465,6 +465,9 @@ func TestQ227WerewolfLeavesAfterAHit(t *testing.T) {
 			werewolf := w.calledHostile(t, "werewolf", q227Werewolf, q227WerewolfAt)
 			w.stepTo(t, q227WerewolfAt)
 			w.strike(t, werewolf, tc.skill)
+			if !w.srv.DrivesClock() {
+				t.Skip("the leave is pinned to the millisecond after the hit, which the wall clock does not meet")
+			}
 			w.advance(t, 999*time.Millisecond)
 			if n := len(npcsOf(w.srv, q227Werewolf)); n != 1 {
 				t.Fatalf("%d werewolves 999 ms after the hit, want 1", n)

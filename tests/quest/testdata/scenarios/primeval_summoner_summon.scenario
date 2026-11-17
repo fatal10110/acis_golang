@@ -8,6 +8,7 @@
 # nothing is paid.
 # Expectations are derived from the reference source (PrimevalSummoner.java); the reference
 # probe has no party member nor npcmaker territory to play this with.
+driven
 character Payer 20
 member Fallen 20 dead 300 0 0
 hold 57 400000

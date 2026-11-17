@@ -106,6 +106,9 @@ func (w *dialogWorld) q334Event(t *testing.T, ev string) []string {
 // the three lines pass, returning what the character was sent by the last.
 func q334Wish(t *testing.T, w *dialogWorld, wish int) []string {
 	t.Helper()
+	if !w.srv.DrivesClock() {
+		t.Skip("the wish's lines and the call after them are pinned to the second, which the wall clock does not meet")
+	}
 	if got := w.talk(t, "matild"); !shows(got, "30738-12.htm") {
 		t.Fatalf("Matild: got %q, want 30738-12.htm", got)
 	}

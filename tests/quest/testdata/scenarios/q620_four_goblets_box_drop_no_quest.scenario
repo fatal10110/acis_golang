@@ -1,4 +1,5 @@
 # Four Goblets (Q620): a character with no quest gets no box. Expectations replay the reference trace of this scenario.
+driven
 trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_box_drop_no_quest.golden
 character Hero 74
 random always 0

@@ -749,6 +749,10 @@ final class ScenarioTrace
 					// The Go runner pins an NPC's combat draws; the reference's come from its seeded generator,
 					// and the trace shows the outcome the pin must reproduce.
 				}
+				case "driven" ->
+				{
+					// The Go runner's real-pool marker (the scenario skips there); the probe drives its own clock.
+				}
 				case "item", "page", "teleports" ->
 				{
 					// The reference loads every item, page and teleport list.

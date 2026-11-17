@@ -110,6 +110,9 @@ func TestQ022GhostOfThePriestLeavesThreeSecondsAfterItsStory(t *testing.T) {
 	if rows := questRows(t, w.srv, w.player, q022Name); rows["<cond>"] != "8" {
 		t.Fatalf("rows %v after the story, want cond 8", rows)
 	}
+	if !w.srv.DrivesClock() {
+		t.Skip("the next wait is pinned to the last 100 ms before a deadline, which the wall clock does not meet")
+	}
 	saysNone(t, "2.9 s after the story", w.advance(t, 2900*time.Millisecond))
 	if n := len(npcsOf(w.srv, q022Priest)); n != 1 {
 		t.Fatalf("%d ghosts 2.9 s after the story, want 1", n)
@@ -172,6 +175,9 @@ func TestQ022SoulOfTheWellHeldTwentySeconds(t *testing.T) {
 		t.Parallel()
 		w, soul := soulWorld(t)
 		hit(t, w.srv, w.player, soul, 10)
+		if !w.srv.DrivesClock() {
+			t.Skip("the next wait is pinned to the last 100 ms before a deadline, which the wall clock does not meet")
+		}
 		w.advance(t, 19900*time.Millisecond)
 		if rows := questRows(t, w.srv, w.player, q022Name); rows["<cond>"] != "10" {
 			t.Fatalf("rows %v 19.9 s after the hit, want cond 10", rows)

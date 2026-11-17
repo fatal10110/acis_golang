@@ -475,6 +475,9 @@ func TestQ070SixthTabletFightWon(t *testing.T) {
 		t.Fatalf("the attacker hates %v most, want the defender", h)
 	}
 
+	if !w.srv.DrivesClock() {
+		t.Skip("the fight's lines are pinned to the millisecond after the call, which the wall clock does not meet")
+	}
 	wantLines(t, "spawn lines", w.advance(t, 500*time.Millisecond),
 		say("defender", defenderID, 7057), say("attacker", attackerID, 7064, "Seeker"))
 	wantLines(t, "first cheer", w.advance(t, 1500*time.Millisecond), say("defender", defenderID, 7058, "Seeker"))

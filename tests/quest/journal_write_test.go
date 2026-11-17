@@ -96,6 +96,15 @@ func statementLines(writes []questlog.Write) []string {
 // questRows returns objID's character_quests rows of quest as var:value.
 func questRows(t *testing.T, srv *gameservertest.Server, objID int32, quest string) map[string]string {
 	t.Helper()
+	// A quest write rides the persistence lane, which on the real pool runs
+	// beside the test: read after it has written what the test caused.
+	srv.FlushPersistence(t)
+	return questRowsNow(t, srv, objID, quest)
+}
+
+// questRowsNow is questRows without waiting for the persistence lane.
+func questRowsNow(t *testing.T, srv *gameservertest.Server, objID int32, quest string) map[string]string {
+	t.Helper()
 	out := map[string]string{}
 	for _, r := range readJournal(t, srv.DB) {
 		if r.charID == objID && r.name == quest {
@@ -400,7 +409,7 @@ func TestJournalWritesBeforeDetachLandBeforeReselect(t *testing.T) {
 		st.SetCond(2)
 	})
 	sentLines(t, srv)
-	if rows := questRows(t, srv, objID, q001); len(rows) != 0 {
+	if rows := questRowsNow(t, srv, objID, q001); len(rows) != 0 {
 		t.Fatalf("rows landed while the lane was held: %v", rows)
 	}
 	// The restart's detach queues its saves behind the held lane and waits

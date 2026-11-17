@@ -93,6 +93,9 @@ func TestQ021DukeCallsThePageWhoLeadsThePlayer(t *testing.T) {
 	}
 	w.spawned(t, "page", q021Page)
 	saysNone(t, "the call", got)
+	if !w.srv.DrivesClock() {
+		t.Skip("the next wait is pinned to the last 100 ms before a deadline, which the wall clock does not meet")
+	}
 	wantLines(t, "half a second later", w.advance(t, 500*time.Millisecond), say("page", q021Page, 2151, "Seeker"))
 	saysNone(t, "8.9 s later", w.advance(t, 8900*time.Millisecond))
 	wantLines(t, "the walk's end", w.advance(t, 100*time.Millisecond), say("page", q021Page, 2152, "Seeker"))

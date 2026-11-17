@@ -81,6 +81,9 @@ func wantQ115Page(t *testing.T, step string, got []string, file string) {
 // passed and leave once gone has, checked 100 ms either side.
 func (w *dialogWorld) wantStrangerLeaves(t *testing.T, said, gone time.Duration, line int32) {
 	t.Helper()
+	if !w.srv.DrivesClock() {
+		t.Skip("the parting line is pinned to 100 ms before and 50 ms after its deadline, which the wall clock does not meet")
+	}
 	saysNone(t, "before the parting line", w.advance(t, said-100*time.Millisecond))
 	wantLines(t, "the parting line", w.advance(t, 150*time.Millisecond), say("stranger", q115Stranger, line))
 	if n := len(npcsOf(w.srv, q115Stranger)); n != 1 {

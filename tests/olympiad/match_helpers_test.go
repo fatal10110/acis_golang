@@ -87,6 +87,9 @@ func bootMatchPrepared(t *testing.T, adjust func(*olympiad.Config), prepare func
 			}
 		}),
 	}, opts...)...)
+	if !srv.DrivesClock() {
+		t.Skip("a match waits out its countdowns, 65 to 88 s of wall time each on the real pool; the inline pass drives them")
+	}
 	m := &match{srv: srv, ones: []*competitor{{c: srv.Client, id: srv.SoleObjectID(t), name: "Alpha"}}}
 	id := srv.SeedCharacterFor(t, "bravo", "Bravo", 40, 0).ID
 	if prepare != nil {
