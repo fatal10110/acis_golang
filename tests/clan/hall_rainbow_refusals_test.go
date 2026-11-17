@@ -37,8 +37,8 @@ func (w *rainbowWorld) joinParty(t *testing.T, from, to *testsupport.ScriptedCli
 
 // TestRainbowSpringsCaretakerRefusals has the Attacker, the leader of
 // Springers, ask the caretaker to port its party to the arena with a party
-// that does not qualify, and checks the page each refusal shows: it does
-// not lead the party (006), a member of another clan stands in it (007),
+// that does not qualify, and checks the page each refusal shows: it has no
+// clan (009), it does not lead the party (006), a member of another clan stands in it (007),
 // it is under five (008), Springers owns another hall (010; the registrations' close frees the siege's own), is under the hall's
 // minimum clan level (011), is unregistered (014) or registered without
 // having been chosen (015). None moves anybody.
@@ -56,6 +56,7 @@ func TestRainbowSpringsCaretakerRefusals(t *testing.T) {
 		leads   bool
 		page    string
 	}{
+		{"no clan", rainbowSetup{seed: []string{"UPDATE characters SET clanid = 0 WHERE char_name = 'Attacker'"}}, 0, false, false, "game_manager009.htm"},
 		{"not the party leader", rainbowSetup{}, 1, false, true, "game_manager006.htm"},
 		{"a member of another clan", rainbowSetup{}, 1, true, false, "game_manager007.htm"},
 		{"party under five", rainbowSetup{}, 1, false, false, "game_manager008.htm"},
