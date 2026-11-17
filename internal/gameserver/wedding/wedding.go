@@ -79,6 +79,10 @@ type Spouse interface {
 	Pay(count int) bool
 	// Refund gives back count adena Pay took.
 	Refund(count int)
+	// WhileAttached runs fn unless the player is leaving the world, and
+	// reports whether it ran. A player leaving the world while fn runs
+	// has fn's changes in its final saves.
+	WhileAttached(fn func()) bool
 }
 
 // Manager holds every couple and runs the marriage requests. Its methods
@@ -244,6 +248,17 @@ func (m *Manager) Answer(partner Spouse, accepted bool, online func(int32) (Spou
 	if !ok {
 		return Answer{}
 	}
+	// The requester pays, and may be refunded, on the partner's queue: a
+	// requester leaving the world counts as offline, and one that starts
+	// leaving meanwhile has the whole outcome in its final saves.
+	var out Answer
+	if !requester.WhileAttached(func() { out = m.answer(requester, partner, accepted) }) {
+		return Answer{}
+	}
+	return out
+}
+
+func (m *Manager) answer(requester, partner Spouse, accepted bool) Answer {
 	out := Answer{Outcome: AnswerDeclined, Requester: requester}
 	if accepted {
 		out = m.marry(requester, partner)

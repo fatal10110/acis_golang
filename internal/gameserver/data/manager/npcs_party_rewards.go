@@ -35,7 +35,9 @@ func (d *deathRewards) rewardGroup(p *player.Character) (RewardParty, bool) {
 // channel's, in a command channel). Every living member's own entry is
 // spent, in range or not. The pooled exp takes the attacker's overhit
 // bonus, and the members split it by the party rules; a member the cutoff
-// leaves out is still paid nothing.
+// leaves out is still paid nothing. A member leaving the world is out of
+// the share, as if already out of the party; one that starts leaving
+// while the share is paid has it in its final saves, or is paid nothing.
 func (d *deathRewards) grantParty(s *KillRewardSettings, attacker *player.Character, group RewardParty, entries []playerRewardEntry, spent map[int32]bool, summonDamage map[int32]float64, totalDamage float64) {
 	var (
 		partyDamage float64
@@ -44,7 +46,7 @@ func (d *deathRewards) grantParty(s *KillRewardSettings, attacker *player.Charac
 	)
 	ownDamage := map[int32]float64{}
 	for _, m := range group.Members {
-		if m.Dead() {
+		if m.Dead() || m.Detaching() {
 			continue
 		}
 		inRange := d.inPartyRange(s, m)
@@ -93,12 +95,14 @@ func (d *deathRewards) grantParty(s *KillRewardSettings, attacker *player.Charac
 		if m.Dead() {
 			continue
 		}
-		if !shares[i].Valid {
-			// Still a reward: the member sees its status and a zero gain.
-			m.RewardExpAndSp(d.config.PlayerLevels, 0, 0)
-			continue
-		}
-		m.UpdateKarmaLoss(d.config.PlayerLevels, shares[i].Exp)
-		d.pay(s, m, owns[i], shares[i].Exp, shares[i].Sp, ownDamage[m.ObjectID()], summonDamage)
+		m.WhileAttached(func() {
+			if !shares[i].Valid {
+				// Still a reward: the member sees its status and a zero gain.
+				m.RewardExpAndSp(d.config.PlayerLevels, 0, 0)
+				return
+			}
+			m.UpdateKarmaLoss(d.config.PlayerLevels, shares[i].Exp)
+			d.pay(s, m, owns[i], shares[i].Exp, shares[i].Sp, ownDamage[m.ObjectID()], summonDamage)
+		})
 	}
 }

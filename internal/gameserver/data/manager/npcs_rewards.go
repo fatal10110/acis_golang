@@ -255,7 +255,9 @@ func (d *deathRewards) grantExpAndSp(s *KillRewardSettings, entries []playerRewa
 	// reaches, which spends every living member's own entry.
 	spent := map[int32]bool{}
 	for _, entry := range entries {
-		if spent[entry.actor.ObjectID()] {
+		// A player leaving the world is out of the kill, as if already out
+		// of its party.
+		if spent[entry.actor.ObjectID()] || entry.actor.Detaching() {
 			continue
 		}
 		if group, ok := d.rewardGroup(entry.actor); ok {
@@ -293,8 +295,11 @@ func (d *deathRewards) grantSolo(s *KillRewardSettings, entry playerRewardEntry,
 		exp += d.hostile.OverhitBonus(exp)
 	}
 	// Karma drops by the whole kill exp, before any pet takes its share.
-	entry.actor.UpdateKarmaLoss(d.config.PlayerLevels, exp)
-	d.pay(s, entry.actor, own, exp, sp, entry.damage, summonDamage)
+	// Paid in the player's final saves, or not at all once it is leaving.
+	entry.actor.WhileAttached(func() {
+		entry.actor.UpdateKarmaLoss(d.config.PlayerLevels, exp)
+		d.pay(s, entry.actor, own, exp, sp, entry.damage, summonDamage)
+	})
 }
 
 // summonOf returns p's live summon, or nil.
