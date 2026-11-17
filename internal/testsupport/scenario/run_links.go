@@ -15,12 +15,17 @@ import (
 type links struct {
 	exact  []string
 	prefix []string
+	// apart is set while the client waits for the answer to a request the
+	// server keeps out of the links: a page the player asked for by name, a
+	// help page or a hero page.
+	apart bool
 }
 
 // observe takes one frame the client was sent: a dialog page replaces the
-// links, and entering the world forgets them (the server keeps them per live
-// player). A page with no NPC (object 0) is one the player asked for or a
-// help page, which the server keeps out of the links; it is skipped.
+// links, whatever NPC it names (the server records every page it sends, the
+// ones with no NPC too), and entering the world forgets them (the server keeps
+// them per live player). The answer to a request that is kept out of the links
+// (see keepsLinks) is skipped.
 func (l *links) observe(payload []byte) {
 	if len(payload) == 0 {
 		return
@@ -29,10 +34,13 @@ func (l *links) observe(payload []byte) {
 	case serverpackets.OpcodeCharSelected:
 		l.exact, l.prefix = nil, nil
 	case serverpackets.OpcodeNpcHtmlMessage:
+		if l.apart {
+			return
+		}
 		rd := wire.NewPacketReader(payload)
-		obj := rd.ReadInt32()
+		rd.ReadInt32() // the NPC's object id
 		html := rd.ReadString()
-		if rd.Err() == nil && obj != 0 {
+		if rd.Err() == nil {
 			l.record(html)
 		}
 	}
@@ -75,6 +83,29 @@ func (l *links) record(html string) {
 }
 
 func isBlank(r rune) bool { return r <= ' ' }
+
+// keepsLinks reports whether the server leaves the links as they were when it
+// answers verb with args: a link request (the page is named by the player), a
+// help request and the hero pages show a page that no dialog offered.
+func keepsLinks(verb, command string) bool {
+	if verb == "link" {
+		return true
+	}
+	for _, p := range []string{"player_help ", "_match", "_diary"} {
+		if strings.HasPrefix(command, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// answerApart marks c as waiting for an answer that does not replace its
+// links (on) or as done waiting (off).
+func (r *run) answerApart(c *testsupport.ScriptedClient, on bool) {
+	if l := r.links[c]; l != nil {
+		l.apart = on
+	}
+}
 
 // validated reports whether the server checks command against the links: the
 // npc_, admin_ and Quest families. The others are not page links.

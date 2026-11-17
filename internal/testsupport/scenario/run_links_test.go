@@ -83,10 +83,32 @@ func TestLinksFollowTheLastPageTheClientWasSent(t *testing.T) {
 	if l.offers("npc_7_Chat 1") || !l.offers("npc_7_Chat 2") {
 		t.Fatal("a page did not replace the links of the last")
 	}
-	// A page for no NPC is one the player asked for: its links are not kept.
+	// A page with no NPC (a GM or clan page) replaces the links like any.
 	l.observe(npcPage(0, `<a action="bypass -h npc_7_Chat 3">a</a>`))
-	if l.offers("npc_7_Chat 3") || !l.offers("npc_7_Chat 2") {
-		t.Fatal("a page with no NPC changed the links")
+	if !l.offers("npc_7_Chat 3") || l.offers("npc_7_Chat 2") {
+		t.Fatal("a page with no NPC did not replace the links")
+	}
+	// The answer to a link, help or hero request is kept out of them.
+	l.apart = true
+	l.observe(npcPage(0, `<a action="bypass -h npc_7_Chat 4">a</a>`))
+	l.apart = false
+	if l.offers("npc_7_Chat 4") || !l.offers("npc_7_Chat 3") {
+		t.Fatal("the answer to a request kept out of the links changed them")
+	}
+	for _, tc := range []struct {
+		verb, command string
+		want          bool
+	}{
+		{"link", "x.htm", true},
+		{"bypass", "player_help tutorial.htm", true},
+		{"bypass", "_diary?class=88&page=1", true},
+		{"bypass", "_match?class=88&page=1", true},
+		{"bypass", "npc_7_Chat 1", false},
+		{"bypass", "Quest Q1 go.htm", false},
+	} {
+		if got := keepsLinks(tc.verb, tc.command); got != tc.want {
+			t.Errorf("keepsLinks(%q, %q) = %t, want %t", tc.verb, tc.command, got, tc.want)
+		}
 	}
 	l.observe([]byte{serverpackets.OpcodeCharSelected})
 	if l.offers("npc_7_Chat 2") {

@@ -950,6 +950,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		c.Send(w.Bytes())
 	case "bypass":
 		command := expandRoles(st.Args[0], r.objs)
+		r.answerApart(c, keepsLinks(st.Verb, command))
 		w := wire.NewPacketWriter(clientpackets.OpcodeRequestBypassToServer)
 		w.WriteString(command)
 		for range st.Repeat - 1 {
@@ -972,6 +973,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	case "appear":
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeAppearing).Bytes())
 	case "link":
+		r.answerApart(c, true)
 		w := wire.NewPacketWriter(clientpackets.OpcodeRequestLinkHtml)
 		w.WriteString(st.Args[0])
 		c.Send(w.Bytes())
@@ -1065,6 +1067,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.setPlayer(t)
 	}
 	frames = append(frames, r.srv.ReadQueued(t, c)...)
+	r.answerApart(c, false)
 	r.drainMembers(t)
 	others, err := r.othersSent(t, c)
 	if err != nil {
