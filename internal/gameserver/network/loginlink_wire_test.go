@@ -87,3 +87,42 @@ func TestInitialServerStatusOnTheWire(t *testing.T) {
 		})
 	}
 }
+
+// TestPlayerAuthApprovalReportsAccountInGameBeforeReleasingClient answers an
+// approval for a client still waiting: the login server is told the account
+// is in game, as the reference's PlayerInGame, and the client is released with
+// its approval. A rejection reports nothing and releases the
+// client with a refusal.
+func TestPlayerAuthApprovalReportsAccountInGameBeforeReleasingClient(t *testing.T) {
+	t.Parallel()
+	peer := linkpeer.Start(t, 1, "Bartz")
+	l, err := DialLoginLink(context.Background(), peer.Addr(), LoginServerAuth{ServerID: 1, HostName: "*", Port: 7777, MaxPlayers: 300},
+		LoginLinkHandlers{}, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("DialLoginLink: %v", err)
+	}
+	defer l.Close()
+	if first := peer.Next(t); first[0] != link.OpcodeServerStatus {
+		t.Fatalf("first frame opcode = %#x, want ServerStatus", first[0])
+	}
+
+	v := newSessionValidator(0)
+	answer := PlayerAuthAnswers(v, func() *LoginLink { return l }, zerolog.Nop())
+
+	rejected := queuedRequest(t, v, "carol", nil)
+	answer("carol", false)
+	expectAnswer(t, rejected, false, "rejected client")
+
+	approved := queuedRequest(t, v, "carol", nil)
+	answer("carol", true)
+	expectAnswer(t, approved, true, "approved client")
+
+	// The rejection sent nothing: the first frame after the status is the
+	// approval's PlayerInGame, byte for byte the reference's.
+	const rosterLen = 1 + 2 + len("carol")*2 + 2
+	got := peer.Next(t)
+	want := referenceLinkPayload(t, "playeringame", "carol")
+	if len(got) != len(want) || !bytes.Equal(got[:rosterLen], want[:rosterLen]) {
+		t.Fatalf("frame after the approval = %x, want the reference's PlayerInGame %x", got, want)
+	}
+}

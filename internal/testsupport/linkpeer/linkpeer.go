@@ -23,6 +23,9 @@ const frameTimeout = 10 * time.Second
 type Peer struct {
 	ln     net.Listener
 	frames chan []byte
+	// done ends the serving goroutine at the test's cleanup, even while
+	// frames nobody reads fill the queue.
+	done chan struct{}
 }
 
 // Start listens on an ephemeral port and answers the first connection: it
@@ -38,8 +41,11 @@ func Start(t testing.TB, serverID byte, name string) *Peer {
 	if err != nil {
 		t.Fatalf("linkpeer: listen: %v", err)
 	}
-	t.Cleanup(func() { _ = ln.Close() })
-	p := &Peer{ln: ln, frames: make(chan []byte, 64)}
+	p := &Peer{ln: ln, frames: make(chan []byte, 64), done: make(chan struct{})}
+	t.Cleanup(func() {
+		close(p.done)
+		_ = ln.Close()
+	})
 	go p.serve(priv, serverID, name)
 	return p
 }
@@ -99,6 +105,10 @@ func (p *Peer) serve(priv *rsa.PrivateKey, serverID byte, name string) {
 		if err != nil || session.Decrypt(payload) != nil {
 			return
 		}
-		p.frames <- payload
+		select {
+		case p.frames <- payload:
+		case <-p.done:
+			return
+		}
 	}
 }

@@ -1,6 +1,8 @@
 package serverpackets
 
 import (
+	"cmp"
+	"slices"
 	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -108,6 +110,8 @@ func oracleDepositable(v [10]int32, private bool) []*item.Instance {
 			out = append(out, inst)
 		}
 	}
+	// The reference container is an ordered set: the highest object id first.
+	slices.SortStableFunc(out, func(a, b *item.Instance) int { return cmp.Compare(b.ObjectID, a.ObjectID) })
 	return out
 }
 

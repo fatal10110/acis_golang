@@ -1,6 +1,7 @@
 package serverpackets
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -46,7 +47,8 @@ func oracleSummon(r int, v [10]int32) PetInfoSnapshot {
 		MoveMultiplier: rowFloat(r, 0), AtkSpdMultiplier: rowFloat(r, 1),
 		CollisionRadius: rowDouble(r, 2), CollisionHeight: rowDouble(r, 3),
 		InCombat: f(1)&1 != 0, AlikeDead: f(2)&1 != 0,
-		Name: oracleStrings[r].s, Title: oracleStrings[(r+1)%len(oracleStrings)].s,
+		// A summon is titled with its owner's name (the probe's owner is "Master").
+		Name: oracleStrings[r].s, Title: "Master",
 		PvpFlag: abs(f(4) % 3), Karma: f(5),
 		CurHP: f(6), MaxHP: f(7), CurMP: f(8), MaxMP: f(9),
 		SP: f(0), Level: f(1), Exp: int64(f(2))*1000003 + int64(f(3)),
@@ -263,6 +265,35 @@ func (o *oraclePlayer) invisible() {
 	o.hidden = true
 }
 
+// oracleMounts are the bodies of the two mounts the probe's variants ride
+// (ProbeCharacters.bodies).
+var oracleMounts = fakeMountBodies{
+	12526: {rowDouble(0, 6), rowDouble(0, 7)},
+	12621: {rowDouble(0, 8), rowDouble(0, 9)},
+}
+
+// ride mounts the character on the mount npcID, whose body its collision then is.
+func (o *oraclePlayer) ride(npcID int32) {
+	o.c.Configure(player.Runtime{Mounts: oracleMounts})
+	o.c.Mount(npcID, 0)
+}
+
+// subclass is ProbeCharacters.subclass over a live character: a class of
+// another race is active, with a template of its own (the live one but for
+// its body); the collision stays the base class's.
+func (o *oraclePlayer) subclass() {
+	active := oracleLiveTemplate
+	active.CollisionRadius, active.CollisionHeight = rowDouble(0, 6), rowDouble(0, 7)
+	active.CollisionRadiusFemale, active.CollisionHeightFemale = rowDouble(0, 8), rowDouble(0, 9)
+	o.c.SetClassID(oracleClassIDs[1])
+	o.c.AttachRuntime(&active, nil)
+}
+
+// unarmed is ProbeCharacters.unarmed: nothing in the right hand.
+func (o *oraclePlayer) unarmed() {
+	o.items = slices.Delete(o.items, rhandPaperdollIndex-1, rhandPaperdollIndex)
+}
+
 // oracleVessel is the boat a passenger rides: only its object id is read.
 type oracleVessel int32
 
@@ -280,8 +311,9 @@ func oracleVariants() map[string]func(o *oraclePlayer) {
 		"gm-hero-aura": func(o *oraclePlayer) { o.gm = true; o.heroAura = true },
 		"hero":         func(o *oraclePlayer) { o.c.SetHero(true) },
 		"noble":        func(o *oraclePlayer) { o.c.SetNoble(true) },
-		"strider":      func(o *oraclePlayer) { o.c.Mount(12526, 0) },
-		"wyvern":       func(o *oraclePlayer) { o.c.Mount(12621, 0) },
+		"strider":      func(o *oraclePlayer) { o.ride(12526) },
+		"wyvern":       func(o *oraclePlayer) { o.ride(12621) },
+		"unarmed":      (*oraclePlayer).unarmed,
 		"fishing": func(o *oraclePlayer) {
 			o.c.SetFishing(true)
 			o.c.SetFishingBait(loc(rowField(a, 3), rowField(a, 4), rowField(a, 5)))
@@ -330,6 +362,7 @@ func addPlayerCases(m map[string]func() wire.Frame) {
 	}
 	add("live", true, func(*oraclePlayer) {})
 	add("live-flying", true, func(o *oraclePlayer) { o.c.SetFlying(true) })
+	add("subclass", true, (*oraclePlayer).subclass)
 	for name, apply := range oracleVariants() {
 		add(name, false, apply)
 	}

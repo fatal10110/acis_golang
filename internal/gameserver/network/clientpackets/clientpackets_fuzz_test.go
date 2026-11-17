@@ -116,7 +116,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestMakeMacro", decodes(DecodeRequestMakeMacro), seedPacket(OpcodeRequestMakeMacro, int32(0), "Heal", "self heal", "H", byte(1), byte(1), byte(1), byte(1), int32(1011), byte(0), "")},
 	{"RequestDeleteMacro", decodes(DecodeRequestDeleteMacro), seedPacket(OpcodeRequestDeleteMacro, int32(1000))},
 	{"RequestEvaluate", decodes(DecodeRequestEvaluate), seedPacket(OpcodeRequestEvaluate, seedObjectID)},
-	{"CannotMoveAnymore", decodes(DecodeCannotMoveAnymore), seedPacket(OpcodeCannotMoveInVehicle, seedX, seedY, seedZ, int32(32768))},
+	{"CannotMoveAnymore", decodes(DecodeCannotMoveAnymore), seedPacket(OpcodeCannotMoveAnymore, seedX, seedY, seedZ, int32(32768))},
 	{"RequestTargetCancel", decodes(DecodeRequestTargetCancel), seedPacket(OpcodeRequestTargetCancel, uint16(0))},
 	{"AnswerTradeRequest", decodes(DecodeAnswerTradeRequest), seedPacket(OpcodeAnswerTradeRequest, int32(1))},
 	{"RequestActionUse", decodes(DecodeRequestActionUse), seedPacket(OpcodeRequestActionUse, int32(0), int32(0), byte(0))},
