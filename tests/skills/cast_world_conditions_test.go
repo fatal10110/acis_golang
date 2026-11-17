@@ -21,7 +21,7 @@ func worldGatedSkill(id modelskill.ID, root modelskill.Condition) modelskill.Def
 }
 
 // squareZone is a <player insidePoly> condition over a square of the given
-// half-width around the world origin, tall enough to hold any spawn height.
+// half-width around (centerX, centerY), tall enough to hold any spawn height.
 func squareZone(inside bool, half, centerX, centerY int) modelskill.Condition {
 	node := func(x, y int) modelskill.Condition {
 		return modelskill.Condition{Kind: "node", Attrs: map[string]string{"x": strconv.Itoa(x), "y": strconv.Itoa(y)}}
@@ -39,9 +39,9 @@ func squareZone(inside bool, half, centerX, centerY int) modelskill.Condition {
 }
 
 // TestCastConditionsReadServerNightAndPlayerZone casts skills gated by
-// <game night="True|False"/> and <player insidePoly="True|False"> on a
-// player the server's day/night source and a polygon decide for: a gate
-// opens only when the world matches it, in both clock states.
+// <game night="True|False"/> and <player insidePoly="True|False"> against the
+// server's day/night source and the player's position: a gate opens only
+// when the world matches it, in both clock states.
 func TestCastConditionsReadServerNightAndPlayerZone(t *testing.T) {
 	t.Parallel()
 	const (
