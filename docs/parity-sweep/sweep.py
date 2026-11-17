@@ -89,6 +89,16 @@ def gh(method, path, fields=None, apply=False, tolerate=()):
     return json.loads(r.stdout or '{}')
 
 
+def gh_read(*args):
+    """One read-only `gh api` listing; a failure stops the run, since an empty answer would turn
+    off the duplicate and label guards that read it."""
+    r = subprocess.run(['gh', 'api', *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit('gh api %s failed: %s\nRerun the same command: finished steps are recorded in %s.' % (
+            ' '.join(args), (r.stderr + r.stdout).strip(), PATHS['issues']))
+    return r.stdout
+
+
 def existing_by_title(apply):
     """Issues already on GitHub with a sweep label, keyed by exact title (guards against duplicates
     when a create succeeded but its result was lost)."""
@@ -96,10 +106,9 @@ def existing_by_title(apply):
         return {}
     found = {}
     for label in ('parity-epic', 'parity-sweep', 'domain-review', 'parity-delta'):
-        out = subprocess.run(['gh', 'api', '--paginate', 'repos/%s/issues?state=all&per_page=100&labels=%s' % (REPO, label),
-                              '--jq', '.[] | select(.pull_request == null) | [.title, .number, .id] | @tsv'],
-                             capture_output=True, text=True)
-        for line in out.stdout.splitlines():
+        out = gh_read('--paginate', 'repos/%s/issues?state=all&per_page=100&labels=%s' % (REPO, label),
+                      '--jq', '.[] | select(.pull_request == null) | [.title, .number, .id] | @tsv')
+        for line in out.splitlines():
             t, n, i = line.split('\t')
             found[t] = {'number': int(n), 'id': int(i)}
     return found
@@ -186,9 +195,7 @@ Run `docs/parity-sweep/prompts/wave-start.md`, then one workflow per slice, then
 def cmd_labels(apply):
     existing = set()
     if apply:
-        out = subprocess.run(['gh', 'api', '--paginate', 'repos/%s/labels?per_page=100' % REPO, '--jq', '.[].name'],
-                             capture_output=True, text=True)
-        existing = set(out.stdout.split('\n'))
+        existing = set(gh_read('--paginate', 'repos/%s/labels?per_page=100' % REPO, '--jq', '.[].name').split('\n'))
     for name, desc in LABELS.items():
         if name not in existing:
             gh('POST', 'repos/%s/labels' % REPO, {'name': name, 'description': desc[:100], 'color': 'c5def5'}, apply)
@@ -197,8 +204,8 @@ def cmd_labels(apply):
 def milestone_number(apply):
     if not apply:
         return 0
-    out = subprocess.run(['gh', 'api', 'repos/%s/milestones?state=all&per_page=100' % REPO], capture_output=True, text=True)
-    return next(x['number'] for x in json.loads(out.stdout) if x['title'] == MILESTONE)
+    out = gh_read('repos/%s/milestones?state=all&per_page=100' % REPO)
+    return next(x['number'] for x in json.loads(out) if x['title'] == MILESTONE)
 
 
 def create(key, title, body, labels, im, ms, apply, existing):
@@ -217,12 +224,18 @@ def create(key, title, body, labels, im, ms, apply, existing):
 
 
 def link(key, parent_number, im, apply):
-    """Link im[key] under parent_number once; 'already' answers count as done."""
+    """Link im[key] under parent_number once. An 'already linked' or 'one parent' answer counts as
+    done only when the child's current parent is parent_number; any other parent stops the run."""
     child = im[key]
     if child.get('linked'):
         return
-    gh('POST', 'repos/%s/issues/%d/sub_issues' % (REPO, parent_number), {'sub_issue_id': child['id']}, apply,
-       tolerate=('already', 'duplicate sub-issue', 'may only have one parent'))
+    r = gh('POST', 'repos/%s/issues/%d/sub_issues' % (REPO, parent_number), {'sub_issue_id': child['id']}, apply,
+           tolerate=('already', 'duplicate sub-issue', 'may only have one parent'))
+    if r is None:
+        current = gh_read('repos/%s/issues/%d/parent' % (REPO, child['number']), '--jq', '.number').strip()
+        if current != str(parent_number):
+            sys.exit('#%d is linked under #%s, not #%d: move it by hand, then rerun.' % (
+                child['number'], current or '?', parent_number))
     child['linked'] = True
     if apply:
         save_issues(im)

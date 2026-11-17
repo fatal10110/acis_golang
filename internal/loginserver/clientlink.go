@@ -2,8 +2,10 @@ package loginserver
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
-	"math/rand/v2"
+	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -160,7 +162,7 @@ func NewClientLink(
 		unclaimed:          make(map[string]unclaimedSession),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
-		newSessionID:       rand.Int32,
+		newSessionID:       randomInt32,
 		hashPassword:       model.HashPassword,
 	}
 }
@@ -658,8 +660,8 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		// The whole session, play keys included, is issued here: a game
 		// server only ever sees play keys this login server drew, which the
 		// client learns from PlayOk once its server choice is admitted.
-		c.loginKey1, c.loginKey2 = rand.Int32(), rand.Int32()
-		c.playKey1, c.playKey2 = rand.Int32(), rand.Int32()
+		c.loginKey1, c.loginKey2 = randomInt32(), randomInt32()
+		c.playKey1, c.playKey2 = randomInt32(), randomInt32()
 		if l.holders == nil {
 			l.holders = make(map[string]*clientConn)
 		}
@@ -985,4 +987,13 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 	// releaseSession.
 	c.joinedGame = true
 	return true
+}
+
+// randomInt32 draws a non-negative int32 from the system's secure random
+// source: session ids and session keys gate a game server login, so a
+// client that saw some of them must not be able to predict the next.
+func randomInt32() int32 {
+	var b [4]byte
+	_, _ = rand.Read(b[:]) // crypto/rand.Read never returns an error
+	return int32(binary.LittleEndian.Uint32(b[:]) & math.MaxInt32)
 }

@@ -161,6 +161,8 @@ func TestConfigValidate(t *testing.T) {
 		"no budget":     func(c *Config) { c.Duration, c.Actions = 0, 0 },
 		"long password": func(c *Config) { c.Password = "12345678901234567" },
 		"no bots":       func(c *Config) { c.Bots = 0 },
+		"past duration": func(c *Config) { c.Duration, c.Actions = -time.Second, 0 },
+		"minus actions": func(c *Config) { c.Actions = -1 },
 	} {
 		c := DefaultConfig()
 		mutate(&c)

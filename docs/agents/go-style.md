@@ -110,6 +110,30 @@ queue's own lock is below every lock in the table. So is the effect-tick registr
 list gains its first effect or loses its last) and `Untrack`: a registry-side path never reads a list
 while holding it (`Effects.Tick` and `Reset` snapshot the entries and unlock before touching a list).
 
+The network package's `livePlayer` wraps a `player.Character` and adds five locks that another
+actor's queue can reach. All of them sit above every `player.Character` lock: a goroutine holding a
+`player.Character` lock never takes one of them. Outer to inner:
+
+| Order | Lock | Held across calls | Why |
+| --- | --- | --- | --- |
+| 1 | `teleportMu` | outer | It serializes a teleport from its start through the landing (`jumpOrDefer`, `landLivePlayer`, `jumpLivePlayer`): a summon-friend cast teleports the player from the caster's queue while `Appearing` lands it on its own. Under it run the world leave and rejoin, zone exits and entries, the position broadcast, the trade, enchant and boat cancels, and `goIdle` (`pickupMu`, `interactMu`). The onlookers' reveal runs after it is released. |
+| 1 | `stanceMu` (`StanceLock`) | outer | An attack-stance transition and the frames it sends are one step (`startLiveAutoAttack`, `stopLiveAttackStance`, `startSummonAttackStance`, the stance tracker's expiry): a hit runs it on the attacker's goroutine, the expiry on the player's queue. Under it run the stance tracker, `SetInCombat` (`stateMu`), the cubic list read (`cubicsMu`) and the `AutoAttackStart`/`AutoAttackStop` broadcasts. |
+| 2 | `cubicsMu` | outer, below the two above | Another player's cubic skill grants or evicts a cubic from the caster's queue (`syncCubicRuntime`). Under it run the character's cubic list and each cubic runtime's lock, which arms the cubic's timer on the queue; no frame is sent under it. |
+| 2 | `pickupMu` | outer, only around the pickup-block check and the pickup-lock paralysis | It guards the deferred intentions and the pickup state, which an effect applied from another queue drops. Its accessors are leaves; `livePickupBlockedDeferrable` reads the posture (`stateMu`) and the attack and cast controllers under it. |
+| 3 | `interactMu` | leaf | It guards the queued interact target; nothing is taken under it. |
+
+`teleportMu` and `stanceMu` share a row: neither is taken while the other is held. `pickupMu` and
+`cubicsMu` share one for the same reason, and `goIdle` takes `pickupMu` and `interactMu` one after the
+other, never one under the other.
+
+Item locks, outer to inner: `itemcontainer.Container.mu`, then `itemcontainer.Inventory.mu`, then an
+item instance's own lock (`item.Instance`). The instance lock is a leaf: an instance releases it
+before it calls its persister, so a persister call made from container code runs under
+`Container.mu` only. `itemcontainer.Exchange` is the one place two containers are locked at once: it
+takes both containers' locks, then both inventories' locks, each pair in ascending owner id, and
+runs the delivery hooks after it releases them all. Any new path that locks two containers goes
+through `Exchange`.
+
 Creature locks follow the same rules. `creature.HPBar.Publish` holds the bar's lock while it reads
 HP and hands the value to `send`; `send` must not block and must not take a lock a `Publish`
 caller may hold.

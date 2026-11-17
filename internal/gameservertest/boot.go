@@ -39,7 +39,6 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
-	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
@@ -223,7 +222,6 @@ type options struct {
 	night                  conditions.NightSource
 	maxGeoPathFailCount    int
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
-	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	seedSpawnData          func(*gamesql.SpawnStore)
@@ -275,7 +273,6 @@ type options struct {
 	manor                  network.ManorConfig
 	augmentationChances    *augmentation.Chances
 	augmentRoll            augmentation.Rand
-	enchantConfig          *enchant.Config
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
 	classTemplate          *player.Template
@@ -744,11 +741,6 @@ func WithClassCharacter(name string, level, sp, class int) Option {
 	}
 }
 
-// WithShortcutSeed inserts shortcut rows before the client dials.
-func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
-	return func(o *options) { o.seedShortcuts = seed }
-}
-
 // WithHennaTable boots with hennas as the loaded dye symbol table instead
 // of HennaTemplates.
 func WithHennaTable(hennas *henna.Table) Option {
@@ -874,12 +866,6 @@ func WithWantChars(n int) Option { return func(o *options) { o.wantChars = n } }
 // start (default: after 100), so a suite can keep its objects' ids out of
 // the range of the small numbers a page or packet carries.
 func WithObjectIDsAfter(start int32) Option { return func(o *options) { o.objectIDStart = start } }
-
-// WithEnchantConfig sets the players.properties scroll-of-enchant rates and
-// limits; without it the shipped defaults apply.
-func WithEnchantConfig(cfg enchant.Config) Option {
-	return func(o *options) { o.enchantConfig = &cfg }
-}
 
 // WithRecipes replaces the recipe table the link loads (default:
 // RecipeTemplates).
@@ -1621,13 +1607,6 @@ func (s *Server) PlayerPosition(tb testing.TB, objID int32) (int, int, int) {
 	return located.Position()
 }
 
-// PlayerTotalWeight reports the live inventory's last-computed total weight.
-func (s *Server) PlayerTotalWeight(tb testing.TB, objID int32) int {
-	tb.Helper()
-	holder := s.onlineCharacter(tb, objID)
-	return holder.Inventory().TotalWeight()
-}
-
 // DrainPlayerMP reduces the live player's current MP by amount, so restore
 // flows have observable headroom no single packet creates.
 func (s *Server) DrainPlayerMP(tb testing.TB, objID int32, amount int) {
@@ -2151,9 +2130,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("load character relations: %v", err)
 	}
 	relations := relation.NewManager(loadedRelations)
-	if o.seedShortcuts != nil {
-		o.seedShortcuts(shortcuts)
-	}
 	crests := o.crests
 	if crests == nil {
 		crests = datacache.NewCrests()
@@ -2458,7 +2434,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PersistWait:      o.persistWait,
 		Queues:           queues,
 		ShadowItems:      shadowItems,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, ShowNPCLevel: o.showNPCLevel},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, ShowNPCLevel: o.showNPCLevel},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,

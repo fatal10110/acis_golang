@@ -409,6 +409,7 @@ func maintain(ctx context.Context, address string, auth func() LoginServerAuth, 
 			select {
 			case <-ctx.Done():
 				l.Close()
+				<-l.Done()
 			case <-l.Done():
 			}
 		}

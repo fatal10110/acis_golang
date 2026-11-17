@@ -16,6 +16,10 @@ func TestRunRejectsBadFlags(t *testing.T) {
 		{"-behaviors", "move,dance"},
 		{"-prefix", "Bot"},
 		{"-no-such-flag"},
+		{"-duration", "-1s", "-actions", "0"},
+		{"-actions", "-1"},
+		{"-revision", "4294967042"},
+		{"-move-radius", "4294967296"},
 	} {
 		var stdout, stderr bytes.Buffer
 		if code := run(context.Background(), args, &stdout, &stderr); code != 2 {

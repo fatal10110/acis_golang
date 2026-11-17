@@ -119,14 +119,16 @@ that the image builds and each of its binaries starts, and that the `db` service
 loads every table file of a stub datapack. It also checks that a first start without
 `tools/full_install.sql` exits non-zero, and that under `docker compose up` the `restart: always`
 restart that follows serves an empty database but never reports healthy, and that a data directory
-left by a first start killed before the schema load never reports healthy either. With
-`ACIS_SMOKE_DATAPACK` set to an `aCis_datapack` checkout it also loads the real schema and checks
-that `acis` holds one table per `sql/*.sql` file; CI does this when the `ACIS_DATAPACK_TOKEN`
-secret (read access to the repository holding `aCis_datapack`) is set, and warns otherwise. To run
-it locally, stop any compose database first: the `db` container name is fixed:
+left by a first start killed before the schema load never reports healthy either. It
+also loads the real schema and checks that `acis` holds one table per `sql/*.sql` file. That
+schema comes from the repository's own `aCis_datapack/` copy, or from the checkout
+`ACIS_SMOKE_DATAPACK` names; CI uses the copy and first checks it against its manifest
+(`ops/datapack-manifest.sh check`). To run it locally, stop any compose database first: the `db`
+container name is fixed:
 
 ```sh
-ACIS_SMOKE_DATAPACK=../aCis_datapack ops/docker/smoke-test.sh
+ops/docker/smoke-test.sh
+ACIS_SMOKE_DATAPACK=/path/to/aCis_datapack ops/docker/smoke-test.sh
 ```
 
 Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
