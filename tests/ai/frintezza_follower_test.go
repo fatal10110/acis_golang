@@ -443,6 +443,9 @@ func TestFollowerOfFrintezzaChangesBodyAndIsBeaten(t *testing.T) {
 // tells Frintezza 30011, gives up memo key 5, sets its db value 0 and plays
 // its exit from 0.5 s later. Its corpse decays 18 s after the death, which
 // cancels the exit's timers past its seventh shot: nothing more is filmed.
+// The death's idle runs the no-desire hook first: db value 6 still, so its
+// first look around in 30 s sees Frintezza and Scarlet van Halisha and,
+// on the rigged roll, tells each 20000.
 func TestFollowerOfFrintezzaDies(t *testing.T) {
 	t.Parallel()
 	w := bootFollower(t, frLiveRow(6), "GrandBoss")
@@ -451,6 +454,9 @@ func TestFollowerOfFrintezzaDies(t *testing.T) {
 	id := f.ObjectID()
 	w.heard.take()
 	w.kill(t, f)
+	if got, want := w.heard.take(), []string{"29993 event=0 arg1=20000 arg2=0", "29994 event=0 arg1=20000 arg2=0"}; !slices.Equal(slices.Sorted(slices.Values(got)), want) {
+		t.Fatalf("heard at the death's idle = %q, want %q", got, want)
+	}
 	w.srv.Advance(t, 3*time.Second)
 	if got, want := w.heard.take(), []string{fmt.Sprintf("29993 event=%d arg1=30011 arg2=0", id)}; !slices.Equal(got, want) {
 		t.Fatalf("heard as it died = %q, want %q", got, want)
