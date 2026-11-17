@@ -107,7 +107,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		}
 		buffID, err := strconv.Atoi(e.Name)
 		if err != nil || buffID > math.MaxInt32 {
-			return htmltext
+			// An id past int32 is no buff: nothing answers it.
+			return ""
 		}
 		if b, ok := buffs()[buffID]; ok {
 			if p.ItemCount(goldenRamCoin) < int32(b.coins) {

@@ -151,7 +151,7 @@ func onEvent(s *script.Script, w *flagwar.War, e script.Event) string {
 		case clan != nil && h.OwnerID() == p.ClanID():
 			html = "farm_kel_mahum_messenger_22.htm"
 		default:
-			html = clanRegisterStatus(s, w, h, p)
+			html = w.Registering(func() string { return clanRegisterStatus(s, w, h, p) })
 		}
 	case strings.EqualFold(event, "register_clan_member"):
 		switch {
