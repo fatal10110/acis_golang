@@ -24,6 +24,17 @@ public class Creature extends WorldObject
 	public double collisionRadius;
 	public double collisionHeight;
 
+	// A creature that is no player or summon has no karma and no pvp flag.
+	public int getKarma()
+	{
+		return 0;
+	}
+
+	public byte getPvpFlag()
+	{
+		return 0;
+	}
+
 	public CreatureStatus getStatus()
 	{
 		return status;

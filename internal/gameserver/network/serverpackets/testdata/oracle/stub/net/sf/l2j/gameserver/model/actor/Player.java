@@ -273,6 +273,7 @@ public final class Player extends Playable
 		return classId;
 	}
 
+	@Override
 	public int getKarma()
 	{
 		return karma;
@@ -470,9 +471,10 @@ public final class Player extends Playable
 		return cursedWeaponEquippedId;
 	}
 
-	public int getPvpFlag()
+	@Override
+	public byte getPvpFlag()
 	{
-		return pvpFlag;
+		return (byte) pvpFlag;
 	}
 
 	public int getPvpKills()

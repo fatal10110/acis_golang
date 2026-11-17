@@ -120,6 +120,13 @@ func oracleSimpleCases() map[string]func() wire.Frame {
 			return FrameExEnchantSkillInfo(EnchantSkillInfo{ID: v[0], Level: v[1], SPCost: v[2], XPCost: int64(v[3]), Rate: v[4]})
 		}
 		m["ExShowScreenMessage"+n] = func() wire.Frame { return FrameExShowScreenMessage("msg", v[0]) }
+		// the reference holds the pvp flag as a byte
+		m["RelationChanged/auto"+n] = func() wire.Frame {
+			return FrameRelationChanged(RelationChangedInfo{ObjectID: v[0], Relation: v[1], IsAutoAttackable: true, Karma: v[2], PvPFlag: int32(int8(v[3]))})
+		}
+		m["RelationChanged/peaceful"+n] = func() wire.Frame {
+			return FrameRelationChanged(RelationChangedInfo{ObjectID: v[0], Relation: v[1], Karma: v[2], PvPFlag: int32(int8(v[3]))})
+		}
 		m["PlaySound/typed"+n] = func() wire.Frame { return FramePlaySoundAt(Sound{Type: v[0], File: "sound"}) }
 		m["PlaySound/full"+n] = func() wire.Frame {
 			return FramePlaySoundAt(Sound{
@@ -164,6 +171,7 @@ func oracleSimpleCases() map[string]func() wire.Frame {
 		m["ShowBoard"+n] = func() wire.Frame { return FrameShowBoard("101", s) }
 		m["ExShowScreenMessage/text-"+str.name] = func() wire.Frame { return FrameExShowScreenMessage(s, 5000) }
 		m["PlaySound/file-"+str.name] = func() wire.Frame { return FramePlaySound(s) }
+		m["TutorialShowHtml"+n] = func() wire.Frame { return FrameTutorialShowHTML(s) }
 	}
 	m["ShowBoard/no-page"] = func() wire.Frame { return FrameShowBoard("102", ShowBoardNoPage) }
 	m["ShowBoard/fields"] = func() wire.Frame { return FrameShowBoardFields([]string{"a", "", "日"}) }
@@ -214,6 +222,27 @@ func oracleSimpleCases() map[string]func() wire.Frame {
 	m["TradePressOwnOk"] = FrameTradePressOwnOk
 	m["TradePressOtherOk"] = FrameTradePressOtherOk
 	m["LeaveWorld"] = FrameLeaveWorld
+	m["ServerClose"] = FrameServerClose
+	m["TutorialCloseHtml"] = FrameTutorialCloseHTML
+	m["PetitionVote"] = FramePetitionVote
+	// The race the probe runs: lane i's object id, npc id, body and speeds.
+	race := func(code1, code2 int32) event.DerbyRace {
+		r := event.DerbyRace{Code1: code1, Code2: code2}
+		for lane := range event.DerbyLanes {
+			r.Runners[lane] = event.DerbyRunner{
+				ObjectID: int32(0x10000000 + lane*3), NpcID: 31003 + lane*7,
+				CollisionHeight: 10.5 + float64(lane), CollisionRadius: 5.25 + float64(lane)*0.25,
+			}
+			for segment := range event.DerbySegments {
+				r.Speeds[lane][segment] = uint8((lane*37 + segment*13 + 128) % 256)
+			}
+		}
+		return r
+	}
+	m["MonRaceInfo/init"] = func() wire.Frame { return FrameMonRaceInfo(race(-1, 0)) }
+	m["MonRaceInfo/start"] = func() wire.Frame { return FrameMonRaceInfo(race(0, 15322)) }
+	m["MonRaceInfo/middle"] = func() wire.Frame { return FrameMonRaceInfo(race(13765, -1)) }
+	m["MonRaceInfo/end"] = func() wire.Frame { return FrameMonRaceInfo(race(-1, 0)) }
 	m["CharCreateOk"] = FrameCharCreateOk
 	m["CharDeleteOk"] = FrameCharDeleteOk
 	m["ExOlympiadMatchEnd"] = FrameExOlympiadMatchEnd

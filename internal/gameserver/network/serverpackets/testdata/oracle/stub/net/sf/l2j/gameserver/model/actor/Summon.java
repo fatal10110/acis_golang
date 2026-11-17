@@ -66,11 +66,13 @@ public class Summon extends Playable
 		return 0;
 	}
 
+	@Override
 	public final byte getPvpFlag()
 	{
 		return pvpFlag;
 	}
 
+	@Override
 	public int getKarma()
 	{
 		return karma;
