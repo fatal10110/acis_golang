@@ -211,5 +211,5 @@ func (l *GameClientLink) sendPartyPositions(id party.ID) {
 		loc := m.CurrentLocation()
 		at[i] = serverpackets.PartyMemberAt{ObjectID: m.ObjectID(), X: int32(loc.X), Y: int32(loc.Y), Z: int32(loc.Z)}
 	}
-	l.broadcastToMembers(members, func() wire.Frame { return serverpackets.FramePartyMemberPosition(at) })
+	sendToMembers(members, func() wire.Frame { return serverpackets.FramePartyMemberPosition(at) })
 }

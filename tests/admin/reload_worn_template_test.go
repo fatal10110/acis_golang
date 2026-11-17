@@ -105,7 +105,7 @@ func TestReloadedAwayWornWeaponUnequipTakesOffWhatItBrought(t *testing.T) {
 		t.Fatalf("enchant the weapon: %v", err)
 	}
 	aug := item.Augmentation{Attributes: riggedAugmentation, SkillID: gameservertest.AugmentRedSkillID, SkillLevel: 1}
-	if err := gamesql.NewAugmentationStore(srv.DB).Create(context.Background(), weapon, aug); err != nil {
+	if err := gameservertest.SeedAugmentation(context.Background(), srv.DB, weapon, aug); err != nil {
 		t.Fatalf("augment the weapon: %v", err)
 	}
 	gm := srv.Client

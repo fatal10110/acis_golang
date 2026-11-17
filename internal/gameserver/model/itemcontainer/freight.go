@@ -33,11 +33,6 @@ func NewFreightWithPersister(ownerID int32, templates *item.Table, persist item.
 	return &Freight{Container: NewContainerWithPersister(ownerID, item.LocationFreight, templates, persist)}
 }
 
-// NewFreight returns an empty freight container for ownerID.
-func NewFreight(ownerID int32, templates *item.Table) *Freight {
-	return &Freight{Container: NewContainer(ownerID, item.LocationFreight, templates)}
-}
-
 func (f *Freight) listed(inst *item.Instance) bool {
 	st := inst.Snapshot()
 	return st.LocationData == 0 || st.LocationData == f.ActiveLocation
@@ -102,12 +97,6 @@ func (f *Freight) Transfer(objectID int32, count int, target Receiver, nextID fu
 		return nil, 0, false, nil
 	}
 	return f.Container.Transfer(objectID, count, target, nextID)
-}
-
-// VisibleItemByTemplateID returns the first instance of templateID visible
-// at the currently active town, or nil.
-func (f *Freight) VisibleItemByTemplateID(templateID int32) *item.Instance {
-	return f.ItemByTemplateID(templateID)
 }
 
 // ItemByTemplateID returns the first visible instance of templateID, or nil.

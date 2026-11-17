@@ -165,6 +165,9 @@ type AllyDissolution struct {
 // and cleared on every clan in no alliance, selected by the now-zero
 // alliance id; with consistent rows that is only the dissolved alliance's
 // clans.
+//
+// Only the clans whose crest changed (Cleared) are reported for a refresh;
+// a clan whose crest was already none gets no redundant user info resend.
 func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now time.Time, sieges Sieges) (AllyDissolution, AllyDissolveResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {

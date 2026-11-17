@@ -361,9 +361,9 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	}
 	ch.SetName("Player")
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
-	inv := itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil)
+	inv := itemcontainer.NewPlayerInventory(ch.ID, testItemTemplates())
 	if len(delivery) > 0 {
-		inv = itemcontainer.RestorePlayerInventoryWithDelivery(ch.ID, testItemTemplates(), nil, delivery[0], nil)
+		inv = itemcontainer.NewPlayerInventoryWithDelivery(ch.ID, testItemTemplates(), delivery[0], nil)
 	}
 	ch.AttachRuntime(tmpl, inv)
 

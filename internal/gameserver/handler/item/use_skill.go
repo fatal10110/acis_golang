@@ -149,12 +149,6 @@ type UseRequest struct {
 	Target any
 }
 
-// Use preserves the first result for callers that handle one instant-cast
-// skill. New item-use paths should use UseAll.
-func Use(req UseRequest) UseResult {
-	return UseAll(req)[0]
-}
-
 // UseAll runs the ItemSkills instant-cast path for every attached instant
 // skill in template order. Processing stops at the first rejected skill.
 func UseAll(req UseRequest) []UseResult {

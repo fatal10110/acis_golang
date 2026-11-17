@@ -208,7 +208,7 @@ func TestInventoryIndex_RestoreAndDestroyAll(t *testing.T) {
 
 func TestFreightIndex_FollowsAdd(t *testing.T) {
 	t.Parallel()
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 	f.ActiveLocation = 1
 	f.AddNew(freightTestItemID, 1, 0x20000001)
 	if _, err := f.AddCreated(freightTestStackableID, 5, func() (int32, error) { return 0x20000002, nil }); err != nil {
@@ -263,7 +263,7 @@ func TestHeldTransferIndex(t *testing.T) {
 // byContainerOrder.
 func TestContainerIndex_OrderSurvivesBucketReshuffle(t *testing.T) {
 	t.Parallel()
-	c := NewWarehouse(1, testTemplates())
+	c := NewContainer(1, item.LocationWarehouse, testTemplates())
 	for _, id := range []int32{601, 602, 603, 604, 605} {
 		c.AddNew(daggerTemplateID, 1, id)
 	}

@@ -210,7 +210,7 @@ func mustFindFrame(t *testing.T, frames [][]byte, start int, opcode byte, sub ui
 func persistedAugmentation(t *testing.T, srv *gameservertest.Server, objectID int32) (item.Augmentation, bool) {
 	t.Helper()
 	srv.FlushPersistence(t)
-	aug, ok, err := gamesql.NewAugmentationStore(srv.DB).Get(context.Background(), objectID)
+	aug, ok, err := gameservertest.StoredAugmentation(context.Background(), srv.DB, objectID)
 	if err != nil {
 		t.Fatalf("read augmentation: %v", err)
 	}
@@ -526,7 +526,7 @@ func TestAugmentActiveSkillKeepsReuseAcrossReequip(t *testing.T) {
 		t.Fatalf("grant expertise: %v", err)
 	}
 	sword := srv.GiveItem(t, objID, gameservertest.StormbringerID, 1)
-	if err := gamesql.NewAugmentationStore(db).Create(context.Background(), sword, item.Augmentation{Attributes: augmentID, SkillID: skillID, SkillLevel: 1}); err != nil {
+	if err := gameservertest.SeedAugmentation(context.Background(), db, sword, item.Augmentation{Attributes: augmentID, SkillID: skillID, SkillLevel: 1}); err != nil {
 		t.Fatalf("seed augmentation: %v", err)
 	}
 	s := &smith{srv: srv, c: srv.Client, objID: objID, sword: sword}

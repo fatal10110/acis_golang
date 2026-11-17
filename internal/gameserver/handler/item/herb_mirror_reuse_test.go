@@ -44,7 +44,7 @@ func TestUseHerbMirrorReuseOnServitor(t *testing.T) {
 			servitor := &reuseRecordingServitor{Actor: newServitor(t, 2, 1, 1), disabled: map[int32]time.Duration{}}
 			req.Summon = servitor
 
-			res := Use(req)
+			res := UseAll(req)[0]
 
 			if res.Outcome != Applied || res.MirroredSummon == nil {
 				t.Fatalf("Outcome = %v, mirrored = %v, want Applied onto the servitor", res.Outcome, res.MirroredSummon)

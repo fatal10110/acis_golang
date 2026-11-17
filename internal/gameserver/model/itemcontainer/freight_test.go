@@ -3,10 +3,12 @@ package itemcontainer
 import (
 	"slices"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
 func TestFreight_AddNew_TagsCurrentTown(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	untagged := f.AddNew(freightTestItemID, 1, 0x20000001)
 	if untagged.LocationData != 0 {
@@ -21,7 +23,7 @@ func TestFreight_AddNew_TagsCurrentTown(t *testing.T) {
 }
 
 func TestFreight_AddNew_MergesOnlyVisibleStacks(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
 	townOne := f.AddNew(freightTestStackableID, 10, 0x20000001)
@@ -48,7 +50,7 @@ func TestFreight_AddNew_MergesOnlyVisibleStacks(t *testing.T) {
 }
 
 func TestFreight_AddNew_MergesUntaggedStackWithoutRetagging(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	untagged := f.AddNew(freightTestStackableID, 10, 0x20000001)
 	f.ActiveLocation = 2
@@ -63,7 +65,7 @@ func TestFreight_AddNew_MergesUntaggedStackWithoutRetagging(t *testing.T) {
 }
 
 func TestFreight_VisibleItems_FiltersByActiveTown(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
 	townOne := f.AddNew(freightTestItemID, 1, 0x20000001)
@@ -107,7 +109,7 @@ func TestFreight_VisibleItems_FiltersByActiveTown(t *testing.T) {
 }
 
 func TestFreight_VisibleItems_ZeroActiveLocationReturnsOnlyUntagged(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
 	tagged := f.AddNew(freightTestItemID, 1, 0x20000001)
@@ -139,7 +141,7 @@ func TestFreight_VisibleItems_ZeroActiveLocationReturnsOnlyUntagged(t *testing.T
 // bucket 0 and keep their container order there; 0x20000002 and 0x20000003
 // fall in buckets 1 and 2.
 func TestFreight_VisibleItems_HashSetOrder(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 	f.ActiveLocation = 1
 
 	for _, objectID := range []int32{0x20000003, 0x20000001, 0x20000011, 0x20000002} {
@@ -177,9 +179,9 @@ func TestFreight_VisibleItems_HashSetOrder(t *testing.T) {
 // (PcFreight.java:69-78) — so the newest visible stack grows, and the same
 // method answers a plain lookup. Asserting both here is the point: a merge
 // target and a lookup that disagreed would hand a future freight handler one
-// stack from Add and a different one from VisibleItemByTemplateID.
+// stack from Add and a different one from ItemByTemplateID.
 func TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
 	older := f.AddNew(freightTestStackableID, 10, 0x20000001)
@@ -194,8 +196,8 @@ func TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup(t *testing.T) {
 	older.SetTime(1000)
 	newer.SetTime(2000)
 
-	if got := f.VisibleItemByTemplateID(freightTestStackableID); got != newer {
-		t.Fatalf("VisibleItemByTemplateID() = object %d, want the newest visible stack %d", got.ObjectID, newer.ObjectID)
+	if got := f.ItemByTemplateID(freightTestStackableID); got != newer {
+		t.Fatalf("ItemByTemplateID() = object %d, want the newest visible stack %d", got.ObjectID, newer.ObjectID)
 	}
 
 	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
@@ -207,25 +209,25 @@ func TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup(t *testing.T) {
 	}
 }
 
-func TestFreight_VisibleItemByTemplateID(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+func TestFreight_ItemByTemplateID(t *testing.T) {
+	f := newFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
 	f.AddNew(freightTestItemID, 1, 0x20000001)
 	f.ActiveLocation = 2
 
-	if got := f.VisibleItemByTemplateID(freightTestItemID); got != nil {
-		t.Errorf("VisibleItemByTemplateID() = %v, want nil (item belongs to a different town)", got)
+	if got := f.ItemByTemplateID(freightTestItemID); got != nil {
+		t.Errorf("ItemByTemplateID() = %v, want nil (item belongs to a different town)", got)
 	}
 
 	f.ActiveLocation = 1
-	if got := f.VisibleItemByTemplateID(freightTestItemID); got == nil {
-		t.Errorf("VisibleItemByTemplateID() = nil, want the town-1 item")
+	if got := f.ItemByTemplateID(freightTestItemID); got == nil {
+		t.Errorf("ItemByTemplateID() = nil, want the town-1 item")
 	}
 }
 
 func TestFreight_ValidateCapacity_ScopedToVisibleItems(t *testing.T) {
-	f := NewFreight(0x10000001, freightTestTemplates())
+	f := newFreight(0x10000001, freightTestTemplates())
 	f.SlotLimit = 1
 
 	f.ActiveLocation = 1
@@ -245,4 +247,9 @@ func TestFreight_ValidateCapacity_ScopedToVisibleItems(t *testing.T) {
 	if !f.ValidateCapacity(0) {
 		t.Errorf("ValidateCapacity(0) should always be true regardless of the limit")
 	}
+}
+
+// newFreight returns an empty freight container for ownerID.
+func newFreight(ownerID int32, templates *item.Table) *Freight {
+	return NewFreightWithPersister(ownerID, templates, nil)
 }

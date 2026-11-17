@@ -571,7 +571,7 @@ func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)
 	c.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
+	c.AttachRuntime(tmpl, restoredInventory(c.ID, items, equipped))
 	live, err := creature.NewLive(c.Location, 0, liveShieldGeo{}, c)
 	if err != nil {
 		t.Fatal(err)
@@ -642,4 +642,12 @@ func TestDisablersPassBlessedShotAndShieldToTemplateLanding(t *testing.T) {
 			}
 		})
 	}
+}
+
+// restoredInventory returns a player inventory holding items, restored
+// without queuing client updates.
+func restoredInventory(ownerID int32, templates *item.Table, items []*item.Instance) *itemcontainer.Inventory {
+	inv := itemcontainer.NewPlayerInventory(ownerID, templates)
+	inv.Restore(items)
+	return inv
 }

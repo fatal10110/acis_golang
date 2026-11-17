@@ -37,7 +37,7 @@ func (l *GameClientLink) changeOccupation(live *livePlayer, classID int, tmpl *p
 	if l.parties != nil {
 		if view, ok := l.parties.View(live.ObjectID()); ok {
 			row := partyMemberRow(live)
-			l.broadcastToMembers(view.Members, func() wire.Frame { return serverpackets.FramePartySmallWindowUpdate(row) })
+			sendToMembers(view.Members, func() wire.Frame { return serverpackets.FramePartySmallWindowUpdate(row) })
 		}
 	}
 	if cl, ok := l.clanService().ClanOf(live.Character); ok {
