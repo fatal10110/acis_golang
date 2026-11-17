@@ -1248,14 +1248,26 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
 // tracking pawn walk, from the cell from to the cell to, the walker turns
 // along.
 type positionUpdate struct {
-	ev       event.Move
-	moving   bool
+	ev     event.Move
+	moving bool
+	// seq is the walk generation (moveSeq) ev belongs to.
+	seq      uint64
 	hook     func()
 	pawnStep bool
 	from, to location.Location
 	// debugStep marks a step of a mover whose moves are debugged, ground
 	// one on the ground.
 	debugStep, ground bool
+}
+
+// stepCurrent reports whether u's step still describes the walk: the walk
+// it was computed for goes on and the actor still stands where the step
+// put it. A teleport that ran since aborted the walk or moved the actor
+// elsewhere, and the step must not be synced over it.
+func (m *CreatureMove) stepCurrent(u positionUpdate) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.moving && m.moveSeq == u.seq && m.origin == u.ev.Origin
 }
 
 // updatePosition runs one position update standing for step. With measured,
@@ -1288,7 +1300,7 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 		}
 	}
 	if step <= 0 && !(player && measured) {
-		return positionUpdate{ev: m.currentEventLocked(), moving: true}
+		return positionUpdate{ev: m.currentEventLocked(), moving: true, seq: m.moveSeq}
 	}
 	m.updates++
 
@@ -1312,7 +1324,7 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 		if !ok {
 			return positionUpdate{hook: m.stopBlockedLocked()}
 		}
-		return positionUpdate{ev: m.currentEventLocked(), moving: true, hook: hook}
+		return positionUpdate{ev: m.currentEventLocked(), moving: true, seq: m.moveSeq, hook: hook}
 	}
 	u := positionUpdate{pawnStep: tracking, from: m.origin, to: next, debugStep: m.debug.Load()&debugMove != 0, ground: moveType == MoveGround}
 	if reached {
@@ -1323,7 +1335,7 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 		// Advanced to the next waypoint segment; report it and fire the
 		// segment-advanced hook (if any) so the client is told about the new
 		// leg the same tick the server itself commits to it.
-		u.ev, u.moving = m.currentEventLocked(), true
+		u.ev, u.moving, u.seq = m.currentEventLocked(), true, m.moveSeq
 		return u
 	}
 
@@ -1339,7 +1351,7 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 	if tracking || m.moveTypeLocked() != m.timedType {
 		m.retimeLocked()
 	}
-	u.ev, u.moving = m.currentEventLocked(), true
+	u.ev, u.moving, u.seq = m.currentEventLocked(), true, m.moveSeq
 	return u
 }
 
@@ -1436,7 +1448,7 @@ func (m *CreatureMove) abandonPawnWalk(gen uint64) (positionUpdate, bool) {
 		return positionUpdate{}, false
 	}
 	if ok, hook := m.startNextWaypointLocked(); ok {
-		return positionUpdate{ev: m.currentEventLocked(), moving: true, hook: hook}, true
+		return positionUpdate{ev: m.currentEventLocked(), moving: true, seq: m.moveSeq, hook: hook}, true
 	}
 	return positionUpdate{hook: m.endLocked()}, true
 }

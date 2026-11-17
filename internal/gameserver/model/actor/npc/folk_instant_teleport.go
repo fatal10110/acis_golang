@@ -11,8 +11,9 @@ import (
 // ground unless the point lies in water, one that cannot keeps j's point;
 // observers see the jump without its fade; the NPC stays in its region
 // until it next moves, so what knows it, what it knows and the zones it is
-// in are unchanged; and its failed-pathfinding streak clears. It aborts
-// nothing and forgets no one.
+// in are unchanged, and the players around that region see it afresh; and
+// its failed-pathfinding streak clears. It aborts nothing and forgets no
+// one.
 func (f *Folk) InstantTeleportTo(j location.Jump) {
 	m := f.motion
 	if m == nil {
@@ -20,6 +21,7 @@ func (f *Folk) InstantTeleportTo(j location.Jump) {
 		f.emit(event.Teleported{To: target, Instant: true})
 		if f.world != nil {
 			f.world.SetPosition(f, target.X, target.Y, target.Z)
+			f.world.RefreshKnown(f)
 		}
 		f.aiSleep.wakeOutOfTerritory(f)
 		return
@@ -29,6 +31,7 @@ func (f *Folk) InstantTeleportTo(j location.Jump) {
 	m.move.SetPosition(target)
 	if m.cfg.World != nil {
 		m.cfg.World.SetPosition(f, target.X, target.Y, target.Z)
+		m.cfg.World.RefreshKnown(f)
 	}
 	m.ResetGeoPathFailCount()
 	f.aiSleep.wakeOutOfTerritory(f)
