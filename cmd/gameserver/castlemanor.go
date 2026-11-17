@@ -38,7 +38,10 @@ func loadCastleManorConfig(paths gameServerPaths, settings manorSettings) (castl
 		ApproveHour:    f.Int("ManorApproveTime", def.ApproveHour),
 		ApproveMin:     f.Int("ManorApproveMin", def.ApproveMin),
 		MaintenanceMin: f.Int("ManorMaintenanceMin", def.MaintenanceMin),
-		SavePeriod:     time.Duration(f.Int("ManorSavePeriodRate", int(def.SavePeriod/time.Hour))) * time.Hour,
+		// The period is counted in 32-bit milliseconds, so a rate past 596
+		// hours wraps; a non-positive result leaves the lists unsaved
+		// between cycles.
+		SavePeriod: time.Duration(int32(f.Int("ManorSavePeriodRate", int(def.SavePeriod/time.Hour)))*3600000) * time.Millisecond,
 	}
 	return cfg, f.Err()
 }

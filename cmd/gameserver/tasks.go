@@ -86,9 +86,9 @@ func startSimPool(lc fx.Lifecycle, pool *sim.Pool) {
 // shutdown before the world starts, returning the store alongside so it can
 // be reused to persist state back at the next shutdown. It deliberately
 // does not clear items_on_ground itself: see startGroundItems.
-func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
+func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, pool *sql.DB, queues *sim.Pool, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
 	store := gamesql.NewGroundItemStore(pool)
-	items := task.NewGroundItems(state, opts, time.Now)
+	items := task.NewGroundItems(state, opts, time.Now, queues.NewQueue("ground-items"))
 
 	rows, err := store.Load(ctx)
 	if err != nil {

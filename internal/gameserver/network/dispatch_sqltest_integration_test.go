@@ -88,7 +88,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		Belongings: BelongingsConfig{
 			Items:            items,
 			Shortcuts:        shortcuts,
-			GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now),
+			GroundItems:      task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now, nil),
 			InventoryUpdates: inventoryUpdates,
 		},
 		LoginLink:     func() *LoginLink { return loginLink },

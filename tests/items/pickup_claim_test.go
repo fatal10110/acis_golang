@@ -133,7 +133,7 @@ func TestGroundCleanupSkipsClaimedDrop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("grounditem.New: %v", err)
 	}
-	g := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Second, PlayerDroppedMultiplier: 1}, func() time.Time { return now })
+	g := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Second, PlayerDroppedMultiplier: 1}, func() time.Time { return now }, nil)
 	g.Drop(ground, task.DropOptions{})
 
 	if !ground.Claim() {

@@ -52,6 +52,7 @@ func TestGroundItemsSurviveConstructorFailureAfterRestore(t *testing.T) {
 			func() zerolog.Logger { return zerolog.Nop() },
 			func() *world.State { return world.New() },
 			func() *sql.DB { return db },
+			provideSimPool,
 			provideGroundItems,
 			func() (*failingComponent, error) {
 				return nil, errors.New("boot: simulated later-constructor failure")
@@ -85,6 +86,7 @@ func TestGroundItemsSurviveConstructorFailureAfterRestore(t *testing.T) {
 			func() zerolog.Logger { return zerolog.Nop() },
 			func() *world.State { return world.New() },
 			func() *sql.DB { return db },
+			provideSimPool,
 			provideGroundItems,
 		),
 		fx.Invoke(startGroundItems),
