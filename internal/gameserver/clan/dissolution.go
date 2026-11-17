@@ -167,10 +167,8 @@ func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Charact
 // forgetWars drops every war cl declared or had declared on it from the
 // other clan's lists; the stored rows go with cl's (DeleteClan).
 //
-// Deliberate simplification: both directions are cleaned. The reference
-// cleans only the clans that declared war on cl, so a clan cl had declared
-// war on would keep the dissolved clan as an attacker until restart; that
-// stale entry is not reproduced.
+// Both directions are cleaned, so no clan cl had declared war on keeps the
+// dissolved clan as a stale attacker until restart.
 func (s *Service) forgetWars(cl *Clan) {
 	cl.mu.RLock()
 	related := make([]int32, 0, cl.wars.Len()+cl.attackers.Len())

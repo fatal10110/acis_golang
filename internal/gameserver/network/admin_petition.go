@@ -209,8 +209,8 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 		{"%state%", d.State.String()},
 		{"%responders%", d.Responders},
 		// Player-written text reaches a GM's window with its link words
-		// stripped, unlike the reference, which shows it raw: a petition
-		// must not plant a working link in front of a GM.
+		// stripped, never raw: a petition must not plant a working link
+		// in front of a GM.
 		{"%content%", commons.StripLinkWords(commons.HTMLValue(d.Content))},
 	} {
 		html = strings.ReplaceAll(html, r.key, r.value)

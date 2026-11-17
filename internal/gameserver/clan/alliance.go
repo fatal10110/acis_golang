@@ -166,10 +166,8 @@ type AllyDissolution struct {
 // alliance id; with consistent rows that is only the dissolved alliance's
 // clans.
 //
-// Deliberate simplification: only the clans whose crest changed (Cleared)
-// are reported for a refresh. The reference resends every online member's
-// user info for every clan in no alliance server-wide, a redundant packet
-// for each clan whose crest was already none; those are not reproduced.
+// Only the clans whose crest changed (Cleared) are reported for a refresh;
+// a clan whose crest was already none gets no redundant user info resend.
 func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now time.Time, sieges Sieges) (AllyDissolution, AllyDissolveResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
