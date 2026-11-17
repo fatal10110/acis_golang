@@ -47,6 +47,13 @@ func newDoorGeo(t *testing.T) (*engine.Engine, int, int) {
 
 func newTestWorldObjects(t *testing.T, tmpl *door.Template) (*WorldObjects, *engine.Engine, int, int, *task.Door) {
 	t.Helper()
+	return newTestWorldObjectsWith(t, tmpl, doorTimerRecorder{}, func() time.Time { return time.UnixMilli(0) })
+}
+
+// newTestWorldObjectsWith is newTestWorldObjects with the door timers'
+// effects and clock supplied by the test.
+func newTestWorldObjectsWith(t *testing.T, tmpl *door.Template, effects task.DoorEffects, now func() time.Time) (*WorldObjects, *engine.Engine, int, int, *task.Door) {
+	t.Helper()
 	geo, doorX, doorY := newDoorGeo(t)
 
 	tmpl.Position = location.Location{X: doorX, Y: doorY, Z: 0}
@@ -67,7 +74,7 @@ func newTestWorldObjects(t *testing.T, tmpl *door.Template) (*WorldObjects, *eng
 		t.Fatalf("static object table: %v", err)
 	}
 
-	doorTimers, err := task.NewDoor(doorTimerRecorder{}, func() time.Time { return time.UnixMilli(0) })
+	doorTimers, err := task.NewDoor(effects, now)
 	if err != nil {
 		t.Fatalf("NewDoor: %v", err)
 	}

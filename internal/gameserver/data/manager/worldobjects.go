@@ -322,7 +322,7 @@ func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool, r
 	}
 	if !triggered {
 		if current, ok := w.Door(obj.DoorID()); ok && current == obj {
-			w.scheduleDoorTimer(obj)
+			w.scheduleDoorTimer(obj, open)
 		}
 	}
 	return true
@@ -514,15 +514,17 @@ func (w *WorldObjects) breakDoor(obj *door.Object) {
 	}
 }
 
-// scheduleDoorTimer schedules obj's auto change back to the state it just
-// left: closeTime after an open, openTime after a close, jittered by a
-// uniform [0, randomTime) delay. The change keeps that target whatever
-// happens to the door meanwhile, and no change already pending is dropped.
-// A total delay of zero or less schedules nothing.
-func (w *WorldObjects) scheduleDoorTimer(obj *door.Object) {
+// scheduleDoorTimer schedules obj's auto change back from the change to
+// open that was made: a close closeTime after an open, an open openTime
+// after a close, jittered by a uniform [0, randomTime) delay. Both come from
+// open, not from the door's state now, which a watcher or another goroutine
+// may already have changed. The change keeps that target whatever happens
+// to the door meanwhile, and no change already pending is dropped. A total
+// delay of zero or less schedules nothing.
+func (w *WorldObjects) scheduleDoorTimer(obj *door.Object, open bool) {
 	tmpl := obj.Template
 	delay := tmpl.CloseTime
-	if !obj.Opened() {
+	if !open {
 		delay = tmpl.OpenTime
 	}
 	if tmpl.RandomTime > 0 {
@@ -531,7 +533,7 @@ func (w *WorldObjects) scheduleDoorTimer(obj *door.Object) {
 	if delay <= 0 {
 		return
 	}
-	w.doorTimers.Schedule(obj.DoorID(), !obj.Opened(), time.Duration(delay)*time.Second)
+	w.doorTimers.Schedule(obj.DoorID(), !open, time.Duration(delay)*time.Second)
 }
 
 // newDoors builds a door for every template of doors, not yet spawned. A
@@ -650,7 +652,7 @@ func (w *WorldObjects) spawnDoor(obj *door.Object) {
 	if !obj.Opened() {
 		w.geo.AddObject(obj)
 	}
-	w.scheduleDoorTimer(obj)
+	w.scheduleDoorTimer(obj, obj.Opened())
 }
 
 // doorSight runs a door's line-of-sight queries on the world geodata.
