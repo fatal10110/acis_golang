@@ -127,14 +127,17 @@ func tutorialFrames(frames [][]byte) [][]byte {
 	return out
 }
 
-// tutorialFramesWant returns the tutorial frames queued to the client,
-// letting time pass in small steps until n have arrived. A step due exactly
+// tutorialFramesWant returns what is queued to the client. On the wall clock
+// it lets time pass in small steps until n tutorial frames have arrived. A step due exactly
 // where the span before ended can fire a few milliseconds late on the wall
 // clock, and a hook that armed its timer after the burst was read puts the
-// deadline that much later; a driven clock has fired it by then, so nothing
-// more passes.
+// deadline that much later. A driven clock has fired it by then, so the read
+// there is exact, unfiltered, and a step that fires late is caught.
 func tutorialFramesWant(t *testing.T, srv *gameservertest.Server, n int) [][]byte {
 	t.Helper()
+	if srv.DrivesClock() {
+		return srv.ReadQueued(t, srv.Client)
+	}
 	var got [][]byte
 	srv.AdvanceUntil(t, "the tutorial frames", func() bool {
 		got = append(got, tutorialFrames(srv.ReadQueued(t, srv.Client))...)

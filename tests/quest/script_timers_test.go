@@ -85,18 +85,20 @@ func (l *timerLog) take() []string {
 	return out
 }
 
-// takeWant is take for a span that ends on the timers' deadline: it keeps
-// letting time pass in small steps until n lines are logged, since on the
-// wall clock a timer's callback can run a few milliseconds after the span
-// ends. It adds nothing on a driven clock, where the timers have fired by the
-// time the span has passed.
+// takeWant is take for a span that ends on the timers' deadline. On the wall
+// clock it keeps letting time pass in small steps until n lines are logged,
+// since a timer's callback can run a few milliseconds after the span ends. On
+// a driven clock the timers have fired by the time the span has passed, so
+// the read is exact and a timer that fires late is caught.
 func (l *timerLog) takeWant(t *testing.T, srv *gameservertest.Server, n int) []string {
 	t.Helper()
-	srv.AdvanceUntil(t, "the timers' firings", func() bool {
-		l.mu.Lock()
-		defer l.mu.Unlock()
-		return len(l.lines) >= n
-	})
+	if !srv.DrivesClock() {
+		srv.AdvanceUntil(t, "the timers' firings", func() bool {
+			l.mu.Lock()
+			defer l.mu.Unlock()
+			return len(l.lines) >= n
+		})
+	}
 	srv.Settle(t)
 	return l.take()
 }

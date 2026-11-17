@@ -168,11 +168,15 @@ func (w *newbieWorld) after(t *testing.T, d time.Duration) []string {
 // afterWant is after for a span that ends on a timer's deadline: it keeps
 // letting time pass in small steps until the player has been sent at least n
 // rendered lines, since on the wall clock the timer's callback can run a few
-// milliseconds after the span ends. It adds nothing on a driven clock, where
-// the timer has fired by the time the span has passed.
+// milliseconds after the span ends. A driven clock has fired the timer by the
+// time the span has passed, so the read there is exact and a late timer is
+// caught.
 func (w *newbieWorld) afterWant(t *testing.T, d time.Duration, n int) []string {
 	t.Helper()
 	w.srv.Advance(t, d)
+	if w.srv.DrivesClock() {
+		return w.render(t, w.srv.ReadQueued(t, w.srv.Client))
+	}
 	var got []string
 	w.srv.AdvanceUntil(t, "the timer's lines", func() bool {
 		got = append(got, w.render(t, w.srv.ReadQueued(t, w.srv.Client))...)
