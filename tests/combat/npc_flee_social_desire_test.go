@@ -196,10 +196,9 @@ func TestScriptSocialDesireRefusedWhileAISleeps(t *testing.T) {
 		hostile.AI().Desires().Clear()
 
 		srv.Client.Send(encodeLogout())
-		srv.AdvanceUntil(t, "the region going to sleep", func() bool {
-			_, active := srv.State.RegionActivity(hostile)
-			return !active
-		})
+		// The region flips inactive before the owning player's departure
+		// reaches the monster's sleep latch, so wait for the latch itself.
+		srv.AdvanceUntil(t, "the monster's AI going to sleep", hostile.AISleeping)
 		monster.AddSocialDesire(2, 1000, 50)
 		if got := hostile.AI().Desires().Len(); got != 0 {
 			t.Fatalf("queued desires in an inactive region = %d, want 0", got)
