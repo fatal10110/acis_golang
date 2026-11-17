@@ -52,22 +52,15 @@ mismatch reflects the reference engine's real search cost, not an approximation.
 
 ## Result
 
-`queries=1000 agreement=98.10%` (see `report.txt`). 19 disagreements across three categories, each
-matching an already-open, milestone-assigned gap rather than a new defect:
+`queries=1000 agreement=100.00%` (see `report.txt`), re-run after the multilayer layer-order, door-lift
+and `findPath` pre-gate fixes. The capture itself first scored 98.10% (6 `los`, 2 `path` and 11
+`validlocation` disagreements, tracked then as #1830, #1764 and #1832).
 
-- **6 `los` mismatches** — line-of-sight disagreements on blocked multilayer edges. Matches #1830
-  (`Multilayer.Above` selects the highest qualifying layer; Java selects the lowest), which this
-  package's `CanSee` blocked-edge path depends on for `Above` resolution.
-- **2 `path` mismatches** — Go finds a path (`found=true`) where Java's `GeoEngine.findPath` rejects
-  outright (`found=false`), both with an endpoint Z far from its nearest geodata layer. Matches #1764
-  (`findPath` missing the `hasGeoPos` and `|gtz-tz|>500` reference pre-gates).
-- **11 `validlocation` mismatches** — large Z/coordinate divergences once movement crosses a
-  multilayer cell. Matches #1832 (post-#804 `PathFinder`/`CanMove` layer-selection reconciliation is
-  still open), which the same movement-resolution path (`getHeightNearest`/`getNsweNearest`) as
-  `ValidLocation` depends on.
+`TestOracleDumpReplaysAgainstShippedGeodata` (`oracle_replay_test.go`) replays this dump against the
+shipped geodata on every local run (`ACIS_REQUIRE_DATAPACK=1`; CI has no geodata and skips it).
 
-No `height` or `canmove` disagreements: those two categories are already at 100% agreement against
-this oracle.
+## Not covered by this capture
 
-Re-run this capture once #1764, #1830, and #1832 land, to confirm they close the corresponding
-disagreements.
+All 200 `path` queries have `found=false` (random far-apart endpoints), and no query uses a non-zero eye
+height, a closed-door overlay or a midpoint/non-monotonic cell. Extending the capture for those needs a
+JDK 21 build of the reference engine (tracked in #4789 and #4793).
