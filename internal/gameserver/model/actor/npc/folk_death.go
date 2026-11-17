@@ -3,6 +3,7 @@ package npc
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -27,8 +28,9 @@ func (f *Folk) Decayed() bool {
 // die runs the NPC's death once and reports whether this call ran it: its
 // HP drops to zero, observers see the empty health bar, its walk, swing and
 // cast stop and its desires drop, every effect that does not last through
-// death ends, observers see it die and leave its attack stance, and its
-// corpse is registered for decay after the template corpse time. A
+// death ends, observers see it die and leave its attack stance, it idles
+// (deathIdle), and its corpse is registered for decay after the template
+// corpse time. A
 // civilian NPC pays no reward. Its dying script hooks are scheduled, then
 // its party is told, then its clan members in range. A siege headquarters
 // then leaves its clan, which takes it out of the world.
@@ -54,6 +56,7 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 		// The route walker releases a dead NPC from its route.
 		f.motion.cfg.Control.Emit(event.Died{})
 	}
+	f.deathIdle()
 	f.scheduleDecay()
 	f.raiseDying(killer)
 	partyDied(f.scripts, f)
@@ -62,6 +65,19 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 		f.headquartersDied()
 	}
 	return true
+}
+
+// deathIdle is the idle a death leaves the NPC in, run by die on its own
+// goroutine with brain not held: its walk, swing and cast are already
+// stopped, so it switches to its walk stance and opens the no-desire point,
+// once. A clan hall manager runs its own idle instead (thinkIdle).
+func (f *Folk) deathIdle() {
+	if f.ClanHallManager() {
+		f.hallManagerIdle()
+		return
+	}
+	f.forceWalkStance()
+	f.AtHookPoint(ai.HookNoDesire)
 }
 
 // scheduleDecay registers the NPC's corpse with the decay task for the

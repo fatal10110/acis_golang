@@ -108,8 +108,9 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 // aggro list, at no hate, then runs its attacked hooks with the damage
 // truncated to an int and sk the skill that dealt it, then calls its party,
 // then makes its clan calls: itself, then every NPC of its clan in range. An
-// invulnerable NPC, or a hit from an attacker without damage permission,
-// then takes nothing. A hit that is no damage-over-time tick then wakes the
+// invulnerable NPC then takes nothing but its own damage-over-time ticks and
+// HP costs, and a hit from an attacker without damage permission nothing at
+// all. A hit that is no damage-over-time tick then wakes the
 // NPC (wakeOnHit).
 // The HP left is never under folkMinHP for an undying template, nor under
 // zero otherwise, and an NPC left under folkDeathHP dies. It reports
@@ -144,24 +145,26 @@ const (
 	lossCost
 )
 
-// loseHP is reduceHP; lossCost leaves out the aggro, the attacked hooks and
-// the clan calls.
+// loseHP is reduceHP; lossCost leaves out the run stance, the aggro, the
+// attacked hooks and the clan calls. An invulnerable NPC still takes its own
+// damage-over-time ticks and pays its own HP costs.
 func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, loss hpLoss) bool {
 	if f.Dead() {
 		return false
 	}
 	creature.InterruptDuelOnNPCHit(attacker)
-	if attacker != nil {
-		f.forceRunStance()
-	}
 	if attacker != nil && loss != lossCost {
+		f.forceRunStance()
 		f.fight.aggro.AddDamage(attacker, amount, 0)
 		damage := commons.TruncInt32Sat(amount)
 		f.raiseAttacked(attacker, damage, sk)
 		propagatePartyAttacked(f, attacker, int(damage), false)
 		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)
 	}
-	if f.Invul() || !creature.CanDealDamage(attacker) {
+	if f.Invul() && (loss == lossHit || attacker != attackable.Combatant(f)) {
+		return false
+	}
+	if !creature.CanDealDamage(attacker) {
 		return false
 	}
 	if loss == lossHit {
