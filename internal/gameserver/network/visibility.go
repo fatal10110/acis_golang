@@ -281,15 +281,15 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 	if l.world == nil {
 		return
 	}
-	l.world.ForEachKnown(a, func(obj world.Tracked) {
+	for obj := range l.world.KnownPlayers(a) {
 		p, ok := obj.(*livePlayer)
 		if !ok || a.ShownAsOwnedBy(p.ObjectID()) {
-			return
+			continue
 		}
 		if snap, ok := l.summonInfoSnapshot(a, p, p.npcs, l.summonInCombat(a)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
-	})
+	}
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {

@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // The war requests a clanless player sends, or that name a clan that does
@@ -168,11 +167,11 @@ func (l *GameClientLink) refreshWarTags(live *livePlayer, cl *clan.Clan) {
 		return
 	}
 	var enemies []*livePlayer
-	l.world.ForEachKnown(live, func(o world.Tracked) {
+	for o := range l.world.KnownPlayers(live) {
 		if other, ok := o.(*livePlayer); ok && slices.Contains(wars, other.Character.ClanID()) {
 			enemies = append(enemies, other)
 		}
-	})
+	}
 	for _, enemy := range enemies {
 		l.broadcastUserInfoOf(live, enemy)
 	}

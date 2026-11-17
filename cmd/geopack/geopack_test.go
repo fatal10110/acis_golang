@@ -10,7 +10,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
-	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/geodata"
 	"github.com/rs/zerolog"
 )
 
@@ -41,7 +41,7 @@ func TestRunWritesCacheAndReport(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	e, err := probe.LoadRegionsCached(dir, probe.L2OFF, []probe.Region{{X: 16, Y: 10}}, out, zerolog.New(&logs))
+	e, err := geodata.LoadRegionsCached(dir, geodata.L2OFF, []geodata.Region{{X: 16, Y: 10}}, out, zerolog.New(&logs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,15 +58,15 @@ func TestRunWritesCacheAndReport(t *testing.T) {
 // server reads them, not from geopack's working directory.
 func TestRunResolvesGeoDataPathLikeTheServer(t *testing.T) {
 	root := t.TempDir()
-	geodata := filepath.Join(root, "data", "geodata")
-	if err := os.MkdirAll(geodata, 0o755); err != nil {
+	geoDir := filepath.Join(root, "data", "geodata")
+	if err := os.MkdirAll(geoDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	region := make([]byte, 18+block.RegionBlockCount*6)
 	for off := 18; off < len(region); off += 6 {
 		binary.LittleEndian.PutUint16(region[off+2:], 72)
 	}
-	if err := os.WriteFile(filepath.Join(geodata, "16_10_conv.dat"), region, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(geoDir, "16_10_conv.dat"), region, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	config := filepath.Join(root, "geoengine.properties")
@@ -81,7 +81,7 @@ func TestRunResolvesGeoDataPathLikeTheServer(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	e, err := probe.LoadRegionsCached(probe.ResolveDir(root, ""), probe.L2OFF, []probe.Region{{X: 16, Y: 10}}, out, zerolog.New(&logs))
+	e, err := geodata.LoadRegionsCached(geodata.ResolveDir(root, ""), geodata.L2OFF, []geodata.Region{{X: 16, Y: 10}}, out, zerolog.New(&logs))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-package probe
+package geodata
 
 import (
 	"bytes"
@@ -52,7 +52,7 @@ func TestCacheMatchesLegacyDecoderOnRealGeodata(t *testing.T) {
 	for i, r := range regions {
 		t.Run(fmt.Sprintf("%d_%d", r.X, r.Y), func(t *testing.T) {
 			t.Parallel()
-			path := regionPath(dir, L2OFF, r.X, r.Y)
+			path := RegionPath(dir, L2OFF, r.X, r.Y)
 			data, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)

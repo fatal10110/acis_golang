@@ -64,7 +64,7 @@ hand.
 - The pinned SHA must have a green CI run (go.yml). CI covers every package except the local-only
   tests.
 - **Local-only tests** (verification.md, decision on #4426):
-  - geodata: `geo/probe` and `geo/pathfind`. They find geodata in the outer `aCis_datapack/` or in
+  - geodata: `geo/geodata` and `geo/pathfind`. They find geodata in the outer `aCis_datapack/` or in
     `ACIS_GEODATA_DIR`, and always skip without it.
   - reference: the tests that read the outer `aCis_gameserver/`. Set `ACIS_REQUIRE_REFERENCE=1` so a
     missing checkout fails instead of skipping.

@@ -8,8 +8,8 @@ import (
 
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/geodata"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
-	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/rs/zerolog"
 )
@@ -114,8 +114,8 @@ MaxObstacleHeight = 48
 	if got, want := filepath.Clean(geo.Dir), filepath.Join(dataRoot, "data", "geodata"); got != want {
 		t.Errorf("Dir = %q, want %q", got, want)
 	}
-	if geo.Type != probe.L2J {
-		t.Errorf("Type = %q, want %q", geo.Type, probe.L2J)
+	if geo.Type != geodata.L2J {
+		t.Errorf("Type = %q, want %q", geo.Type, geodata.L2J)
 	}
 	wantEngineOptions := engine.Options{MaxObstacleHeight: 48, PartOfCharacterHeight: 75}
 	if geo.EngineOptions != wantEngineOptions {
@@ -152,8 +152,8 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 	if got, want := filepath.Clean(geo.Dir), filepath.Join(dataRoot, "data", "geodata"); got != want {
 		t.Errorf("Dir = %q, want %q", got, want)
 	}
-	if geo.Type != probe.L2OFF {
-		t.Errorf("Type = %q, want %q", geo.Type, probe.L2OFF)
+	if geo.Type != geodata.L2OFF {
+		t.Errorf("Type = %q, want %q", geo.Type, geodata.L2OFF)
 	}
 	if geo.EngineOptions != engine.DefaultOptions() {
 		t.Errorf("EngineOptions = %#v, want defaults %#v", geo.EngineOptions, engine.DefaultOptions())

@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/fatal10110/acis_golang/internal/config"
-	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/geodata"
 	"github.com/rs/zerolog"
 )
 
@@ -37,12 +37,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	dir := *geodataDir
 	if dir == "" {
-		dir = probe.ResolveDir(*dataRoot, props.String("GeoDataPath", ""))
+		dir = geodata.ResolveDir(*dataRoot, props.String("GeoDataPath", ""))
 	}
-	geoType := probe.GeoType(props.String("GeoDataType", string(probe.L2OFF)))
-	regions := probe.ListedRegions(props)
+	geoType := geodata.GeoType(props.String("GeoDataType", string(geodata.L2OFF)))
+	regions := geodata.ListedRegions(props)
 
-	stats, err := probe.WriteCache(*out, dir, geoType, regions, zerolog.New(stderr))
+	stats, err := geodata.WriteCache(*out, dir, geoType, regions, zerolog.New(stderr))
 	if err != nil {
 		fmt.Fprintf(stderr, "geopack: %v\n", err)
 		return 1

@@ -23,7 +23,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // gameSummonSpawner spawns a live player's pet or servitor for its summon
@@ -762,20 +761,20 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	}
 	defer frames[0].release()
 	defer frames[1].release()
-	l.world.ForEachKnown(actor, func(object world.Tracked) {
+	for object := range l.world.KnownPlayers(actor) {
 		if object.ObjectID() == owner.ObjectID() {
-			return
+			continue
 		}
 		receiver, ok := object.(frameReceiver)
 		if !ok {
-			return
+			continue
 		}
 		attackable := 0
 		if viewer, ok := object.(*livePlayer); ok && actor.AttackableWithoutForceBy(viewer.Character) {
 			attackable = 1
 		}
 		frames[attackable].send(receiver)
-	})
+	}
 }
 
 // inertSummonMoveController is the fallback when a test or incomplete

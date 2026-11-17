@@ -666,7 +666,7 @@ func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
 	if l == nil || l.world == nil || target == nil {
 		return
 	}
-	for _, obj := range l.world.Objects() {
+	for _, obj := range l.world.Players() {
 		caster, ok := obj.(*livePlayer)
 		if ok && caster.fusesTarget(target.ObjectID()) {
 			caster.Character.StopCast()

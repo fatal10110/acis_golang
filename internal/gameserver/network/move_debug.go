@@ -16,6 +16,10 @@ import (
 // are drawn at.
 const boatDockDepth = -3624
 
+// climbFallDebugHeight is the height change of one ground step past which
+// the move debug view reports a climb or fall bug.
+const climbFallDebugHeight = 100
+
 // debugMover is a creature whose moves can be debugged.
 type debugMover interface {
 	Move() *move.CreatureMove
@@ -25,11 +29,11 @@ type debugMover interface {
 // mover and, for a player mover, of the player itself.
 func moveDebugViewers(w *world.State, mover world.Tracked, fn func(gm *livePlayer)) {
 	if w != nil {
-		w.ForEachKnown(mover, func(o world.Tracked) {
+		for o := range w.KnownPlayers(mover) {
 			if g, ok := o.(*livePlayer); ok && g != mover && g.accessLevel().IsGM {
 				postLive(g, func() { fn(g) })
 			}
-		})
+		}
 	}
 	if p, ok := mover.(*livePlayer); ok {
 		postLive(p, func() { fn(p) })
@@ -87,7 +91,7 @@ func drawMoveDebug(w *world.State, mover world.Tracked, ev event.Event) bool {
 			d := gm.drawing("MOVE" + id)
 			d.AddPoint(serverpackets.PrimitivePoint{Name: heading, Color: serverpackets.PrimitiveRed, NameColored: true, X: int32(e.To.X), Y: int32(e.To.Y), Z: int32(e.To.Z)})
 			sendDrawing(gm, d)
-			if e.Ground && max(e.From.Z-e.To.Z, e.To.Z-e.From.Z) > 100 {
+			if e.Ground && max(e.From.Z-e.To.Z, e.To.Z-e.From.Z) > climbFallDebugHeight {
 				sendText(gm, "Falling/Climb bug found when moving from "+locationText(e.From)+" to "+headedText(e.To, e.Heading))
 			}
 		})
@@ -131,16 +135,7 @@ func (l *GameClientLink) drawValidatedPosition(live *livePlayer, at location.Loc
 
 // dockedBoat returns a boat docked where mover knows it, nil without one.
 func dockedBoat(w *world.State, mover world.Tracked) *boat.Boat {
-	if w == nil {
-		return nil
-	}
-	var found *boat.Boat
-	w.ForEachKnown(mover, func(o world.Tracked) {
-		if b, ok := o.(*boat.Boat); ok && found == nil && b.Dock() != nil {
-			found = b
-		}
-	})
-	return found
+	return firstKnownBoat(w, mover, func(b *boat.Boat) bool { return b.Dock() != nil })
 }
 
 // debugLine is a labelled line of color from a to b.

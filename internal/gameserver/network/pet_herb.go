@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv *itemcontainer.Inventory, herb *item.Instance) {
@@ -62,13 +61,13 @@ func (l *GameClientLink) broadcastPetFrame(live *livePlayer, pet *summon.Actor, 
 		if l.world == nil {
 			return
 		}
-		l.world.ForEachKnown(pet, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(pet) {
 			if o.ObjectID() == live.ObjectID() {
-				return
+				continue
 			}
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }

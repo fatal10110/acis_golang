@@ -1,5 +1,5 @@
 //go:build !race
 
-package probe
+package geodata
 
 const raceDetector = false

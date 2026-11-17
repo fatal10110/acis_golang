@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/datadiff"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/geodata"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/rs/zerolog"
@@ -69,11 +69,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		props = p
 	}
 
-	geoType := probe.GeoType(*geoTypeFlag)
+	geoType := geodata.GeoType(*geoTypeFlag)
 	if geoType == "" {
-		geoType = probe.L2OFF
+		geoType = geodata.L2OFF
 		if props != nil {
-			geoType = probe.GeoType(props.String("GeoDataType", string(probe.L2OFF)))
+			geoType = geodata.GeoType(props.String("GeoDataType", string(geodata.L2OFF)))
 		}
 	}
 
@@ -86,7 +86,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	if !validGeoType(geoType) {
+	if !geoType.Valid() {
 		fmt.Fprintf(stderr, "geoprobe: probe: unknown geodata type %q\n", geoType)
 		return exitError
 	}
@@ -102,7 +102,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	e, err := probe.LoadEngine(dir, geoType, zerolog.New(stderr).With().Timestamp().Logger())
+	e, err := geodata.LoadEngine(dir, geoType, zerolog.New(stderr).With().Timestamp().Logger())
 	if err != nil {
 		fmt.Fprintf(stderr, "geoprobe: %v\n", err)
 		return exitError
@@ -154,14 +154,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-func validGeoType(geoType probe.GeoType) bool {
-	return geoType == probe.L2OFF || geoType == probe.L2J
-}
-
-func hasLoadableGeodataFile(dir string, geoType probe.GeoType) (bool, error) {
+func hasLoadableGeodataFile(dir string, geoType geodata.GeoType) (bool, error) {
 	for x := engine.TileXMin; x <= engine.TileXMax; x++ {
 		for y := engine.TileYMin; y <= engine.TileYMax; y++ {
-			if ok, err := fileExists(geodataRegionPath(dir, geoType, x, y)); ok || err != nil {
+			if ok, err := fileExists(geodata.RegionPath(dir, geoType, x, y)); ok || err != nil {
 				return ok, err
 			}
 		}
@@ -178,13 +174,6 @@ func fileExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-func geodataRegionPath(dir string, geoType probe.GeoType, x, y int) string {
-	if geoType == probe.L2J {
-		return filepath.Join(dir, fmt.Sprintf("%d_%d.l2j", x, y))
-	}
-	return filepath.Join(dir, fmt.Sprintf("%d_%d_conv.dat", x, y))
 }
 
 // resolveQueries returns the queries to evaluate: parsed from

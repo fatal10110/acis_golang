@@ -36,17 +36,14 @@ func (l OrientedLocation) IsInFrontOf(other Location) bool {
 	return angleClose(angleHeading-angleOther, 60)
 }
 
-// IsFacing reports whether other is inside l's forward-facing angle.
+// IsFacing reports whether other is inside l's forward-facing angle of
+// degrees. The half angle is halved in integers, so an odd angle loses its
+// half degree; an angle of 0 or 1 still accepts a target exactly ahead, and
+// 360 or more accepts every target.
 func (l OrientedLocation) IsFacing(other Location, degrees int) bool {
-	if degrees >= 360 {
-		return true
-	}
-	if degrees <= 0 {
-		return false
-	}
 	angleOther := angleFrom(l.X, l.Y, other.X, other.Y)
 	angleHeading := headingDegrees(l.Heading)
-	return angleClose(angleHeading-angleOther, float64(degrees)/2)
+	return angleClose(angleHeading-angleOther, float64(degrees/2))
 }
 
 func angleFrom(x1, y1, x2, y2 int) float64 {
