@@ -53,10 +53,12 @@ func TestSkillsForFollowsReputationAndRank(t *testing.T) {
 	}
 }
 
-// TestLearnSkillRechecksReputationAfterPayment drops the clan's reputation
-// below the price while the leader's item is being paid: the clan learns
-// nothing and keeps its score.
-func TestLearnSkillRechecksReputationAfterPayment(t *testing.T) {
+// TestLearnSkillTakesReputationOnceItemPaid drops the clan's reputation
+// below the price while the leader's item is being paid: the item is
+// gone, so the clan still learns the skill and pays its price from what
+// is left, taking its score below 0, as the reputation is checked only
+// before the payment (RequestAcquireSkill).
+func TestLearnSkillTakesReputationOnceItemPaid(t *testing.T) {
 	s, cl, _, _ := orderedClan(t, 600, 0)
 	leader := inClan(orderLeaderID, "Leader", orderClanID)
 	pay := func(itemID int32) bool {
@@ -70,11 +72,33 @@ func TestLearnSkillRechecksReputationAfterPayment(t *testing.T) {
 	}
 
 	got := s.LearnSkill(leader, vitalityTree(), 370, 1, pay)
+	want := []any{
+		ReputationChanged{Score: -400, Crossed: -1},
+		ReputationDeducted{Points: 500},
+		SkillLearned{Skill: Skill{ID: 370, Level: 1}, Refresh: true},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("notices = %#v, want %#v", got, want)
+	}
+	if skills := cl.Skills(); !slices.Equal(skills, []Skill{{ID: 370, Level: 1}}) || cl.Reputation() != -400 {
+		t.Fatalf("clan = skills %v reputation %d, want Clan Vitality 1 and -400", skills, cl.Reputation())
+	}
+}
+
+// TestLearnSkillRefusesBeforePayingItem refuses a skill the reputation
+// does not cover without asking for the item.
+func TestLearnSkillRefusesBeforePayingItem(t *testing.T) {
+	s, cl, _, _ := orderedClan(t, 499, 0)
+	leader := inClan(orderLeaderID, "Leader", orderClanID)
+	got := s.LearnSkill(leader, vitalityTree(), 370, 1, func(int32) bool {
+		t.Fatal("the item was paid for a refused skill")
+		return false
+	})
 	if len(got) != 1 || got[0] != (SkillLowReputation{}) {
 		t.Fatalf("notices = %#v, want SkillLowReputation", got)
 	}
-	if skills := cl.Skills(); len(skills) != 0 || cl.Reputation() != 100 {
-		t.Fatalf("clan = skills %v reputation %d, want none and 100", skills, cl.Reputation())
+	if len(cl.Skills()) != 0 || cl.Reputation() != 499 {
+		t.Fatalf("clan = skills %v reputation %d, want none and 499", cl.Skills(), cl.Reputation())
 	}
 }
 
