@@ -4,8 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -278,30 +278,36 @@ func TestEveryGameDecoderIsFuzzed(t *testing.T) {
 	notFuzzed := map[string]string{}
 
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool { return strings.HasSuffix(fi.Name(), ".go") }, 0)
+	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	declared := map[string]bool{}
 	fuzzed := map[string]bool{}
-	for _, pkg := range pkgs {
-		for file, f := range pkg.Files {
-			if file == "clientpackets_fuzz_test.go" {
-				ast.Inspect(f, func(n ast.Node) bool {
-					if id, ok := n.(*ast.Ident); ok && strings.HasPrefix(id.Name, "Decode") {
-						fuzzed[id.Name] = true
-					}
-					return true
-				})
-				continue
-			}
-			if strings.HasSuffix(file, "_test.go") {
-				continue
-			}
-			for _, decl := range f.Decls {
-				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.IsExported() && strings.HasPrefix(fn.Name.Name, "Decode") {
-					declared[fn.Name.Name] = true
+	for _, entry := range entries {
+		file := entry.Name()
+		if !strings.HasSuffix(file, ".go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if file == "clientpackets_fuzz_test.go" {
+			ast.Inspect(f, func(n ast.Node) bool {
+				if id, ok := n.(*ast.Ident); ok && strings.HasPrefix(id.Name, "Decode") {
+					fuzzed[id.Name] = true
 				}
+				return true
+			})
+			continue
+		}
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		for _, decl := range f.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.IsExported() && strings.HasPrefix(fn.Name.Name, "Decode") {
+				declared[fn.Name.Name] = true
 			}
 		}
 	}

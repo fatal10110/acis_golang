@@ -27,19 +27,19 @@ func (r *recorder) record(kind, query string) {
 	r.seen = append(r.seen, kind+" "+query)
 }
 
-type recorderConn struct{ r *recorder }
+type recorderConn struct{ *recorder }
 
 func (c recorderConn) Prepare(string) (driver.Stmt, error) { return nil, driver.ErrSkip }
 func (c recorderConn) Close() error                        { return nil }
 func (c recorderConn) Begin() (driver.Tx, error)           { return nil, driver.ErrSkip }
 
 func (c recorderConn) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
-	c.r.record("exec", query)
+	c.record("exec", query)
 	return driver.RowsAffected(0), nil
 }
 
 func (c recorderConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
-	c.r.record("query", query)
+	c.record("query", query)
 	return emptyRows{}, nil
 }
 
@@ -48,10 +48,6 @@ type emptyRows struct{}
 func (emptyRows) Columns() []string         { return []string{"id"} }
 func (emptyRows) Close() error              { return nil }
 func (emptyRows) Next([]driver.Value) error { return io.EOF }
-
-type recorderDriver struct{ r *recorder }
-
-func (d recorderDriver) Open(string) (driver.Conn, error) { return recorderConn{d.r}, nil }
 
 // TestBootStatementsMatchReferenceProbe replays testdata/statements.golden,
 // the output of testdata/oracle/IdFactoryProbe.java: every statement the
@@ -78,7 +74,7 @@ func TestBootStatementsMatchReferenceProbe(t *testing.T) {
 	}
 
 	rec := &recorder{}
-	db := sql.OpenDB(connectorFor(rec))
+	db := sql.OpenDB(connector{rec})
 	defer db.Close()
 	if _, err := New(context.Background(), db, zerolog.Nop()); err != nil {
 		t.Fatal(err)
@@ -99,9 +95,8 @@ func TestBootStatementsMatchReferenceProbe(t *testing.T) {
 	}
 }
 
+// connector opens connections that record into r.
 type connector struct{ r *recorder }
 
-func connectorFor(r *recorder) driver.Connector { return connector{r} }
-
 func (c connector) Connect(context.Context) (driver.Conn, error) { return recorderConn{c.r}, nil }
-func (c connector) Driver() driver.Driver                        { return recorderDriver{c.r} }
+func (c connector) Driver() driver.Driver                        { return nil }
