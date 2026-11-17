@@ -14,11 +14,16 @@ import net.sf.l2j.gameserver.enums.actors.ClassRace;
 import net.sf.l2j.gameserver.enums.actors.WeightPenalty;
 import net.sf.l2j.gameserver.enums.skills.EffectFlag;
 import net.sf.l2j.gameserver.model.AccessLevel;
+import net.sf.l2j.gameserver.data.xml.NpcData;
+import net.sf.l2j.gameserver.data.xml.PlayerData;
+import net.sf.l2j.gameserver.model.actor.cast.PlayerCast;
 import net.sf.l2j.gameserver.model.actor.container.player.Appearance;
 import net.sf.l2j.gameserver.model.actor.container.player.BoatInfo;
 import net.sf.l2j.gameserver.model.actor.container.player.FishingStance;
 import net.sf.l2j.gameserver.model.actor.instance.Cubic;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
+import net.sf.l2j.gameserver.model.actor.template.PlayerTemplate;
+import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
 import net.sf.l2j.gameserver.model.actor.status.PlayerStatus;
 import net.sf.l2j.gameserver.model.actor.container.player.HennaList;
 import net.sf.l2j.gameserver.model.actor.container.player.QuestList;
@@ -58,6 +63,10 @@ public final class Player extends Playable
 	public int pkKills;
 	public int adena;
 	public PcInventory inventory = new PcInventory();
+
+	{
+		inventory.owner = this;
+	}
 	public PcInventory warehouse = new PcInventory();
 	public TradeList activeTradeList;
 	public TradeList sellList = new TradeList();
@@ -73,7 +82,8 @@ public final class Player extends Playable
 	public int baseClass;
 	public int currentWeight;
 	public int weightLimit;
-	public Object activeWeaponItem;
+	public ItemInstance activeEnchantItem;
+	public final PlayerCast cast = new PlayerCast();
 	public boolean mounted;
 	public Summon summon;
 	public int mountType;
@@ -273,6 +283,7 @@ public final class Player extends Playable
 		return classId;
 	}
 
+	@Override
 	public int getKarma()
 	{
 		return karma;
@@ -330,9 +341,41 @@ public final class Player extends Playable
 		return weightLimit;
 	}
 
+	// Nothing in the right hand holds the class's fists, which every class has: the weapon is
+	// never null (the packets read only that).
+	private static final Object FISTS = new Object();
+
 	public Object getActiveWeaponItem()
 	{
-		return activeWeaponItem;
+		return (inventory.getItemObjectIdFrom(net.sf.l2j.gameserver.enums.Paperdoll.RHAND) == 0) ? FISTS : new Object();
+	}
+
+	public ItemInstance getActiveEnchantItem()
+	{
+		return activeEnchantItem;
+	}
+
+	public PlayerCast getCast()
+	{
+		return cast;
+	}
+
+	// The body of the base class, whichever class is active.
+	public PlayerTemplate getBaseTemplate()
+	{
+		return PlayerData.getInstance().getTemplate(baseClass);
+	}
+
+	@Override
+	public double getCollisionRadius()
+	{
+		return (isMounted()) ? NpcData.getInstance().getTemplate(mountNpcId).getCollisionRadius() : getBaseTemplate().getCollisionRadiusBySex(getAppearance().getSex());
+	}
+
+	@Override
+	public double getCollisionHeight()
+	{
+		return (isMounted()) ? NpcData.getInstance().getTemplate(mountNpcId).getCollisionHeight() : getBaseTemplate().getCollisionHeightBySex(getAppearance().getSex());
 	}
 
 	public boolean isMounted()
@@ -470,9 +513,10 @@ public final class Player extends Playable
 		return cursedWeaponEquippedId;
 	}
 
-	public int getPvpFlag()
+	@Override
+	public byte getPvpFlag()
 	{
-		return pvpFlag;
+		return (byte) pvpFlag;
 	}
 
 	public int getPvpKills()

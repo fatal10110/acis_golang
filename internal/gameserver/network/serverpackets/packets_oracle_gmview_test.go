@@ -56,7 +56,8 @@ func oracleGMViewCases() map[string]func() wire.Frame {
 	variants := oracleVariants()
 	m["GMViewCharacterInfo/live"] = variant(true, func(*oraclePlayer) {})
 	m["GMViewCharacterInfo/live-flying"] = variant(true, func(o *oraclePlayer) { o.c.SetFlying(true) })
-	for _, name := range []string{"gm", "hero", "noble"} {
+	m["GMViewCharacterInfo/subclass"] = variant(true, (*oraclePlayer).subclass)
+	for _, name := range []string{"gm", "hero", "noble", "strider", "wyvern", "unarmed"} {
 		m["GMViewCharacterInfo/"+name] = variant(false, variants[name])
 	}
 	for i := range oracleVitals {

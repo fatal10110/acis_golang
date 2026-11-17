@@ -2,9 +2,11 @@ package serverpackets
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
@@ -112,6 +114,7 @@ func addTradeCases(m map[string]func() wire.Frame, v [10]int32, n string) {
 	m["TradeStart"+n] = func() wire.Frame {
 		return mustFrame(FrameTradeStart(rowField(v, 3), oracleItems(v), table))
 	}
+	addTradeStartHeldCases(m, v, n, table)
 	qty := int(rowField(v, 3))
 	for _, c := range []struct {
 		name string
@@ -313,4 +316,44 @@ func addHennaCases(m map[string]func() wire.Frame, v [10]int32, n string) {
 	}
 	m["HennaInfo"+n] = func() wire.Frame { return FrameHennaInfo(equipped()) }
 	m["GMHennaInfo"+n] = func() wire.Frame { return FrameGMHennaInfo(equipped()) }
+}
+
+// addTradeStartHeldCases is ProbeShops.tradeStartHeld: the window a player
+// with free items gets when one of them is the pet's collar, the enchant
+// scroll in use or what the last cast consumes. The selection is the
+// inventory service's, the one the trade handler runs before the frame.
+func addTradeStartHeldCases(m map[string]func() wire.Frame, v [10]int32, n string, table *item.Table) {
+	for _, c := range []struct {
+		name                 string
+		collar, scroll, cast bool
+	}{
+		{"/plain", false, false, false},
+		{"/pet-collar", true, false, false},
+		{"/enchant-scroll", false, true, false},
+		{"/cast-consume", false, false, true},
+		{"/all-held", true, true, true},
+	} {
+		m["TradeStart"+c.name+n] = func() wire.Frame {
+			distinct := func(kind int) *item.Instance {
+				inst := oracleItem(v, kind, false, false)
+				inst.ObjectID += int32(kind+1) * 0x101
+				return inst
+			}
+			weapon, armor, jewel, adena := distinct(oracleWeapon), distinct(oracleArmor), distinct(oracleJewel), distinct(oracleAdena)
+			inv := itemcontainer.NewPlayerInventory(1, table)
+			inv.Restore([]*item.Instance{weapon, armor, jewel, adena})
+			var held inventory.Holder
+			if c.collar {
+				held.PetCollar = func(id int32) bool { return id == armor.ObjectID }
+			}
+			if c.scroll {
+				held.EnchantScroll = jewel.ObjectID
+			}
+			if c.cast {
+				held.CastConsumeID = weapon.TemplateID
+			}
+			items := inventory.NewService(nil).SendableItems(inv, held)
+			return mustFrame(FrameTradeStart(rowField(v, 3), items, table))
+		}
+	}
 }

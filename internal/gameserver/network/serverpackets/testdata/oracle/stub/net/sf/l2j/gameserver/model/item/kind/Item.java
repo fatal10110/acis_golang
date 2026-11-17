@@ -53,6 +53,12 @@ public class Item
 		return stackable;
 	}
 
+	// Every probed template is tradable, as the Go table the oracle builds.
+	public boolean isTradable()
+	{
+		return true;
+	}
+
 	public final CrystalType getCrystalType()
 	{
 		return crystalType;

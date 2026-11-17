@@ -139,6 +139,25 @@ owner-invisible hiding, which belong to the callers that build the snapshots; an
 not yet shown its summon animation. A player mounted with a summon out (the
 summon's collision radius and height) cannot occur in the Go model.
 
+Getters that run the reference rule in the stand-ins (so a producer that disagrees fails the golden): `Player.getCollisionRadius`
+and `getCollisionHeight` (the mount's template while mounted, else the base class's by sex; `NpcData` and the
+`PlayerTemplate` collision fields back them, and the `strider`, `wyvern` and `subclass` variants pin the branches),
+`Player.getActiveWeaponItem` (the class's fists with an empty right hand: UserInfo writes 40 for every character, `unarmed`),
+`Player.getEnchantEffect` (the variant sets it to 0 without a weapon), `ItemInstance.isAvailable` behind
+`PcInventory.getAvailableItems` (equipped, quest, shield-armor money, the summoned pet's collar, the enchant scroll in
+use, adena, the current cast's consumed item, tradable; its result in the container's order, highest object id first), and the
+summon title (the owner's name, set when the summon is created: `ProbeCharacters.summonBase`). The `TradeStart/*`
+cases run Go's `inventory.Service.SendableItems` over an inventory, the selection the trade handler makes before the frame.
+
+Still flat (plain fields; the Go packet encoders take these values through snapshots the domain fills, so the golden
+pins their layout and a drift in the value is caught only by the domain's own tests): `Creature.getAbnormalEffect`,
+`isInCombat`, `isAlikeDead`, `isFlying` and `CreatureStatus`/`PlayerStatus` (every stat; the calculators are pinned by
+`TestOracleCharacterInputsPinned` and their own probes); `Npc` hands and enchant; `Summon`/`Pet` `getWeapon`, `getArmor`,
+`getKarma`, `getPvpFlag`, `getTeam`, `isMountable`, `getWeightLimit` and `getSoulShotsPerHit` (built by
+`network.petInfoSnapshot`, driven by `tests/pets`); the `ItemInstance`/`Item` type words; `Clan` rank, war and reputation;
+`QuestState.getFlags`; and `PcInventory.getItemsToSell`, `getUniqueItems` and `TradeList.getAvailableItems` (the
+private-store lists, whose rows the store domain chooses before the encoder).
+
 The item and shop windows (`../../packets_oracle_item_test.go`, `../../packets_oracle_shop_test.go`) build
 every field from the shared row, rotated by the item kind (`ProbeItems.item`): a worn augmented weapon,
 a worn shadow armor, an augmented jewel, a quest stack and adena (plus a siege guard ticket for the

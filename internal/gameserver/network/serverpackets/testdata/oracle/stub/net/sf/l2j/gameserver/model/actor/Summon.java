@@ -50,6 +50,12 @@ public class Summon extends Playable
 		return template.getNpcId();
 	}
 
+	// The base summon has no collar; a pet overrides it.
+	public int getControlItemId()
+	{
+		return 0;
+	}
+
 	public int getSummonType()
 	{
 		return summonType;
@@ -66,11 +72,13 @@ public class Summon extends Playable
 		return 0;
 	}
 
+	@Override
 	public final byte getPvpFlag()
 	{
 		return pvpFlag;
 	}
 
+	@Override
 	public int getKarma()
 	{
 		return karma;

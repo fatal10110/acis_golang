@@ -2,6 +2,7 @@ package net.sf.l2j.gameserver.model.actor.template;
 
 import net.sf.l2j.gameserver.enums.actors.ClassId;
 import net.sf.l2j.gameserver.enums.actors.ClassRace;
+import net.sf.l2j.gameserver.enums.actors.Sex;
 
 // Stand-in for a player template: its class and base stats; the race is the
 // class's own, as in the reference.
@@ -14,6 +15,20 @@ public final class PlayerTemplate
 	public int intelligence;
 	public int wit;
 	public int men;
+	public double collisionRadius;
+	public double collisionHeight;
+	public double collisionRadiusFemale;
+	public double collisionHeightFemale;
+
+	public double getCollisionRadiusBySex(Sex sex)
+	{
+		return (sex == Sex.MALE) ? collisionRadius : collisionRadiusFemale;
+	}
+
+	public double getCollisionHeightBySex(Sex sex)
+	{
+		return (sex == Sex.MALE) ? collisionHeight : collisionHeightFemale;
+	}
 
 	public final ClassId getClassId()
 	{
