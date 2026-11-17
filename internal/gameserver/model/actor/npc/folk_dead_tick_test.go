@@ -10,7 +10,8 @@ import (
 // resets the NPC's lifetime and takes it off the AI task at once, so a dead
 // NPC is never ticked: a hit civilian NPC holding no desire that dies while
 // an AI tick is already queued ahead of its death's reset runs that tick as
-// a corpse, and the tick must not switch the corpse to its walk stance.
+// a corpse, and the tick must not idle the corpse again: the death itself
+// already switched it to its walk stance (CreatureAI.onEvtDead).
 func TestDeadFolkTickBeforeAbortCastDoesNotIdle(t *testing.T) {
 	r := newFolkCastRig(t, 50)
 	if r.f.Instance.Template.Undying {
@@ -27,6 +28,9 @@ func TestDeadFolkTickBeforeAbortCastDoesNotIdle(t *testing.T) {
 	if !r.f.TakeDamage(1_000_000, attacker) {
 		t.Fatal("lethal hit reported no kill")
 	}
+	if r.f.Running() {
+		t.Fatal("dead NPC still running, want the death's idle walk stance")
+	}
 	// The death's AbortCast reset is posted, not run: the tick runs first.
 	if r.f.cast.lifeTime.Load() == 0 {
 		t.Fatal("lifetime already reset before the queued AbortCast ran")
@@ -40,9 +44,6 @@ func TestDeadFolkTickBeforeAbortCastDoesNotIdle(t *testing.T) {
 		case event.MoveTypeChanged, event.NPCInfoChanged:
 			t.Fatalf("dead NPC's tick emitted %T, want nothing", ev)
 		}
-	}
-	if !r.f.Running() {
-		t.Fatal("dead NPC's tick switched it to walk stance")
 	}
 
 	r.in.Run()

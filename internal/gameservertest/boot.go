@@ -2202,7 +2202,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	cleanup(t, taskEffects.Reset)
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
-	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: cmp.Or(o.dropMultiplier, 1)}, time.Now)
 	gameNow := o.gameClockNow
 	var drivenNow atomic.Pointer[func() time.Time]
 	if !o.drivenStart.IsZero() {
@@ -2279,6 +2278,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
 	queues := startQueues(t, o.log, o.realPool, o.drivenStart)
+	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: cmp.Or(o.dropMultiplier, 1)}, time.Now, queues.NewQueue("ground-items"))
 	if !o.drivenStart.IsZero() {
 		now := time.Now
 		if queues.inline != nil {
