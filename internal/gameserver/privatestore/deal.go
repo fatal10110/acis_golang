@@ -2,6 +2,7 @@ package privatestore
 
 import (
 	"math"
+	"slices"
 
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -194,7 +195,8 @@ func (s *Store) Buy(svc *invops.Service, owner, buyer Trader, rows []PurchaseRow
 // that enchant free to trade. The owner must afford the total. Both
 // inventories are checked as the moves find them, so the deal moves
 // everything or nothing. A deal that would pay more than the largest int32
-// is refused.
+// is refused. Each sold row's units come off the first buy row wanting that
+// item, whatever its enchant and price (see takeBoughtLocked).
 func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) (Deal, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -209,10 +211,9 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 	var total int64
 	moves := make([]invops.Move, 0, len(rows))
 	moved := make([]Moved, 0, len(rows))
-	wanted := make([]int, len(rows))
 	asked := make(map[int]int, len(rows))
 	perItem := make(map[int32]int, len(rows))
-	for i, row := range rows {
+	for _, row := range rows {
 		if row.Count < 1 {
 			return Deal{}, nil
 		}
@@ -237,7 +238,6 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 		if total > math.MaxInt32 {
 			return Deal{}, nil
 		}
-		wanted[i] = idx
 		perItem[row.ObjectID] += row.Count
 		moves = append(moves, invops.Move{ObjectID: row.ObjectID, Count: row.Count})
 		moved = append(moved, Moved{ItemID: row.ItemID, Count: row.Count, Enchant: row.Enchant, Stackable: tmpl.Stackable})
@@ -266,16 +266,9 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 	if err != nil || !ok {
 		return deal, err
 	}
-	for i, row := range rows {
-		s.buy[wanted[i]].Quantity -= row.Count
+	for _, row := range rows {
+		s.takeBoughtLocked(row.ItemID, row.Count)
 	}
-	kept := s.buy[:0]
-	for _, row := range s.buy {
-		if row.Quantity > 0 {
-			kept = append(kept, row)
-		}
-	}
-	s.buy = kept
 	deal.Status, deal.Rows = DealDone, moved
 	deal.Emptied = len(s.buy) == 0 && s.operate.CompareAndSwap(int32(OperateBuy), int32(OperateNone))
 	return deal, nil
@@ -300,6 +293,23 @@ func (s *Store) buyRowLocked(templateID int32, enchant, price int) int {
 		}
 	}
 	return -1
+}
+
+// takeBoughtLocked takes count bought units off the first buy row wanting
+// templateID, whatever its enchant and price, so a sale priced at a later
+// row of the item still fills the earlier one first. The row leaves the
+// list once it wants nothing more.
+func (s *Store) takeBoughtLocked(templateID int32, count int) {
+	for i := range s.buy {
+		if s.buy[i].TemplateID != templateID {
+			continue
+		}
+		s.buy[i].Quantity -= count
+		if s.buy[i].Quantity <= 0 {
+			s.buy = slices.Delete(s.buy, i, i+1)
+		}
+		return
+	}
 }
 
 // takeSoldLocked takes count sold units off objectID's sell row, dropping
