@@ -552,8 +552,10 @@ func (l *GameClientLink) leaveDuel(live *livePlayer) {
 }
 
 // cancelPartyDuel cancels the party duel leader's party fights, as any
-// change to its members does: every player returns where it stood and
-// leaves the duel, then the duel ends in a tie.
+// change to its members does: every player returns where it stood, then
+// the duel ends in a tie. Each player stays in the duel until its part of
+// the end takes it out, so no other duel can take it in before the end
+// has cleared its duel and colour.
 func (l *GameClientLink) cancelPartyDuel(leader *livePlayer) {
 	if l.duels == nil {
 		return
@@ -567,7 +569,6 @@ func (l *GameClientLink) cancelPartyDuel(leader *livePlayer) {
 			if cond := m.duelCondition; cond != nil && cond.at != nil {
 				l.forceTeleportLivePlayer(m, *cond.at, 0, atLarge(m))
 			}
-			m.LeaveDuel()
 		})
 	}
 	l.endDuel(v, duel.Canceled, true)

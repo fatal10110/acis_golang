@@ -336,13 +336,15 @@ func (r *Registry[M]) remove(out *notices, g *group[M], player M, reason Reason)
 		r.disband(out, g)
 		return
 	}
-	// Only a disconnecting leader gets here: its client is gone, so the
-	// leadership notices go to the members who stay.
+	// Only a disconnecting leader gets here. The party changes hands while
+	// the leaver is still in it, so the windows the members who stay get
+	// list it until the delete that follows; its own client is gone, so
+	// only they are told.
+	if isLeader {
+		r.changeLeader(out, g, g.others(player)[0], player.ObjectID())
+	}
 	g.members = without(g.members, player.ObjectID())
 	delete(r.byMember, player.ObjectID())
-	if isLeader {
-		r.changeLeader(out, g, g.members[0])
-	}
 	out.add(Edited[M]{Leader: g.leader})
 	g.recalculateLevel()
 	out.add(Departing[M]{Member: player, Members: g.members})
@@ -398,22 +400,24 @@ func (r *Registry[M]) ChangeLeader(requester M, name string) []Notice {
 		return out
 	}
 	if target, ok := g.byName(name); ok && !inDuel(target) {
-		r.changeLeader(&out, g, target)
+		r.changeLeader(&out, g, target, 0)
 	}
 	return out
 }
 
-func (r *Registry[M]) changeLeader(out *notices, g *group[M], player M) {
+// changeLeader hands g to player. gone is the member whose client is gone,
+// which no notice goes to, or 0 when every member is still connected.
+func (r *Registry[M]) changeLeader(out *notices, g *group[M], player M, gone int32) {
 	if g.leader.ObjectID() == player.ObjectID() {
 		out.add(Msg[M]{To: []M{player}, ID: MsgCannotTransferToSelf})
 		return
 	}
 	if c := g.channel; c != nil && c.leader.ObjectID() == g.leader.ObjectID() {
 		c.leader = player
-		out.add(Msg[M]{To: c.members(), ID: MsgChannelLeaderNow, Name: player.CharacterName()})
+		out.add(Msg[M]{To: without(c.members(), gone), ID: MsgChannelLeaderNow, Name: player.CharacterName()})
 	}
 	g.leader = player
-	for _, m := range g.members {
+	for _, m := range without(g.members, gone) {
 		out.add(WindowDeleteAll[M]{To: m})
 		out.add(WindowAll[M]{To: m, Leader: player.ObjectID(), Loot: g.loot, Others: g.others(m)})
 		out.add(InfoRefresh[M]{Member: m})

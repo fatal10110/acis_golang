@@ -1,6 +1,7 @@
 package party
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -140,7 +141,9 @@ func TestChangeLeader(t *testing.T) {
 
 // TestLeaderDisconnectHandsOver pins Player.deleteMe for a leader of three:
 // a disconnect does not disperse the party; the next member leads, and the
-// one left is dropped from the windows of those who stay.
+// one left is dropped from the windows of those who stay. The hand-over
+// comes first, so the new windows still list the leaver as one of the
+// others (#4999) until the delete that follows.
 func TestLeaderDisconnectHandsOver(t *testing.T) {
 	t.Parallel()
 	g := threeMemberParty(t)
@@ -153,11 +156,15 @@ func TestLeaderDisconnectHandsOver(t *testing.T) {
 	})
 	for _, p := range []player{member, third} {
 		frames := drainFrames(t, p.c)
-		lead, _, rows := readWindowAll(t, frames[indexOf(frames, serverpackets.OpcodePartySmallWindowAll)])
-		if lead != member.id || len(rows) != 1 {
-			t.Fatalf("%s PartySmallWindowAll leader %d rows %+v, want leader %d with one other", p.name, lead, rows, member.id)
+		all := indexOf(frames, serverpackets.OpcodePartySmallWindowAll)
+		lead, _, rows := readWindowAll(t, frames[all])
+		if lead != member.id || len(rows) != 2 || !slices.ContainsFunc(rows, func(r windowRow) bool { return r.objectID == leader.id }) {
+			t.Fatalf("%s PartySmallWindowAll leader %d rows %+v, want leader %d with two others, the leaver among them", p.name, lead, rows, member.id)
 		}
 		left := indexOfMessage(frames, serverpackets.SystemMessageS1LeftParty)
+		if left < all {
+			t.Fatalf("%s frames = %x, want the hand-over before S1_LEFT_PARTY", p.name, opcodes(frames))
+		}
 		if left < 0 {
 			t.Fatalf("%s frames = %x, want S1_LEFT_PARTY", p.name, opcodes(frames))
 		}
