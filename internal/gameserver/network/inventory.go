@@ -962,14 +962,11 @@ func liveItemOpsAllowed(live *livePlayer) bool {
 }
 
 // liveItemInteractionAllowed reports whether live may currently use or
-// equip/unequip an item, or pick one up off the ground: not gone, not dead,
-// and free of the crowd-control quartet that locks item interaction
-// (stunned, sleeping, paralyzed, or afraid). This is the union applied to
-// UseItem and RequestUnEquipItem directly, and to pickup indirectly via the
-// AI's deny-action gate — which also folds
-// in teleporting/immobile-until-attacked/dead, which this port doesn't model
-// for pickup any more than it does for use/unequip (documented deferred
-// gaps).
+// equip/unequip an item: not gone, not dead or fake-dead, and free of the
+// crowd-control quartet that locks item interaction (stunned, sleeping,
+// paralyzed, or afraid). UseItem and RequestUnEquipItem apply it directly; a
+// ground pickup applies it together with DenyAIAction, which also refuses
+// a teleporting or immobile-until-attacked player.
 func liveItemInteractionAllowed(live *livePlayer) bool {
 	return liveItemOpsAllowed(live) && !live.Stunned() && !live.Sleeping() && !live.Paralyzed() && !live.Afraid()
 }
