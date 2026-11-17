@@ -241,7 +241,7 @@ func (l *GameClientLink) reloadCursedWeapons() error {
 		return nil
 	}
 	if l.reloads.CursedWeapons == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	fresh, err := l.reloads.CursedWeapons()
 	if err != nil {

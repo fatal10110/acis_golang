@@ -29,13 +29,6 @@ func (c *PlayerCell) Set(p *Player) {
 	c.mu.Unlock()
 }
 
-// Clear empties the cell.
-func (c *PlayerCell) Clear() {
-	c.mu.Lock()
-	c.held = nil
-	c.mu.Unlock()
-}
-
 // ListCell is an ordered list, empty at first, that keeps duplicates. A creature
 // handle (an *NPC, a *Player or a Creature) matches by world identity: an NPC's
 // is its spawn slot's, the one the timers use; a player's is its character,

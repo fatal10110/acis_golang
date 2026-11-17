@@ -1,9 +1,9 @@
 package baium
 
 import (
-	"math"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -246,7 +246,7 @@ func Baium() script.Script {
 					s.StartTimer("2002", n, nil, 60000*time.Millisecond)
 				}
 			case "2003":
-				n.SetInt(slotPartyDamage, saturatedInt(float64(n.Int(slotPartyDamage))*2.73))
+				n.SetInt(slotPartyDamage, commons.TruncInt32Sat(float64(n.Int(slotPartyDamage))*2.73))
 
 				damage, partyDamage := n.Int(slotDamage), n.Int(slotPartyDamage)
 				i0 := damage + partyDamage
@@ -476,18 +476,4 @@ func castBaiumSkill(s *script.Script, n *script.NPC) {
 // empty, over 9000 away or dead.
 func gone(n *script.NPC, c script.Creature) bool {
 	return c == nil || n.Distance2D(c) > 9000 || c.Dead()
-}
-
-// saturatedInt converts f to an int32 as a cast of a double to an int
-// does: rounded toward zero, clamped to the int32 range, NaN to 0.
-func saturatedInt(f float64) int32 {
-	switch {
-	case math.IsNaN(f):
-		return 0
-	case f >= math.MaxInt32:
-		return math.MaxInt32
-	case f <= math.MinInt32:
-		return math.MinInt32
-	}
-	return int32(f)
 }

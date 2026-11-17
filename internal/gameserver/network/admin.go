@@ -14,9 +14,9 @@ import (
 // is the whole command, its admin_ word first.
 type adminCommand func(l *GameClientLink, gm *livePlayer, line string)
 
-// adminCommands maps every ported admin_ command word, matched exactly, to
-// its handler. A word the command table defines but no entry here claims is
-// a command still to port.
+// adminCommands maps every admin_ command word with a handler, matched
+// exactly, to that handler. A word the command table defines but no entry
+// here claims, such as an operator-added command row, has no handler.
 var adminCommands = map[string]adminCommand{
 	"admin_admin":        (*GameClientLink).adminMainPage,
 	"admin_camera":       (*GameClientLink).adminCamera,
@@ -225,7 +225,7 @@ func (l *GameClientLink) runAdminCommand(gm *livePlayer, entry adminEntry, word,
 	}
 	l.gmAudit.Info().Msgf("%s [%d] used '%s' command on: %s", gm.CharacterName(), gm.ObjectID(), audited, trackedName(gm.Target()))
 	if !ported {
-		l.log.Warn().Str("command", word).Msg("admin: command not implemented yet")
+		l.log.Warn().Str("command", word).Msg("admin: no handler for admin command")
 		gm.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

@@ -1,7 +1,7 @@
 // Package q614 is the quest Slay the Enemy Commander: Ashas Varka Durai asks
-// a Varka ally of level 4 or more for the head of Tayr, the Ketra raid boss,
-// and pays for it with the Feather of Wisdom. Every ally of the killer's
-// party near Tayr gets a head.
+// a level 75 Varka ally of alliance level 4 or more for the head of Tayr,
+// the Ketra raid boss, and pays for it with the Feather of Wisdom. Every
+// ally of the killer's party near Tayr gets a head.
 package q614
 
 import (
@@ -70,8 +70,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk offers the quest to a level 75 Varka ally of level 4 or more who
-// holds the level 4 alliance mark and no feather yet.
+// onTalk offers the quest to a level 75 Varka ally of alliance level 4 or
+// more who holds the level 4 alliance mark and no feather yet.
 func onTalk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
 	st := s.QuestState(e.Player, questName)
