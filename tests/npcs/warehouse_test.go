@@ -538,18 +538,28 @@ func bootFreight(t *testing.T, adena int32, stacks [][2]int32, extra ...gameserv
 }
 
 // bootFreightPrepared is bootFreight running prepare, when set, once both
-// characters exist and before the sender enters the world.
+// characters exist and before the sender enters the world. Both are on the
+// account before the client logs in: the selection takes the account's other
+// characters from the list the client was sent.
 func bootFreightPrepared(t *testing.T, prepare func(srv *gameservertest.Server, sender int32, receiver *player.Character), adena int32, stacks [][2]int32, extra ...gameservertest.Option) *freightWorld {
 	t.Helper()
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCharacter("Sender", playerLevel, 0),
-		gameservertest.WithWantChars(1),
+		gameservertest.WithCharacter("Receiver", playerLevel, 0),
+		gameservertest.WithWantChars(2),
 		gameservertest.WithHTMLPages(warehousePages()),
 		noBypassReuse,
 	}, extra...)
 	srv := gameservertest.Boot(t, opts...)
-	w := &whWorld{folkWorld: &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}, items: map[int32]int32{}}
-	receiver := srv.SeedCharacter(t, "Receiver", playerLevel, 0)
+	chars, err := srv.Chars.ListByAccount(context.Background(), srv.Account())
+	if err != nil {
+		t.Fatalf("list characters: %v", err)
+	}
+	if len(chars) != 2 || chars[0].CharacterName() != "Sender" {
+		t.Fatalf("account characters %v, want Sender in the first slot and Receiver", chars)
+	}
+	receiver := chars[1]
+	w := &whWorld{folkWorld: &folkWorld{srv: srv, c: srv.Client, player: chars[0].ID}, items: map[int32]int32{}}
 	w.items[item.AdenaID] = srv.GiveItem(t, w.player, item.AdenaID, adena)
 	for _, s := range stacks {
 		w.items[s[0]] = srv.GiveItem(t, w.player, s[0], s[1])

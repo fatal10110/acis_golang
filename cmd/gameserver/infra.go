@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/config"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -72,10 +73,12 @@ func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Lo
 	return rt.Logger, gmAuditLogger(rt.GMAudit), chatLogger(rt.Chat), itemLogger(rt.Item), nil
 }
 
-// provideGameServerDatabase opens the pool and reaches the database once,
-// within the boot deadline. A server that cannot reach it refuses to boot:
-// its object ids would be handed out from an empty used set, and its empty
-// clan, castle and hero tables would later be written over the stored ones.
+// provideGameServerDatabase opens the pool, reaches the database once and
+// adds the indexes the shipped schema lacks, within the boot deadline. A
+// server that cannot reach it refuses to boot: its object ids would be handed
+// out from an empty used set, and its empty clan, castle and hero tables
+// would later be written over the stored ones. One that cannot add an index
+// refuses too, naming it, rather than scan whole tables at every login.
 func provideGameServerDatabase(lc fx.Lifecycle, ctx bootContext, cfg gameServerConfig) (*sql.DB, error) {
 	pool, err := db.Open(cfg.Database)
 	if err != nil {
@@ -84,6 +87,10 @@ func provideGameServerDatabase(lc fx.Lifecycle, ctx bootContext, cfg gameServerC
 	if err := pool.PingContext(ctx); err != nil {
 		_ = pool.Close()
 		return nil, fmt.Errorf("reach database: %w", err)
+	}
+	if err := gamesql.EnsureIndexes(ctx, pool); err != nil {
+		_ = pool.Close()
+		return nil, err
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return pool.Close() }})
 	return pool, nil

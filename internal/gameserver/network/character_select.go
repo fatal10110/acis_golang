@@ -124,7 +124,7 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, cs *connState, slo
 	}
 	// The selection restores the character in full. A restore that fails
 	// attaches nothing, and closes the connection.
-	selected, ok := l.restoreSelected(ctx, client, c)
+	selected, ok := l.restoreSelected(ctx, client, chars, c)
 	if !ok {
 		client.closeNow()
 		return selectionStopped
