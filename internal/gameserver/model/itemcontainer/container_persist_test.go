@@ -154,7 +154,7 @@ func TestInventoryItemPersisterAppliesToRestoredItems(t *testing.T) {
 		{ObjectID: 0x20000001, TemplateID: potionTemplateID, Count: 5, Location: item.LocationInventory, ManaLeft: -1},
 	}
 	rec := &recordingPersister{}
-	inv := RestorePlayerInventoryWithDelivery(0x10000001, testTemplates(), restored, nil, rec)
+	inv := restorePlayerInventoryWithDelivery(0x10000001, testTemplates(), restored, nil, rec)
 	if len(rec.ids) != 0 {
 		t.Fatalf("restoring an inventory persisted %d times, want 0", len(rec.ids))
 	}
@@ -177,7 +177,7 @@ func TestInventoryRestoreNormalizesStacksAndEquipment(t *testing.T) {
 	})
 	shield := &item.Instance{ObjectID: 0x20000001, TemplateID: shieldID, Count: 1, Location: item.LocationPaperdoll, LocationData: LHand, ManaLeft: -1}
 	twoHand := &item.Instance{ObjectID: 0x20000002, TemplateID: twoHandID, Count: 1, Location: item.LocationPaperdoll, LocationData: RHand, ManaLeft: -1}
-	inv := RestorePlayerInventory(0x10000001, templates, []*item.Instance{
+	inv := restorePlayerInventory(0x10000001, templates, []*item.Instance{
 		{ObjectID: 0x20000003, TemplateID: potionTemplateID, Count: 4, Location: item.LocationInventory, ManaLeft: -1},
 		{ObjectID: 0x20000004, TemplateID: potionTemplateID, Count: 6, Location: item.LocationInventory, ManaLeft: -1},
 		shield,
@@ -253,7 +253,7 @@ func TestInventoryRestoreMergePersistsBothRows(t *testing.T) {
 		{ObjectID: 0x20000003, TemplateID: daggerTemplateID, Count: 1, Location: item.LocationInventory, ManaLeft: -1},
 	}
 	rec := &recordingPersister{}
-	inv := RestorePlayerInventoryWithDelivery(0x10000001, testTemplates(), rows, nil, rec)
+	inv := restorePlayerInventoryWithDelivery(0x10000001, testTemplates(), rows, nil, rec)
 	if len(rec.states) != 2 {
 		t.Fatalf("restore persisted %v, want exactly the survivor and the absorbed row", rec.ids)
 	}
@@ -279,7 +279,7 @@ func TestInventoryRestoreMergePersistsBothRows(t *testing.T) {
 // ids and times are interleaved so an implementation that used either key
 // alone would produce a different order than the one asserted.
 func TestContainerItemsOrderedByEntryTimeThenObjectID(t *testing.T) {
-	c := NewWarehouse(1, testTemplates())
+	c := NewContainer(1, item.LocationWarehouse, testTemplates())
 	for _, objectID := range []int32{601, 602, 603, 604} {
 		if c.AddNew(daggerTemplateID, 1, objectID) == nil {
 			t.Fatalf("AddNew(%d) returned nil", objectID)
@@ -318,7 +318,7 @@ func TestContainerItemsOrderedByEntryTimeThenObjectID(t *testing.T) {
 // the newest; merging units into a stack that is already held leaves that
 // stack's place in the list alone.
 func TestContainerAddStampsEntryTimeWithoutRestampingMergedStack(t *testing.T) {
-	c := NewWarehouse(1, testTemplates())
+	c := NewContainer(1, item.LocationWarehouse, testTemplates())
 
 	stack := c.AddNew(adenaTemplateID, 100, 700)
 	if stack == nil {
@@ -373,7 +373,7 @@ func TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored(t *testing.T) {
 			})
 		}
 
-		inv := RestorePlayerInventory(1, testTemplates(), rows)
+		inv := restorePlayerInventory(1, testTemplates(), rows)
 
 		items := inv.Items()
 		if len(items) != 1 {
@@ -389,4 +389,20 @@ func TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored(t *testing.T) {
 			t.Fatalf("restore order %v: merged-away instance %d still held", restoreOrder, restoreOrder[1])
 		}
 	}
+}
+
+// restorePlayerInventory rebuilds a player inventory from items without
+// queuing client updates.
+func restorePlayerInventory(ownerID int32, templates *item.Table, items []*item.Instance) *Inventory {
+	inv := NewPlayerInventory(ownerID, templates)
+	inv.Restore(items)
+	return inv
+}
+
+// restorePlayerInventoryWithDelivery is restorePlayerInventory with delivery
+// and persist in place before the rows are restored.
+func restorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery, persist item.Persister) *Inventory {
+	inv := NewPlayerInventoryWithDelivery(ownerID, templates, delivery, persist)
+	inv.Restore(items)
+	return inv
 }

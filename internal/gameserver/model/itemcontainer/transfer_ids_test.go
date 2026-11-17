@@ -29,7 +29,7 @@ func (s *idSource) next() (int32, error) {
 // active town; a hidden other-town stack is not merged into.
 func TestFreightTransferSplitTagsActiveTown(t *testing.T) {
 	src := NewContainer(0x10000001, 0, freightTestTemplates())
-	dst := NewFreight(0x10000002, freightTestTemplates())
+	dst := newFreight(0x10000002, freightTestTemplates())
 
 	dst.ActiveLocation = 1
 	townOne := dst.AddNew(freightTestStackableID, 10, 0x20000002)

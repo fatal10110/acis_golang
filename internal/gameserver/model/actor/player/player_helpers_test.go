@@ -277,7 +277,7 @@ func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*ite
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
+	c.AttachRuntime(tmpl, restoredInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)
 	setRules(c, func(r *Rules) { r.PerfectShieldBlockRate = 5 })
 	return c
@@ -392,4 +392,12 @@ func setRules(c *Character, edit func(*Rules)) {
 	r := *c.rules()
 	edit(&r)
 	c.ruleBook.Store(NewRuleBook(r))
+}
+
+// restoredInventory returns a player inventory holding items, restored
+// without queuing client updates.
+func restoredInventory(ownerID int32, templates *item.Table, items []*item.Instance) *itemcontainer.Inventory {
+	inv := itemcontainer.NewPlayerInventory(ownerID, templates)
+	inv.Restore(items)
+	return inv
 }

@@ -81,11 +81,17 @@ func (b *Invites) activeLocked(objectID int32, at time.Time) (Invite, bool) {
 	return e, !e.left
 }
 
-// Send records an invitation from requesterID to targetID.
+// Send records an invitation from requesterID to targetID. It first drops
+// every lapsed entry, so the book holds only invitations that still stand.
 func (b *Invites) Send(kind InviteKind, requesterID int32, requesterName string, targetID int32, pledgeType int) InviteStatus {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	at := b.now()
+	for id, e := range b.entries {
+		if !at.Before(e.expiresAt) {
+			delete(b.entries, id)
+		}
+	}
 	if _, busy := b.activeLocked(targetID, at); busy {
 		return InviteTargetBusy
 	}

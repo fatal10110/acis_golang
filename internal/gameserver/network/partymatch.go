@@ -194,7 +194,7 @@ func (l *GameClientLink) chatPartyMatchRoom(_ *Client, live *livePlayer, line ch
 	if !ok {
 		return
 	}
-	l.broadcastToMembers(room.Members, frameCreatureSay(live, line))
+	sendToMembers(room.Members, frameCreatureSay(live, line))
 }
 
 // applyRoomNotices sends the packets of a party-matching change, in order.
@@ -207,12 +207,12 @@ func (l *GameClientLink) applyRoomNotices(notices []partymatch.Notice) {
 			n.To.SendFrame(serverpackets.FrameExPartyRoomMember(int32(n.Mode), l.roomMemberRows(n.Room)))
 		case partymatch.MemberChange[*livePlayer]:
 			row := l.roomMemberRow(n.Member, n.Leader)
-			l.broadcastToMembers(n.To, func() wire.Frame {
+			sendToMembers(n.To, func() wire.Frame {
 				return serverpackets.FrameExManagePartyRoomMember(int32(n.Mode), row)
 			})
 		case partymatch.Msg[*livePlayer]:
 			id := roomMessages[n.ID]
-			l.broadcastToMembers(n.To, func() wire.Frame {
+			sendToMembers(n.To, func() wire.Frame {
 				if n.Name != "" {
 					return serverpackets.FrameSystemMessageString(id, n.Name)
 				}

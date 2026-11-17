@@ -354,7 +354,9 @@ type Sender struct {
 // every check but the invalid target. Only a mail whose fields fit their
 // columns is stored; one that does not reaches its recipients for the run
 // but files no sent-box copy. It still counts against the sender's daily
-// limit, as a stored mail does.
+// limit, as a stored mail does. Deliberate divergence: the reference fails
+// the whole batch on such a mail, so nothing would count and the limit could
+// be dodged by sending wide mail.
 func (m *Mailbox) Send(sender Sender, recipients []Recipient, list, subject, message string, now time.Time) ([]Delivery, bool) {
 	subject = trimOr(subject, subjectLength, noSubject)
 	message = strings.ReplaceAll(message, "\n", "<br1>")

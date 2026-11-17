@@ -675,5 +675,5 @@ func (l *GameClientLink) sendOlympiadVitals(live *livePlayer, cpOrHP bool) {
 			to = append(to, p)
 		}
 	}
-	l.broadcastToMembers(to, func() wire.Frame { return serverpackets.FrameExOlympiadUserInfo(info) })
+	sendToMembers(to, func() wire.Frame { return serverpackets.FrameExOlympiadUserInfo(info) })
 }

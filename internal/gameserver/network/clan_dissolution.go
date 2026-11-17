@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -79,13 +78,7 @@ func (l *GameClientLink) DissolveDue(cl *clan.Clan) {
 // on its own queue.
 func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool) {
 	now := time.Now()
-	online := func(id int32) *player.Character {
-		if live, ok := l.livePlayerByID(id); ok {
-			return live.Character
-		}
-		return nil
-	}
-	out, ok := l.clanService().Destroy(cl, due, online, now)
+	out, ok := l.clanService().Destroy(cl, due, l.onlineCharacter, now)
 	if !ok {
 		return
 	}

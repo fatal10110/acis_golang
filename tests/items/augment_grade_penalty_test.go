@@ -70,7 +70,7 @@ func bootAugmentedGradeWeapon(t *testing.T) (*gameservertest.Server, int32, int3
 	objID := srv.SoleObjectID(t)
 	weapon := srv.GiveItem(t, objID, gradeWeaponID, 1)
 	aug := item.Augmentation{Attributes: gradeAugmentation, SkillID: gameservertest.AugmentRedSkillID, SkillLevel: 1}
-	if err := gamesql.NewAugmentationStore(srv.DB).Create(context.Background(), weapon, aug); err != nil {
+	if err := gameservertest.SeedAugmentation(context.Background(), srv.DB, weapon, aug); err != nil {
 		t.Fatalf("augment the weapon: %v", err)
 	}
 	startInWorld(t, srv.Client)

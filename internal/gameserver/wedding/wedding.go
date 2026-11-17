@@ -274,6 +274,9 @@ func (m *Manager) answer(requester, partner Spouse, accepted bool) Answer {
 // longer pay. The payment is taken before the couple exists, so a spouse
 // whose adena leaves between the check and the payment leaves both
 // unmarried and, once the other's payment is refunded, neither paying.
+// Deliberate divergence: the reference makes the couple first and ignores a
+// failed payment, so a spouse short of adena would marry for free and a
+// requester who asked two players could end up in two couples.
 func (m *Manager) marry(requester, partner Spouse) Answer {
 	out := Answer{Outcome: AnswerVoid, Requester: requester}
 	if m.byPlayer[requester.ObjectID()] > 0 || m.byPlayer[partner.ObjectID()] > 0 || m.ids == nil {

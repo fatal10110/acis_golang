@@ -8,7 +8,7 @@ import (
 
 // ---- from container_bench_test.go ----
 func newFullFreight(size int) *Freight {
-	f := NewFreight(0x10000001, testTemplates())
+	f := newFreight(0x10000001, testTemplates())
 	f.ActiveLocation = 1
 	for i := 0; i < size; i++ {
 		inst := f.AddNew(daggerTemplateID, 1, int32(0x20000000+i))

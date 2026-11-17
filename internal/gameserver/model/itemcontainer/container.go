@@ -167,16 +167,6 @@ func NewContainerWithPersister(ownerID int32, location item.Location, templates 
 	return c
 }
 
-// NewWarehouse returns an empty private warehouse container for ownerID.
-func NewWarehouse(ownerID int32, templates *item.Table) *Container {
-	return NewContainer(ownerID, item.LocationWarehouse, templates)
-}
-
-// NewClanWarehouse returns an empty clan warehouse container for clanID.
-func NewClanWarehouse(clanID int32, templates *item.Table) *Container {
-	return NewContainer(clanID, item.LocationClanWarehouse, templates)
-}
-
 // OwnerID returns the owning actor's object id.
 func (c *Container) OwnerID() int32 { return c.ownerID }
 

@@ -585,7 +585,7 @@ func (l *GameClientLink) sendDuelVitals(live *livePlayer, cpOrHP bool) {
 		return
 	}
 	info := duelUserInfo(live)
-	l.broadcastToMembers(opponents, func() wire.Frame { return serverpackets.FrameExDuelUpdateUserInfo(info) })
+	sendToMembers(opponents, func() wire.Frame { return serverpackets.FrameExDuelUpdateUserInfo(info) })
 }
 
 // refuseFrozenDuellist answers an action on a player that lost its duel, or
