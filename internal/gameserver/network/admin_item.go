@@ -26,7 +26,7 @@ func (l *GameClientLink) adminItem(gm *livePlayer, line string) {
 	switch param := args[0]; {
 	case isDigits(param):
 		// An id, count or radius out of the int range or not a number
-		// answers nothing, as specified; the link leaves no client action
+		// answers nothing by design; the link leaves no client action
 		// pending.
 		id, count, radius, ok := parseItemArgs(param, args[1:])
 		if !ok {
@@ -38,7 +38,7 @@ func (l *GameClientLink) adminItem(gm *livePlayer, line string) {
 	case param == "set":
 		l.adminItemSet(gm, target, args[1:])
 	default:
-		// Any other parameter answers nothing, as specified; the link
+		// Any other parameter answers nothing by design; the link
 		// leaves no client action pending.
 	}
 }
@@ -52,7 +52,7 @@ func (l *GameClientLink) adminGive(gm *livePlayer, line string) {
 		return
 	}
 	// A count or id out of the int range or not a number answers
-	// nothing, as specified; the link leaves no client action pending.
+	// nothing by design; the link leaves no client action pending.
 	// Only the count follows the id.
 	rest := args[1:]
 	if len(rest) > 1 {

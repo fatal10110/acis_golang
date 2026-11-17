@@ -316,6 +316,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 
 	objID, err := link.ids.NextID()
 	if err != nil {
+		link.log.Error().Err(err).Int("npc_id", int(summonItem.NPCID)).Msg("summon: allocate pet object id")
 		return
 	}
 
@@ -373,6 +374,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
+		link.log.Error().Err(err).Int("npc_id", int(summonItem.NPCID)).Msg("summon: build pet")
 		return
 	}
 	pet.SetHP(curHP)
@@ -394,14 +396,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		pet.RestoreDead()
 	}
 
-	// Combat AI wiring (owner-commanded attack/follow execution against a
-	// real move/attack controller, and the cast controller that would let
-	// TryUseSkill's dispatched cast actually resolve) is deferred — see
-	// this PR's linked follow-up. Attaching AI here with inert controllers
-	// still gives TryUseSkill a non-nil brain, matching its own documented
-	// contract: "a dispatched cast reports true even if the AI goes on to
-	// reject it" (live_accessors.go), which is exactly what a cast
-	// controller-less ai.Summon already does by design.
+	// wireSummonAI gives the pet its brain with live move, attack and cast
+	// controllers.
 	//
 	// Attach must run before SpawnAt publishes pet into world.State:
 	// SpawnAt's registry writes take a mutex, giving a
@@ -462,6 +458,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	}
 	objID, err := link.ids.NextID()
 	if err != nil {
+		link.log.Error().Err(err).Int("npc_id", def.NpcID).Msg("summon: allocate servitor object id")
 		return false
 	}
 
@@ -512,6 +509,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
+		link.log.Error().Err(err).Int("npc_id", def.NpcID).Msg("summon: build servitor")
 		return false
 	}
 	link.wireSummonAI(servitor)
@@ -778,8 +776,9 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 }
 
 // inertSummonMoveController is the fallback when a test or incomplete
-// composition root has no geodata collaborator. Production wires a real
-// move.Controller above.
+// composition root has no geodata collaborator, or when building or
+// attaching the movement controller fails (logged at warn). Otherwise a
+// real move.Controller is wired above.
 type inertSummonMoveController struct{}
 
 func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {

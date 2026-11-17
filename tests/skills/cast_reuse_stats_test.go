@@ -97,11 +97,17 @@ func TestCastReuseFollowsMagicReuseRate(t *testing.T) {
 			srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 			drainUntilQuiet(t, c)
 
-			// The disable timer runs out exactly at the planned reuse.
+			// The skill stays disabled through the planned reuse instant
+			// itself and frees one millisecond later.
 			srv.Advance(t, start.Add(time.Duration(tc.wantReuse-1)*time.Millisecond).Sub(c.Now()))
 			c.Send(encodeRequestMagicSkillUse(windStrikeID, false, false))
 			assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1PreparedForReuse, windStrikeID, 1)
 			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "recast before the reuse ran out")
+			drainUntilQuiet(t, c)
+			srv.Advance(t, time.Millisecond)
+			c.Send(encodeRequestMagicSkillUse(windStrikeID, false, false))
+			assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1PreparedForReuse, windStrikeID, 1)
+			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "recast at the reuse instant")
 			drainUntilQuiet(t, c)
 			srv.Advance(t, time.Millisecond)
 			c.Send(encodeRequestMagicSkillUse(windStrikeID, false, false))

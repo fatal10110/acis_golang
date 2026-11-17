@@ -30,9 +30,14 @@ var arenaCPRecovery = modelskill.Ref{ID: 4380, Level: 1}
 // cpRecoveryWeight is the weight of the restore's cast desire.
 const cpRecoveryWeight = 1_000_000
 
-// arenaManager reports whether npcID is one of the arena managers that
-// restore CP.
-func arenaManager(npcID int) bool { return npcID == 31225 || npcID == 31226 }
+// arenaManagers are the arena managers that restore CP.
+var arenaManagers = map[int]bool{
+	31225: true, // Arena Manager
+	31226: true, // Arena Director
+}
+
+// arenaManager reports whether npcID is one of the arenaManagers.
+func arenaManager(npcID int) bool { return arenaManagers[npcID] }
 
 // CPRecovery takes the fee from talker, then has f cast its CP restore on
 // talker on its next AI tick.

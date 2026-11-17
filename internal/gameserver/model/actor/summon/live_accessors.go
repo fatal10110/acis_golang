@@ -599,7 +599,7 @@ func (a *Actor) CanUseSkill() bool {
 	if owner := a.currentOwner(); owner != nil {
 		ownerLevel = owner.LevelValue()
 	}
-	return a.Level()-ownerLevel <= 20
+	return a.Level()-ownerLevel <= petOwnerLevelGap
 }
 
 // TryUseSkill dispatches an owner-commanded special-skill cast: resolves

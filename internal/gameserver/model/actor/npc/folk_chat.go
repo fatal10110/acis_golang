@@ -88,7 +88,7 @@ func canUseGK(r ChatRules) bool        { return r.KarmaCanUseGK }
 func canUseWarehouse(r ChatRules) bool { return r.KarmaCanUseWarehouse }
 
 // folkChats maps each civilian type with a page-only chat window to where
-// it reads it. A type absent here and from unportedFolkChats uses the
+// it reads it. A type absent here and from siegeMessengers uses the
 // default page.
 var folkChats = map[InstanceKind]folkChat{
 	"Adventurer":           {dir: "adventurer_guildsman"},
@@ -119,10 +119,12 @@ var folkChats = map[InstanceKind]folkChat{
 	"WyvernManagerNpc":  {dir: "merchant", pk: canShop},
 }
 
-// unportedFolkChats are the civilian types whose chat window is answered
-// before it: a castle's or a siegable hall's messenger. One serving
-// neither residence opens no page.
-var unportedFolkChats = map[InstanceKind]struct{}{
+// siegeMessengers are the civilian types whose chat window the network
+// answers from siege state: a castle's or a siegable hall's messenger. One
+// serving neither residence opens no page. Their pages carry no command
+// links, so a dialog command addressed to one is not modeled: it answers
+// BypassUnported, which the network logs and releases with ActionFailed.
+var siegeMessengers = map[InstanceKind]struct{}{
 	"SiegeNpc": {},
 }
 
@@ -141,7 +143,7 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatSta
 	if kind == auctioneer {
 		return f.AuctioneerChat(pages), ChatShown
 	}
-	if _, ok := unportedFolkChats[kind]; ok {
+	if _, ok := siegeMessengers[kind]; ok {
 		return "", ChatUnported
 	}
 	if page, outcome, ok := f.residenceChat(pages, kind, rules, state); ok {

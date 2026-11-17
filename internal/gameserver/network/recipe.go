@@ -75,7 +75,7 @@ func recipeBookFrame(live *livePlayer, dwarven bool) wire.Frame {
 // destroyRecipe answers RequestRecipeBookDestroy: the recipe leaves the
 // book together with every shortcut pointing at it, then live sees the
 // deletion and its page again. An unknown recipe id is dropped without a
-// word, as specified; the book window stays as it was and no
+// word by design; the book window stays as it was and no
 // client action waits on the answer.
 func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.RequestRecipeBookDestroy) {
 	// The book of a running workshop is locked, the recipe kept.
@@ -102,7 +102,7 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 
 // sendRecipeItemMakeInfo answers RequestRecipeItemMakeInfo with the craft
 // window of any loaded recipe, whether or not live holds it. An unknown
-// recipe id gets nothing: the specified answer is a packet carrying no
+// recipe id gets nothing: the answer is a packet carrying no
 // bytes at all, which the client has nothing to read from, and the
 // request leaves no client action waiting.
 func (l *GameClientLink) sendRecipeItemMakeInfo(live *livePlayer, req clientpackets.RequestRecipeItemMakeInfo) {
@@ -118,8 +118,8 @@ func sendRecipeMakeInfo(live *livePlayer, r recipe.Recipe, status int32) {
 	live.SendFrame(serverpackets.FrameRecipeItemMakeInfo(r, res.CurrentMP, res.MaxMP, status))
 }
 
-// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request specified to
-// drop without a word stays silent here too: an unknown recipe, or one not
+// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request refused
+// without a word stays silent here too: an unknown recipe, or one not
 // on the matching page of live's book. The craft window only asks again on
 // the player's next click, so nothing waits on those.
 func (l *GameClientLink) makeRecipeSelf(live *livePlayer, req clientpackets.RequestRecipeItemMakeSelf) {
