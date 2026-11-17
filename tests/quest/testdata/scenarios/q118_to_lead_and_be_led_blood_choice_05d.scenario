@@ -1,0 +1,44 @@
+# To Lead and Be Led (Q118), the armor choice 05d: with ten bloods the player picks the armor of stateEx 1 (cond 3) and,
+# having no sponsor, is told so by page 06a on the next talk.
+# Hand-written from the quest script (no reference trace).
+character Pupil 19
+quest Q118_ToLeadAndBeLed <cond>=2 <state>=STARTED state=1
+hold 8062 10
+script quest.Q118_ToLeadAndBeLed
+item 1458 7850 7851 7852 7853 7854 7855 7856 7857 7858 7859 8062 8063
+page trainer/30298.htm
+page script/quest/Q118_ToLeadAndBeLed/
+npc pinter 30298 Trainer 10 0 0
+
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q118_ToLeadAndBeLed 30298-05a.htm
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-05a.htm
+  S ActionFailed
+bypass Quest Q118_ToLeadAndBeLed 30298-05d.htm
+  S QuestList 118:0x80000007
+  S ExShowQuestMark quest=118
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:8062 6:10
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-05d.htm
+  S ActionFailed
+  Q upsert Q118_ToLeadAndBeLed | <cond> | 3
+  Q upsert Q118_ToLeadAndBeLed | state | 2
+  Q upsert Q118_ToLeadAndBeLed | stateEx | 1
+  items 8062=0
+  rows Q118_ToLeadAndBeLed <cond>=3 <state>=STARTED state=2 stateEx=1
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q118_ToLeadAndBeLed/30298-06a.htm
+  S ActionFailed
+  S ActionFailed

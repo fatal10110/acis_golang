@@ -1,0 +1,24 @@
+# Sword of Solidarity (Q101), cond 4: Altran, asked again after his note was given, says so (30283-04a)
+# Hand-written from the quest script (no reference trace).
+character Waiter 9
+quest Q101_SwordOfSolidarity <cond>=4 <state>=STARTED
+script quest.Q101_SwordOfSolidarity
+item 739 740 741 796 937 742 738 1060 4412 4413 4414 4415 4416 5789
+page default/30008.htm
+page default/30283.htm
+page script/quest/Q101_SwordOfSolidarity/
+npc roien 30008 Folk 10 0 0
+npc altran 30283 Folk 20 0 0
+npc marksman 20361 Monster 40 0 0
+
+action altran
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-04a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q101_SwordOfSolidarity STARTED
+  rows Q101_SwordOfSolidarity <cond>=4 <state>=STARTED

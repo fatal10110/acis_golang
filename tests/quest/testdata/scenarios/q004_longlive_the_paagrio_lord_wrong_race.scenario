@@ -1,0 +1,21 @@
+# Long Live the Paagrio Lord (Q004), refused: a human is turned away by Nakusin (orcs only)
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 2
+script quest.Q004_LongliveThePaagrioLord
+item 1541 1542 1543 1544 1545 1546 4
+page guard/30578.htm
+page script/quest/Q004_LongliveThePaagrioLord/
+npc nakusin 30578 Guard 10 0 0
+
+action nakusin
+action nakusin
+  S ActionFailed
+  S NpcHtmlMessage obj=nakusin item=0 page=guard/30578.htm
+  S ActionFailed
+bypass npc_{nakusin}_Quest
+  S NpcHtmlMessage obj=nakusin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30578-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q004_LongliveThePaagrioLord CREATED
+  rows Q004_LongliveThePaagrioLord -

@@ -1,0 +1,22 @@
+# Into the City of Humans (Q009), refused: an orc of level 2 is turned away by Petukai
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 2
+class 44
+script quest.Q009_IntoTheCityOfHumans
+item 7559 7570
+page guard/30583.htm
+page script/quest/Q009_IntoTheCityOfHumans/
+npc petukai 30583 Guard 10 0 0
+
+action petukai
+action petukai
+  S ActionFailed
+  S NpcHtmlMessage obj=petukai item=0 page=guard/30583.htm
+  S ActionFailed
+bypass npc_{petukai}_Quest
+  S NpcHtmlMessage obj=petukai item=0 page=script/quest/Q009_IntoTheCityOfHumans/30583-00a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q009_IntoTheCityOfHumans CREATED
+  rows Q009_IntoTheCityOfHumans -

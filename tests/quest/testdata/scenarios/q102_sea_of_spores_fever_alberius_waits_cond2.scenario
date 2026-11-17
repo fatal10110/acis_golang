@@ -1,0 +1,33 @@
+# Sea of Spores Fever (Q102), cond 2: Alberius, asked while the player is out for the dryad tears, sends the player on (30284-09)
+# Hand-written from the quest script (no reference trace).
+character Waiter 12
+class 18
+quest Q102_SeaOfSporesFever <cond>=2 <state>=STARTED
+script quest.Q102_SeaOfSporesFever
+item 964 965 966 746 1130 1131 1132 1133 1134 743 744 1060 1835 2509 4412 4413 4414 4415 4416
+page guard/30284.htm
+page trainer/30156.htm
+page guard/30217.htm
+page guard/30219.htm
+page guard/30221.htm
+page guard/30285.htm
+page script/quest/Q102_SeaOfSporesFever/
+npc alberius 30284 Guard 10 0 0
+npc cobendell 30156 Trainer 20 0 0
+npc berros 30217 Guard 30 0 0
+npc veltress 30219 Guard 0 10 0
+npc rayen 30221 Guard 0 20 0
+npc gartrandell 30285 Guard 0 30 0
+npc dryad 20013 Monster 40 0 0
+
+action alberius
+action alberius
+  S ActionFailed
+  S NpcHtmlMessage obj=alberius item=0 page=guard/30284.htm
+  S ActionFailed
+bypass npc_{alberius}_Quest
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-09.htm
+  S ActionFailed
+  S ActionFailed
+  state Q102_SeaOfSporesFever STARTED
+  rows Q102_SeaOfSporesFever <cond>=2 <state>=STARTED

@@ -1,0 +1,28 @@
+# Spirit of Craftsman (Q103), cond 5: Harne, asked after the soul catcher was handed over, says so (30144-04)
+# Hand-written from the quest script (no reference trace).
+character Waiter 11
+class 31
+quest Q103_SpiritOfCraftsman <cond>=5 <state>=STARTED
+script quest.Q103_SpiritOfCraftsman
+item 968 969 970 971 972 973 974 1107 975 1060 1835 2509 4412 4413 4414 4415 4416 5790
+page default/30307.htm
+page default/30132.htm
+page trainer/30144.htm
+page script/quest/Q103_SpiritOfCraftsman/
+npc karrod 30307 Folk 10 0 0
+npc cecktinon 30132 Folk 20 0 0
+npc harne 30144 Trainer 30 0 0
+npc skeleton 20517 Monster 40 0 0
+npc zombie 20015 Monster 0 40 0
+
+action harne
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q103_SpiritOfCraftsman/30144-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q103_SpiritOfCraftsman STARTED
+  rows Q103_SpiritOfCraftsman <cond>=5 <state>=STARTED

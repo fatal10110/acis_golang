@@ -1,0 +1,22 @@
+# What Women Want (Q002), refused: a dwarf is turned away by Arujien (humans and elves only)
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 2
+class 53
+script quest.Q002_WhatWomenWant
+item 1092 1093 1094 689 693 113
+page default/30223.htm
+page script/quest/Q002_WhatWomenWant/
+npc arujien 30223 Folk 10 0 0
+
+action arujien
+action arujien
+  S ActionFailed
+  S NpcHtmlMessage obj=arujien item=0 page=default/30223.htm
+  S ActionFailed
+bypass npc_{arujien}_Quest
+  S NpcHtmlMessage obj=arujien item=0 page=script/quest/Q002_WhatWomenWant/30223-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q002_WhatWomenWant CREATED
+  rows Q002_WhatWomenWant -
