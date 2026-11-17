@@ -66,29 +66,30 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 			l.releaseGround(ground)
 		}
 	}()
-	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
-		return true
-	}
 	inv := live.Inventory()
 	if inv == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
+	// A full picker that must keep what it picks up is refused for its
+	// inventory before an open trade refuses it; the loot lock comes last.
+	if l.pickupNeedsRoom(live) && !inv.ValidateCapacity(inv.SlotsNeededFor(&ground.Instance, ground.Template)) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
+		return true
+	}
+	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
+		return true
+	}
 
 	// A herb is used the instant it is picked up and never reaches the
 	// inventory: it carries no client icon there, so storing it would leave
-	// an unusable blank slot. The capacity and loot-lock gates still run
-	// first, in the specified order — a herb needs no slot, so the capacity
-	// check only rejects an inventory already past its limit.
+	// an unusable blank slot. The capacity, trade and loot-lock gates still
+	// run first; a herb needs no slot, so the capacity check never refuses it.
 	if ground.Herb() {
 		groundState := ground.Instance.Snapshot()
-		if !inv.ValidateCapacity(inv.SlotsNeededFor(&ground.Instance, ground.Template)) {
-			live.SendFrame(serverpackets.FrameActionFailed())
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
-			return true
-		}
 		if invops.LootLocked(groundState.OwnerID, live) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
@@ -233,24 +234,22 @@ func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 // what let a click land in the unlock instant, read blocked, then read
 // not-deferrable, and get discarded instead of re-deferred (#1159).
 //
-// Crowd control IS in the block set here: a pickup click goes through the
-// playable AI's pickup entry, which opens with the deny-action check before
-// it ever reaches the flying-only check further down. That check unions
-// stunned/sleeping/paralyzed/afraid with teleporting, immobile-until-attacked
-// and dead; this port models the CC quartet via liveItemInteractionAllowed
-// (matching use/unequip) and leaves teleporting/immobile-until-attacked as
-// the same documented deferred gaps noted for those two handlers. The
-// transient pickup lock (pickupLocked, the 200ms anti-mash gate), a swing
-// and a cast in flight queue the pickup as the next
-// intention, run when the lock lifts, the swing ends (finishQueuedBehindAttack)
-// or the cast ends (finishLiveCast).
+// A player that cannot act on an intention (DenyAIAction: dead, teleporting,
+// in store mode, or held by stun, sleep, paralysis, fear or an
+// immobile-until-attacked effect) is refused outright, never queued, as is
+// a fake-dead one. The one paralysis a click waits out is the pickup lock's
+// own: the transient pickup lock (pickupLocked, the 200ms anti-mash gate),
+// a swing and a cast in flight queue the pickup as the next intention, run
+// when the lock lifts, the swing ends (finishQueuedBehindAttack) or the cast
+// ends (finishLiveCast).
 func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
 	live.pickupMu.Lock()
 	defer live.pickupMu.Unlock()
 	attacking := live.attack != nil && live.attack.AttackingNow()
 	casting := live.cast != nil && live.cast.CastingNow()
-	blocked = !liveItemInteractionAllowed(live) || live.pickupLocked || !live.Standing() || attacking || casting
-	deferrable = attacking || casting || live.pickupLocked
+	denied := live.DenyAIAction() || !liveItemInteractionAllowed(live)
+	blocked = denied || live.pickupLocked || !live.Standing() || attacking || casting
+	deferrable = live.pickupLocked || (!denied && (attacking || casting))
 	return
 }
 
