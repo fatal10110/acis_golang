@@ -128,3 +128,46 @@ func TestEntryRemovalRacesEnter(t *testing.T) {
 		}
 	}
 }
+
+// TestEntryDissolutionRacesEnter dissolves a clan while its leader enters,
+// many times: the leader either enters as a member and is dissolved online,
+// or takes the removal's columns, with no title and the creation penalty a
+// leader leaving takes.
+func TestEntryDissolutionRacesEnter(t *testing.T) {
+	now := time.UnixMilli(1_800_000_000_000)
+	create := now.UnixMilli() + int64(DefaultConfig().CreateDays)*dayMillis
+	for i := range 500 {
+		table := NewTable()
+		table.Restore(Snapshot{
+			Clans:   []Row{{ID: 1, Name: "Home", Level: 5, LeaderID: 10}},
+			Members: []MemberRow{{ClanID: 1, Member: Member{ObjectID: 10, Name: "Lead"}}, {ClanID: 1, Member: Member{ObjectID: 11, Name: "Mate"}}},
+		}, now, 1)
+		s := NewService(table, nil, nil, nil, DefaultConfig(), nil, zerolog.Nop())
+		cl, _ := table.Get(1)
+		s.BeginEntry(10)
+		c := inClan(10, "Lead", 1)
+		c.SetTitle("Lord")
+		var out Dissolution
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			out, _ = s.Destroy(cl, false, func(int32) *player.Character { return c }, now)
+		})
+		_, entered := s.Enter(c)
+		wg.Wait()
+		var lead Member
+		for _, m := range out.Members {
+			if m.ObjectID == 10 {
+				lead = m
+			}
+		}
+		switch {
+		case lead.ObjectID == 0:
+			t.Fatalf("run %d: the dissolution did not remove the leader", i)
+		case entered && (!lead.Online || lead.Entering):
+			t.Fatalf("run %d: entered as a member but dissolved offline (online %v, entering %v)", i, lead.Online, lead.Entering)
+		case !entered && (!lead.Entering || c.ClanID() != 0 || c.Title() != "" || c.ClanCreateExpiryTime() != create):
+			t.Fatalf("run %d: entered clanless with entering %v clan %d title %q create %d, want the removal's columns",
+				i, lead.Entering, c.ClanID(), c.Title(), c.ClanCreateExpiryTime())
+		}
+	}
+}

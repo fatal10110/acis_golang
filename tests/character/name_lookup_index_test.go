@@ -2,6 +2,7 @@ package character
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -77,5 +78,27 @@ func TestCreateRefusesNameDifferingOnlyInCase(t *testing.T) {
 	}
 	if n := nameRows(t, srv, "Casefold"); n != 1 {
 		t.Fatalf("%d rows hold the name, want 1", n)
+	}
+}
+
+// TestBootIndexesRefuseCaseSensitiveNames gives characters.char_name, then
+// characters.account_name, a collation that tells letter cases apart: the
+// boot index step refuses the database, since a name differing only in
+// case would then pass as free.
+func TestBootIndexesRefuseCaseSensitiveNames(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, col := range []struct{ name, def string }{
+		{"char_name", "VARCHAR(35) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"},
+		{"account_name", "VARCHAR(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL"},
+	} {
+		db := sqltest.NewDB(t)
+		if _, err := db.ExecContext(ctx, "ALTER TABLE characters MODIFY "+col.name+" "+col.def); err != nil {
+			t.Fatalf("make %s case-sensitive: %v", col.name, err)
+		}
+		err := gamesql.EnsureIndexes(ctx, db)
+		if err == nil || !strings.Contains(err.Error(), col.name) {
+			t.Fatalf("EnsureIndexes with %s case-sensitive = %v, want a refusal naming it", col.name, err)
+		}
 	}
 }
