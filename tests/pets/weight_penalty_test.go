@@ -56,10 +56,9 @@ type petLoad struct {
 // band's speed.
 func TestPetWeightPenaltyBands(t *testing.T) {
 	t.Parallel()
-	h := bootBallastWolf(t)
-	wolf, burst := h.spawnWolf(t)
+	h, wolf, burst := bootBallastWolf(t)
 	if info, ok := firstOpcode(burst, serverpackets.OpcodePetInfo); !ok {
-		t.Fatalf("spawn burst has no PetInfo: opcodes %x", frameOpcodes(burst))
+		t.Fatalf("load frames have no PetInfo: opcodes %x", frameOpcodes(burst))
 	} else if got := readPetInfoLoad(t, info); got.limit != petWeightLimit {
 		t.Fatalf("spawn PetInfo weight limit = %d, want %d", got.limit, petWeightLimit)
 	}
@@ -111,8 +110,7 @@ func TestPetWeightPenaltyBands(t *testing.T) {
 // nothing. A give that lands exactly on the limit passes.
 func TestGiveToPetPastWeightLimitRefused(t *testing.T) {
 	t.Parallel()
-	h := bootBallastWolf(t)
-	h.spawnWolf(t)
+	h, _, _ := bootBallastWolf(t)
 	drainUntilQuiet(t, h.client)
 	ballast := h.seededItem(t, ballastID)
 	// Settle the spawn's pending inventory updates, as giveToPet does, so
@@ -133,22 +131,21 @@ func TestGiveToPetPastWeightLimitRefused(t *testing.T) {
 	if got := h.ownerItemCount(t, ballastID); got != 2728 {
 		t.Fatalf("owner ballast after refused give = %d, want 2728", got)
 	}
-	if got := h.collarItemCount(t, ballastID); got != 2724 {
+	if got := h.petRowCount(t, ballastID); got != 2724 {
 		t.Fatalf("pet ballast after refused give = %d, want 2724", got)
 	}
 
 	h.giveToPet(t, ballast, 2727)
-	if got := h.collarItemCount(t, ballastID); got != 5451 {
+	if got := h.petRowCount(t, ballastID); got != 5451 {
 		t.Fatalf("pet ballast after a give to the limit = %d, want 5451", got)
 	}
 }
 
-// TestRestoredPetLoadSetsBand calls out a wolf whose saved items already
-// weigh 46360 of its 54510 limit (85%, LEVEL_3), alive and as a corpse. The
-// restored load is weighed before the pet appears, so its first PetInfo
-// already carries the load and the band's halved speed, and its movement
-// and regeneration follow the band without any inventory change.
-func TestRestoredPetLoadSetsBand(t *testing.T) {
+// TestPetLoadSetsBand loads a wolf, alive and as a corpse, with items that
+// weigh 46360 of its 54510 limit (85%, LEVEL_3). The PetInfo the load sends
+// carries the load and the band's halved speed, and its movement and
+// regeneration follow the band.
+func TestPetLoadSetsBand(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name  string
@@ -157,18 +154,17 @@ func TestRestoredPetLoadSetsBand(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			saved := pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: tc.curHP, CurMP: 10, Fed: wolfMaxMeal}
-			h := bootBallastWolfCarrying(t, saved, 4636)
-			wolf, burst := h.spawnWolf(t)
+			h, wolf, burst := bootBallastWolfCarrying(t, saved, 4636)
 			if wolf.Dead() != (tc.curHP == 0) {
 				t.Fatalf("restored wolf dead = %v, want %v", wolf.Dead(), tc.curHP == 0)
 			}
 			info, ok := firstOpcode(burst, serverpackets.OpcodePetInfo)
 			if !ok {
-				t.Fatalf("spawn burst has no PetInfo: opcodes %x", frameOpcodes(burst))
+				t.Fatalf("load frames have no PetInfo: opcodes %x", frameOpcodes(burst))
 			}
 			want := petInfoLoad{multiplier: float64(float32(0.55)), weight: 46360, limit: petWeightLimit, moveSpeed: 66}
 			if got := readPetInfoLoad(t, info); got != want {
-				t.Fatalf("spawn PetInfo load = %+v, want %+v", got, want)
+				t.Fatalf("load PetInfo = %+v, want %+v", got, want)
 			}
 			if band := wolf.WeightPenalty(); band != 3 {
 				t.Fatalf("restored band = %d, want 3", band)
@@ -196,8 +192,7 @@ func TestRestoredPetLoadSetsBand(t *testing.T) {
 // status republish keeps the band without a second broadcast.
 func TestOverloadedPetRegenTick(t *testing.T) {
 	t.Parallel()
-	h := bootBallastWolf(t)
-	wolf, _ := h.spawnWolf(t)
+	h, wolf, _ := bootBallastWolf(t)
 	drainUntilQuiet(t, h.client)
 	h.giveToPet(t, h.seededItem(t, ballastID), 2)
 
@@ -213,19 +208,20 @@ func TestOverloadedPetRegenTick(t *testing.T) {
 	}
 }
 
-// bootBallastWolf boots the owner with 2728 ballast and a wounded regen
-// wolf saved under the collar, already carrying 2724 ballast (27240, just
-// under half its limit). The fixture owner's CON 0 limit is quadrupled (the
-// pet's stays at the shipped 1.0) so the owner's ballast never puts it in a
-// weight-penalty band of its own.
-func bootBallastWolf(t *testing.T) *petWorld {
+// bootBallastWolf boots the owner with 2728 ballast, calls out a wounded
+// regen wolf and loads it with 2724 ballast (27240, just under half its
+// limit). The fixture owner's CON 0 limit is quadrupled (the pet's stays at
+// the shipped 1.0) so the owner's ballast never puts it in a weight-penalty
+// band of its own.
+func bootBallastWolf(t *testing.T) (*petWorld, *summon.Actor, [][]byte) {
 	t.Helper()
 	return bootBallastWolfCarrying(t, pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal}, 2724)
 }
 
 // bootBallastWolfCarrying is bootBallastWolf with the wolf saved as saved,
-// carrying carried ballast.
-func bootBallastWolfCarrying(t *testing.T, saved pet.State, carried int) *petWorld {
+// loaded with carried ballast. It returns the wolf and the frames the load
+// sent its owner, which end with the PetInfo carrying the new weight.
+func bootBallastWolfCarrying(t *testing.T, saved pet.State, carried int) (*petWorld, *summon.Actor, [][]byte) {
 	t.Helper()
 	catalog := append(gameservertest.ItemTemplates().All(), &item.Template{
 		ID: ballastID, Name: "Ballast", Kind: item.KindEtcItem, Duration: -1,
@@ -243,11 +239,11 @@ func bootBallastWolfCarrying(t *testing.T, saved pet.State, carried int) *petWor
 	if err := h.srv.Pets.Save(context.Background(), h.collarID, saved); err != nil {
 		t.Fatalf("seed pets row: %v", err)
 	}
-	stack := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: ballastID, OwnerID: h.collarID, Count: carried, Location: item.LocationPet}
-	if err := h.srv.Items.Create(context.Background(), h.collarID, stack); err != nil {
-		t.Fatalf("seed pet ballast: %v", err)
-	}
-	return h
+	wolf, _ := h.spawnWolf(t)
+	h.settleInventoryUpdates(t)
+	h.srv.GivePetItem(t, h.ownerID, ballastID, int32(carried))
+	h.srv.InventoryUpdates.Tick()
+	return h, wolf, drainFrames(t, h.client)
 }
 
 // requirePetLoad checks one weight change: the owner's PetStatusUpdate and

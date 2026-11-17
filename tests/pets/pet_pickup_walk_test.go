@@ -55,7 +55,7 @@ func TestPetIgnoresItemOutOfSight(t *testing.T) {
 	if _, ok := h.srv.State.Object(groundID); !ok {
 		t.Fatal("out-of-sight adena left the ground")
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 0 {
+	if got := h.petRowCount(t, item.AdenaID); got != 0 {
 		t.Fatalf("pet adena rows = %d, want none", got)
 	}
 }
@@ -95,7 +95,7 @@ func TestPetWalkToItemIsBroadcastOnce(t *testing.T) {
 	if got := walksTo(frames[:taken], wolf.ObjectID(), x+600); got != 1 {
 		t.Fatalf("pet walks to the adena before GetItem = %d (%x), want exactly 1", got, frameOpcodes(frames[:taken]))
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 40 {
+	if got := h.petRowCount(t, item.AdenaID); got != 40 {
 		t.Fatalf("pet adena rows = %d, want 40", got)
 	}
 }

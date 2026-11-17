@@ -10,11 +10,9 @@ import (
 )
 
 // TestCharacterStorePurgeRemovesPetItems deletes a character whose pet
-// carries items. Those rows are saved under the pet's collar, not under the
-// character (see itemcontainer.NewPetInventory), yet the reference's delete
-// removes them with the character's own items, since it keys them on the
-// player: the purge must remove them, and their augmentation, too. Another
-// character's pet items stay.
+// carries items, saved under the character at PET and PET_EQUIP: the purge
+// removes them with the character's own items, and their augmentation and
+// the collar's pets row too. Another character's pet items stay.
 func TestCharacterStorePurgeRemovesPetItems(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
@@ -38,10 +36,10 @@ func TestCharacterStorePurgeRemovesPetItems(t *testing.T) {
 		}
 	}
 	seedItemRow(t, db, keeperID, keeperCollar, item.LocationInventory)
-	seedItemRow(t, db, keeperCollar, keeperPetItem, item.LocationPet)
-	seedItemRow(t, db, keeperCollar, keeperPetArmor, item.LocationPetEquip)
+	seedItemRow(t, db, keeperID, keeperPetItem, item.LocationPet)
+	seedItemRow(t, db, keeperID, keeperPetArmor, item.LocationPetEquip)
 	seedItemRow(t, db, otherID, otherCollar, item.LocationInventory)
-	seedItemRow(t, db, otherCollar, otherPetItem, item.LocationPet)
+	seedItemRow(t, db, otherID, otherPetItem, item.LocationPet)
 	for _, collar := range []int32{keeperCollar, otherCollar} {
 		if _, err := db.ExecContext(ctx, "INSERT INTO pets (item_obj_id, name) VALUES (?, NULL)", collar); err != nil {
 			t.Fatalf("seed pets row %d: %v", collar, err)
@@ -57,7 +55,7 @@ func TestCharacterStorePurgeRemovesPetItems(t *testing.T) {
 		t.Fatalf("Purge() = %v, %v, want true, nil", deleted, err)
 	}
 
-	if n := countRows(t, db, "SELECT COUNT(*) FROM items WHERE owner_id IN (?, ?)", keeperID, keeperCollar); n != 0 {
+	if n := countRows(t, db, "SELECT COUNT(*) FROM items WHERE owner_id = ?", keeperID); n != 0 {
 		t.Errorf("purged character's item and pet item rows = %d, want 0", n)
 	}
 	if n := countRows(t, db, "SELECT COUNT(*) FROM pets WHERE item_obj_id = ?", keeperCollar); n != 0 {

@@ -54,7 +54,7 @@ func (l *petItemLog) take(t *testing.T) []petItemRecord {
 }
 
 // TestItemLogRecordsPetInventoryChanges pins LogItems on a pet's inventory:
-// the wolf putting on its weapon is a change recorded under the collar, and
+// the wolf putting on its weapon is a change recorded under its owner, and
 // taking the worn weapon back records the take-off in the pet's inventory,
 // then the weapon leaving it, before it arrives in the owner's inventory.
 func TestItemLogRecordsPetInventoryChanges(t *testing.T) {
@@ -64,15 +64,15 @@ func TestItemLogRecordsPetInventoryChanges(t *testing.T) {
 	log.take(t)
 
 	h.sendAndTick(t, encodeRequestPetUseItem(weaponID))
-	want := []petItemRecord{{"MODIFIED", "Owner", h.collarID, weaponID, "PET_EQUIP"}}
+	want := []petItemRecord{{"MODIFIED", "Owner", h.ownerID, weaponID, "PET_EQUIP"}}
 	if got := log.take(t); !slices.Equal(got, want) {
 		t.Fatalf("item log after the wolf equips = %+v, want %+v", got, want)
 	}
 
 	h.sendAndTick(t, encodeRequestGetItemFromPet(weaponID, 1))
 	want = []petItemRecord{
-		{"MODIFIED", "Owner", h.collarID, weaponID, "PET"},
-		{"REMOVED", "Owner", h.collarID, weaponID, "PET"},
+		{"MODIFIED", "Owner", h.ownerID, weaponID, "PET"},
+		{"REMOVED", "Owner", h.ownerID, weaponID, "PET"},
 		{"ADDED", "Owner", h.ownerID, weaponID, "INVENTORY"},
 	}
 	if got := log.take(t); !slices.Equal(got, want) {

@@ -1,7 +1,6 @@
 package pets
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -173,7 +172,7 @@ func (h *petWorld) requireHerbGone(t *testing.T, wolf *summon.Actor, groundID, t
 	if inst := wolf.PetInventory().ItemByTemplateID(templateID); inst != nil {
 		t.Fatalf("pet inventory holds the herb: %+v", inst.Snapshot())
 	}
-	if got := h.collarItemCount(t, templateID); got != 0 {
+	if got := h.petRowCount(t, templateID); got != 0 {
 		t.Fatalf("persisted pet herb count = %d, want 0", got)
 	}
 }
@@ -331,7 +330,7 @@ func TestPetPickupMergesIntoCarriedStack(t *testing.T) {
 	}
 	requirePetPicked(t, rest, petPickedS1Adena, smParam{smParamItemNumber, 40})
 	h.srv.FlushItems(t)
-	rows, err := h.srv.Items.ListByOwner(petCtx(), h.collarID)
+	rows, err := h.srv.Items.ListByOwnerAndLocations(petCtx(), h.ownerID, item.LocationPet)
 	if err != nil {
 		t.Fatalf("list pet items: %v", err)
 	}
@@ -344,20 +343,15 @@ func TestPetPickupMergesIntoCarriedStack(t *testing.T) {
 }
 
 // persistedRowExists flushes pending item writes and reports whether a row
-// for objectID is saved under the owner or the pet's collar.
+// for objectID is saved under the owner, the pet's items included.
 func (h *petWorld) persistedRowExists(t *testing.T, objectID int32) bool {
 	t.Helper()
 	h.srv.FlushItems(t)
-	for _, owner := range []int32{h.ownerID, h.collarID} {
-		rows, err := h.srv.Items.ListByOwner(petCtx(), owner)
-		if err != nil {
-			t.Fatalf("list items of %d: %v", owner, err)
-		}
-		if slices.ContainsFunc(rows, func(r *item.Instance) bool { return r.ObjectID == objectID }) {
-			return true
-		}
+	rows, err := h.srv.Items.ListByOwner(petCtx(), h.ownerID)
+	if err != nil {
+		t.Fatalf("list items of %d: %v", h.ownerID, err)
 	}
-	return false
+	return slices.ContainsFunc(rows, func(r *item.Instance) bool { return r.ObjectID == objectID })
 }
 
 // TestPetPickupIgnoresWeightLimit loots ballast with the wolf already past
@@ -366,8 +360,7 @@ func (h *petWorld) persistedRowExists(t *testing.T, objectID int32) bool {
 // no encumbered refusal.
 func TestPetPickupIgnoresWeightLimit(t *testing.T) {
 	t.Parallel()
-	h := bootBallastWolfCarrying(t, pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal}, petWeightLimit/10+1)
-	wolf, _ := h.spawnWolf(t)
+	h, wolf, _ := bootBallastWolfCarrying(t, pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal}, petWeightLimit/10+1)
 	drainUntilQuiet(t, h.client)
 	h.settleInventoryUpdates(t)
 	groundID := h.seedGroundNearOwner(t, ballastID, 1)
@@ -382,7 +375,7 @@ func TestPetPickupIgnoresWeightLimit(t *testing.T) {
 	if _, ok := firstOpcode(rest, serverpackets.OpcodePetInventoryUpdate); !ok {
 		t.Fatalf("pickup over the weight limit frames = %x, want a PetInventoryUpdate", frameOpcodes(rest))
 	}
-	if got := h.collarItemCount(t, ballastID); got != petWeightLimit/10+2 {
+	if got := h.petRowCount(t, ballastID); got != petWeightLimit/10+2 {
 		t.Fatalf("pet ballast after the pickup = %d, want %d", got, petWeightLimit/10+2)
 	}
 }
@@ -394,13 +387,10 @@ func TestPetPickupIgnoresWeightLimit(t *testing.T) {
 func TestPetPickupRefusedWhenPetSlotsFull(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
-	for range 12 {
-		sword := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: 30, OwnerID: h.collarID, Count: 1, Location: item.LocationPet}
-		if err := h.srv.Items.Create(context.Background(), h.collarID, sword); err != nil {
-			t.Fatalf("seed pet sword: %v", err)
-		}
-	}
 	wolf, _ := h.spawnWolf(t)
+	for range 12 {
+		h.srv.GivePetItem(t, h.ownerID, 30, 1)
+	}
 	drainUntilQuiet(t, h.client)
 	h.settleInventoryUpdates(t)
 	groundID := h.seedGroundNearOwner(t, item.AdenaID, 40)

@@ -42,8 +42,8 @@ func TestReturningOwnerRevivesItsPetCorpse(t *testing.T) {
 	if got := h.ownerItemCount(t, item.AdenaID); got != 40 {
 		t.Fatalf("owner adena rows after the return = %d, want 40", got)
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 0 {
-		t.Fatalf("adena still saved under the collar after the return = %d, want none", got)
+	if got := h.petRowCount(t, item.AdenaID); got != 0 {
+		t.Fatalf("adena still saved at a pet location after the return = %d, want none", got)
 	}
 	if got := h.savedPetState(t).CurHP; got <= 0 {
 		t.Fatalf("returned pet saved with HP %v, want it saved alive", got)

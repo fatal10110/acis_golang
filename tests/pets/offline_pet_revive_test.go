@@ -232,8 +232,8 @@ func TestOfflineOwnersRevivedPetUnsummoned(t *testing.T) {
 	if got := o.ownerItemCount(t, item.AdenaID); got != 40 {
 		t.Fatalf("offline owner adena rows = %d, want the pet's 40", got)
 	}
-	if got := o.collarItemCount(t, item.AdenaID); got != 0 {
-		t.Fatalf("adena still saved under the collar = %d, want none", got)
+	if got := o.petRowCount(t, item.AdenaID); got != 0 {
+		t.Fatalf("adena still saved at a pet location = %d, want none", got)
 	}
 
 	frames := o.relogIn(t)

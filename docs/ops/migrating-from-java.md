@@ -147,6 +147,24 @@ Stop the Go servers and start the Java servers again from the same directories. 
 database and files. If anything looks wrong after running the Go servers, restore the cold backup
 from step 1 before you start Java.
 
+## Databases written by an older Go build
+
+Go builds before #4719 saved a pet's items with `items.owner_id` set to the pet's collar (its
+control item's object id). Both servers now save them as the reference server does: under the
+player, at `loc` `PET` or `PET_EQUIP`. The boot cleanup deletes item rows whose owner is neither a
+character nor a clan, so the first boot of a newer build deletes collar-keyed rows. To keep them,
+run this once against the stopped database before that boot:
+
+```sql
+UPDATE items AS pet JOIN items AS collar ON pet.owner_id = collar.object_id
+SET pet.owner_id = collar.owner_id
+WHERE pet.loc IN ('PET', 'PET_EQUIP');
+```
+
+Rows it moves stay at the pet locations. A pet is always called out empty, so neither server loads
+them again. This is also what happens to the items of a pet corpse that is still waiting for its
+owner when the server stops.
+
 ## Known differences
 
 The port is still in progress. Systems the Go server does not run yet are tracked as open issues

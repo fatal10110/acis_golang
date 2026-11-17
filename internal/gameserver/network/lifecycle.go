@@ -136,17 +136,14 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		// settled here -- a living pet's items back to live, the row and
 		// collar saved -- so that must happen before live's own inventory
 		// is flushed below, and before live is despawned. A dead pet's
-		// items stay with its corpse, saved under its collar, on the lane
-		// awaited with the row.
+		// items stay with its corpse, saved under live at the pet
+		// locations, on live's own lane.
 		//
 		// A summon whose owner already left is a pet an earlier session left
 		// behind, which live's selection did not take over (its decay had
 		// claimed it first): it is not live's to settle.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
 			if s, ok := obj.(*summon.Actor); ok && !s.OwnerLeft() {
-				if inv := s.PetInventory(); inv != nil {
-					owners = append(owners, inv.OwnerID())
-				}
 				s.LeaveWithOwner()
 			}
 		}

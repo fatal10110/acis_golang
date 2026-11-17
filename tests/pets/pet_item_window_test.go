@@ -45,13 +45,10 @@ func bootArmedWolf(t *testing.T, extra ...gameservertest.Option) (*petWorld, *su
 		gameservertest.WithSummonItems(summonItems),
 		gameservertest.WithItemTemplates(item.NewTable(append(gameservertest.ItemTemplates().All(), petWeaponTemplate()))),
 	}, extra...))
-	weapon := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: fixturePetWeaponID, OwnerID: h.collarID, Count: 1, Location: item.LocationPet}
-	if err := h.srv.Items.Create(context.Background(), h.collarID, weapon); err != nil {
-		t.Fatalf("seed pet weapon: %v", err)
-	}
 	actor, _ := h.spawnWolf(t)
+	weaponID := h.srv.GivePetItem(t, h.ownerID, fixturePetWeaponID, 1)
 	h.settleInventoryUpdates(t)
-	return h, actor, weapon.ObjectID
+	return h, actor, weaponID
 }
 
 // sendAndTick sends payload, waits for the server to run it, then runs one
@@ -80,7 +77,7 @@ func TestPetUseItemEquipsWolfWeapon(t *testing.T) {
 	if held := wolf.PetInventory().ItemAt(itemcontainer.RHand); held == nil || held.ObjectID != weaponID {
 		t.Fatalf("wolf right hand = %+v, want weapon %d", held, weaponID)
 	}
-	row := mustPersistedItem(t, h.srv, h.collarID, weaponID)
+	row := mustPersistedItem(t, h.srv, h.ownerID, weaponID)
 	if row.Location != item.LocationPetEquip || row.LocationData != itemcontainer.RHand {
 		t.Fatalf("weapon row = %+v, want pet equipment in the right hand", row)
 	}
@@ -110,7 +107,7 @@ func TestGetItemFromPetUnequipsWornWeapon(t *testing.T) {
 	if row.Location != item.LocationInventory || row.OwnerID != h.ownerID {
 		t.Fatalf("weapon row = %+v, want in the owner's inventory", row)
 	}
-	if got := h.collarItemCount(t, fixturePetWeaponID); got != 0 {
+	if got := h.petRowCount(t, fixturePetWeaponID); got != 0 {
 		t.Fatalf("pet still holds %d weapon rows", got)
 	}
 }
@@ -134,7 +131,7 @@ func TestGiveItemToPetRejectsForbiddenItem(t *testing.T) {
 	if got := h.ownerItemCount(t, woodenArrowID); got != 50 {
 		t.Fatalf("owner arrows = %d, want all 50 kept", got)
 	}
-	if got := h.collarItemCount(t, woodenArrowID); got != 0 {
+	if got := h.petRowCount(t, woodenArrowID); got != 0 {
 		t.Fatalf("pet arrows = %d, want none", got)
 	}
 }
@@ -182,7 +179,7 @@ func TestGiveItemToPetCancelsActiveEnchant(t *testing.T) {
 	if got, want := frameOpcodes(rest), []byte{serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate}; !slices.Equal(got, want) {
 		t.Fatalf("frames after the cancel = %x, want PetInventoryUpdate then InventoryUpdate", got)
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 30 {
+	if got := h.petRowCount(t, item.AdenaID); got != 30 {
 		t.Fatalf("pet adena = %d, want 30", got)
 	}
 }
@@ -258,7 +255,7 @@ func TestDisconnectWithPetOutSettlesCollarAndCarriedItems(t *testing.T) {
 	if got := h.ownerItemCount(t, item.AdenaID); got != 100 {
 		t.Fatalf("owner adena rows = %d, want 100", got)
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 0 {
+	if got := h.petRowCount(t, item.AdenaID); got != 0 {
 		t.Fatalf("pet adena rows = %d, want none", got)
 	}
 }

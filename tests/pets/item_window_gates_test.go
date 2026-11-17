@@ -74,7 +74,7 @@ func TestGiveItemToPetKarmaGate(t *testing.T) {
 			adena := h.seededItem(t, item.AdenaID)
 			if !tc.refused {
 				h.giveToPet(t, adena, 30)
-				if got := h.collarItemCount(t, item.AdenaID); got != 30 {
+				if got := h.petRowCount(t, item.AdenaID); got != 30 {
 					t.Fatalf("pet adena = %d, want 30", got)
 				}
 				return
@@ -87,7 +87,7 @@ func TestGiveItemToPetKarmaGate(t *testing.T) {
 			if got := h.ownerItemCount(t, item.AdenaID); got != 100 {
 				t.Fatalf("owner adena = %d, want all 100 kept", got)
 			}
-			if got := h.collarItemCount(t, item.AdenaID); got != 0 {
+			if got := h.petRowCount(t, item.AdenaID); got != 0 {
 				t.Fatalf("pet adena = %d, want none", got)
 			}
 		})
@@ -137,7 +137,7 @@ func TestPetItemWindowRefusedWhileTrading(t *testing.T) {
 			if got := h.ownerItemCount(t, item.AdenaID); got != 70 {
 				t.Fatalf("owner adena = %d, want 70", got)
 			}
-			if got := h.collarItemCount(t, item.AdenaID); got != 30 {
+			if got := h.petRowCount(t, item.AdenaID); got != 30 {
 				t.Fatalf("pet adena = %d, want 30", got)
 			}
 		})
@@ -177,13 +177,13 @@ func TestPetTransferRejectsInvalidCount(t *testing.T) {
 	if got := h.ownerItemCount(t, item.AdenaID); got != 70 {
 		t.Fatalf("owner adena = %d, want 70", got)
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 30 {
+	if got := h.petRowCount(t, item.AdenaID); got != 30 {
 		t.Fatalf("pet adena = %d, want 30", got)
 	}
 	if got := h.ownerItemCount(t, tunicID); got != 1 {
 		t.Fatalf("owner tunics = %d, want the tunic kept", got)
 	}
-	if got := h.collarItemCount(t, tunicID); got != 0 {
+	if got := h.petRowCount(t, tunicID); got != 0 {
 		t.Fatalf("pet tunics = %d, want none", got)
 	}
 }

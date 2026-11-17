@@ -141,12 +141,8 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 
 	// An unsummon or logout whose pets-row write is still queued restores
 	// from the state it queued; otherwise the row has to be read.
-	//
-	// Such a write leaves no items behind under the collar: an unsummon and a
-	// decay hand every item to the owner, and a logout leaves a dead pet's
-	// items with its corpse, which keeps the owner's summon slot.
 	if state, hasSaved := link.summoning.queued.latest(controlItem.ObjectID); hasSaved {
-		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true, nil)
+		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true)
 		return
 	}
 	// The read runs on the control item's persistence lane: behind every
@@ -210,10 +206,6 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
 		state, hasSaved, err := link.summoning.store.Get(restoreCtx, controlItem.ObjectID)
-		var items []*item.Instance
-		if err == nil {
-			items, err = link.petItemRows(restoreCtx, controlItem.ObjectID)
-		}
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
 			if !postLive(live, func() { s.endRestoreOnQueue(releaseFinish) }) {
@@ -223,7 +215,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		}
 		posted := postLive(live, func() {
 			defer s.endRestoreOnQueue(releaseFinish)
-			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved, items)
+			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved)
 		})
 		if !posted {
 			s.endRestore(releaseFinish)
@@ -276,9 +268,7 @@ func (s *gameSummonSpawner) endRestoreOnQueue(releaseFinish func()) {
 // pet, and such a spawn has no separate continuation to leave behind. The
 // detaching flag is the same one taskeffects.go checks
 // before applying a deferred effect to a departing session.
-//
-// items are the pet's saved item rows, which it carries again.
-func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool, items []*item.Instance) {
+func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool) {
 	link, live := s.link, s.live
 	if live.detached() {
 		return
@@ -356,7 +346,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		ExpType:         levelStats.ExpType,
 		Growth:          npcTmpl.Pet,
 		Config:          nil, // set by newPet from link.summoning.config
-		Inventory:       link.newPetInventory(live, controlItem.ObjectID, items),
+		Inventory:       link.newPetInventory(live),
 		Fed:             fed,
 		MaxMeal:         levelStats.MaxMeal,
 		MealInNormal:    levelStats.MealInNormal,
@@ -431,43 +421,21 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	npc.ForceSeeCreature(link.world, pet)
 }
 
-// newPetInventory builds the live inventory of live's pet called out of the
-// collar controlItemID, carrying items, its saved rows.
-//
-// A pet's items are saved under its collar, not under the pet's own object
-// id, which is new each time it is called out: a dead pet keeps its items
-// across its owner's logout, and a server restart must not lose them.
-func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, items []*item.Instance) *itemcontainer.Inventory {
-	inv := itemcontainer.NewPetInventoryWithDelivery(controlItemID, live.Inventory().Templates(), &petInventoryDelivery{
+// newPetInventory builds the empty live inventory of live's pet. A pet's
+// items are saved under its owner, at the pet locations, and a pet called out
+// never loads them back: the rows a pet still held when the server stopped
+// (a corpse waiting for its owner, a crash) stay where they are.
+func (l *GameClientLink) newPetInventory(live *livePlayer) *itemcontainer.Inventory {
+	inv := itemcontainer.NewPetInventoryWithDelivery(live.ObjectID(), live.Inventory().Templates(), &petInventoryDelivery{
 		updates: l.belongings.inventoryUpdates,
 		ownerID: live.ObjectID(),
 		state:   l.world,
 		log:     l.log,
-	}, l.itemPersister(controlItemID))
+	}, l.itemPersister(live.ObjectID()))
 	// The pet built around inv does not exist yet, so its records name the
 	// player it is called out for.
 	inv.SetItemLog(l.itemLog, func() string { return live.CharacterName() })
-	inv.Restore(l.restoreRows(controlItemID, items, restoredPetItemLocation))
-	// Restored rows never queue an update, so the carried weight stays 0
-	// unless recomputed here; the pet built around inv takes its
-	// weight-penalty band from it. No pet holds inv yet, so the weight
-	// delivery sends nothing.
-	inv.UpdateWeight()
 	return inv
-}
-
-// petItemRows reads the item rows saved under the collar controlItemID.
-func (l *GameClientLink) petItemRows(ctx context.Context, controlItemID int32) ([]*item.Instance, error) {
-	if l.belongings.items == nil {
-		return nil, nil
-	}
-	return l.belongings.items.ListByOwner(ctx, controlItemID)
-}
-
-// restoredPetItemLocation reports whether a row at loc is one a pet inventory
-// rebuilds itself from: its base and equip locations.
-func restoredPetItemLocation(loc item.Location) bool {
-	return loc == item.LocationPet || loc == item.LocationPetEquip
 }
 
 // SpawnServitor creates the non-cubic SUMMON skill's live servitor beside its
