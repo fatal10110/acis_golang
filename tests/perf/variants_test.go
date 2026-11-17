@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -31,6 +32,23 @@ import (
 //	scripts  every monster has a script on the production registry path,
 //	         subscribed to the attack hook, so the script engine's dispatch
 //	         shows in the profile
+//	cast     clients cast a skill at their monster and the monsters, wired
+//	         with the AI-cast seam, cast one back at whoever struck them:
+//	         the cast, effect and NPC cast-desire paths run under load
+//	catalog  the monsters are shipped templates, each bound to a different
+//	         script of the production content catalog (scripts.xml, the
+//	         catalog package, the shipped NPC and skill tables), so the real
+//	         behaviors' hooks run on every hit. The monsters have no cast
+//	         seam: a shipped skill would one-shot the 36-HP test class (the
+//	         cast variant covers casting). It skips without a datapack.
+//	         ACIS_PERF_CATALOG_NPCS bounds how many templates. It implies
+//	         spread, one region per client unless ACIS_PERF_REGIONS says
+//	         otherwise, so the behaviors' aggro sees only their own client
+//	fixture  the database holds a production-sized item and character
+//	         population (ACIS_PERF_ITEMS per client, ACIS_PERF_BG_CHARS other
+//	         characters, ACIS_PERF_BG_ITEMS other item rows), and the run
+//	         ends by stopping the server with every client connected,
+//	         logging how long the drain and the detach saves took
 const variantEnv = "ACIS_PERF_VARIANT"
 
 // variantBase is where a variant that places clients starts: a point inside
@@ -43,8 +61,9 @@ const regionStep = 4096
 
 // variants is what ACIS_PERF_VARIANT selected.
 type variants struct {
-	spread, geo, scripts bool
-	regions              int
+	spread, geo, scripts, cast, catalog, fixture bool
+	regions                                      int
+	catalogNPCs                                  int
 }
 
 func variantsFromEnv(t *testing.T) variants {
@@ -59,15 +78,38 @@ func variantsFromEnv(t *testing.T) variants {
 				v.geo = true
 			case "scripts":
 				v.scripts = true
+			case "cast":
+				v.cast = true
+			case "catalog":
+				v.catalog = true
+			case "fixture":
+				v.fixture = true
 			default:
-				t.Fatalf("%s=%q: want a comma-separated list of spread, geo, scripts", variantEnv, raw)
+				t.Fatalf("%s=%q: want a comma-separated list of spread, geo, scripts, cast, catalog, fixture", variantEnv, raw)
 			}
 		}
+	}
+	// The shipped behaviors aggro and call for help: 200 clients at one spot
+	// would have crowds of monsters on the first few of them, so each client
+	// of the catalog variant stands in a region of its own.
+	if v.catalog {
+		v.spread = true
 	}
 	if v.spread && v.geo {
 		t.Fatalf("%s: spread and geo do not combine: the geo variant loads one tile", variantEnv)
 	}
-	v.regions = envInt(t, "ACIS_PERF_REGIONS", 16)
+	if scripted := countTrue(v.scripts, v.cast, v.catalog); scripted > 1 {
+		t.Fatalf("%s: scripts, cast and catalog do not combine: each boots its own script set", variantEnv)
+	}
+	v.catalogNPCs = envInt(t, "ACIS_PERF_CATALOG_NPCS", 24)
+	if v.catalogNPCs < 1 {
+		t.Fatalf("ACIS_PERF_CATALOG_NPCS=%d: want at least 1", v.catalogNPCs)
+	}
+	defaultRegions := 16
+	if v.catalog {
+		defaultRegions = max(defaultRegions, envInt(t, "ACIS_PERF_CLIENTS", 0))
+	}
+	v.regions = envInt(t, "ACIS_PERF_REGIONS", defaultRegions)
 	if v.regions < 1 {
 		t.Fatalf("ACIS_PERF_REGIONS=%d: want at least 1", v.regions)
 	}
@@ -92,9 +134,19 @@ func (v variants) place(i int) location.Location {
 	return location.Location{X: variantBase.X + slot%cols*regionStep, Y: variantBase.Y + slot/cols*regionStep, Z: variantBase.Z}
 }
 
+func countTrue(flags ...bool) int {
+	n := 0
+	for _, f := range flags {
+		if f {
+			n++
+		}
+	}
+	return n
+}
+
 func (v variants) String() string {
 	var names []string
-	for name, on := range map[string]bool{"spread": v.spread, "geo": v.geo, "scripts": v.scripts} {
+	for name, on := range map[string]bool{"spread": v.spread, "geo": v.geo, "scripts": v.scripts, "cast": v.cast, "catalog": v.catalog, "fixture": v.fixture} {
 		if on {
 			names = append(names, name)
 		}
@@ -129,6 +181,9 @@ func loadGeo(t *testing.T) move.Geo {
 type monsterScript struct {
 	templateID int32
 	attacked   atomic.Int64
+	// castRef, when set, is the skill the monster answers every hit with: a
+	// cast desire at the attacker.
+	castRef modelskill.Ref
 }
 
 const monsterScriptKey = "perf/monster"
@@ -142,22 +197,41 @@ func (m *monsterScript) catalog() script.Catalog {
 		return script.Script{
 			Bind: script.Bindings{script.EventAttacked: []int32{m.templateID}},
 			Hooks: script.Hooks{
-				OnAttacked: func(*script.Script, script.Attacked) { m.attacked.Add(1) },
+				OnAttacked: func(_ *script.Script, e script.Attacked) {
+					m.attacked.Add(1)
+					if m.castRef.ID != 0 {
+						e.NPC.AddCastDesire(e.Attacker, m.castRef, 1000)
+					}
+				},
 			},
 		}
 	}}
 }
 
-// options are the boot options the variants add for a monster template.
-func (v variants) options(tmpl *npc.Template, geo move.Geo, ms *monsterScript) []gameservertest.Option {
+// options are the boot options the variants add for a monster template:
+// ms is the counter script of the scripts and cast variants, kit the cast
+// variant's skills, cat the catalog variant's data.
+func (v variants) options(tmpl *npc.Template, geo move.Geo, ms *monsterScript, kit *castKit, cat *prodCatalog) []gameservertest.Option {
 	var opts []gameservertest.Option
 	if v.geo {
 		opts = append(opts, gameservertest.WithGeo(geo))
 	}
-	if v.scripts {
+	switch {
+	case v.scripts:
 		opts = append(opts,
 			gameservertest.WithNPCs(npc.NewTable([]*npc.Template{tmpl})),
 			gameservertest.WithTemplateScripts(ms.listing(), ms.catalog()))
+	case v.cast:
+		opts = append(opts,
+			kit.opt,
+			gameservertest.WithNPCs(npc.NewTable([]*npc.Template{tmpl})),
+			gameservertest.WithScriptSkills(castDefinitions()...),
+			gameservertest.WithTemplateScripts(ms.listing(), ms.catalog()))
+	case v.catalog:
+		opts = append(opts,
+			gameservertest.WithNPCs(cat.table),
+			gameservertest.WithScriptSkills(cat.skills.All()...),
+			gameservertest.WithTemplateScripts(cat.list, cat.catalog))
 	}
 	return opts
 }

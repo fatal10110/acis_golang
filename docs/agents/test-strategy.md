@@ -64,6 +64,26 @@ Rules:
   except that a single `Advance` over 30 s skips the rest of its test there (the inline pass pins
   long timers); `WithRealPool()` pins one test there (pool task-panic recovery, the slow-task
   watchdog, perf), and its waits are never cut.
+- CI runs every `tests/` package on the real pool except the ones `POOL_EXCLUDED` names in
+  `.github/workflows/go.yml`, each with its reason (ai, olympiad and quest: wall-clock timers
+  the pool cannot skip, tracked in #5301); `.github/scripts/test-shards.sh check` fails when a
+  package is on no `pool` list and not excluded. Measured on the main run for `d3fc17dc0`
+  (2026-11-17; job wall time includes checkout and setup, the pool step is `go test` alone;
+  `gotest.sh` ends every log with the slowest packages):
+
+  | Job | Wall | Pool step | Packages (pool wall time each, run in parallel inside a package) |
+  |---|---|---|---|
+  | `pool-admin-npcs` | 214 s | 173 s | npcs 63 s, admin 44 s |
+  | `pool-skills-pets` | 165 s | 125 s | skills 94 s, pets 64 s |
+  | `pool-rest` | 157 s | 62 s (+ 52 s static, no race) | character 39 s, lifecycle 20 s, trade 15 s, social 15 s |
+  | `pool-small` | 135 s | 93 s | clan 58 s, party 34 s, duel 25 s, boat 13 s, petition 12 s, bbs 10 s, botswarm 5 s, wedding 4 s, fishchamp 2 s, lottery 2 s, perf 1 s |
+  | `pool-combat-items` | 129 s | 97 s | combat 74 s, items 61 s |
+
+  The longest pool job (214 s) is shorter than the inline `lint` (450 s), `suites` (408 s) and
+  `rest` (368 s) jobs of the same run, so the pool shards do not set the run's wall time. A new
+  `tests/` package goes on the `pool` list of the shard with the most headroom (`pool-small`,
+  `pool-rest`) or into `POOL_EXCLUDED` with its reason; re-measure from the log's slowest
+  packages when a shard approaches the longest inline job.
 - Per-script behavior (a quest's dialog, an NPC behavior's reactions) is a scenario file, not Go
   code: `tests/quest/testdata/scenarios/*.scenario` or `tests/ai/testdata/scenarios/*.scenario`,
   run by each suite's `TestScenarios` (format: package `internal/testsupport/scenario`). A ported
