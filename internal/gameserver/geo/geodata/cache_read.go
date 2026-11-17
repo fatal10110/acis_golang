@@ -1,6 +1,6 @@
 //go:build !(linux || darwin || freebsd)
 
-package probe
+package geodata
 
 import (
 	"io"

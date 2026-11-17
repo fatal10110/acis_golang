@@ -1,6 +1,6 @@
 //go:build race
 
-package probe
+package geodata
 
 // raceDetector reports a -race build, which samples the real-geodata
 // equivalence test instead of walking every region.

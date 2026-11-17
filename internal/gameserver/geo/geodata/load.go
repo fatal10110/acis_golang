@@ -1,4 +1,4 @@
-package probe
+package geodata
 
 import (
 	"errors"
@@ -53,15 +53,15 @@ func ListedRegions(props *config.Properties) []Region {
 // malformed), naming each failed file plus dir and geoType, so the
 // caller stops the boot.
 func LoadRegions(dir string, geoType GeoType, regions []Region, log zerolog.Logger, options ...engine.Options) (*engine.Engine, error) {
-	if !validGeoType(geoType) {
-		return nil, fmt.Errorf("probe: unknown geodata type %q", geoType)
+	if !geoType.Valid() {
+		return nil, fmt.Errorf("geodata: unknown geodata type %q", geoType)
 	}
 
 	e := engine.New(options...)
 	loaded := 0
 	var failures []string
 	for _, r := range regions {
-		path := regionPath(dir, geoType, r.X, r.Y)
+		path := RegionPath(dir, geoType, r.X, r.Y)
 		if err := loadRegion(e, path, geoType, r.X, r.Y, log); err != nil {
 			log.Error().Err(err).Str("region_file", path).Msg("error loading geodata region file")
 			failures = append(failures, fmt.Sprintf("%d_%d (%s): %v", r.X, r.Y, path, err))
@@ -72,7 +72,7 @@ func LoadRegions(dir string, geoType GeoType, regions []Region, log zerolog.Logg
 	log.Info().Int("region_files", loaded).Str("geodata_type", string(geoType)).Msg("geodata region files loaded")
 
 	if len(failures) > 0 {
-		return nil, fmt.Errorf("probe: failed to load %d %s region files listed in geoengine.properties (GeoDataPath %s, GeoDataType %s); the server will not start until every listed region loads: %s",
+		return nil, fmt.Errorf("geodata: failed to load %d %s region files listed in geoengine.properties (GeoDataPath %s, GeoDataType %s); the server will not start until every listed region loads: %s",
 			len(failures), geoType, dir, geoType, strings.Join(failures, "; "))
 	}
 	return e, nil
@@ -85,27 +85,28 @@ func LoadRegions(dir string, geoType GeoType, regions []Region, log zerolog.Logg
 // It is geoprobe's "load whatever exists" mode; the gameserver boot loads the
 // geoengine.properties region list through LoadRegions instead.
 func LoadEngine(dir string, geoType GeoType, log zerolog.Logger, options ...engine.Options) (*engine.Engine, error) {
-	if !validGeoType(geoType) {
-		return nil, fmt.Errorf("probe: unknown geodata type %q", geoType)
+	if !geoType.Valid() {
+		return nil, fmt.Errorf("geodata: unknown geodata type %q", geoType)
 	}
 
 	e := engine.New(options...)
 	for x := engine.TileXMin; x <= engine.TileXMax; x++ {
 		for y := engine.TileYMin; y <= engine.TileYMax; y++ {
-			err := loadRegion(e, regionPath(dir, geoType, x, y), geoType, x, y, log)
+			err := loadRegion(e, RegionPath(dir, geoType, x, y), geoType, x, y, log)
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			if err != nil {
-				return nil, fmt.Errorf("probe: load region %d_%d: %w", x, y, err)
+				return nil, fmt.Errorf("geodata: load region %d_%d: %w", x, y, err)
 			}
 		}
 	}
 	return e, nil
 }
 
-func validGeoType(geoType GeoType) bool {
-	return geoType == L2OFF || geoType == L2J
+// Valid reports whether t names a geodata format the server reads.
+func (t GeoType) Valid() bool {
+	return t == L2OFF || t == L2J
 }
 
 // loadRegion reads one region file into e. A file with unread trailing bytes
@@ -121,7 +122,8 @@ func loadRegion(e *engine.Engine, path string, geoType GeoType, x, y int, log ze
 	return e.SetRegion(x, y, blocks)
 }
 
-func regionPath(dir string, geoType GeoType, x, y int) string {
+// RegionPath returns the file of region (x, y) in dir for geoType.
+func RegionPath(dir string, geoType GeoType, x, y int) string {
 	if geoType == L2J {
 		return filepath.Join(dir, fmt.Sprintf("%d_%d.l2j", x, y))
 	}

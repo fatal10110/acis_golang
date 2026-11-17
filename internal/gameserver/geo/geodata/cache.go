@@ -1,4 +1,4 @@
-package probe
+package geodata
 
 import (
 	"bufio"
@@ -50,8 +50,8 @@ type sourceFile struct {
 // or the cache cannot be built or opened, it falls back to LoadRegions,
 // which reports every failed region and fails the same way.
 func LoadRegionsCached(dir string, geoType GeoType, regions []Region, cachePath string, log zerolog.Logger, options ...engine.Options) (*engine.Engine, error) {
-	if !validGeoType(geoType) {
-		return nil, fmt.Errorf("probe: unknown geodata type %q", geoType)
+	if !geoType.Valid() {
+		return nil, fmt.Errorf("geodata: unknown geodata type %q", geoType)
 	}
 	sources, err := statSources(dir, geoType, regions)
 	if err != nil {
@@ -85,8 +85,8 @@ func LoadRegionsCached(dir string, geoType GeoType, regions []Region, cachePath 
 // cache file at cachePath, replacing any previous one atomically, and
 // returns the stored regions' summed statistics.
 func WriteCache(cachePath, dir string, geoType GeoType, regions []Region, log zerolog.Logger) (block.RegionStats, error) {
-	if !validGeoType(geoType) {
-		return block.RegionStats{}, fmt.Errorf("probe: unknown geodata type %q", geoType)
+	if !geoType.Valid() {
+		return block.RegionStats{}, fmt.Errorf("geodata: unknown geodata type %q", geoType)
 	}
 	sources, err := statSources(dir, geoType, regions)
 	if err != nil {
@@ -98,7 +98,7 @@ func WriteCache(cachePath, dir string, geoType GeoType, regions []Region, log ze
 func statSources(dir string, geoType GeoType, regions []Region) ([]sourceFile, error) {
 	sources := make([]sourceFile, len(regions))
 	for i, r := range regions {
-		info, err := os.Stat(regionPath(dir, geoType, r.X, r.Y))
+		info, err := os.Stat(RegionPath(dir, geoType, r.X, r.Y))
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func geoTypeCode(geoType GeoType) uint32 {
 func writeCache(cachePath, dir string, geoType GeoType, sources []sourceFile, log zerolog.Logger) (stats block.RegionStats, err error) {
 	f, err := os.CreateTemp(filepath.Dir(cachePath), filepath.Base(cachePath)+".tmp*")
 	if err != nil {
-		return stats, fmt.Errorf("probe: create geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: create geodata cache: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -128,23 +128,23 @@ func writeCache(cachePath, dir string, geoType GeoType, sources []sourceFile, lo
 
 	head := make([]byte, cacheHeaderSize+len(sources)*cacheEntrySize)
 	if _, err := f.Write(head); err != nil {
-		return stats, fmt.Errorf("probe: write geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: write geodata cache: %w", err)
 	}
 	w := bufio.NewWriterSize(f, 1<<20)
 	crc := uint32(0)
 	off := uint64(len(head))
 	for i, src := range sources {
-		path := regionPath(dir, geoType, src.region.X, src.region.Y)
+		path := RegionPath(dir, geoType, src.region.X, src.region.Y)
 		region, trailing, err := readRegion(path, geoType)
 		if err != nil {
-			return stats, fmt.Errorf("probe: load region %s: %w", path, err)
+			return stats, fmt.Errorf("geodata: load region %s: %w", path, err)
 		}
 		if trailing > 0 {
 			log.Warn().Int("region_x", src.region.X).Int("region_y", src.region.Y).Int("trailing_bytes", trailing).Msg("geodata region has trailing bytes")
 		}
 		n, err := region.WriteTo(crcWriter{w: w, crc: &crc})
 		if err != nil {
-			return stats, fmt.Errorf("probe: write geodata cache: %w", err)
+			return stats, fmt.Errorf("geodata: write geodata cache: %w", err)
 		}
 		e := head[cacheHeaderSize+i*cacheEntrySize:]
 		binary.LittleEndian.PutUint32(e, uint32(src.region.X))
@@ -157,7 +157,7 @@ func writeCache(cachePath, dir string, geoType GeoType, sources []sourceFile, lo
 		stats.Add(region.Stats())
 	}
 	if err := w.Flush(); err != nil {
-		return stats, fmt.Errorf("probe: write geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: write geodata cache: %w", err)
 	}
 
 	copy(head, cacheMagic)
@@ -166,16 +166,16 @@ func writeCache(cachePath, dir string, geoType GeoType, sources []sourceFile, lo
 	binary.LittleEndian.PutUint32(head[16:], uint32(len(sources)))
 	binary.LittleEndian.PutUint32(head[20:], crc32.Update(crc, cacheCRC, head[cacheHeaderSize:]))
 	if _, err := f.WriteAt(head, 0); err != nil {
-		return stats, fmt.Errorf("probe: write geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: write geodata cache: %w", err)
 	}
 	if err := f.Sync(); err != nil {
-		return stats, fmt.Errorf("probe: sync geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: sync geodata cache: %w", err)
 	}
 	if err := f.Close(); err != nil {
-		return stats, fmt.Errorf("probe: close geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: close geodata cache: %w", err)
 	}
 	if err := os.Rename(f.Name(), cachePath); err != nil {
-		return stats, fmt.Errorf("probe: install geodata cache: %w", err)
+		return stats, fmt.Errorf("geodata: install geodata cache: %w", err)
 	}
 	syncDir(filepath.Dir(cachePath))
 	return stats, nil
@@ -215,17 +215,17 @@ func openCache(cachePath string, geoType GeoType, sources []sourceFile) ([]*bloc
 	}
 	tableEnd := cacheHeaderSize + len(sources)*cacheEntrySize
 	if info.Size() < int64(tableEnd) {
-		return nil, fmt.Errorf("probe: geodata cache %s is truncated", cachePath)
+		return nil, fmt.Errorf("geodata: geodata cache %s is truncated", cachePath)
 	}
 
 	b, err := mapFile(f, int(info.Size()))
 	if err != nil {
-		return nil, fmt.Errorf("probe: map geodata cache %s: %w", cachePath, err)
+		return nil, fmt.Errorf("geodata: map geodata cache %s: %w", cachePath, err)
 	}
 	regions, err := parseCache(b, geoType, sources)
 	if err != nil {
 		unmapFile(b)
-		return nil, fmt.Errorf("probe: geodata cache %s: %w", cachePath, err)
+		return nil, fmt.Errorf("geodata: geodata cache %s: %w", cachePath, err)
 	}
 	adviseRandom(b)
 	return regions, nil
