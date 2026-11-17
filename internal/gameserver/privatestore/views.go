@@ -15,10 +15,10 @@ type SellCandidate struct {
 // ItemsToSell lists, in inventory order, every item of inv a sell store may
 // list and how many of its units sell does not list yet: tradable items
 // that are not worn, not quest items, not adena and not hidden (a summoned
-// pet's collar, the selected enchant scroll). A stackable item lists its
-// count less the first sell row of the same item; any other item is left
-// out once a row lists it.
-func ItemsToSell(inv *itemcontainer.Inventory, sell []SellItem, hidden func(objectID int32) bool) []SellCandidate {
+// pet's collar, the selected enchant scroll, what the last cast consumes).
+// A stackable item lists its count less the first sell row of the same
+// item; any other item is left out once a row lists it.
+func ItemsToSell(inv *itemcontainer.Inventory, sell []SellItem, hidden func(objectID, templateID int32) bool) []SellCandidate {
 	if inv == nil {
 		return nil
 	}
@@ -29,7 +29,7 @@ func ItemsToSell(inv *itemcontainer.Inventory, sell []SellItem, hidden func(obje
 		if !ok || st.Equipped() || st.TemplateID == item.AdenaID || inst.QuestItem(tmpl) || !inst.Tradable(tmpl) {
 			continue
 		}
-		if hidden != nil && hidden(st.ObjectID) {
+		if hidden != nil && hidden(st.ObjectID, st.TemplateID) {
 			continue
 		}
 		count := st.Count
@@ -61,7 +61,7 @@ func ItemsToSell(inv *itemcontainer.Inventory, sell []SellItem, hidden func(obje
 // manage window offers to want: one instance per item that does not stack,
 // worn ones included, every one that is tradable or sellable and is not a
 // quest item, not adena and not hidden.
-func ItemsToBuy(inv *itemcontainer.Inventory, hidden func(objectID int32) bool) []item.InstanceState {
+func ItemsToBuy(inv *itemcontainer.Inventory, hidden func(objectID, templateID int32) bool) []item.InstanceState {
 	if inv == nil {
 		return nil
 	}
@@ -78,7 +78,7 @@ func ItemsToBuy(inv *itemcontainer.Inventory, hidden func(objectID int32) bool) 
 		if inst.QuestItem(tmpl) || !(inst.Tradable(tmpl) || inst.Sellable(tmpl)) {
 			continue
 		}
-		if hidden != nil && hidden(st.ObjectID) {
+		if hidden != nil && hidden(st.ObjectID, st.TemplateID) {
 			continue
 		}
 		out = append(out, st)

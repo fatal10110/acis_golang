@@ -5,13 +5,16 @@
 //
 //	ACIS_PERF_CLIENTS=50 ACIS_PERF_DURATION=30s go test ./tests/perf/ -run TestLoadBaseline -v -count=1
 //
-// ACIS_PERF_VARIANT=spread,geo,scripts selects the variants in variants_test.go
-// (clients spread over regions, a geodata-backed run, scripted monsters).
+// ACIS_PERF_VARIANT=spread,geo,scripts,cast,catalog,fixture selects the
+// variants in variants_test.go (clients spread over regions, a geodata-backed
+// run, scripted monsters, casting clients and monsters, the production script
+// catalog, a production-sized database with a measured stop).
 // ACIS_PERF_PROFILE_DIR=<dir> also writes the run's CPU, heap and goroutine
 // profiles there; docs/profiling.md reads them.
 package perf
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math/rand/v2"
@@ -87,6 +90,15 @@ func TestLoadBaseline(t *testing.T) {
 	tmpl := gameservertest.MovingHostileTemplate("Monster")
 	tmpl.PAtk = 0.25
 	ms := &monsterScript{templateID: int32(tmpl.ID)}
+	var kit *castKit
+	var cat *prodCatalog
+	switch {
+	case v.cast:
+		kit = newCastKit(t)
+		ms.castRef = castMonsterRef
+	case v.catalog:
+		cat = loadProdCatalog(t, v.catalogNPCs)
+	}
 
 	character := gameservertest.WithCharacter("Perf0", 5, 0)
 	if v.placed() {
@@ -97,7 +109,7 @@ func TestLoadBaseline(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithProductionTickers(),
 		gameservertest.WithRealPool(), // measures the production executor
-	}, v.options(tmpl, geo, ms)...)...)
+	}, v.options(tmpl, geo, ms, kit, cat)...)...)
 	goroutineBaseline := runtime.NumGoroutine()
 	conns := []*testsupport.ScriptedClient{srv.Client}
 	ids := []int32{srv.SoleObjectID(t)}
@@ -110,6 +122,17 @@ func TestLoadBaseline(t *testing.T) {
 			ids = append(ids, srv.SeedCharacterFor(t, account, name, 5, 0).ID)
 		}
 		conns = append(conns, srv.DialClient(t, account, 1))
+	}
+
+	if v.cast {
+		for _, id := range ids {
+			if err := srv.KnownSkills.SetKnownSkill(context.Background(), id, 0, int(castPlayerSkill), 1); err != nil {
+				t.Fatalf("seed known skill: %v", err)
+			}
+		}
+	}
+	if v.fixture {
+		seedFixture(t, srv, fixtureSizeFromEnv(t), ids)
 	}
 
 	readers := make([]*frameReader, clients)
@@ -143,7 +166,15 @@ func TestLoadBaseline(t *testing.T) {
 	// short walks never moved them, failing the "left the spawn point" check.
 	for i := range monsters {
 		at := v.monsterSpot(geo, origins[i], i)
-		monsters[i] = srv.SpawnMovingHostileNPCTemplateAtGeo(t, tmpl, at, at, geo)
+		mt := tmpl
+		if cat != nil {
+			mt = cat.templates[i%len(cat.templates)]
+		}
+		monsters[i] = srv.SpawnMovingHostileNPCTemplateAtGeo(t, mt, at, at, geo)
+		if kit != nil {
+			srv.InstallNPCCastSeam(t, monsters[i], kit.defs)
+		}
+		readers[i].monsterID.Store(monsters[i].ObjectID())
 		srv.AI.Add(monsters[i])
 	}
 
@@ -166,7 +197,7 @@ func TestLoadBaseline(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range conns {
 		wg.Go(func() {
-			samples[i] = runClient(srv, conns[i], readers[i], monsters[i], origins[i], i, deadline, &timeouts)
+			samples[i] = runClient(srv, v, conns[i], readers[i], monsters[i], origins[i], i, deadline, &timeouts)
 		})
 	}
 	wg.Wait()
@@ -184,7 +215,8 @@ func TestLoadBaseline(t *testing.T) {
 
 	var all []time.Duration
 	var frames int64
-	disconnected, died, stationary, noAttack, strayReplies := 0, 0, 0, 0, 0
+	disconnected, died, stationary, noAttack, strayReplies, noCast, noMonsterCast := 0, 0, 0, 0, 0, 0, 0
+	var casts, monsterCasts int64
 	for i, r := range readers {
 		all = append(all, samples[i]...)
 		frames += r.frames.Load()
@@ -193,12 +225,23 @@ func TestLoadBaseline(t *testing.T) {
 		}
 		if r.died.Load() {
 			died++
+			if cat != nil {
+				t.Logf("  client %d died to template %d", i, cat.templates[i%len(cat.templates)].ID)
+			}
 		}
 		if !r.moved.Load() {
 			stationary++
 		}
 		if r.attacks.Load() == 0 {
 			noAttack++
+		}
+		casts += r.casts.Load()
+		monsterCasts += r.monsterCasts.Load()
+		if r.casts.Load() == 0 {
+			noCast++
+		}
+		if r.monsterCasts.Load() == 0 {
+			noMonsterCast++
 		}
 		if r.replies.Load() != r.probes.Load() {
 			strayReplies++
@@ -223,17 +266,33 @@ func TestLoadBaseline(t *testing.T) {
 	if died > 0 || stationary > 0 || noAttack > 0 {
 		t.Errorf("workload not driven: of %d clients %d died, %d never left the spawn point, %d never landed an attack", clients, died, stationary, noAttack)
 	}
-	if v.scripts {
+	if v.scripts || v.cast {
 		heard := ms.attacked.Load()
 		t.Logf("  script attacked hooks=%d", heard)
 		if heard == 0 {
-			t.Error("the scripts variant ran no script hook: the monsters' scripts were not bound")
+			t.Errorf("the %s variant ran no script hook: the monsters' scripts were not bound", v)
+		}
+	}
+	if v.cast {
+		t.Logf("  cast frames: players=%d monsters=%d", casts, monsterCasts)
+		if noCast > 0 || noMonsterCast > 0 {
+			t.Errorf("cast workload not driven: of %d clients %d never cast and %d never saw their monster cast", clients, noCast, noMonsterCast)
+		}
+	}
+	if v.catalog {
+		heard := cat.attacked.Load()
+		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed, attacked hooks=%d", len(cat.templates), clients, len(cat.list), heard)
+		if heard == 0 {
+			t.Errorf("the catalog variant ran no script hook: the shipped scripts were not bound")
 		}
 	}
 	if strayReplies > 0 {
 		t.Errorf("%d clients got a probe-reply count different from their probe count; an unsolicited SkillList would corrupt the latency samples", strayReplies)
 	}
 
+	if v.fixture {
+		measureStop(t, srv, clients)
+	}
 	stopReaders()
 	checkGoroutineLeak(t, goroutineBaseline)
 }
@@ -242,7 +301,7 @@ func TestLoadBaseline(t *testing.T) {
 // A client stops early when its connection is lost or a step times out: a
 // probe reply arriving after its step gave up would otherwise be credited to
 // the next step. Both fail the run.
-func runClient(srv *gameservertest.Server, c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hostile, origin location.Location, index int, deadline time.Time, timeouts *atomic.Int64) []time.Duration {
+func runClient(srv *gameservertest.Server, v variants, c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hostile, origin location.Location, index int, deadline time.Time, timeouts *atomic.Int64) []time.Duration {
 	rng := rand.New(rand.NewPCG(uint64(index), 2285))
 	tick := time.NewTicker(stepInterval)
 	defer tick.Stop()
@@ -255,6 +314,9 @@ func runClient(srv *gameservertest.Server, c *testsupport.ScriptedClient, r *fra
 			if p, ok := obj.(vitals); ok && p.HP() < p.MaxHPValue()/2 {
 				p.AddHP(p.MaxHPValue())
 			}
+			if m, ok := obj.(mana); ok && m.MPValue() < m.MaxMPValue()/2 {
+				m.AddMP(m.MaxMPValue())
+			}
 		}
 		sent := time.Now()
 		var action []byte
@@ -264,6 +326,9 @@ func runClient(srv *gameservertest.Server, c *testsupport.ScriptedClient, r *fra
 				monster.SetCurrentHP(monster.MaxHP())
 			}
 			action = encodeAction(monster.ObjectID(), origin)
+			if v.cast && (step%8 == 2 || step%8 == 4) { // the monster is already the target
+				action = encodeMagicSkillUse(castPlayerSkill)
+			}
 		default: // a short walk near the monster keeps the next approach inside the attack window
 			mx, my, _ := monster.Position()
 			target := location.Location{X: mx + rng.IntN(201) - 100, Y: my + rng.IntN(201) - 100, Z: origin.Z}
@@ -310,12 +375,17 @@ type frameReader struct {
 	frames  atomic.Int64
 	attacks atomic.Int64
 	probes  atomic.Int64
-	replies atomic.Int64
-	lost    atomic.Bool
-	died    atomic.Bool
-	moved   atomic.Bool
-	done    atomic.Bool
-	stopped chan struct{}
+	// casts counts the MagicSkillUse frames of the client's own character,
+	// monsterCasts those of its monster (monsterID, set once it spawned).
+	casts        atomic.Int64
+	monsterCasts atomic.Int64
+	monsterID    atomic.Int32
+	replies      atomic.Int64
+	lost         atomic.Bool
+	died         atomic.Bool
+	moved        atomic.Bool
+	done         atomic.Bool
+	stopped      chan struct{}
 }
 
 func startReader(c *testsupport.ScriptedClient, id int32) *frameReader {
@@ -337,6 +407,14 @@ func startReader(c *testsupport.ScriptedClient, id int32) *frameReader {
 			}
 			if len(frame) >= 5 && frame[0] == serverpackets.OpcodeDie && int32(binary.LittleEndian.Uint32(frame[1:5])) == id {
 				r.died.Store(true)
+			}
+			if len(frame) >= 5 && frame[0] == serverpackets.OpcodeMagicSkillUse {
+				switch int32(binary.LittleEndian.Uint32(frame[1:5])) {
+				case id:
+					r.casts.Add(1)
+				case r.monsterID.Load():
+					r.monsterCasts.Add(1)
+				}
 			}
 			if frame[0] == serverpackets.OpcodeSkillList {
 				r.replies.Add(1)

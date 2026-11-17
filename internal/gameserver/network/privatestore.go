@@ -200,15 +200,10 @@ func (l *GameClientLink) sendRecipeShopManageList(live *livePlayer, dwarven bool
 }
 
 // storeHidden reports the items a store manage window leaves out: a
-// summoned pet's collar (a ridden mount's is shown) and the selected
-// enchant scroll. The item a cast in flight consumes would be left out too,
-// but a manage window only opens after the set-up checks refused a casting
-// player, so no cast is ever in flight here.
-func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID int32) bool {
-	scroll := l.enchanting.scrolls.Active(live.ObjectID())
-	return func(objectID int32) bool {
-		return objectID == scroll || (objectID != live.MountObjectID() && live.ControlItemInUse(objectID))
-	}
+// summoned pet's collar (a ridden mount's is shown), the selected enchant
+// scroll and what the last cast consumes, even once that cast has ended.
+func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID, templateID int32) bool {
+	return l.itemHolder(live).Hidden
 }
 
 // storeTrader is live as one side of a store deal.
