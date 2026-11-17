@@ -370,8 +370,15 @@ func (c *Character) RewardItemFits(itemID int32, count int) bool {
 // one; a non-stackable one arrives as count single instances when multiple
 // (server.properties MultipleItemDrop), else as one. nextID allocates the
 // object id of each instance actually created, so units joining a held
-// stack take none. It reports whether anything was added.
-func (c *Character) AddRewardItem(itemID int32, count int, multiple bool, nextID func() (int32, error)) bool {
+// stack take none. It reports whether anything was added. A character
+// leaving the world takes nothing (see WhileAttached), so a reward paid
+// from another queue is in its final saves or was never given.
+func (c *Character) AddRewardItem(itemID int32, count int, multiple bool, nextID func() (int32, error)) (added bool) {
+	c.WhileAttached(func() { added = c.addRewardItem(itemID, count, multiple, nextID) })
+	return added
+}
+
+func (c *Character) addRewardItem(itemID int32, count int, multiple bool, nextID func() (int32, error)) bool {
 	if c.inventory == nil || count < 1 || nextID == nil {
 		return false
 	}
@@ -416,9 +423,11 @@ func (c *Character) AddCreatedItem(itemID int32, count int, nextID func() (int32
 // inventory, named in chat as earned, the way a sweep or a harvest pays
 // out. A non-stackable arrives as count instances, or as one when the
 // multiple item drop rule is off. nextID allocates each new instance's object id. It
-// reports whether anything was added or, for a herb, applied.
-func (c *Character) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
-	return c.createItem(itemID, count, nextID, event.ObtainEarned)
+// reports whether anything was added or, for a herb, applied. Like
+// AddRewardItem, it gives a character leaving the world nothing.
+func (c *Character) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) (added bool) {
+	c.WhileAttached(func() { added = c.createItem(itemID, count, nextID, event.ObtainEarned) })
+	return added
 }
 
 // createItem creates count units of itemID by template id: a herb is
