@@ -309,10 +309,12 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 }
 
 // CountByAccount returns how many characters exist on accountName. Matching
-// is case-insensitive, since account names are.
+// is case-insensitive, since account names are: the column's collation
+// folds case, so the comparison is the column's own, which its index
+// serves.
 func (s *CharacterStore) CountByAccount(ctx context.Context, accountName string) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM characters WHERE LOWER(account_name) = LOWER(?)", accountName).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM characters WHERE account_name = ?", accountName).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("count characters for %q: %w", accountName, err)
 	}
@@ -320,10 +322,12 @@ func (s *CharacterStore) CountByAccount(ctx context.Context, accountName string)
 }
 
 // NameTaken reports whether a character named name already exists.
-// Matching is case-insensitive, since character names are.
+// Matching is case-insensitive, since character names are: the column's
+// collation folds case, so the comparison is the column's own, which its
+// index serves.
 func (s *CharacterStore) NameTaken(ctx context.Context, name string) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM characters WHERE LOWER(char_name) = LOWER(?)", name).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM characters WHERE char_name = ?", name).Scan(&n)
 	if err != nil {
 		return false, fmt.Errorf("check name %q: %w", name, err)
 	}
