@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -329,25 +328,27 @@ func loadHTMLCache(paths gameServerPaths, log zerolog.Logger) (*datacache.HTML, 
 	return html, err
 }
 
-// loadCrestCache loads the datapack crest images. A
-// crest load that stops early keeps the crests read so far and the server
-// boots on: the failure is logged at error level, each deleted invalid
-// crest file is warned about, and the loaded count is reported. A missing
-// crest directory leaves an empty cache that still saves new crests there.
+// loadCrestCache loads the datapack crest images; see loadCrestDir.
 func loadCrestCache(paths gameServerPaths, log zerolog.Logger) (*datacache.Crests, error) {
-	dir := filepath.Join(paths.DataRoot, "data", "crests")
+	return loadCrestDir(filepath.Join(paths.DataRoot, "data", "crests"), log)
+}
+
+// loadCrestDir loads the crest images in dir. A crest file that cannot be
+// loaded is skipped and the server boots on: the skipped files are logged at
+// error level, each deleted invalid crest file is warned about, and the
+// loaded count is reported. A missing crest directory leaves an empty cache
+// that still saves new crests there. Only a directory that exists but cannot
+// be read fails.
+func loadCrestDir(dir string, log zerolog.Logger) (*datacache.Crests, error) {
 	crests, deleted, err := datacache.LoadCrests(dir)
+	if crests == nil {
+		return nil, err
+	}
 	for _, name := range deleted {
 		log.Warn().Str("crest", name).Msg("crest data is invalid; the crest file has been deleted")
 	}
 	if err != nil {
-		if crests == nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-		log.Error().Err(err).Msg("error loading crest files; clans whose crest was not loaded lose it")
-		if crests == nil {
-			crests = datacache.NewCrestsIn(dir)
-		}
+		log.Error().Err(err).Bool("partial", crests.Partial()).Msg("error loading crest files")
 	}
 	log.Info().Int("crests", crests.Len()).Msg("crests loaded")
 	return crests, nil

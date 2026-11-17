@@ -107,9 +107,14 @@ func (s *Service) changeCrest(cl *Clan, typ datacache.CrestType, id int32, files
 
 // DropMissingCrests clears every clan crest id whose image files does not
 // hold, as the clans are restored at boot before any player connects. With
-// no crest cache at all nothing is cleared.
+// no crest cache at all, or a partial one that cannot tell which crests are
+// gone, nothing is cleared.
 func (s *Service) DropMissingCrests(files *datacache.Crests) {
 	if files == nil {
+		return
+	}
+	if files.Partial() {
+		s.log.Warn().Msg("clan: crest load incomplete; clan crest ids are kept")
 		return
 	}
 	for _, cl := range s.table.allClans() {
