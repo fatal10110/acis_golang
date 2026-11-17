@@ -180,12 +180,14 @@ func TestAdminMakerPages(t *testing.T) {
 		t.Fatalf("maker events = %q, want admin_m1:1001", got)
 	}
 
-	// The NPCs the spawn event places show up on their own time.
-	assertTexts(t, onlyMessages(exchangeZones(t, c, encodeBuildCmd("maker nobody"))), `Maker "nobody" doesn't exist.`)
-	assertTexts(t, exchangeZones(t, c, encodeBuildCmd("maker delete nobody")), `Maker "nobody" doesn't exist.`)
-	assertTexts(t, exchangeZones(t, c, encodeBuildCmd("maker bogus admin_m1")), "Usage: //maker [delete|respawn|scripts|spawn|switch <name>]")
+	// The NPCs the spawn event places show up on their own time, in the
+	// middle of whatever the admin sends next: the answers below are read
+	// without them.
+	assertTexts(t, withoutSpawnFrames(exchangeZones(t, c, encodeBuildCmd("maker nobody"))), `Maker "nobody" doesn't exist.`)
+	assertTexts(t, withoutSpawnFrames(exchangeZones(t, c, encodeBuildCmd("maker delete nobody"))), `Maker "nobody" doesn't exist.`)
+	assertTexts(t, withoutSpawnFrames(exchangeZones(t, c, encodeBuildCmd("maker bogus admin_m1"))), "Usage: //maker [delete|respawn|scripts|spawn|switch <name>]")
 	// A page number that shows no page answers nothing.
-	if frames := exchangeZones(t, c, encodeBuildCmd("maker 0")); len(frames) != 0 {
+	if frames := withoutSpawnFrames(exchangeZones(t, c, encodeBuildCmd("maker 0"))); len(frames) != 0 {
 		t.Fatalf("//maker 0 frames = %x, want none", testsupport.FrameOpcodes(frames))
 	}
 }
@@ -326,6 +328,18 @@ func undirected(t *testing.T, p primitive, name string) []string {
 		}
 	}
 	slices.Sort(out)
+	return out
+}
+
+// withoutSpawnFrames drops what a spawn announces to the admin standing
+// near it: the NPC's info and its move-type frame.
+func withoutSpawnFrames(frames [][]byte) [][]byte {
+	var out [][]byte
+	for _, f := range frames {
+		if f[0] != serverpackets.OpcodeNPCInfo && f[0] != serverpackets.OpcodeChangeMoveType {
+			out = append(out, f)
+		}
+	}
 	return out
 }
 

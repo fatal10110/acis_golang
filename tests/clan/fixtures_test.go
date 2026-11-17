@@ -315,9 +315,11 @@ func only(frames [][]byte, keep ...byte) []byte {
 	return out
 }
 
-// queryInt reads one integer column.
+// queryInt reads one integer column once the persistence lane has written
+// what the test did before it.
 func queryInt(t *testing.T, w *clanWorld, query string, args ...any) int64 {
 	t.Helper()
+	w.srv.FlushPersistence(t)
 	var v int64
 	if err := w.srv.DB.QueryRowContext(context.Background(), query, args...).Scan(&v); err != nil {
 		t.Fatalf("%s: %v", query, err)
