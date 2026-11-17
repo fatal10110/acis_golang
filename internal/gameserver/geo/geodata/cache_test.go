@@ -1,4 +1,4 @@
-package probe
+package geodata
 
 import (
 	"bytes"
@@ -213,7 +213,7 @@ func TestCacheMatchesHeapLoader(t *testing.T) {
 		t.Fatalf("openCache(): %v", err)
 	}
 	for i, r := range regions {
-		heap, _, err := readRegion(regionPath(dir, L2OFF, r.X, r.Y), L2OFF)
+		heap, _, err := readRegion(RegionPath(dir, L2OFF, r.X, r.Y), L2OFF)
 		if err != nil {
 			t.Fatal(err)
 		}

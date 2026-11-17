@@ -1,4 +1,4 @@
-package probe
+package geodata
 
 import (
 	"encoding/binary"
@@ -114,5 +114,5 @@ func writeFlatL2J(t *testing.T, dir string, tileX, tileY int, height int16) {
 }
 
 func fileNameFor(geoType GeoType, tileX, tileY int) string {
-	return filepath.Base(regionPath("", geoType, tileX, tileY))
+	return filepath.Base(RegionPath("", geoType, tileX, tileY))
 }

@@ -274,11 +274,11 @@ func (s *effectPointSink) Emit(ev event.Event) {
 		return
 	}
 	broadcastBuiltFrame(frame, func(send func(frameReceiver)) {
-		s.world.ForEachKnown(s.ep, func(o world.Tracked) {
+		for o := range s.world.KnownPlayers(s.ep) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 

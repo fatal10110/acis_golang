@@ -125,20 +125,19 @@ func isConvex(isCw bool, ax, ay, bx, by, cx, cy int32) bool {
 }
 
 // earPointInTriangle is the ear-detection containment test: strictly
-// interior, computed as float-division barycentric coefficients. It is
+// interior, computed as float-division barycentric coefficients. The
+// determinant and both numerators are int32 products that wrap like the rest
+// of the triangulation; only the divisions run in float64. It is
 // deliberately distinct from Triangle.Contains, which is edge-inclusive and
 // runs in exact integers.
 func earPointInTriangle(ax, ay, bx, by, cx, cy, px, py int32) bool {
-	bax := float64(bx - ax)
-	bay := float64(by - ay)
-	cax := float64(cx - ax)
-	cay := float64(cy - ay)
-	pax := float64(px - ax)
-	pay := float64(py - ay)
+	bax, bay := bx-ax, by-ay
+	cax, cay := cx-ax, cy-ay
+	pax, pay := px-ax, py-ay
 
-	det := bax*cay - cax*bay
-	ba := (bax*pay - pax*bay) / det
-	ca := (pax*cay - cax*pay) / det
+	det := float64(bax*cay - cax*bay)
+	ba := float64(bax*pay-pax*bay) / det
+	ca := float64(pax*cay-cax*pay) / det
 	return ba > 0 && ca > 0 && (ba+ca) < 1
 }
 

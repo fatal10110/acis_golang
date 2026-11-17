@@ -17,7 +17,7 @@ Start wave {N} of the acis_golang #258 parity sweep (epic #{wave_epic}). This is
 5. Issue bodies: for every slice in this wave, run `$S patch-body P## --apply`, so each body matches the pinned manifest.
 6. Post the pinned SHA, the CI run link and the list of delta issues on #{wave_epic}.
 7. Local-only evidence. Run only the local-only tests listed in docs/agents/verification.md whose packages are in this wave's evidence_packages:
-   - geodata: `geo/probe` and `geo/pathfind`, which find geodata in the outer aCis_datapack/ or $ACIS_GEODATA_DIR;
+   - geodata: `geo/geodata` and `geo/pathfind`, which find geodata in the outer aCis_datapack/ or $ACIS_GEODATA_DIR;
    - reference: the tests that need the outer aCis_gameserver/.
    Command: `ACIS_REQUIRE_DATAPACK=1 ACIS_REQUIRE_REFERENCE=1 rtk go -C $WT test -count=1 -v <package> -run '<listed tests>'`.
    Post one evidence comment on #{wave_epic}: the CI run link, then for each local test its result. A SKIP counts as not run; give the reason.

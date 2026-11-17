@@ -1,4 +1,4 @@
-package probe
+package geodata
 
 import (
 	"encoding/binary"

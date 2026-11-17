@@ -66,6 +66,11 @@ type Player interface {
 
 func isPlayer(t Tracked) bool { return t.Kind() == actor.KindPlayer }
 
+func isObserver(t Tracked) bool {
+	_, ok := t.(Observer)
+	return ok
+}
+
 // Spawn places t in the world at (x, y, z) facing heading, clamping x and
 // y to the world bounds, registers it, and notifies observers around the
 // landing region that t entered their sight (and t of everything it now
@@ -235,11 +240,20 @@ func (s *State) Despawn(t Tracked) {
 // quadratic in same-region batch size. Like Despawn, it updates the grid
 // under the world lock and delivers every callback after releasing it.
 //
-// ponytail: ts must not themselves implement Observer (the reciprocal
-// tObs.Forget(o) that relocate does for a single despawning observer isn't
-// replicated here) — fine for today's only caller (ground items, which
-// never observe), revisit if a future caller despawns Observers in bulk.
+// An Observer in ts is despawned on its own through Despawn, first: only
+// that path also tells it to forget everything it knew.
 func (s *State) DespawnAll(ts []Tracked) {
+	if slices.ContainsFunc(ts, isObserver) {
+		batch := make([]Tracked, 0, len(ts))
+		for _, t := range ts {
+			if isObserver(t) {
+				s.Despawn(t)
+			} else {
+				batch = append(batch, t)
+			}
+		}
+		ts = batch
+	}
 	s.mu.Lock()
 	for slices.ContainsFunc(ts, func(t Tracked) bool { return t.presence().busy.Load() }) {
 		s.idle.Wait()
@@ -383,22 +397,22 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	var notificationBuf [16]visibilityNotification
 	var notifications []visibilityNotification
 	var scratch *RelocateScratch
-	n := 0
 	if tIsPlayer {
 		if owner, ok := t.(relocateScratchOwner); ok {
 			scratch = owner.relocateScratch()
 		}
-		// Same unshared-region skip as appendCrossing: two notifications
-		// per object, and the region's own crossing.
-		for _, r := range oldAreas {
-			if !containsRegion(oldShared, r) {
-				n += 2*len(r.objects) + 1
-			}
+	}
+	// An upper bound with the same unshared-region skip as appendCrossing:
+	// two notifications per object, and the region's own crossing.
+	n := 0
+	for _, r := range oldAreas {
+		if !containsRegion(oldShared, r) {
+			n += 2*len(r.objects) + 1
 		}
-		for _, r := range newAreas {
-			if !containsRegion(newShared, r) {
-				n += 2*len(r.objects) + 1
-			}
+	}
+	for _, r := range newAreas {
+		if !containsRegion(newShared, r) {
+			n += 2*len(r.objects) + 1
 		}
 	}
 	// The scratch and stack-buffer paths keep separate slice variables so
@@ -448,11 +462,17 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	// remaining callbacks). clear zeroes the full capacity, not just the
 	// length this call used, so a shrinking crossing (widest cap held over
 	// from a crowded earlier region) can't keep stale Tracked references
-	// reachable from the player's scratch past their despawn.
+	// reachable from the player's scratch past their despawn. A buffer far
+	// wider than this crossing needed is dropped instead, so a player does
+	// not hold the storage of the densest crowd it ever crossed.
 	defer func() {
 		if scratch != nil {
-			clear(scratch.notifications[:cap(scratch.notifications)])
-			scratch.notifications = scratch.notifications[:0]
+			if c := cap(scratch.notifications); c > relocateScratchKeep && c > relocateScratchSlack*len(scratch.notifications) {
+				scratch.notifications = nil
+			} else {
+				clear(scratch.notifications[:c])
+				scratch.notifications = scratch.notifications[:0]
+			}
 		}
 		s.mu.Lock()
 		p.knownFrom.Store(nil)
@@ -631,10 +651,18 @@ func Knows(t, target Tracked) bool {
 }
 
 // ForEachKnown calls fn for every object in t's surrounding regions,
-// excluding t itself. It does nothing when t is off the grid.
+// excluding t itself. It does nothing when t is off the grid. The objects are
+// collected into pooled scratch first, so no region lock is held while fn
+// runs. A caller that wants only players uses KnownPlayers.
 func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
-	var buf [32]Tracked
-	for _, o := range s.AppendKnown(buf[:0], t) {
+	scratch := knownScratch.Get().(*[]Tracked)
+	known := s.AppendKnown((*scratch)[:0], t)
+	defer func() {
+		clear(known)
+		*scratch = known[:0]
+		knownScratch.Put(scratch)
+	}()
+	for _, o := range known {
 		fn(o)
 	}
 }
@@ -685,7 +713,7 @@ func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
 		if r == nil {
 			return
 		}
-		scratch := knownPlayersScratch.Get().(*[]Tracked)
+		scratch := knownScratch.Get().(*[]Tracked)
 		players := (*scratch)[:0]
 		var regionBuf [9]*Region
 		for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
@@ -694,7 +722,7 @@ func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
 		defer func() {
 			clear(players)
 			*scratch = players[:0]
-			knownPlayersScratch.Put(scratch)
+			knownScratch.Put(scratch)
 		}()
 		for _, p := range players {
 			if !yield(p) {
@@ -704,9 +732,9 @@ func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
 	}
 }
 
-// knownPlayersScratch holds the reusable collection slices of KnownPlayers;
-// each one serves a single iteration at a time.
-var knownPlayersScratch = sync.Pool{New: func() any { return new([]Tracked) }}
+// knownScratch holds the reusable collection slices of ForEachKnown and
+// KnownPlayers; each one serves a single iteration at a time.
+var knownScratch = sync.Pool{New: func() any { return new([]Tracked) }}
 
 // AppendAround appends every object in the regions surrounding the one
 // holding (x, y) to out, excluding the object except: what an object in

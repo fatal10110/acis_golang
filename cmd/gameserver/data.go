@@ -7,8 +7,8 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/geodata"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
-	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
@@ -88,12 +88,12 @@ type gameData struct {
 	NewbieBuffs *skill.NewbieBuffTable
 }
 
-type geodata struct {
+type loadedGeodata struct {
 	Engine        *engine.Engine
 	Finder        *pathfind.Finder
 	Bugs          *engine.BugLog
 	Dir           string
-	Type          probe.GeoType
+	Type          geodata.GeoType
 	EngineOptions engine.Options
 	Pathfind      pathfind.Options
 }
@@ -287,7 +287,7 @@ func loadCrestDir(dir string, log zerolog.Logger) (*datacache.Crests, error) {
 // their "X_Y" keys; unlisted tiles stay null-block. A listed region that
 // fails to load fails boot: the server does not run on partial geodata.
 // With a cache path the regions are served from that packed cache file.
-func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
+func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*loadedGeodata, error) {
 	props, err := config.LoadFile(paths.GeoConfigPath)
 	if err != nil {
 		return nil, err
@@ -302,16 +302,16 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 		return nil, err
 	}
 
-	geo := &geodata{
-		Dir:           probe.ResolveDir(paths.DataRoot, props.String("GeoDataPath", "")),
-		Type:          probe.GeoType(props.String("GeoDataType", string(probe.L2OFF))),
+	geo := &loadedGeodata{
+		Dir:           geodata.ResolveDir(paths.DataRoot, props.String("GeoDataPath", "")),
+		Type:          geodata.GeoType(props.String("GeoDataType", string(geodata.L2OFF))),
 		EngineOptions: engineOptions,
 		Pathfind:      pathOptions,
 	}
 	if paths.GeoCachePath != "" {
-		geo.Engine, err = probe.LoadRegionsCached(geo.Dir, geo.Type, probe.ListedRegions(props), paths.GeoCachePath, log, geo.EngineOptions)
+		geo.Engine, err = geodata.LoadRegionsCached(geo.Dir, geo.Type, geodata.ListedRegions(props), paths.GeoCachePath, log, geo.EngineOptions)
 	} else {
-		geo.Engine, err = probe.LoadRegions(geo.Dir, geo.Type, probe.ListedRegions(props), log, geo.EngineOptions)
+		geo.Engine, err = geodata.LoadRegions(geo.Dir, geo.Type, geodata.ListedRegions(props), log, geo.EngineOptions)
 	}
 	if err != nil {
 		return nil, err

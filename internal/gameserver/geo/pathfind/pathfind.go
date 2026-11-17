@@ -88,8 +88,9 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 		return dst, 0, false
 	}
 
+	// A search that starts on its goal cell has no route to walk.
 	if start.key() == goal.key() {
-		return dst, 0, true
+		return dst, 0, false
 	}
 
 	var began time.Time

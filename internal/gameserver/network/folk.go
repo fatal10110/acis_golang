@@ -110,11 +110,11 @@ func (l *GameClientLink) broadcastNPCFrame(f world.Tracked, build func() wire.Fr
 		return
 	}
 	broadcastFrame(build, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(f, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(f) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 

@@ -156,16 +156,28 @@ func (l *GameClientLink) probeBoatEntrance(live *livePlayer, target location.Loc
 
 // knownBoat returns a boat obj knows, or nil.
 func (l *GameClientLink) knownBoat(obj world.Tracked) *boat.Boat {
-	if l.world == nil {
+	return firstKnownBoat(l.world, obj, nil)
+}
+
+// firstKnownBoat returns the first boat obj knows that match accepts (any
+// boat for a nil match), or nil. Only the boats are copied out of the known
+// set, into a stack buffer that fits the usual one or two.
+func firstKnownBoat(w *world.State, obj world.Tracked, match func(*boat.Boat) bool) *boat.Boat {
+	if w == nil {
 		return nil
 	}
-	var found *boat.Boat
-	l.world.ForEachKnown(obj, func(obj world.Tracked) {
-		if b, ok := obj.(*boat.Boat); ok && found == nil {
-			found = b
+	var buf [2]world.Tracked
+	for _, o := range w.AppendKnownMatching(buf[:0], obj, isBoat) {
+		if b := o.(*boat.Boat); match == nil || match(b) {
+			return b
 		}
-	})
-	return found
+	}
+	return nil
+}
+
+func isBoat(o world.Tracked) bool {
+	_, ok := o.(*boat.Boat)
+	return ok
 }
 
 // requestGetOnVehicle answers RequestGetOnVehicle: live, granted leave to
