@@ -1,0 +1,30 @@
+# Q232_TestOfTheLord, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Shaman 39
+class 50
+memo secondClassChange39 true
+script quest.Q232_TestOfTheLord
+item 1341 3390 3391 3392 3393 3394 3395 3396 3397 3398 3399 3400 3401 3402 3403 3404 3405 3406 3407 3408 3409 3410 3411 3412 3413 3414 3415 3416 7562
+page villagemaster/30565.htm
+page script/quest/Q232_TestOfTheLord/
+npc kakai 30565 VillageMasterOrc 10 0 0
+
+action kakai
+action kakai
+  S ActionFailed
+  S NpcHtmlMessage obj=kakai item=0 page=villagemaster/30565.htm
+  S ActionFailed
+bypass npc_{kakai}_Quest
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q232_TestOfTheLord 30565-05.htm
+  S QuestList 232:0x80000001
+  S ExShowQuestMark quest=232
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3391
+  S NpcHtmlMessage obj=kakai item=0 page=script/quest/Q232_TestOfTheLord/30565-05.htm
+  S ActionFailed
+  Q upsert Q232_TestOfTheLord | <state> | STARTED
+  Q upsert Q232_TestOfTheLord | <cond> | 1

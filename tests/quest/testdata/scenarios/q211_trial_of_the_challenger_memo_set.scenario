@@ -1,0 +1,46 @@
+# Q211_TrialOfTheChallenger, start with the diamonds already paid: the character holds the secondClassChange35 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Challenger 36
+class 1
+memo secondClassChange35 true
+script quest.Q211_TrialOfTheChallenger
+item 2627 2628 2629 2630 2631 2632 7562 1940 1943 1946 2918 2927
+page default/30644.htm
+page default/30645.htm
+page default/30646.htm
+page default/30647.htm
+page default/30535.htm
+page script/quest/Q211_TrialOfTheChallenger/
+npc kash 30644 Folk 10 0 0
+npc martien 30645 Folk -10 0 0
+npc raldo 30646 Folk 0 10 0
+npc chest 30647 Folk 0 -10 0
+npc filaur 30535 Folk 20 20 0
+npc shyslassys 27110 Monster 40 0 0
+npc gorr 27112 Monster -40 0 0
+npc baraham 27113 Monster 0 40 0
+npc succubus 27114 Monster 0 -40 0
+
+action kash
+action kash
+  S ActionFailed
+  S NpcHtmlMessage obj=kash item=0 page=default/30644.htm
+  S ActionFailed
+bypass npc_{kash}_Quest
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q211_TrialOfTheChallenger CREATED
+bypass Quest Q211_TrialOfTheChallenger 30644-04.htm
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-04.htm
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30644-05.htm
+  S QuestList 211:0x80000001
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-05.htm
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <state> | STARTED
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 1
+  items 7562=0

@@ -1,0 +1,52 @@
+# Q224_TestOfSagittarius, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Sagittarius 39
+class 35
+memo secondClassChange39 true
+hold 3298 8
+hold 3299 8
+script quest.Q224_TestOfSagittarius
+item 17 3028 3293 3294 3295 3296 3297 3298 3299 3300 3301 3302 3303 3304 3305 3306 7562
+page default/30702.htm
+page default/30626.htm
+page default/30653.htm
+page trainer/30514.htm
+page trainer/30717.htm
+page script/quest/Q224_TestOfSagittarius/
+npc bernard 30702 Folk 10 0 0
+npc hamil 30626 Folk -10 0 0
+npc aron 30653 Folk 0 10 0
+npc vokian 30514 Trainer 0 -10 0
+npc gauen 30717 Trainer 10 10 0
+npc ant 20079 Monster 40 0 0
+npc antleader 20090 Monster -40 0 0
+npc shaman 20269 Monster 0 40 0
+npc overlord 20270 Monster 0 -40 0
+npc stakato 20230 Monster 40 40 0
+npc spider 20233 Monster -40 40 0
+npc scavenger 20551 Monster 40 -40 0
+npc gargoyle 20563 Monster -40 -40 0
+npc lizardman 20577 Monster 60 0 0
+npc lizoverlord 20582 Monster -60 0 0
+
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q224_TestOfSagittarius 30702-04.htm
+  S QuestList 224:0x80000001
+  S ExShowQuestMark quest=224
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3294
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q224_TestOfSagittarius/30702-04.htm
+  S ActionFailed
+  Q upsert Q224_TestOfSagittarius | <state> | STARTED
+  Q upsert Q224_TestOfSagittarius | <cond> | 1
+  state Q224_TestOfSagittarius STARTED
+  rows Q224_TestOfSagittarius <state>=STARTED <cond>=1

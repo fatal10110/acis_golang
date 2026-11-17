@@ -1,0 +1,61 @@
+# Q223_TestOfTheChampion, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Champion 39
+class 1
+memo secondClassChange39 true
+hold 3290 97
+hold 3287 27
+hold 3288 28
+hold 3289 28
+hold 3291 97
+hold 3292 94
+script quest.Q223_TestOfTheChampion
+item 3276 3277 3278 3279 3280 3281 3282 3283 3284 3285 3286 3287 3288 3289 3290 3291 3292 7562
+page default/30624.htm
+page default/30625.htm
+page merchant/30093.htm
+page guard/30196.htm
+page script/quest/Q223_TestOfTheChampion/
+npc ascalon 30624 Folk 10 0 0
+npc mason 30625 Folk -10 0 0
+npc groot 30093 Merchant 0 10 0
+npc mouen 30196 Guard 0 -10 0
+npc axe 20780 Monster 40 0 0
+npc harpy 20145 Monster -40 0 0
+npc matriarch 27088 Monster 0 40 0
+npc medusa 20158 Monster 0 -40 0
+npc windsus 20553 Monster 40 40 0
+npc scavenger 20551 Monster -40 40 0
+npc collector 27089 Monster 40 -40 0
+npc lizardman 20577 Monster -40 -40 0
+npc lizarcher 20578 Monster 60 0 0
+npc lizsoldier 20579 Monster -60 0 0
+npc lizwarrior 20580 Monster 0 60 0
+npc lizshaman 20581 Monster 0 -60 0
+npc lizoverlord 20582 Monster 60 60 0
+
+action ascalon
+action ascalon
+  S ActionFailed
+  S NpcHtmlMessage obj=ascalon item=0 page=default/30624.htm
+  S ActionFailed
+bypass npc_{ascalon}_Quest
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-05.htm
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-05.htm
+  S ActionFailed
+bypass Quest Q223_TestOfTheChampion 30624-06.htm
+  S QuestList 223:0x80000001
+  S ExShowQuestMark quest=223
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3277
+  S NpcHtmlMessage obj=ascalon item=0 page=script/quest/Q223_TestOfTheChampion/30624-06.htm
+  S ActionFailed
+  Q upsert Q223_TestOfTheChampion | <state> | STARTED
+  Q upsert Q223_TestOfTheChampion | <cond> | 1
+  items 3277=1 7562=0
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <state>=STARTED <cond>=1
