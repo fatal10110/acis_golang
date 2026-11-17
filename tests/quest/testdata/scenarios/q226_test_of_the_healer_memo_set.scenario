@@ -1,0 +1,65 @@
+# Q226_TestOfTheHealer, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Healer 39
+class 15
+memo secondClassChange39 true
+hold 57 150000
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page trainer/30473.htm
+page trainer/30327.htm
+page default/30424.htm
+page default/30428.htm
+page default/30658.htm
+page default/30659.htm
+page default/30660.htm
+page default/30661.htm
+page default/30662.htm
+page default/30663.htm
+page default/30664.htm
+page default/30665.htm
+page default/30674.htm
+page script/quest/Q226_TestOfTheHealer/
+npc bandellos 30473 Trainer 10 0 0
+npc sorius 30327 Trainer -10 0 0
+npc allana 30424 Folk 0 10 0
+npc perrin 30428 Folk 0 -10 0
+npc gupu 30658 Folk 10 10 0
+npc orphan 30659 Folk -10 10 0
+npc windy 30660 Folk 10 -10 0
+npc darkelf 30661 Folk -10 -10 0
+npc piper 30662 Folk 20 0 0
+npc slein 30663 Folk -20 0 0
+npc kain 30664 Folk 0 20 0
+npc kristina 30665 Folk 0 -20 0
+npc daurin 30674 Folk 20 20 0
+npc tatoma 27134 Monster 40 0 0
+npc leader 27123 Monster -40 0 0
+npc assassin 27124 Monster 0 40 0
+npc sniper 27125 Monster 0 -40 0
+npc wizard 27126 Monster -40 40 0
+npc lord 27127 Monster 40 40 0
+
+
+action bandellos
+action bandellos
+  S ActionFailed
+  S NpcHtmlMessage obj=bandellos item=0 page=trainer/30473.htm
+  S ActionFailed
+bypass npc_{bandellos}_Quest
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q226_TestOfTheHealer 30473-04.htm
+  S QuestList 226:0x80000001
+  S ExShowQuestMark quest=226
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2810
+  S NpcHtmlMessage obj=bandellos item=0 page=script/quest/Q226_TestOfTheHealer/30473-04.htm
+  S ActionFailed
+  Q upsert Q226_TestOfTheHealer | <state> | STARTED
+  Q upsert Q226_TestOfTheHealer | <cond> | 1
+  items 2810=1
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <state>=STARTED <cond>=1

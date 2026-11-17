@@ -1,0 +1,48 @@
+# Q219_TestimonyOfFate, start with the diamonds already paid: the character holds the secondClassChange37 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Scholar 38
+class 32
+memo secondClassChange37 true
+hold 3180 10
+hold 3181 10
+hold 3178 10
+hold 3182 10
+hold 3179 9
+script quest.Q219_TestimonyOfFate
+item 3172 3173 3174 3175 3176 3177 3178 3179 3180 3181 3182 3183 3184 3185 3186 3187 3188 3189 3190 3191 3192 3193 3194 3195 3196 3197 3198 3199 3200 3201 3202 7562
+page default/30614.htm
+page trainer/30463.htm
+page trainer/30476.htm
+page script/quest/Q219_TestimonyOfFate/
+npc kaira 30476 Trainer -20 10 0
+npc metheus 30614 Folk -10 10 0
+npc ixia 30463 Trainer 0 10 0
+npc hangman 20144 Monster -60 0 0
+npc spider 20233 Monster -70 0 0
+
+action kaira
+action kaira
+  S ActionFailed
+  S NpcHtmlMessage obj=kaira item=0 page=trainer/30476.htm
+  S ActionFailed
+bypass npc_{kaira}_Quest
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q219_TestimonyOfFate CREATED
+  rows Q219_TestimonyOfFate -
+bypass Quest Q219_TestimonyOfFate 30476-04.htm
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-04.htm
+  S ActionFailed
+bypass Quest Q219_TestimonyOfFate 30476-05.htm
+  S QuestList 219:0x80000001
+  S ExShowQuestMark quest=219
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3173
+  S NpcHtmlMessage obj=kaira item=0 page=script/quest/Q219_TestimonyOfFate/30476-05.htm
+  S ActionFailed
+  Q upsert Q219_TestimonyOfFate | <state> | STARTED
+  Q upsert Q219_TestimonyOfFate | <cond> | 1
+  state Q219_TestimonyOfFate STARTED
+  rows Q219_TestimonyOfFate <cond>=1 <state>=STARTED

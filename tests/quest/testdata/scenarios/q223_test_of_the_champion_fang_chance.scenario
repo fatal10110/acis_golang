@@ -1,0 +1,59 @@
+# Test of the Champion (Q223), the Leto lizardman fang chance per kind: 500000 + 100000 per id above 20577
+# (out of 1000000), so each of the first five kinds misses on a draw of its chance and hits one below it, and
+# the overlord (20582) always hits. Hand-written from the quest script (no reference trace).
+character Champion 39
+class 1
+quest Q223_TestOfTheChampion <cond>=12 <state>=STARTED
+random 500000 499999 600000 599999 700000 699999 800000 799999 900000 899999 999999
+script quest.Q223_TestOfTheChampion
+item 3276 3292 7562
+page script/quest/Q223_TestOfTheChampion/
+npc lizardman 20577 Monster -40 -40 0
+npc lizarcher 20578 Monster 60 0 0
+npc lizsoldier 20579 Monster -60 0 0
+npc lizwarrior 20580 Monster 0 60 0
+npc lizshaman 20581 Monster 0 -60 0
+npc lizoverlord 20582 Monster 60 60 0
+
+# 20577: chance 500000 of 1000000, so a draw of 500000 misses and 499999 hits.
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+# 20578: chance 600000 of 1000000, so a draw of 600000 misses and 599999 hits.
+kill lizarcher
+  S SystemMessage id=95 1:0 1:0
+kill lizarcher
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+# 20579: chance 700000 of 1000000, so a draw of 700000 misses and 699999 hits.
+kill lizsoldier
+  S SystemMessage id=95 1:0 1:0
+kill lizsoldier
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+# 20580: chance 800000 of 1000000, so a draw of 800000 misses and 799999 hits.
+kill lizwarrior
+  S SystemMessage id=95 1:0 1:0
+kill lizwarrior
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+# 20581: chance 900000 of 1000000, so a draw of 900000 misses and 899999 hits.
+kill lizshaman
+  S SystemMessage id=95 1:0 1:0
+kill lizshaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+# 20582: chance 1000000, every draw hits.
+kill lizoverlord
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3292
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3292=6
+  rows Q223_TestOfTheChampion <cond>=12 <state>=STARTED

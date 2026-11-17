@@ -1,0 +1,34 @@
+# Trial of the Challenger (Q211), cond 10: Filaur, asked after the Succubus Queen fell, says so (30535-04)
+# Hand-written from the quest script (no reference trace).
+character Waiter 36
+class 1
+quest Q211_TrialOfTheChallenger <cond>=10 <state>=STARTED
+script quest.Q211_TrialOfTheChallenger
+item 2627 2628 2629 2630 2631 2632 7562 1940 1943 1946 2918 2927
+page default/30644.htm
+page default/30645.htm
+page default/30646.htm
+page default/30647.htm
+page default/30535.htm
+page script/quest/Q211_TrialOfTheChallenger/
+npc kash 30644 Folk 10 0 0
+npc martien 30645 Folk -10 0 0
+npc raldo 30646 Folk 0 10 0
+npc chest 30647 Folk 0 -10 0
+npc filaur 30535 Folk 20 20 0
+npc shyslassys 27110 Monster 40 0 0
+npc gorr 27112 Monster -40 0 0
+npc baraham 27113 Monster 0 40 0
+npc succubus 27114 Monster 0 -40 0
+
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q211_TrialOfTheChallenger/30535-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q211_TrialOfTheChallenger STARTED
+  rows Q211_TrialOfTheChallenger <cond>=10 <state>=STARTED

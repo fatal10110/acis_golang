@@ -1,0 +1,61 @@
+# Q228_TestOfMagus, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Magus 39
+class 11
+memo secondClassChange39 true
+hold 2848 19
+hold 2849 4
+hold 2850 19
+hold 2851 10
+hold 2852 10
+hold 2853 9
+hold 2854 10
+hold 2855 10
+script quest.Q228_TestOfMagus
+item 2840 2841 2842 2843 2844 2845 2846 2847 2848 2849 2850 2851 2852 2853 2854 2855 2856 2857 2858 2859 2860 2861 2862 2863 7562
+page default/30629.htm
+page default/30391.htm
+page default/30612.htm
+page default/30409.htm
+page default/30411.htm
+page default/30412.htm
+page default/30413.htm
+page script/quest/Q228_TestOfMagus/
+npc rukal 30629 Folk 10 0 0
+npc parina 30391 Folk -10 0 0
+npc casian 30612 Folk 0 10 0
+npc snake 30409 Folk 0 -10 0
+npc salamander 30411 Folk 10 10 0
+npc sylph 30412 Folk -10 10 0
+npc undine 30413 Folk 10 -10 0
+npc phantasm 27095 Monster 40 0 0
+npc nightmare 27096 Monster -40 0 0
+npc darkling 27097 Monster 0 40 0
+npc ghostfire 27098 Monster 0 -40 0
+npc stakato 20157 Monster 40 40 0
+npc harpy 20145 Monster -40 40 0
+npc monstereye 20564 Monster 40 -40 0
+
+
+action rukal
+action rukal
+  S ActionFailed
+  S NpcHtmlMessage obj=rukal item=0 page=default/30629.htm
+  S ActionFailed
+bypass npc_{rukal}_Quest
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q228_TestOfMagus 30629-04.htm
+  S QuestList 228:0x80000001
+  S ExShowQuestMark quest=228
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2841
+  S NpcHtmlMessage obj=rukal item=0 page=script/quest/Q228_TestOfMagus/30629-04.htm
+  S ActionFailed
+  Q upsert Q228_TestOfMagus | <state> | STARTED
+  Q upsert Q228_TestOfMagus | <cond> | 1
+  items 2841=1
+  state Q228_TestOfMagus STARTED
+  rows Q228_TestOfMagus <state>=STARTED <cond>=1

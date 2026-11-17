@@ -1,0 +1,60 @@
+# Q217_TestimonyOfTrust, start with the diamonds already paid: the character holds the secondClassChange37 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Trusty 38
+class 4
+memo secondClassChange37 true
+script quest.Q217_TestimonyOfTrust
+item 2734 2735 2736 2737 2738 2739 2740 2741 2742 2743 2744 2745 2746 2747 2748 2749 2750 2751 2752 2753 2754 2755 2756 2757 2758 2759 2760 2761 7562
+page villagemaster/30191.htm
+page villagemaster/30154.htm
+page villagemaster/30358.htm
+page trainer/30464.htm
+page default/30657.htm
+page villagemaster/30565.htm
+page trainer/30515.htm
+page default/30531.htm
+page default/30621.htm
+page villagemaster/30031.htm
+page script/quest/Q217_TestimonyOfTrust/
+npc hollint 30191 VillageMasterPriest 10 0 0
+npc asterios 30154 VillageMasterPriest -10 0 0
+npc thifiell 30358 VillageMasterDElf 0 10 0
+npc clayton 30464 Trainer 0 -10 0
+npc seresin 30657 Folk 20 20 0
+npc kakai 30565 VillageMasterOrc -20 20 0
+npc manakia 30515 Trainer 20 -20 0
+npc lockirin 30531 Folk -20 -20 0
+npc nikola 30621 Folk 30 0 0
+npc biotin 30031 VillageMasterPriest -30 0 0
+npc actea 27121 Monster 40 0 0
+npc luell 27120 Monster -40 0 0
+npc stakato 20157 Monster 0 40 0
+npc ant 20082 Monster 0 -40 0
+npc basilisk 20550 Monster 40 40 0
+npc windsus 20553 Monster -40 40 0
+npc porta 20213 Monster 40 -40 0
+
+
+action hollint
+action hollint
+  S ActionFailed
+  S NpcHtmlMessage obj=hollint item=0 page=villagemaster/30191.htm
+  S ActionFailed
+bypass npc_{hollint}_Quest
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q217_TestimonyOfTrust 30191-04.htm
+  S QuestList 217:0x80000001
+  S ExShowQuestMark quest=217
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2735
+  S SystemMessage id=54 3:2736
+  S NpcHtmlMessage obj=hollint item=0 page=script/quest/Q217_TestimonyOfTrust/30191-04.htm
+  S ActionFailed
+  Q upsert Q217_TestimonyOfTrust | <state> | STARTED
+  Q upsert Q217_TestimonyOfTrust | <cond> | 1
+  items 2735=1 2736=1 7562=0
+  state Q217_TestimonyOfTrust STARTED
+  rows Q217_TestimonyOfTrust <state>=STARTED <cond>=1

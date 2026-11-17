@@ -1,0 +1,24 @@
+# Merciless Punishment (Q107), refused: an orc of level 11 is turned away by Hatos until level 12
+# Hand-written from the quest script (no reference trace).
+character Visitor 11
+class 44
+script quest.Q107_MercilessPunishment
+item 1553 1554 1555 1556 1557 1558 1510 1060 4412 4413 4414 4415 4416 5789
+page default/30568.htm
+page guard/30580.htm
+page script/quest/Q107_MercilessPunishment/
+npc hatos 30568 Folk 10 0 0
+npc parugon 30580 Guard 20 0 0
+npc messenger 27041 Monster 40 0 0
+
+action hatos
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q107_MercilessPunishment CREATED
+  rows Q107_MercilessPunishment -

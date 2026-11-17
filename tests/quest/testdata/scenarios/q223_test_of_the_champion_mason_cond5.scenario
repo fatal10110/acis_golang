@@ -1,0 +1,41 @@
+# Test of the Champion (Q223), cond 5: Mason, asked after he handed his letter over, says so (30625-07)
+# Hand-written from the quest script (no reference trace).
+character Waiter 39
+class 1
+quest Q223_TestOfTheChampion <cond>=5 <state>=STARTED
+script quest.Q223_TestOfTheChampion
+item 3276 3277 3278 3279 3280 3281 3282 3283 3284 3285 3286 3287 3288 3289 3290 3291 3292 7562
+page default/30624.htm
+page default/30625.htm
+page merchant/30093.htm
+page guard/30196.htm
+page script/quest/Q223_TestOfTheChampion/
+npc ascalon 30624 Folk 10 0 0
+npc mason 30625 Folk -10 0 0
+npc groot 30093 Merchant 0 10 0
+npc mouen 30196 Guard 0 -10 0
+npc axe 20780 Monster 40 0 0
+npc harpy 20145 Monster -40 0 0
+npc matriarch 27088 Monster 0 40 0
+npc medusa 20158 Monster 0 -40 0
+npc windsus 20553 Monster 40 40 0
+npc scavenger 20551 Monster -40 40 0
+npc collector 27089 Monster 40 -40 0
+npc lizardman 20577 Monster -40 -40 0
+npc lizarcher 20578 Monster 60 0 0
+npc lizsoldier 20579 Monster -60 0 0
+npc lizwarrior 20580 Monster 0 60 0
+npc lizshaman 20581 Monster 0 -60 0
+npc lizoverlord 20582 Monster 60 60 0
+
+action mason
+action mason
+  S ActionFailed
+  S NpcHtmlMessage obj=mason item=0 page=default/30625.htm
+  S ActionFailed
+bypass npc_{mason}_Quest
+  S NpcHtmlMessage obj=mason item=0 page=script/quest/Q223_TestOfTheChampion/30625-07.htm
+  S ActionFailed
+  S ActionFailed
+  state Q223_TestOfTheChampion STARTED
+  rows Q223_TestOfTheChampion <cond>=5 <state>=STARTED

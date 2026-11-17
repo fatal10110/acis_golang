@@ -1,0 +1,41 @@
+# Q220_TestimonyOfGlory, start with the diamonds already paid: the character holds the secondClassChange37 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Raider 38
+class 45
+memo secondClassChange37 true
+hold 3205 10
+hold 3207 10
+hold 3206 9
+script quest.Q220_TestimonyOfGlory
+item 3203 3204 3205 3206 3207 3208 3209 3210 3211 3212 3213 3214 3215 3216 3217 3218 3219 3220 3221 3222 3223 3224 3225 3226 3227 3228 3229 3230 3231 3232 3233 3234 3235 3236 3237 7562
+page trainer/30514.htm
+page default/30642.htm
+page script/quest/Q220_TestimonyOfGlory/
+npc vokian 30514 Trainer -20 10 0
+npc chianta 30642 Folk -10 10 0
+npc tyrant 20192 Monster -60 0 0
+
+action vokian
+action vokian
+  S ActionFailed
+  S NpcHtmlMessage obj=vokian item=0 page=trainer/30514.htm
+  S ActionFailed
+bypass npc_{vokian}_Quest
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q220_TestimonyOfGlory/30514-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q220_TestimonyOfGlory 30514-04.htm
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q220_TestimonyOfGlory/30514-04.htm
+  S ActionFailed
+bypass Quest Q220_TestimonyOfGlory 30514-05.htm
+  S QuestList 220:0x80000001
+  S ExShowQuestMark quest=220
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3204
+  S NpcHtmlMessage obj=vokian item=0 page=script/quest/Q220_TestimonyOfGlory/30514-05.htm
+  S ActionFailed
+  Q upsert Q220_TestimonyOfGlory | <state> | STARTED
+  Q upsert Q220_TestimonyOfGlory | <cond> | 1
+  state Q220_TestimonyOfGlory STARTED
+  rows Q220_TestimonyOfGlory <cond>=1 <state>=STARTED

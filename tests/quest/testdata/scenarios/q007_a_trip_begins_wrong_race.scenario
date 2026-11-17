@@ -1,0 +1,21 @@
+# A Trip Begins (Q007), refused: a human of level 3 is turned away by Mirabel (elves only)
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 3
+script quest.Q007_ATripBegins
+item 7572 7559 7570
+page gatekeeper/30146.htm
+page script/quest/Q007_ATripBegins/
+npc mirabel 30146 Gatekeeper 10 0 0
+
+action mirabel
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q007_ATripBegins/30146-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q007_ATripBegins CREATED
+  rows Q007_ATripBegins -

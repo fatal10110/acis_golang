@@ -1,0 +1,48 @@
+# Trial of the Seeker (Q213), a Rogue of level 36 at cond 14 holding the third order: Terry takes it for the list of
+# hosts (30064-21) and the quest moves to cond 15.
+# Hand-written from the quest script (no reference trace).
+character Seeker 36
+class 7
+hold 2666 1
+quest Q213_TrialOfTheSeeker <cond>=14 <state>=STARTED
+script quest.Q213_TrialOfTheSeeker
+item 2647 2648 2649 2650 2651 2652 2653 2654 2655 2656 2657 2658 2659 2660 2661 2662 2663 2664 2665 2666 2667 2668 2669 2670 2671 2672 2673 7562
+page trainer/30106.htm
+page trainer/30064.htm
+page trainer/30526.htm
+page merchant/30684.htm
+page trainer/30715.htm
+page script/quest/Q213_TrialOfTheSeeker/
+npc dufner 30106 Trainer 10 0 0
+npc terry 30064 Trainer -10 0 0
+npc brunon 30526 Trainer 0 10 0
+npc viktor 30684 Merchant 0 -10 0
+npc marina 30715 Trainer 20 20 0
+npc ghoul 20198 Monster 40 0 0
+npc antcaptain 20080 Monster -40 0 0
+npc olmahum 20211 Monster 0 40 0
+npc bugbear 20249 Monster 0 -40 0
+npc turek 20495 Monster 40 40 0
+npc medusa 20158 Monster -40 -40 0
+npc stakato 20234 Monster 40 -40 0
+npc breka 20270 Monster -40 40 0
+npc antwarrior 20088 Monster 60 0 0
+npc leto 20580 Monster -60 0 0
+
+action terry
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S QuestList 213:0x80007fff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2666
+  S SystemMessage id=54 3:2667
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-21.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 15
+  items 2666=0 2667=1
+  rows Q213_TrialOfTheSeeker <cond>=15 <state>=STARTED

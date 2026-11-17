@@ -1,0 +1,71 @@
+# Q233_TestOfTheWarSpirit, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Shaman 39
+class 50
+memo secondClassChange39 true
+hold 2884 9
+hold 2885 9
+hold 2886 9
+hold 2889 1
+hold 2890 1
+hold 2891 1
+hold 2897 1
+hold 2898 1
+hold 2881 11
+script quest.Q233_TestOfTheWarSpirit
+item 2879 2880 2881 2882 2883 2884 2885 2886 2887 2888 2889 2890 2891 2892 2893 2894 2895 2896 2897 2898 2899 2900 2901 2902 2903 2904 2905 2906 2907 2908 2909 2910 2911 2912 2913 2914 7562
+page trainer/30030.htm
+page trainer/30030-noskills.htm
+page trainer/30507.htm
+page trainer/30507-noskills.htm
+page trainer/30510.htm
+page trainer/30510-noskills.htm
+page trainer/30515.htm
+page trainer/30515-noskills.htm
+page trainer/30682.htm
+page trainer/30682-noskills.htm
+page merchant/30436.htm
+page default/30630.htm
+page default/30649.htm
+page script/quest/Q233_TestOfTheWarSpirit/
+npc somak 30510 Trainer 10 0 0
+npc orim 30630 Folk -10 0 0
+npc racoy 30507 Trainer 0 10 0
+npc vivyan 30030 Trainer 0 -10 0
+npc sarien 30436 Merchant 10 10 0
+npc pekiron 30682 Trainer -10 10 0
+npc manakia 30515 Trainer 10 -10 0
+npc martankus 30649 Folk -10 -10 0
+npc porta 20213 Monster 40 0 0
+npc excuro 20214 Monster -40 0 0
+npc mordeo 20215 Monster 0 40 0
+npc ant 20089 Monster 0 -40 0
+npc antleader 20090 Monster 40 40 0
+npc shaman 20581 Monster -40 40 0
+npc overlord 20582 Monster 40 -40 0
+npc medusa 20158 Monster -40 -40 0
+npc stenoa 27108 Monster 80 0 0
+npc tamlin 20601 Monster -80 0 0
+npc archer 20602 Monster 0 80 0
+
+action somak
+action somak
+  S ActionFailed
+  S NpcHtmlMessage obj=somak item=0 page=trainer/30510.htm
+  S ActionFailed
+bypass npc_{somak}_Quest
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q233_TestOfTheWarSpirit CREATED
+bypass Quest Q233_TestOfTheWarSpirit 30510-05.htm
+  S QuestList 233:0x80000001
+  S ExShowQuestMark quest=233
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=somak item=0 page=script/quest/Q233_TestOfTheWarSpirit/30510-05.htm
+  S ActionFailed
+  Q upsert Q233_TestOfTheWarSpirit | <state> | STARTED
+  Q upsert Q233_TestOfTheWarSpirit | <cond> | 1
+  state Q233_TestOfTheWarSpirit STARTED
+  rows Q233_TestOfTheWarSpirit <state>=STARTED <cond>=1

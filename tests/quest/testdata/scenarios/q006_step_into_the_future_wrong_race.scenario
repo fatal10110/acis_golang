@@ -1,0 +1,22 @@
+# Step into the Future (Q006), refused: an elf of level 3 is turned away by Roxxy (humans only)
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 3
+class 18
+script quest.Q006_StepIntoTheFuture
+item 7571 7559 7570
+page gatekeeper/30006.htm
+page script/quest/Q006_StepIntoTheFuture/
+npc roxxy 30006 Gatekeeper 10 0 0
+
+action roxxy
+action roxxy
+  S ActionFailed
+  S NpcHtmlMessage obj=roxxy item=0 page=gatekeeper/30006.htm
+  S ActionFailed
+bypass npc_{roxxy}_Quest
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q006_StepIntoTheFuture/30006-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q006_StepIntoTheFuture CREATED
+  rows Q006_StepIntoTheFuture -

@@ -1,0 +1,27 @@
+# Spirit of Mirrors (Q104), refused: a human of level 9 is turned away by Gallint until level 10
+# Hand-written from the quest script (no reference trace).
+character Visitor 9
+script quest.Q104_SpiritOfMirrors
+item 748 1135 1136 1137 747 1060 1835 2509 4412 4413 4414 4415 4416 5790
+page default/30017.htm
+page guard/30045.htm
+page guard/30041.htm
+page script/quest/Q104_SpiritOfMirrors/
+npc gallint 30017 Folk 10 0 0
+npc kenyos 30045 Guard 20 0 0
+npc arnold 30041 Guard 30 0 0
+npc spirit1 27003 Monster -40 0 0
+npc spirit2 27004 Monster 40 0 0
+npc spirit3 27005 Monster 0 40 0
+
+action gallint
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q104_SpiritOfMirrors/30017-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q104_SpiritOfMirrors CREATED
+  rows Q104_SpiritOfMirrors -

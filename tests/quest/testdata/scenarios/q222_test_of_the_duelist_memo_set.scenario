@@ -1,0 +1,76 @@
+# Q222_TestOfTheDuelist, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Duelist 39
+class 1
+memo secondClassChange39 true
+script quest.Q222_TestOfTheDuelist
+item 2762 2763 2764 2765 2766 2767 2768 2769 2770 2771 2772 2773 2774 2775 2776 2777 2778 2779 2780 2781 2782 2783 7562
+hold 2768 8
+hold 2769 8
+hold 2770 8
+hold 2771 8
+hold 2772 8
+hold 2773 8
+hold 2774 8
+hold 2775 8
+hold 2776 8
+hold 2777 8
+hold 2779 1
+hold 2780 1
+hold 2781 1
+hold 2782 1
+hold 2783 1
+page default/30623.htm
+page script/quest/Q222_TestOfTheDuelist/
+npc kaien 30623 Folk 10 0 0
+npc puncher 20085 Monster 40 0 0
+npc antleader 20090 Monster -40 0 0
+npc drone 20234 Monster 0 40 0
+npc seeker 20202 Monster 0 -40 0
+npc breka 20270 Monster 40 40 0
+npc fettered 20552 Monster -40 40 0
+npc leto 20582 Monster 40 -40 0
+npc eye 20564 Monster -40 -40 0
+npc tamlin 20601 Monster 60 0 0
+npc archer 20602 Monster -60 0 0
+npc excuro 20214 Monster 0 60 0
+npc krator 20217 Monster 0 -60 0
+npc grandis 20554 Monster 60 60 0
+npc timak 20588 Monster -60 60 0
+npc lakin 20604 Monster 60 -60 0
+
+action kaien
+action kaien
+  S ActionFailed
+  S NpcHtmlMessage obj=kaien item=0 page=default/30623.htm
+  S ActionFailed
+bypass npc_{kaien}_Quest
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-04.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-04.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-06.htm
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-06.htm
+  S ActionFailed
+bypass Quest Q222_TestOfTheDuelist 30623-07.htm
+  S QuestList 222:0x80000001
+  S ExShowQuestMark quest=222
+  S QuestList 222:0x80000003
+  S ExShowQuestMark quest=222
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2763
+  S SystemMessage id=54 3:2764
+  S SystemMessage id=54 3:2765
+  S SystemMessage id=54 3:2766
+  S SystemMessage id=54 3:2767
+  S NpcHtmlMessage obj=kaien item=0 page=script/quest/Q222_TestOfTheDuelist/30623-07.htm
+  S ActionFailed
+  Q upsert Q222_TestOfTheDuelist | <state> | STARTED
+  Q upsert Q222_TestOfTheDuelist | <cond> | 1
+  Q upsert Q222_TestOfTheDuelist | <cond> | 2
+  items 2763=1 2764=1 2765=1 2766=1 2767=1 7562=0
+  state Q222_TestOfTheDuelist STARTED
+  rows Q222_TestOfTheDuelist <state>=STARTED <cond>=2
