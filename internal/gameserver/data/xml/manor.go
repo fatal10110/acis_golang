@@ -44,7 +44,9 @@ func LoadManors(path string) (*manor.Table, error) {
 }
 
 // buildSeed builds one <crop> of the manor whose castle id is castleID.
-// Every attribute but isAlternative is a required decimal int.
+// Every attribute but isAlternative is a required decimal int;
+// isAlternative defaults to false instead of being required (issue #4781;
+// every shipped crop sets it).
 func buildSeed(a *attrValues, castleID int) (manor.Seed, error) {
 	a.prefix = "manor: seed"
 	cropID := a.int("id")

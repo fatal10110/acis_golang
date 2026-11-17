@@ -34,6 +34,10 @@ import (
 func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req clientpackets.AuthLogin) (bool, error) {
 	loginLink := l.loginLink()
 	if loginLink == nil {
+		// Deliberate divergence (issue #4742): with no login link the
+		// specified flow sends nothing and leaves the client waiting; refusing at once
+		// tells the player to retry later instead of hanging the client.
+		// A link that drops mid-validation closes silently (Validate).
 		client.Session.SendFrame(serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater))
 		return false, nil
 	}
@@ -371,7 +375,13 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.flow.playerClock.Add(live)
 	}
 	// Periodic autosave: first full-stat save 5 minutes after entering the
-	// world, then every 15 minutes while still online.
+	// world, then every 15 minutes while still online. Deliberate
+	// divergence (issue #4742): the schedule starts here and restarts on
+	// every world entry, where the specified flow starts it when the
+	// connection opens
+	// and keeps it across a restart to the character list and the next
+	// selection. Saves still come every 15 minutes in play; only the phase
+	// of the first one after a reselect moves.
 	if l.flow.autosave != nil {
 		l.flow.autosave.Add(live)
 	}

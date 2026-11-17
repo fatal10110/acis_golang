@@ -121,188 +121,87 @@ type gameplayConfig struct {
 // property file is read, letting config warnings reach the configured sinks.
 func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig, error) {
 	var cfg gameplayConfig
-	var err error
-	if cfg.RespawnRestoreHP, err = loadRespawnRestoreHP(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.DeathPenaltyChance, err = loadDeathPenaltyChance(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.MaxBuffsAmount, err = loadMaxBuffsAmount(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.PerfectShieldBlockRate, err = loadPerfectShieldBlockRate(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.MagicFailures, err = loadMagicFailures(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.CancelLesserEffect, err = loadCancelLesserEffect(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.StoreSkillCooltime, err = loadStoreSkillCooltime(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SpawnProtection, err = loadPlayerSpawnProtection(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SkillEnchantSPBookNeeded, err = loadSkillEnchantSPBookNeeded(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.AutoLearnSkills, err = loadAutoLearnSkills(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.WeightLimitMultiplier, err = loadWeightLimitMultiplier(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.RegenMultipliers, err = loadRegenMultipliers(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.InventorySlots, err = loadInventorySlots(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.StorageSlots, err = loadStorageSlots(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.KarmaPlayerCanTeleport, err = loadKarmaPlayerCanTeleport(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.KarmaServiceGates, err = loadKarmaServiceGates(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.KarmaPlayerCanTrade, err = loadKarmaPlayerCanTrade(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.AllowDelevel, err = loadAllowDelevel(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.RateKarmaExpLost, err = loadRateKarmaExpLost(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.DeathDrop, err = loadDeathDropRules(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.CharacterSelectDelay, err = loadCharacterSelectDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ServerBypassDelay, err = loadServerBypassDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ManufactureDelay, err = loadManufactureDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.CraftingEnabled, err = loadCraftingEnabled(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.MultisellDelay, err = loadMultisellDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ManorDelay, err = loadManorDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.RollDiceDelay, err = loadRollDiceDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SocialDelay, err = loadSocialDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.DropItemDelay, err = loadDropItemDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.WarehouseAllowed, err = loadWarehouseAllowed(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.NoSpawns, err = loadNoSpawns(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.FakeDeathUpProtection, err = loadFakeDeathUpProtection(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ShowSummonCrest, err = loadShowSummonCrest(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SubclassDelay, err = loadSubclassDelay(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SubclassWithoutQuests, err = loadSubclassWithoutQuests(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.BlacksmithUseRecipes, err = loadBlacksmithUseRecipes(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.AllowDiscardItem, err = loadAllowDiscardItem(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.LogItems, err = loadLogItems(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Manor, err = loadManorSettings(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.SpawnEvents, err = loadSpawnEvents(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.RandomWalkRate, err = loadRandomWalkRate(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.MaxGeoPathFailCount, err = loadMaxGeoPathFailCount(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.DisableRaidCurse, err = loadDisableRaidCurse(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.FreeTeleport, err = loadFreeTeleport(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ShowNPCCrest, err = loadShowNPCCrest(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ShowNPCLevel, err = loadShowNPCLevel(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Wyvern, err = loadWyvernRules(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.NpcAI, err = loadNpcAIConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.MaxDriftRange, err = loadMaxDriftRange(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.BossWaits, err = loadBossWaitTimes(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Enchant, err = loadEnchantConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Merchant, err = loadMerchantConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Freight, err = loadFreightConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.AugmentationChances, err = loadAugmentationChances(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Admin, err = loadAdminConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Chat, err = loadChatConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.Petition, err = loadPetitionConfig(paths); err != nil {
-		return gameplayConfig{}, err
-	}
-	if cfg.ClassMaster, err = loadClassMasterConfig(paths); err != nil {
-		return gameplayConfig{}, err
+	l := &configLoads{paths: paths}
+	loadConfig(l, &cfg.RespawnRestoreHP, loadRespawnRestoreHP)
+	loadConfig(l, &cfg.DeathPenaltyChance, loadDeathPenaltyChance)
+	loadConfig(l, &cfg.MaxBuffsAmount, loadMaxBuffsAmount)
+	loadConfig(l, &cfg.PerfectShieldBlockRate, loadPerfectShieldBlockRate)
+	loadConfig(l, &cfg.MagicFailures, loadMagicFailures)
+	loadConfig(l, &cfg.CancelLesserEffect, loadCancelLesserEffect)
+	loadConfig(l, &cfg.StoreSkillCooltime, loadStoreSkillCooltime)
+	loadConfig(l, &cfg.SpawnProtection, loadPlayerSpawnProtection)
+	loadConfig(l, &cfg.SkillEnchantSPBookNeeded, loadSkillEnchantSPBookNeeded)
+	loadConfig(l, &cfg.AutoLearnSkills, loadAutoLearnSkills)
+	loadConfig(l, &cfg.WeightLimitMultiplier, loadWeightLimitMultiplier)
+	loadConfig(l, &cfg.RegenMultipliers, loadRegenMultipliers)
+	loadConfig(l, &cfg.InventorySlots, loadInventorySlots)
+	loadConfig(l, &cfg.StorageSlots, loadStorageSlots)
+	loadConfig(l, &cfg.KarmaPlayerCanTeleport, loadKarmaPlayerCanTeleport)
+	loadConfig(l, &cfg.KarmaServiceGates, loadKarmaServiceGates)
+	loadConfig(l, &cfg.KarmaPlayerCanTrade, loadKarmaPlayerCanTrade)
+	loadConfig(l, &cfg.AllowDelevel, loadAllowDelevel)
+	loadConfig(l, &cfg.RateKarmaExpLost, loadRateKarmaExpLost)
+	loadConfig(l, &cfg.DeathDrop, loadDeathDropRules)
+	loadConfig(l, &cfg.CharacterSelectDelay, loadCharacterSelectDelay)
+	loadConfig(l, &cfg.ServerBypassDelay, loadServerBypassDelay)
+	loadConfig(l, &cfg.ManufactureDelay, loadManufactureDelay)
+	loadConfig(l, &cfg.CraftingEnabled, loadCraftingEnabled)
+	loadConfig(l, &cfg.MultisellDelay, loadMultisellDelay)
+	loadConfig(l, &cfg.ManorDelay, loadManorDelay)
+	loadConfig(l, &cfg.RollDiceDelay, loadRollDiceDelay)
+	loadConfig(l, &cfg.SocialDelay, loadSocialDelay)
+	loadConfig(l, &cfg.DropItemDelay, loadDropItemDelay)
+	loadConfig(l, &cfg.WarehouseAllowed, loadWarehouseAllowed)
+	loadConfig(l, &cfg.NoSpawns, loadNoSpawns)
+	loadConfig(l, &cfg.FakeDeathUpProtection, loadFakeDeathUpProtection)
+	loadConfig(l, &cfg.ShowSummonCrest, loadShowSummonCrest)
+	loadConfig(l, &cfg.SubclassDelay, loadSubclassDelay)
+	loadConfig(l, &cfg.SubclassWithoutQuests, loadSubclassWithoutQuests)
+	loadConfig(l, &cfg.BlacksmithUseRecipes, loadBlacksmithUseRecipes)
+	loadConfig(l, &cfg.AllowDiscardItem, loadAllowDiscardItem)
+	loadConfig(l, &cfg.LogItems, loadLogItems)
+	loadConfig(l, &cfg.Manor, loadManorSettings)
+	loadConfig(l, &cfg.SpawnMultiplier, loadSpawnMultiplier)
+	loadConfig(l, &cfg.SpawnEvents, loadSpawnEvents)
+	loadConfig(l, &cfg.RandomWalkRate, loadRandomWalkRate)
+	loadConfig(l, &cfg.MaxGeoPathFailCount, loadMaxGeoPathFailCount)
+	loadConfig(l, &cfg.DisableRaidCurse, loadDisableRaidCurse)
+	loadConfig(l, &cfg.FreeTeleport, loadFreeTeleport)
+	loadConfig(l, &cfg.ShowNPCCrest, loadShowNPCCrest)
+	loadConfig(l, &cfg.ShowNPCLevel, loadShowNPCLevel)
+	loadConfig(l, &cfg.Wyvern, loadWyvernRules)
+	loadConfig(l, &cfg.RaidMultipliers, loadRaidMultipliers)
+	loadConfig(l, &cfg.NpcAI, loadNpcAIConfig)
+	loadConfig(l, &cfg.MaxDriftRange, loadMaxDriftRange)
+	loadConfig(l, &cfg.BossWaits, loadBossWaitTimes)
+	loadConfig(l, &cfg.Enchant, loadEnchantConfig)
+	loadConfig(l, &cfg.Merchant, loadMerchantConfig)
+	loadConfig(l, &cfg.Freight, loadFreightConfig)
+	loadConfig(l, &cfg.AugmentationChances, loadAugmentationChances)
+	loadConfig(l, &cfg.Admin, loadAdminConfig)
+	loadConfig(l, &cfg.Chat, loadChatConfig)
+	loadConfig(l, &cfg.Petition, loadPetitionConfig)
+	loadConfig(l, &cfg.ClassMaster, loadClassMasterConfig)
+	if l.err != nil {
+		return gameplayConfig{}, l.err
 	}
 	return cfg, nil
+}
+
+// configLoads runs config loaders in order until the first one fails, and
+// keeps that failure.
+type configLoads struct {
+	paths gameServerPaths
+	err   error
+}
+
+// loadConfig stores load's value in dst, unless an earlier load failed, in
+// which case load is not run.
+func loadConfig[T any](l *configLoads, dst *T, load func(gameServerPaths) (T, error)) {
+	if l.err != nil {
+		return
+	}
+	*dst, l.err = load(l.paths)
 }
 
 // loadGameServerProperties takes the process logger so the fx graph builds

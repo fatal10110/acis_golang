@@ -200,9 +200,12 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
   (`lifecycle.go:154`), item batching (`task/iteminstances.go`) and `flushItemPersistence` route
   through it. Detach enqueues the final save then the offline-status write, in order → `saveMu`
   deleted (closes #2263).
-- `Flush(ctx)` for shutdown. Composition root (`cmd/gameserver`) shutdown order: stop accepting
-  connections → stop tickers → `pool.Stop(ctx)` (Phase 2+) → enqueue final saves for every online
-  player → `persist.Flush(ctx)` → close DB.
+- Shutdown runs through fx stop hooks in reverse invoke order (`cmd/gameserver/main.go`
+  `newGameServerAppOptions`): the game listener stops first, closing every connection, whose
+  handler detaches its player and waits for that player's saves; then the hooks invoked after
+  `startSimPool` (the world savers and tickers); then the actor pool (`startSimPool`); then the 27
+  start hooks invoked before it, among them the item ticker and `drainItemInstances`
+  (save → `Worker.Close` → save) and the ground-item save; the database pool closes last.
 - Gate: relog mid-fight and autosave-during-detach scenarios in `internal/gameservertest`; `-race`.
 
 #### Durability trade (accepted, #2406)
@@ -265,20 +268,25 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
     stop hook in reverse start order. fx checks it before each hook and skips the rest once it
     has expired, and `App.Run` then exits the process with any running hook cut off, so a
     step's own detached budget cannot carry it past this deadline. It is therefore the sum of
-    each step's worst case, in stop order = 93 s:
+    each step's worst case, in stop order: 225 s (3m45s, the figure `docs/ops/docker.md` sizes
+    the container stop grace against). The constant's own expression names every step; the
+    main ones are:
     - the listener stop, which closes every connection and waits for the handlers; each handler
       detaches its player and waits up to `LivePlayerPersistWait` (16 s, in parallel across
       handlers) for those writes;
     - the debug HTTP listener's stop (`debugHTTPStopTimeout` = 2 s);
-    - the spawn-data save (`shutdownSaveTimeout`);
+    - the spawn-data, relation, petition and Seven Signs saves (`shutdownSaveTimeout` each);
     - the actor pool's stop (`simPoolStopTimeout` = 5 s);
     - the item ticker's stop, which cancels an in-flight tick and waits for it to notice,
       budgeted at one `ItemInstanceSaveTimeout` as headroom;
     - `drainItemInstances`: save → `Worker.Close` → save, each on its own
-      `ItemInstanceSaveTimeout` (30 s);
+      `ItemInstanceSaveTimeout` (10 s);
     - the persistence worker's last close (`persistCloseTimeout` = 5 s), which gives lanes the
       drain left backed up a little longer;
     - the ground-item save (`shutdownSaveTimeout`);
+    - the Olympiad, grand boss, scheme buffer, wedding, fishing championship, manor and crash-flag
+      saves (`shutdownSaveTimeout`, `olympiad.TaskTimeout`, `fishchamp.TaskTimeout`,
+      `castlemanor.TaskTimeout`);
     - `gameServerStopSlack` = 5 s for the hooks that wait on neither the database nor other
       goroutines' work. The pool close waits for running queries, but nothing after it writes.
 

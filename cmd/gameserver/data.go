@@ -1,9 +1,7 @@
 package main
 
 import (
-	"errors"
 	"path/filepath"
-	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -34,38 +32,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/rs/zerolog"
 )
-
-// logUnsupportedSkillEffects warns once per shipped skill effect template
-// whose name effect.New doesn't recognize, so a coreKinds gap (#1517) is
-// visible at boot instead of silently degrading a cast to a no-op the way
-// an unlogged effect.New rejection does at apply/restore time. A name
-// starting with "#" is the unresolved-<table> loader defect tracked by
-// #1516, not a coreKinds gap, so it doesn't warn here.
-func logUnsupportedSkillEffects(table *skill.Table, log zerolog.Logger) {
-	check := func(def skill.Definition, effects []skill.EffectTemplate, kind string) {
-		for _, eff := range effects {
-			if strings.HasPrefix(eff.Name, "#") {
-				continue
-			}
-			if _, err := effect.New(effect.SkillFromDefinition(def), eff); err != nil && errors.Is(err, effect.ErrUnsupportedCoreEffect) {
-				log.Warn().
-					Int("skill", int(def.ID)).
-					Int("level", def.Level).
-					Str("skillName", def.Name).
-					Str("effect", eff.Name).
-					Str("kind", kind).
-					Msg("skill effect template names an unsupported core effect kind; casts using it apply nothing")
-			}
-		}
-	}
-	for _, def := range table.All() {
-		check(def, def.Effects, "effect")
-		check(def, def.SelfEffects, "self-effect")
-	}
-}
 
 type gameData struct {
 	Players       *player.TemplateTable
@@ -130,185 +98,146 @@ type geodata struct {
 	Pathfind      pathfind.Options
 }
 
+// loadGameData reads every datapack table the game server needs, in a fixed
+// order, failing boot at the first table that does not load.
 func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logger) (*gameData, error) {
 	xmlRoot := filepath.Join(paths.DataRoot, "data", "xml")
-	players, err := gamexml.LoadPlayerTemplates(filepath.Join(xmlRoot, "classes"))
-	if err != nil {
+	d := &gameData{}
+	if err := loadCharacterData(d, xmlRoot, cfg, log); err != nil {
 		return nil, err
 	}
-	levels, err := gamexml.LoadPlayerLevels(filepath.Join(xmlRoot, "playerLevels.xml"))
-	if err != nil {
+	if err := loadWorldData(d, xmlRoot, cfg, log); err != nil {
 		return nil, err
 	}
-	items, err := gamexml.LoadItemTemplates(filepath.Join(xmlRoot, "items"), log)
-	if err != nil {
-		return nil, err
-	}
-	skills, err := gamexml.LoadSkillDefinitions(filepath.Join(xmlRoot, "skills"), log)
-	if err != nil {
-		return nil, err
-	}
-	logUnsupportedSkillEffects(skills, log)
-	trees, err := gamexml.LoadSkillTrees(filepath.Join(xmlRoot, "skillstrees"))
-	if err != nil {
-		return nil, err
-	}
-	spellbooks, err := gamexml.LoadSpellbooks(filepath.Join(xmlRoot, "spellbooks.xml"))
-	if err != nil {
-		return nil, err
-	}
-	var cursedWeapons *entity.CursedWeaponTable
-	if cfg.AllowCursedWeapons {
-		cursedWeapons, err = gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), skills)
-		if err != nil {
-			return nil, err
-		}
-	}
-	zones, err := gamexml.LoadZones(filepath.Join(xmlRoot, "zones"))
-	if err != nil {
-		return nil, err
-	}
-	applyTownCombatRule(zones, cfg.TownCombatRule)
-	routes, routesLoaded, err := gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml"))
-	if err != nil {
-		return nil, err
-	}
-	npcs, err := gamexml.LoadNPCTemplates(filepath.Join(xmlRoot, "npcs"), items, skills, log)
-	if err != nil {
-		return nil, err
-	}
-	summonItems, err := gamexml.LoadSummonItems(filepath.Join(xmlRoot, "summonItems.xml"))
-	if err != nil {
-		return nil, err
-	}
-	soulCrystals, err := gamexml.LoadSoulCrystalData(filepath.Join(xmlRoot, "soulCrystals.xml"))
-	if err != nil {
-		return nil, err
-	}
-	newbieBuffs, err := gamexml.LoadNewbieBuffs(filepath.Join(xmlRoot, "newbieBuffs.xml"))
-	if err != nil {
-		return nil, err
-	}
-	doors, err := gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"), log)
-	if err != nil {
-		return nil, err
-	}
-	statics, err := gamexml.LoadStaticObjects(filepath.Join(xmlRoot, "staticObjects.xml"))
-	if err != nil {
-		return nil, err
-	}
-	restarts, err := gamexml.LoadRestartPoints(filepath.Join(xmlRoot, "restartPointAreas.xml"))
-	if err != nil {
-		return nil, err
-	}
-	teleports, err := gamexml.LoadTeleports(filepath.Join(xmlRoot, "teleports.xml"))
-	if err != nil {
-		return nil, err
-	}
-	instantTeleports, err := gamexml.LoadInstantTeleports(filepath.Join(xmlRoot, "instantTeleports.xml"))
-	if err != nil {
-		return nil, err
-	}
-	adminData, err := gamexml.LoadAdminData(xmlRoot)
-	if err != nil {
-		return nil, err
-	}
-	hennas, err := gamexml.LoadHennas(filepath.Join(xmlRoot, "hennas.xml"))
-	if err != nil {
-		return nil, err
-	}
-	healSps, err := gamexml.LoadHealSps(filepath.Join(xmlRoot, "healSps.xml"))
-	if err != nil {
-		return nil, err
-	}
-	recipes, err := gamexml.LoadRecipes(filepath.Join(xmlRoot, "recipes.xml"))
-	if err != nil {
-		return nil, err
-	}
-	buyLists, err := gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), items)
-	if err != nil {
-		return nil, err
-	}
-	multisells, err := gamexml.LoadMultiSellLists(filepath.Join(xmlRoot, "multisell"), items)
-	if err != nil {
-		return nil, err
-	}
-	augmentations, err := gamexml.LoadAugmentations(filepath.Join(xmlRoot, "augmentation"))
-	if err != nil {
-		return nil, err
-	}
-	armorSets, err := gamexml.LoadArmorSets(filepath.Join(xmlRoot, "armorSets.xml"))
-	if err != nil {
-		return nil, err
-	}
-	fishTable, err := gamexml.LoadFish(filepath.Join(xmlRoot, "fish.xml"))
-	if err != nil {
-		return nil, err
-	}
-	clanHalls, err := gamexml.LoadClanHalls(filepath.Join(xmlRoot, "clanHalls.xml"))
-	if err != nil {
-		return nil, err
-	}
-	clanHallDecos, err := gamexml.LoadClanHallDeco(filepath.Join(xmlRoot, "clanHallDeco.xml"))
-	if err != nil {
-		return nil, err
-	}
-	castles, err := gamexml.LoadCastles(filepath.Join(xmlRoot, "castles.xml"))
-	if err != nil {
-		return nil, err
-	}
-	manors, manorAreas, err := loadManor(xmlRoot, items, log)
-	if err != nil {
-		return nil, err
-	}
-	observers, err := gamexml.LoadObserverGroups(filepath.Join(xmlRoot, "observerGroups.xml"))
-	if err != nil {
+	if err := loadEconomyData(d, xmlRoot, log); err != nil {
 		return nil, err
 	}
 	geo, err := loadGeodata(paths, log)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Int("recipes", recipes.Len()).Int("buylists", buyLists.Len()).Int("multisells", multisells.Count()).Int("augmentation_skills", augmentations.SkillCount()).Int("augmentation_stats", augmentations.StatCount()).Int("armor_sets", armorSets.Len()).Int("fish", fishTable.Len()).Int("teleports", teleports.Count()).Int("instant_teleports", instantTeleports.Count()).Msg("game data loaded")
-	return &gameData{
-		Players:          players,
-		Levels:           levels,
-		Items:            items,
-		Skills:           skills,
-		Trees:            trees,
-		Spellbooks:       spellbooks,
-		CursedWeapons:    cursedWeapons,
-		Zones:            zones,
-		Routes:           routes,
-		RoutesLoaded:     routesLoaded,
-		NPCs:             npcs,
-		SummonItems:      summonItems,
-		SoulCrystals:     soulCrystals,
-		NewbieBuffs:      newbieBuffs,
-		Doors:            doors,
-		Statics:          statics,
-		Restarts:         restarts,
-		Teleports:        teleports,
-		InstantTeleports: instantTeleports,
-		Admin:            adminData,
-		Geo:              geo.Engine,
-		Finder:           geo.Finder,
-		GeoBugs:          geo.Bugs,
-		Hennas:           hennas,
-		HealSps:          healSps,
-		Recipes:          recipes,
-		BuyLists:         buyLists,
-		Multisells:       multisells,
-		Augmentations:    augmentations,
-		ArmorSets:        armorSets,
-		Fish:             fishTable,
-		ClanHalls:        clanHalls,
-		ClanHallDecos:    clanHallDecos,
-		Castles:          castles,
-		Manors:           manors,
-		ManorAreas:       manorAreas,
-		Observers:        observers,
-	}, nil
+	d.Geo, d.Finder, d.GeoBugs = geo.Engine, geo.Finder, geo.Bugs
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", d.NPCs.Len()).Int("skills", d.Skills.Len()).Int("hennas", d.Hennas.Len()).Int("heal_sps", d.HealSps.Count()).Int("recipes", d.Recipes.Len()).Int("buylists", d.BuyLists.Len()).Int("multisells", d.Multisells.Count()).Int("augmentation_skills", d.Augmentations.SkillCount()).Int("augmentation_stats", d.Augmentations.StatCount()).Int("armor_sets", d.ArmorSets.Len()).Int("fish", d.Fish.Len()).Int("teleports", d.Teleports.Count()).Int("instant_teleports", d.InstantTeleports.Count()).Msg("game data loaded")
+	return d, nil
+}
+
+// loadCharacterData reads the player, item and skill tables.
+func loadCharacterData(d *gameData, xmlRoot string, cfg gameServerConfig, log zerolog.Logger) error {
+	var err error
+	if d.Players, err = gamexml.LoadPlayerTemplates(filepath.Join(xmlRoot, "classes")); err != nil {
+		return err
+	}
+	if d.Levels, err = gamexml.LoadPlayerLevels(filepath.Join(xmlRoot, "playerLevels.xml")); err != nil {
+		return err
+	}
+	if d.Items, err = gamexml.LoadItemTemplates(filepath.Join(xmlRoot, "items"), log); err != nil {
+		return err
+	}
+	if d.Skills, err = gamexml.LoadSkillDefinitions(filepath.Join(xmlRoot, "skills"), log); err != nil {
+		return err
+	}
+	if d.Trees, err = gamexml.LoadSkillTrees(filepath.Join(xmlRoot, "skillstrees")); err != nil {
+		return err
+	}
+	if d.Spellbooks, err = gamexml.LoadSpellbooks(filepath.Join(xmlRoot, "spellbooks.xml")); err != nil {
+		return err
+	}
+	if cfg.AllowCursedWeapons {
+		if d.CursedWeapons, err = gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), d.Skills); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// loadWorldData reads the zones, NPCs, doors, teleports and other world
+// placement tables; it needs the item and skill tables.
+func loadWorldData(d *gameData, xmlRoot string, cfg gameServerConfig, log zerolog.Logger) error {
+	var err error
+	if d.Zones, err = gamexml.LoadZones(filepath.Join(xmlRoot, "zones")); err != nil {
+		return err
+	}
+	applyTownCombatRule(d.Zones, cfg.TownCombatRule)
+	if d.Routes, d.RoutesLoaded, err = gamexml.LoadWalkerRoutes(filepath.Join(xmlRoot, "walkerRoutes.xml")); err != nil {
+		return err
+	}
+	if d.NPCs, err = gamexml.LoadNPCTemplates(filepath.Join(xmlRoot, "npcs"), d.Items, d.Skills, log); err != nil {
+		return err
+	}
+	if d.SummonItems, err = gamexml.LoadSummonItems(filepath.Join(xmlRoot, "summonItems.xml")); err != nil {
+		return err
+	}
+	if d.SoulCrystals, err = gamexml.LoadSoulCrystalData(filepath.Join(xmlRoot, "soulCrystals.xml")); err != nil {
+		return err
+	}
+	if d.NewbieBuffs, err = gamexml.LoadNewbieBuffs(filepath.Join(xmlRoot, "newbieBuffs.xml")); err != nil {
+		return err
+	}
+	if d.Doors, err = gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"), log); err != nil {
+		return err
+	}
+	if d.Statics, err = gamexml.LoadStaticObjects(filepath.Join(xmlRoot, "staticObjects.xml")); err != nil {
+		return err
+	}
+	if d.Restarts, err = gamexml.LoadRestartPoints(filepath.Join(xmlRoot, "restartPointAreas.xml")); err != nil {
+		return err
+	}
+	if d.Teleports, err = gamexml.LoadTeleports(filepath.Join(xmlRoot, "teleports.xml")); err != nil {
+		return err
+	}
+	if d.InstantTeleports, err = gamexml.LoadInstantTeleports(filepath.Join(xmlRoot, "instantTeleports.xml")); err != nil {
+		return err
+	}
+	if d.Admin, err = gamexml.LoadAdminData(xmlRoot); err != nil {
+		return err
+	}
+	return nil
+}
+
+// loadEconomyData reads the crafting, trade, residence and manor tables;
+// it needs the item table.
+func loadEconomyData(d *gameData, xmlRoot string, log zerolog.Logger) error {
+	var err error
+	if d.Hennas, err = gamexml.LoadHennas(filepath.Join(xmlRoot, "hennas.xml")); err != nil {
+		return err
+	}
+	if d.HealSps, err = gamexml.LoadHealSps(filepath.Join(xmlRoot, "healSps.xml")); err != nil {
+		return err
+	}
+	if d.Recipes, err = gamexml.LoadRecipes(filepath.Join(xmlRoot, "recipes.xml")); err != nil {
+		return err
+	}
+	if d.BuyLists, err = gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), d.Items); err != nil {
+		return err
+	}
+	if d.Multisells, err = gamexml.LoadMultiSellLists(filepath.Join(xmlRoot, "multisell"), d.Items); err != nil {
+		return err
+	}
+	if d.Augmentations, err = gamexml.LoadAugmentations(filepath.Join(xmlRoot, "augmentation")); err != nil {
+		return err
+	}
+	if d.ArmorSets, err = gamexml.LoadArmorSets(filepath.Join(xmlRoot, "armorSets.xml")); err != nil {
+		return err
+	}
+	if d.Fish, err = gamexml.LoadFish(filepath.Join(xmlRoot, "fish.xml")); err != nil {
+		return err
+	}
+	if d.ClanHalls, err = gamexml.LoadClanHalls(filepath.Join(xmlRoot, "clanHalls.xml")); err != nil {
+		return err
+	}
+	if d.ClanHallDecos, err = gamexml.LoadClanHallDeco(filepath.Join(xmlRoot, "clanHallDeco.xml")); err != nil {
+		return err
+	}
+	if d.Castles, err = gamexml.LoadCastles(filepath.Join(xmlRoot, "castles.xml")); err != nil {
+		return err
+	}
+	if d.Manors, d.ManorAreas, err = loadManor(xmlRoot, d.Items, log); err != nil {
+		return err
+	}
+	if d.Observers, err = gamexml.LoadObserverGroups(filepath.Join(xmlRoot, "observerGroups.xml")); err != nil {
+		return err
+	}
+	return nil
 }
 
 func applyTownCombatRule(index *zone.Index, rule int) {

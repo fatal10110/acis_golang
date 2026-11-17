@@ -26,7 +26,9 @@ type npcFile struct {
 
 // npcElement is one <npc> element. Its own attributes (id, idTemplate,
 // name, title, alias) fold in directly; everything else is a distinctly
-// shaped child block handled by its own type.
+// shaped child block handled by its own type. Repeated <ai>, <drops>,
+// <privates> or <skills> blocks merge rather than the last one replacing
+// the others (issue #4781; no shipped NPC repeats a block).
 type npcElement struct {
 	Attrs    []xml.Attr        `xml:",any,attr"`
 	Sets     []setElem         `xml:"set"`

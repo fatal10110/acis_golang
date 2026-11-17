@@ -328,7 +328,8 @@ func parseSkillTriggerAttr(a *attrValues, skillKey, chanceKey string) *item.Skil
 
 // parseIntPairAttr reads key as an "a,b" pair of int32s, returning (0, 0)
 // when key is absent. A present value that isn't exactly two comma-separated
-// integers is recorded on a.
+// integers is recorded on a. Deliberately strict (issue #4779): such a value
+// fails the item instead of reading as (0, 0) or dropping extra parts.
 func parseIntPairAttr(a *attrValues, key string) (int32, int32) {
 	if a.err != nil || !a.has(key) {
 		return 0, 0
