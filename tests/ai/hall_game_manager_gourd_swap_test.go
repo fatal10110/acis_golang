@@ -85,7 +85,7 @@ func TestGameManagerSwapsGourdHitPoints(t *testing.T) {
 			w.managerTalk(t, manager) // selects it
 			frames := w.castFrames(t, hotSpringSwap)
 
-			if got, want := says(frames, manager.ObjectID()), []string{script.NpcString(1010641, "Hunter")}; !slices.Equal(got, want) {
+			if got, want := shouts(t, frames, manager.ObjectID()), []string{script.NpcString(1010641, "Hunter")}; !slices.Equal(got, want) {
 				t.Fatalf("manager said %q, want %q", got, want)
 			}
 			for i, g := range others {

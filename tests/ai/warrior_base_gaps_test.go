@@ -252,6 +252,9 @@ func TestWarriorBaseIsVsChallengesAPlayerThatHitsIt(t *testing.T) {
 	other := w.spawn(t, warriorFarID, -150, 0)
 	neighbor := w.spawn(t, warriorTwoID, 0, 200)
 	listener := w.spawn(t, ind1ListenerID, 0, -200)
+	// Past the radius of 600 from the NPC, these two hear nothing.
+	farNeighbor := w.spawn(t, warriorTwoID, 0, 700)
+	farListener := w.spawn(t, ind1ListenerID, 0, -700)
 	w.hateOn(t, h, other, 500)
 	challenger := func() int32 {
 		c := script.NPCOf(h).Slot(script.SlotCreature0)
@@ -280,6 +283,15 @@ func TestWarriorBaseIsVsChallengesAPlayerThatHitsIt(t *testing.T) {
 	}
 	if got, want := w.heard2e.take(listener.ObjectID()), []string{fmt.Sprintf("event=10001 arg1=%d arg2=0", w.player.ObjectID())}; !slices.Equal(got, want) {
 		t.Fatalf("the listener's events = %q, want %q", got, want)
+	}
+	if d, ok := attackOn(farNeighbor, w.player); ok {
+		t.Fatalf("the far neighbor's attack desire on the character = %+v, want none", d)
+	}
+	if got := sayLines(frames, farNeighbor); len(got) != 0 {
+		t.Fatalf("the far neighbor's lines = %q, want none", got)
+	}
+	if got := w.heard2e.take(farListener.ObjectID()); len(got) != 0 {
+		t.Fatalf("the far listener's events = %q, want none", got)
 	}
 
 	w.hit(t, h, 10)
@@ -382,26 +394,56 @@ func TestWarriorBaseHeroSilhouetteAnswersAPlayerAtLowHP(t *testing.T) {
 	}
 }
 
+// holdSpecial lands the special skill's effect on h and waits for it.
+func (w *ind2eWorld) holdSpecial(t *testing.T, h *npc.Hostile) {
+	t.Helper()
+	me := w.player.ObjectID()
+	ref := modelskill.Ref{ID: ind2fSpecialSkill, Level: 1}
+	if !w.srv.RunScript(t, me, "Ind1Director", func(s *script.Script, _ *script.Player) {
+		s.ApplyEffects(ref, script.NPCOf(h), script.NPCOf(h))
+	}) {
+		t.Fatal("the special skill's landing panicked")
+	}
+	w.srv.AdvanceUntil(t, "the special skill landed", func() bool {
+		var level int32
+		w.srv.RunScript(t, me, "Ind1Director", func(s *script.Script, _ *script.Player) {
+			level = s.AbnormalLevel(script.NPCOf(h), ref)
+		})
+		return level > 0
+	})
+	w.srv.ReadQueued(t, w.srv.Client)
+}
+
 // TestWarriorBaseCastsItsSpecialSkillWhenHurt ports the special skill of
 // WarriorBase's attacked hook: a hit that finds the NPC at 30% of its HP or
 // less, on a draw under 10, says a line and wants its special skill on
-// itself with weight 1000000.
+// itself with weight 1000000, unless it already holds an abnormal of the
+// skill.
 func TestWarriorBaseCastsItsSpecialSkillWhenHurt(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
 		name string
 		down float64
 		draw int
+		held bool // the NPC holds an abnormal of the skill
 		cast bool
 	}{
-		{"30% of its HP, draw 9", 0.3, 9, true},
-		{"over 30% of its HP", 0.4, 0, false},
-		{"30% of its HP, draw 10", 0.3, 10, false},
+		{"30% of its HP, draw 9", 0.3, 9, false, true},
+		{"over 30% of its HP", 0.4, 0, false, false},
+		{"30% of its HP, draw 10", 0.3, 10, false, false},
+		{"30% of its HP, draw 0, under the skill's abnormal", 0.3, 0, true, false},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
-			w := bootIndividual2f(t, raidBoot{}, ind2fTemplate(warriorID, nil, map[npc.SkillType]modelskill.ID{npc.SkillTypeSpecialSkill: ind2fSpecialSkill}))
+			// The special skill holds an effect of its own stack for a minute.
+			special := ind1Skill(ind2fSpecialSkill, 2000, false)
+			special.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "warrior_base_special", StackOrder: 1}}
+			w := bootIndividual2f(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithScriptSkills(special)}},
+				ind2fTemplate(warriorID, nil, map[npc.SkillType]modelskill.ID{npc.SkillTypeSpecialSkill: ind2fSpecialSkill}))
 			h := w.spawn(t, warriorID, 150, 0)
+			if row.held {
+				w.holdSpecial(t, h)
+			}
 			w.hitDownTo(t, h, row.down)
 			w.draws.set(row.draw)
 

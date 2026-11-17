@@ -146,13 +146,13 @@ func TestDefaultNpcTryToAttackWaitsForItsAggressiveTime(t *testing.T) {
 		name string
 		time string
 		draw int
-		life int32 // the life time it attacks at or after
+		life int32 // its life time when it first attacks: 1 is the first cycle, as soon as the loop looks
 	}{
 		{"-1, draw 0", "-1", 0, 3},
 		{"-1, draw 4", "-1", 4, 7},
-		{"5, draw 0", "5", 0, 0},
-		{"5, draw 3", "5", 3, 0},
-		{"0", "0", 4, 0},
+		{"5, draw 0", "5", 0, 1},
+		{"5, draw 3", "5", 3, 1},
+		{"0", "0", 4, 1},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
@@ -170,8 +170,8 @@ func TestDefaultNpcTryToAttackWaitsForItsAggressiveTime(t *testing.T) {
 					first = h.LifeTime()
 				}
 			}
-			if first < row.life || first > row.life+1 {
-				t.Fatalf("the NPC first hated the character, seen again each cycle, at life time %d, want %d", first, row.life)
+			if first != row.life {
+				t.Fatalf("the NPC first hated the character, seen again each cycle, at life time %d, want exactly %d", first, row.life)
 			}
 			if got := h.AggroHate(w.player); got < 200 || math.Mod(got, 200) != 0 {
 				t.Fatalf("hate for the character = %v, want whole wants of 200", got)
