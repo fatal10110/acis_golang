@@ -304,6 +304,10 @@ func (w *worldDecayEffects) Decay(actor task.DecayActor) {
 // SetRespawnHook records the callback used to arm a decayed actor's next
 // respawn. Call it once, before fx starts the decay ticker.
 func (w *worldDecayEffects) SetRespawnHook(f func(id int32) func()) {
+	if f == nil {
+		w.respawnHook.Store(nil)
+		return
+	}
 	w.respawnHook.Store(&f)
 }
 
@@ -334,6 +338,10 @@ func (e *npcRespawnEffects) Respawn(slot task.SlotID) {
 // SetHook records the callback that re-instantiates a due spawn slot. Call
 // it once, before fx starts the respawn ticker.
 func (e *npcRespawnEffects) SetHook(f func(slot task.SlotID)) {
+	if f == nil {
+		e.hook.Store(nil)
+		return
+	}
 	e.hook.Store(&f)
 }
 
@@ -360,6 +368,10 @@ func (e *doorTimerEffects) SetDoorOpen(id int, open bool) bool {
 // SetHook records the callback that applies a due door change. Call it
 // once, before fx starts the door-timer ticker.
 func (e *doorTimerEffects) SetHook(f func(id int, open bool) bool) {
+	if f == nil {
+		e.hook.Store(nil)
+		return
+	}
 	e.hook.Store(&f)
 }
 

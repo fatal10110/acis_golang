@@ -126,13 +126,24 @@ actor's queue can reach. All of them sit above every `player.Character` lock: a 
 `cubicsMu` share one for the same reason, and `goIdle` takes `pickupMu` and `interactMu` one after the
 other, never one under the other.
 
-Item locks, outer to inner: `itemcontainer.Container.mu`, then `itemcontainer.Inventory.mu`, then an
-item instance's own lock (`item.Instance`). The instance lock is a leaf: an instance releases it
-before it calls its persister, so a persister call made from container code runs under
-`Container.mu` only. `itemcontainer.Exchange` is the one place two containers are locked at once: it
-takes both containers' locks, then both inventories' locks, each pair in ascending owner id, and
-runs the delivery hooks after it releases them all. Any new path that locks two containers goes
-through `Exchange`.
+Item locks, outer to inner:
+
+| Order | Lock | Held across calls | Why |
+| --- | --- | --- | --- |
+| 1 | operation gate (`task.ItemInstances.BeginOperation`) | outer | A multi-row item operation (trade, private store, warehouse, pet hand-over, manor) holds its owners from before its first mutation until its rows are bound. It is taken before any container lock and ended after they are all released; nothing waits on it while holding a lock below it. |
+| 2 | `itemcontainer.Container.mu` | outer | It guards one container's contents. |
+| 3 | `itemcontainer.Inventory.mu` | outer | It guards an inventory's paperdoll, total weight and queued updates on top of its container. |
+| 4 | `item.Instance` lock | leaf | An instance releases it before it calls its persister. |
+| 5 | persister (`ownerItemPersister.Persist`): `task.ItemInstances.mu`, then its `groupsMu` | leaf | A count or state change calls the persister after the instance lock is released, but still under every container and inventory lock its caller holds: `Held.Transfer` inside `Exchange` changes a stack's count (`AddCount`) under all four exchange locks. The persister only records the pending row and never waits on the operation gate or a container. |
+
+`itemcontainer.Exchange` is the one place two containers are locked at once: it takes both
+containers' locks, then both inventories' locks, each pair in ascending owner id, runs `fn` under all
+four, and runs the delivery hooks after it releases them. `fn`, and the `check` that
+`inventory.Service.Exchange` runs inside it, may take only leaves below the inventory locks: the
+trade's bound-item check (`boundItems`) reads the enchant scroll state (`enchant.State.mu`), the
+mount and summon world lookup and the cursed weapon table, and nothing else. A check never takes
+another container's or inventory's lock, the operation gate, or a `livePlayer` lock. Any new path
+that locks two containers goes through `Exchange`.
 
 Creature locks follow the same rules. `creature.HPBar.Publish` holds the bar's lock while it reads
 HP and hands the value to `send`; `send` must not block and must not take a lock a `Publish`
