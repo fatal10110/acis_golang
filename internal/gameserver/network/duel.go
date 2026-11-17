@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
@@ -286,6 +287,7 @@ func (l *GameClientLink) beginDuel(answerer, challenger *livePlayer, teamA, team
 // written to the character's saved skill state, which a logout during the
 // duel leaves as it is.
 func (l *GameClientLink) saveDuelCondition(live *livePlayer, party bool) {
+	sim.AssertOwner(live.Queue())
 	res := live.ResourceValues()
 	cond := &duelCondition{cp: res.CurrentCP, hp: res.CurrentHP, mp: res.CurrentMP}
 	if party {
@@ -542,6 +544,7 @@ func (l *GameClientLink) restoreDuelCondition(live *livePlayer, abnormal bool) {
 
 // leaveDuel takes live out of its duel and back to no colour.
 func (l *GameClientLink) leaveDuel(live *livePlayer) {
+	sim.AssertOwner(live.Queue())
 	live.duelCondition = nil
 	live.LeaveDuel()
 	live.SetDuelTeam(duel.TeamNone)

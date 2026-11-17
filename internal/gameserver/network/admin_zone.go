@@ -7,6 +7,7 @@ import (
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -148,6 +149,7 @@ func (l *GameClientLink) zonesAround(x, y int) []zone.Kind {
 // drawing returns live's debug drawing name, anchored where it entered the
 // world.
 func (live *livePlayer) drawing(name string) *serverpackets.Drawing {
+	sim.AssertOwner(live.Queue())
 	if d, ok := live.drawings[name]; ok {
 		return d
 	}

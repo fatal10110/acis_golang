@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -70,6 +71,7 @@ func (a lotteryAnnouncer) toAll(build func() wire.Frame) {
 // adds it to the jackpot and hands over the ticket. A claim answers no page.
 // It reports false for a negative n, which answers nothing at all.
 func (l *GameClientLink) lotteryBypass(live *livePlayer, f *npc.Folk, command string) bool {
+	sim.AssertOwner(live.Queue())
 	pages := l.pages()
 	lot := l.lottery
 	val := lottery.Command(command)

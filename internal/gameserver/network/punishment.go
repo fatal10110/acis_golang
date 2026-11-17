@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // punishmentStore stores a character's chat ban or jail term.
@@ -141,6 +142,7 @@ func jailedOutside(live *livePlayer) func() bool {
 // armPunishTimer lifts live's punishment once its timer has run, counted
 // from now.
 func (l *GameClientLink) armPunishTimer(live *livePlayer) {
+	sim.AssertOwner(live.Queue())
 	_, timer := live.Punishment()
 	delay := time.Duration(math.MaxInt64)
 	if timer < int64(delay/time.Millisecond) {
@@ -154,6 +156,7 @@ func (l *GameClientLink) armPunishTimer(live *livePlayer) {
 // stopPunishTimer cancels p's punishment timer, if one runs; with save, the
 // punishment timer becomes the time that was left.
 func (p *livePlayer) stopPunishTimer(save bool) {
+	sim.AssertOwner(p.Queue())
 	if p.punishTimer == nil {
 		return
 	}

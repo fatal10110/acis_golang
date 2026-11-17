@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // unknownWriter names a mail's sender no character has.
@@ -130,6 +131,7 @@ func (l *GameClientLink) mailWriters(box []bbs.Mail) func(int32) string {
 // showMailList shows the folder page q asks for and remembers it as the
 // player's last one.
 func (l *GameClientLink) showMailList(live *livePlayer, q bbs.MailQuery) {
+	sim.AssertOwner(live.Queue())
 	page, ok := l.boardPage(bbs.MailListPage)
 	if !ok {
 		return
