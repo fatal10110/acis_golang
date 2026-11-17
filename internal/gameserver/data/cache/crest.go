@@ -3,7 +3,6 @@ package cache
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -39,12 +38,20 @@ type crestKey struct {
 }
 
 // Crests keeps the .dds crest blobs keyed by crest family and id, and the
-// directory new crests are saved to. mu guards byKey: crest uploads write it
-// while every client's crest requests read it.
+// directory new crests are saved to. mu guards byKey, touched and partial:
+// crest uploads write them while every client's crest requests read them.
+// reloadMu lets one reload at a time read the directory.
 type Crests struct {
-	dir   string
-	mu    sync.RWMutex
-	byKey map[crestKey][]byte
+	dir      string
+	reloadMu sync.Mutex
+	mu       sync.RWMutex
+	byKey    map[crestKey][]byte
+	// touched is non-nil while a reload reads the directory; it holds every
+	// key Save and Remove changed meanwhile, whose in-memory state outranks
+	// what the read found.
+	touched map[crestKey]struct{}
+	// partial marks a load that may have missed crests the directory holds.
+	partial bool
 }
 
 // NewCrests returns an empty crest cache with no directory: it saves no
@@ -60,50 +67,80 @@ func NewCrestsIn(dir string) *Crests {
 // are saved there too. A crest file whose size does not match its family is
 // deleted and skipped, and its name is returned in deleted.
 //
-// The load stops at the first file it cannot handle (an id that is not a number,
-// an unreadable file, an undeletable invalid file). It then returns the cache
-// holding the crests read before that file together with a non-nil error saying
-// why it stopped, so the caller can keep the partial cache and report the
-// failure. A nil cache with an error means the directory itself could not be
-// read.
+// A file the load cannot handle (an unreadable file, an id that is not a
+// number, an undeletable invalid file) is skipped: every other crest still
+// loads, and the returned error names each skipped file. When a skipped file
+// might hold a crest a clan points at (an unreadable file with a valid name),
+// or dir does not exist, the cache is marked partial (see [Crests.Partial]).
+// A missing dir gives an empty partial cache with the error; a nil cache with
+// an error means dir exists but could not be read.
 func LoadCrests(dir string) (c *Crests, deleted []string, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load crests from %q: %w", dir, err)
+		err = fmt.Errorf("load crests from %q: %w", dir, err)
+		if errors.Is(err, os.ErrNotExist) {
+			c = NewCrestsIn(dir)
+			c.partial = true
+			return c, nil, err
+		}
+		return nil, nil, err
 	}
 
 	c = NewCrestsIn(dir)
+	var skipped []error
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-
 		name := entry.Name()
-		typ, id, ok, err := parseCrestName(name)
-		if err != nil {
-			return c, deleted, fmt.Errorf("load crests from %q: crest file %s: %w", dir, name, err)
-		}
+		typ, ok := crestTypeOf(name)
 		if !ok {
 			continue
 		}
+		spec, _ := typ.spec()
 
 		path := filepath.Join(dir, name)
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return c, deleted, fmt.Errorf("load crests from %q: %w", dir, err)
+			if _, idErr := parseCrestID(name, spec); idErr == nil {
+				c.partial = true
+			}
+			skipped = append(skipped, fmt.Errorf("crest file %s: %w", name, err))
+			continue
 		}
-		spec, _ := typ.spec()
+		// The size is checked before the id, so a wrong-size file is deleted
+		// whatever its name.
 		if len(data) != spec.size {
 			if err := os.Remove(path); err != nil {
-				return c, deleted, fmt.Errorf("load crests from %q: delete invalid crest: %w", dir, err)
+				skipped = append(skipped, fmt.Errorf("delete invalid crest %s: %w", name, err))
+				continue
 			}
 			deleted = append(deleted, name)
 			continue
 		}
+		id, err := parseCrestID(name, spec)
+		if err != nil {
+			skipped = append(skipped, fmt.Errorf("crest file %s: %w", name, err))
+			continue
+		}
 		c.byKey[crestKey{typ, id}] = data
 	}
+	if len(skipped) > 0 {
+		err = fmt.Errorf("load crests from %q: %w", dir, errors.Join(skipped...))
+	}
+	return c, deleted, err
+}
 
-	return c, deleted, nil
+// Partial reports whether the load behind c may have missed crests its
+// directory holds (an unreadable crest file, a missing directory). A partial
+// cache cannot tell which crest ids are gone.
+func (c *Crests) Partial() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.partial
 }
 
 // Get returns a copy of the typ crest id's data when it exists.
@@ -153,7 +190,9 @@ func (c *Crests) Save(typ CrestType, id int, data []byte) error {
 	if err := os.WriteFile(filepath.Join(c.dir, name), data, 0o644); err != nil {
 		return fmt.Errorf("save crest %s: %w", name, err)
 	}
-	c.byKey[crestKey{typ, id}] = data
+	key := crestKey{typ, id}
+	c.byKey[key] = data
+	c.touchLocked(key)
 	return nil
 }
 
@@ -171,6 +210,7 @@ func (c *Crests) Remove(typ CrestType, id int) error {
 		return nil
 	}
 	delete(c.byKey, key)
+	c.touchLocked(key)
 	if c.dir == "" {
 		return nil
 	}
@@ -181,15 +221,45 @@ func (c *Crests) Remove(typ CrestType, id int) error {
 	return nil
 }
 
-// Replace swaps c's crests for a copy of from's, as a crest reload does. c keeps
-// its own directory.
-func (c *Crests) Replace(from *Crests) {
-	from.mu.RLock()
-	crests := maps.Clone(from.byKey)
-	from.mu.RUnlock()
+// Reload swaps c's crests for the ones load reads from c's directory, as a
+// crest reload does; c keeps its directory. A crest saved or removed while
+// load runs keeps that change through the swap. When load fails, c is left
+// as it was.
+func (c *Crests) Reload(load func(dir string) (*Crests, error)) error {
+	c.reloadMu.Lock()
+	defer c.reloadMu.Unlock()
+
 	c.mu.Lock()
-	c.byKey = crests
+	c.touched = make(map[crestKey]struct{})
 	c.mu.Unlock()
+
+	// fresh is not shared until it is swapped in, so it is read unlocked.
+	fresh, err := load(c.dir)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	touched := c.touched
+	c.touched = nil
+	if err != nil {
+		return err
+	}
+	for key := range touched {
+		if data, ok := c.byKey[key]; ok {
+			fresh.byKey[key] = data
+		} else {
+			delete(fresh.byKey, key)
+		}
+	}
+	c.byKey = fresh.byKey
+	c.partial = fresh.partial
+	return nil
+}
+
+// touchLocked records key as changed during a running reload; c.mu is held.
+func (c *Crests) touchLocked(key crestKey) {
+	if c.touched != nil {
+		c.touched[key] = struct{}{}
+	}
 }
 
 // Len returns the number of crests currently loaded.
@@ -202,24 +272,28 @@ func (c *Crests) Len() int {
 	return len(c.byKey)
 }
 
-func parseCrestName(name string) (CrestType, int, bool, error) {
+// crestTypeOf is the crest family a .dds file name's prefix names.
+func crestTypeOf(name string) (CrestType, bool) {
 	if !strings.HasSuffix(name, ".dds") {
-		return 0, 0, false, nil
+		return 0, false
 	}
 	for _, typ := range crestTypes {
-		spec, _ := typ.spec()
-		if !strings.HasPrefix(name, spec.prefix) {
-			continue
+		if spec, _ := typ.spec(); strings.HasPrefix(name, spec.prefix) {
+			return typ, true
 		}
-
-		rawID := strings.TrimSuffix(strings.TrimPrefix(name, spec.prefix), ".dds")
-		id, err := strconv.Atoi(rawID)
-		if err != nil {
-			return 0, 0, false, fmt.Errorf("parse crest id %q: %w", rawID, err)
-		}
-		return typ, id, true, nil
 	}
-	return 0, 0, false, nil
+	return 0, false
+}
+
+// parseCrestID is the crest id a spec file name carries between its prefix
+// and its .dds suffix.
+func parseCrestID(name string, spec crestSpec) (int, error) {
+	rawID := strings.TrimSuffix(strings.TrimPrefix(name, spec.prefix), ".dds")
+	id, err := strconv.ParseInt(rawID, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse crest id %q: %w", rawID, err)
+	}
+	return int(id), nil
 }
 
 func (t CrestType) spec() (crestSpec, bool) {

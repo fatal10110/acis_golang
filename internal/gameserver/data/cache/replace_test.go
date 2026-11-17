@@ -61,9 +61,9 @@ func TestHTMLReplace(t *testing.T) {
 	}
 }
 
-// Replace is CrestCache.reload: the cache holds what the directory holds
+// Reload is CrestCache.reload: the cache holds what the directory holds
 // now, keeps saving there, and a crest request beside it is race-free.
-func TestCrestsReplace(t *testing.T) {
+func TestCrestsReload(t *testing.T) {
 	dir := t.TempDir()
 	old := bytes.Repeat([]byte{1}, 256)
 	writeFile(t, dir, "Crest_1.dds", old)
@@ -90,7 +90,9 @@ func TestCrestsReplace(t *testing.T) {
 			crests.Has(AllyCrest, 2)
 		}
 	}()
-	crests.Replace(fresh)
+	if err := crests.Reload(func(string) (*Crests, error) { return fresh, nil }); err != nil {
+		t.Fatal(err)
+	}
 	wg.Wait()
 
 	if crests.Has(PledgeCrest, 1) {
