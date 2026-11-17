@@ -1,0 +1,40 @@
+# Trial of Duty (Q212), cond 14: Dustin, asked while the player gathers Atheabaldt's remains, says so (30116-06)
+# Hand-written from the quest script (no reference trace).
+character Waiter 35
+class 4
+quest Q212_TrialOfDuty <cond>=14 <state>=STARTED
+script quest.Q212_TrialOfDuty
+item 2633 2634 2635 2636 2637 2638 2639 2640 2641 2642 2643 2644 2645 2646 3027 7562
+page villagemaster/30109.htm
+page trainer/30116.htm
+page default/30311.htm
+page default/30653.htm
+page default/30654.htm
+page default/30655.htm
+page default/30656.htm
+page script/quest/Q212_TrialOfDuty/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+npc dustin 30116 Trainer -10 0 0
+npc collin 30311 Folk 0 10 0
+npc aron 30653 Folk 0 -10 0
+npc kiel 30654 Folk 20 20 0
+npc silvershadow 30655 Folk -20 20 0
+npc talianus 30656 Folk 20 -20 0
+npc marauder 20190 Monster 40 0 0
+npc herod 27119 Monster -40 0 0
+npc strain 20200 Monster 0 40 0
+npc hangman 20144 Monster 0 -40 0
+npc lizardman 20577 Monster 40 40 0
+npc breka 20270 Monster -40 -40 0
+
+action dustin
+action dustin
+  S ActionFailed
+  S NpcHtmlMessage obj=dustin item=0 page=trainer/30116.htm
+  S ActionFailed
+bypass npc_{dustin}_Quest
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q212_TrialOfDuty STARTED
+  rows Q212_TrialOfDuty <cond>=14 <state>=STARTED

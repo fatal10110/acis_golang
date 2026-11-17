@@ -1,0 +1,39 @@
+# Trial of Duty (Q212), the Breka Orc Overlord coin toss: tails gives nothing, heads gives the first remains.
+# Hand-written from the quest script (no reference trace).
+character Knight 35
+class 4
+random 1 0
+quest Q212_TrialOfDuty <cond>=14 <state>=STARTED
+script quest.Q212_TrialOfDuty
+item 2633 2634 2635 2636 2637 2638 2639 2640 2641 2642 2643 2644 2645 2646 3027 7562
+page villagemaster/30109.htm
+page trainer/30116.htm
+page default/30311.htm
+page default/30653.htm
+page default/30654.htm
+page default/30655.htm
+page default/30656.htm
+page script/quest/Q212_TrialOfDuty/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+npc dustin 30116 Trainer -10 0 0
+npc collin 30311 Folk 0 10 0
+npc aron 30653 Folk 0 -10 0
+npc kiel 30654 Folk 20 20 0
+npc silvershadow 30655 Folk -20 20 0
+npc talianus 30656 Folk 20 -20 0
+npc marauder 20190 Monster 40 0 0
+npc herod 27119 Monster -40 0 0
+npc strain 20200 Monster 0 40 0
+npc hangman 20144 Monster 0 -40 0
+npc lizardman 20577 Monster 40 40 0
+npc breka 20270 Monster -40 -40 0
+
+# A Breka Orc Overlord killed on a lost coin toss (draw 1) gives no remains; the next one, on heads (draw 0), gives the skull.
+kill breka
+  S SystemMessage id=95 1:0 1:0
+  items 2643=0
+kill breka
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2643
+  items 2643=1
