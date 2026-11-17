@@ -68,6 +68,12 @@ only. Do not open issues to emulate these. UTF-16 length counting (`commons.UTF1
 stays a core rule, and stdlib behavior must never accept input the server would otherwise reject for
 abuse (length, name validity, duplicate names).
 
+**Parity exception: the summoned pet's collar never drops on death** (#4973). The death drop skips
+the control item of the pet the player has out or rides, matched by object id; the reference compares
+an object id with a template id there, so only the configured kept-pet-items list protects a collar.
+With the stock list nothing differs; with a list that omits a collar the reference drops it and Go
+keeps it. Pinned by `tests/pets` `TestDeathDropKeepsSummonedPetCollar`.
+
 ## 4. Design the native Go shape
 
 Search the Go repository for existing domain types, helpers, constructors, fixtures, and package

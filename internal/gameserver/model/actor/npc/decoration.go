@@ -445,6 +445,10 @@ func (fs fixedStats) stanceSpeed(base int) (speed, multiplier float64) {
 func (fs fixedStats) calc(s stat.Stat, base float64) float64 {
 	c := effect.NewCalculator(defaultBuiltin(s))
 	v := c.Calc(templateStatActor{t: fs.template}, base, nil, nil)
+	// A non-positive result floors at one even when no modifier or builtin
+	// applies to s, where the base would otherwise pass through unchanged.
+	// Nothing reads such a stat at zero: shield defence is read only after a
+	// successful block, and every shield carries its own defence.
 	if s.CantBeNegative() && v <= 0 {
 		return 1
 	}

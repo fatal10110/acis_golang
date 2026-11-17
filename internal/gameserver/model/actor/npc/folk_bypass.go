@@ -345,7 +345,8 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		reply.Outcome = BypassClanHallManager
 		return reply
 	}
-	if _, ok := unportedFolkChats[kind]; ok {
+	// A siege messenger page links no command; see siegeMessengers.
+	if _, ok := siegeMessengers[kind]; ok {
 		return reply
 	}
 	if out, ok := f.residenceCommand(pages, kind, rules, talker, command, reply); ok {

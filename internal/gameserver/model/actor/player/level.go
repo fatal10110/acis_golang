@@ -103,15 +103,13 @@ func (t *LevelTable) ExpSpanAtLevel(level int) int64 {
 }
 
 // levelForExp returns the highest level whose experience threshold exp has
-// reached, per t. It never returns above t.maxLevel.
+// reached, per t. It never returns above t.maxLevel: exp at or past the cap
+// threshold reads as the sentinel level, which addLevel refuses.
 func (t *LevelTable) levelForExp(exp int64) int {
-	level := 1
-	for ; level <= t.maxLevel; level++ {
-		if exp >= t.RequiredExpForLevel(level) {
-			continue
+	for level := 1; level <= t.maxLevel; level++ {
+		if exp < t.RequiredExpForLevel(level) {
+			return level - 1
 		}
-		level--
-		break
 	}
-	return level
+	return t.maxLevel
 }

@@ -238,14 +238,19 @@ func (c *Character) SkillDisabled(key int32) bool {
 	if !ok {
 		return false
 	}
-	if now.Before(expiresAt) {
+	// The expiry instant itself still counts as disabled; the key frees
+	// only once the clock has moved past it.
+	if !now.After(expiresAt) {
 		return true
 	}
 	delete(c.skills.disabled, key)
 	return false
 }
 
-// DisableSkill marks key unusable until delay elapses.
+// DisableSkill marks key unusable until delay elapses. A non-positive delay
+// is ignored rather than read as a permanent lock: every caller passes a
+// positive reuse or equip delay, and no shipped skill or item carries a
+// delay short enough to be mistaken for one.
 func (c *Character) DisableSkill(key int32, delay time.Duration) {
 	if delay <= 0 {
 		return
