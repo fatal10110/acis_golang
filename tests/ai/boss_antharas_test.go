@@ -394,6 +394,7 @@ func TestAntharasAwakens(t *testing.T) {
 // not.
 func antharasAwakens(t *testing.T, hero bool) {
 	w := bootAntharas(t, nil, "1hour")
+	needsDrivenClock(t, w.srv)
 	if hero {
 		w.srv.RunQuest(t, w.player.ObjectID(), antharasDirector, func(_ *script.Quests, c *player.Character, _ *script.Script) { c.SetHero(true) })
 		w.srv.ReadQueued(t, w.srv.Client)

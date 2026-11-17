@@ -293,6 +293,7 @@ func drChaosAssertRaised(t *testing.T, w *warriorWorld, chaos *npc.Folk) {
 func TestDrChaosLeadsThePlayerToTheGolem(t *testing.T) {
 	t.Parallel()
 	w := bootDrChaos(t)
+	needsDrivenClock(t, w.srv)
 	machine := drChaosSpawn(t, w, drChaosMachineID, drChaosMachine)
 	chaos := drChaosSpawn(t, w, drChaosID, drChaosHome)
 
@@ -319,6 +320,7 @@ func TestDrChaosLeadsThePlayerToTheGolem(t *testing.T) {
 func TestDrChaosSendsTheWholeParty(t *testing.T) {
 	t.Parallel()
 	w := bootDrChaos(t)
+	needsDrivenClock(t, w.srv)
 	w.joinMate(t)
 	chaos := drChaosSpawn(t, w, drChaosID, drChaosHome)
 

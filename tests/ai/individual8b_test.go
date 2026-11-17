@@ -149,6 +149,7 @@ func ind8Pick(frames [][]byte, opcode byte) [][]byte {
 func TestTriolCameraFilmsTheSacrifice(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual8(t, raidBoot{}, ind8Folk(ind8CameraID, nil), warriorTemplate(ind8ListenerID, nil))
+	needsDrivenClock(t, w.srv)
 	w.spawn(t, ind8ListenerID, 300, 100)
 	c, _ := w.place(t, ind8CameraID, 100, 0)
 	camera := c.(*npc.Folk)
@@ -386,6 +387,7 @@ func (w *ind8World) roomNPC(x int) int32 {
 func TestRoyalRushNpcRunsTheSepulcherHour(t *testing.T) {
 	t.Parallel()
 	w, escape := bootSepulcher(t)
+	needsDrivenClock(t, w.srv)
 	c, _ := w.place(t, ind8ManagerID, 100, 0)
 	first := c.(*npc.Folk)
 	start := w.now(t)

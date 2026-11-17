@@ -350,6 +350,7 @@ var trShots = [][]int32{
 func TestFrintezzaTransformDiesOnCamera(t *testing.T) {
 	t.Parallel()
 	w := bootTransform(t, trLiveRow(7, 1<<20), "GrandBoss", raidBoot{})
+	needsDrivenClock(t, w.srv)
 	f := w.transform(t)
 	id := f.ObjectID()
 	w.draws.set(99)

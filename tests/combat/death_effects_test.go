@@ -48,6 +48,27 @@ func TestDeathConsumesBlessingsAndCleansOrdinaryEffects(t *testing.T) {
 				victimClient.Send(encodeRequestMagicSkillUse(int32(skillID), false, false))
 				drainUntilQuiet(t, victimClient)
 			}
+			// A self-buff's cast completes on a timer, so on the wall clock
+			// its effect can land after the reply was read. Death must find
+			// every one of them on the list.
+			obj, ok := srv.State.Player(victimID)
+			if !ok {
+				t.Fatal("victim missing from world state")
+			}
+			holder, ok := obj.(interface{ EffectList() *effect.List })
+			if !ok {
+				t.Fatalf("world victim = %T, want effect-list owner", obj)
+			}
+			srv.AdvanceUntil(t, "the buffs' effects", func() bool {
+				held := holder.EffectList().All()
+				for _, skillID := range tt.cast {
+					if !hasEffectID(held, skillID) {
+						return false
+					}
+				}
+				return true
+			})
+			drainUntilQuiet(t, victimClient)
 
 			killerChar := srv.SeedCharacterFor(t, "killer", "Killer", 5, 0)
 			seedKnownSkill(t, srv, killerChar.ID, 42, 1)
@@ -67,15 +88,7 @@ func TestDeathConsumesBlessingsAndCleansOrdinaryEffects(t *testing.T) {
 				}
 			}
 
-			obj, ok := srv.State.Player(victimID)
-			if !ok {
-				t.Fatal("victim missing from world state")
-			}
-			victim, ok := obj.(interface{ EffectList() *effect.List })
-			if !ok {
-				t.Fatalf("world victim = %T, want effect-list owner", obj)
-			}
-			remaining := victim.EffectList().All()
+			remaining := holder.EffectList().All()
 			if len(remaining) != len(tt.wantIDs) {
 				t.Fatalf("effects after death = %v, want skill IDs %v", effectIDs(remaining), tt.wantIDs)
 			}

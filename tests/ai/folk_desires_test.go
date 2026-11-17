@@ -268,6 +268,7 @@ func TestFolkOfferingSocialHoldsSelectionAndTalk(t *testing.T) {
 		}}
 	}
 	srv, at := bootFolkDesires(t, script.Catalog{"ai.FolkOffering": offering})
+	needsDrivenClock(t, srv)
 	f := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", int(folkOfferingID)), location.Location{X: at.X + 40, Y: at.Y, Z: at.Z})
 	id := f.ObjectID()
 	srv.ReadQueued(t, srv.Client)

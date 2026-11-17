@@ -151,6 +151,7 @@ func TestFrintezzaAwakens(t *testing.T) {
 func TestFrintezzaHearsHisFollowers(t *testing.T) {
 	t.Parallel()
 	w := bootFrintezza(t, nil)
+	needsDrivenClock(t, w.srv)
 	f := w.frintezza(t)
 	n := script.NPCOf(f)
 	follower := w.listener(t, fzFollowerID).ObjectID()
@@ -248,6 +249,7 @@ func (w *frWorld) fzHit(t *testing.T, f *npc.Hostile, def modelskill.Definition)
 func TestFrintezzaIsSilenced(t *testing.T) {
 	t.Parallel()
 	w, f := bootFrintezzaFighting(t)
+	needsDrivenClock(t, w.srv)
 	n := script.NPCOf(f)
 	w.onQueue(t, f, func() { n.AddDoNothingDesire(60, 50) })
 	w.fzHit(t, f, modelskill.Definition{})
@@ -471,6 +473,7 @@ func TestFrintezzaPlaysHisLastSong(t *testing.T) {
 func TestFrintezzaDies(t *testing.T) {
 	t.Parallel()
 	w, f := bootFrintezzaFighting(t)
+	needsDrivenClock(t, w.srv)
 	n := script.NPCOf(f)
 	w.makers.take()
 	w.send(t, f, 1, 8)
