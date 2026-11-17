@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -57,21 +58,25 @@ func TestBootStagesAreOrderedByTheirConstructorInputs(t *testing.T) {
 // and no other function may bind a listener or start the login link.
 func TestClientListenerAndLoginLinkOpenAfterEveryRestore(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", nil, 0)
+	names, err := filepath.Glob("*.go")
 	if err != nil {
-		t.Fatalf("parse package: %v", err)
+		t.Fatal(err)
 	}
-	pkg := pkgs["main"]
-	if pkg == nil {
-		t.Fatal("package main not found")
+	files := map[string]*ast.File{}
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		files[name] = file
 	}
 
 	var lastInvoke []ast.Expr
 	opensListener := map[string]bool{}
-	for name, file := range pkg.Files {
-		if strings.HasSuffix(name, "_test.go") {
-			continue
-		}
+	for _, file := range files {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok {
