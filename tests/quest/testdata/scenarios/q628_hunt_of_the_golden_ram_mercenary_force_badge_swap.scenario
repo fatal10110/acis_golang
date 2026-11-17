@@ -32,7 +32,9 @@ bypass npc_{kahman}_Quest
   rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
   items 7246=0 7247=1 7248=0 7249=0
 advance 1s
+# A link the page on screen does not offer: the server drops it.
 bypass npc_{kahman}_Quest
+  rejected
   rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED
 relog
   rows Q628_HuntOfTheGoldenRamMercenaryForce <cond>=3 <state>=STARTED

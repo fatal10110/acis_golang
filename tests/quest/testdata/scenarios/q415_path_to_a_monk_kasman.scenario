@@ -30,7 +30,9 @@ npc klizard 20024 Monster 100 0 0
 npc ratman 20359 Monster 110 0 0
 npc baar 21118 Monster 120 0 0
 
+# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
 bypass Quest Q415_PathToAMonk 30587-09a.htm
+  rejected
 action kasman
 action kasman
   S ActionFailed

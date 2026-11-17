@@ -107,6 +107,7 @@ bypass npc_{kaien}_Quest
 
 # Kaien's final order, a link the page he shows does not offer, does nothing before cond 3.
 bypass Quest Q222_TestOfTheDuelist 30623-16.htm
+  rejected
   items 2763=1 2778=0
 
 # Two more of each of the first ten trophies; the last one brings cond 3.

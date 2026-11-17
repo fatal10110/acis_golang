@@ -21,6 +21,8 @@ bypass npc_{spirit}_Quest
   S ActionFailed
   state Q119_LastImperialPrince CREATED
   rows Q119_LastImperialPrince -
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q119_LastImperialPrince 31453-04.htm
+  rejected
   state Q119_LastImperialPrince CREATED
   rows Q119_LastImperialPrince -

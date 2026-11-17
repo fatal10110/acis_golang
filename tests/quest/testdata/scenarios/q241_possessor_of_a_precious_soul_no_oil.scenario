@@ -22,5 +22,7 @@ bypass npc_{noel}_Quest
   S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-03.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q241_PossessorOfAPreciousSoul 31272-05.htm
+  rejected
   rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=20

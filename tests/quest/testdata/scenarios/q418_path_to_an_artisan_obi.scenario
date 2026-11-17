@@ -36,7 +36,17 @@ bypass npc_{hitchi}_Quest
   S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-01.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q418_PathToAnArtisan 31963-02.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-02.htm
+  S ActionFailed
 bypass Quest Q418_PathToAnArtisan 31963-05.htm
+  S QuestList 418:0x800005ff
+  S ExShowQuestMark quest=418
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-05.htm
+  S ActionFailed
+  Q upsert Q418_PathToAnArtisan | <flags> | -2147482113
+  Q upsert Q418_PathToAnArtisan | <cond> | 11
 action hitchi
   S ActionFailed
   S NpcHtmlMessage obj=hitchi item=0 page=merchant/31963.htm
@@ -46,7 +56,7 @@ action hitchi
   S NpcHtmlMessage obj=hitchi item=0 page=merchant/31963.htm
   S ActionFailed
 bypass npc_{hitchi}_Quest
-  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-01.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-06a.htm
   S ActionFailed
   S ActionFailed
 action obi
@@ -55,7 +65,27 @@ action obi
   S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
   S ActionFailed
 bypass npc_{obi}_Quest
-  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q418_PathToAnArtisan/32052-06a.htm
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q418_PathToAnArtisan/32052-07.htm
   S ActionFailed
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 32052-08.htm
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q418_PathToAnArtisan/32052-08.htm
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 32052-09.htm
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q418_PathToAnArtisan/32052-09.htm
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 32052-10.htm
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q418_PathToAnArtisan/32052-10.htm
   S ActionFailed
 bypass Quest Q418_PathToAnArtisan 32052-11.htm
+  S SystemMessage id=302 3:1633
+  S SystemMessage id=302 3:1634
+  S SystemMessage id=302 3:1641
+  S SystemMessage id=54 3:1635
+  S SystemMessage id=95 1:3200 1:3490
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q418_PathToAnArtisan/32052-11.htm
+  S ActionFailed
+  Q delete-quest Q418_PathToAnArtisan

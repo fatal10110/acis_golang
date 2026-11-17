@@ -16,6 +16,10 @@ action monument
   S ActionFailed
   S NpcHtmlMessage obj=monument item=0 page=olympiad/hero_main2.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass npc_{monument}_Quest HeroWeapon
+  rejected
+# A link the page on screen does not offer: the server drops it.
 bypass npc_{monument}_Quest HeroCirclet
+  rejected
   items 6842=0

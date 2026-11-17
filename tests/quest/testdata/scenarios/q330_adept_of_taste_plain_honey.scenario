@@ -89,6 +89,7 @@ bypass npc_{sonia}_Quest
 
 # Her red sap offer is not on the page she showed: refused, nothing taken.
 bypass Quest Q330_AdeptOfTaste 30062-05.htm
+  rejected
   items 1421=1 1422=40 1423=39 1424=0
 kill wildsprout
   S SystemMessage id=95 1:0 1:0
@@ -204,7 +205,9 @@ bypass npc_{glyvka}_Quest
   S NpcHtmlMessage obj=glyvka item=0 page=script/quest/Q330_AdeptOfTaste/30067-02.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q330_AdeptOfTaste 30067-05.htm
+  rejected
   items 1434=1 1435=20 1436=19 1437=0
 kill crimsonant
   S SystemMessage id=95 1:0 1:0

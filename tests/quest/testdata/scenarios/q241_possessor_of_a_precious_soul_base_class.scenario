@@ -25,5 +25,6 @@ bypass npc_{talien}_Quest
 
 # An accept bypass the refusal page does not offer is refused, and the quest is not started.
 bypass Quest Q241_PossessorOfAPreciousSoul 31739-03.htm
+  rejected
   state Q241_PossessorOfAPreciousSoul CREATED
   rows Q241_PossessorOfAPreciousSoul -

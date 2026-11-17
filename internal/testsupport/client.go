@@ -43,6 +43,9 @@ type ScriptedClient struct {
 	// afterSend, when set, runs after Send has written a frame; see
 	// SetAfterSend.
 	afterSend func(payload []byte)
+	// afterRead, when set, runs on each frame Read and TryRead return; see
+	// SetAfterRead.
+	afterRead func(payload []byte)
 	// queued, when set, lets the server catch up and counts the frames it has
 	// queued to this client; see SetQueued.
 	queued func() (int64, error)
@@ -65,6 +68,14 @@ func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool, now func() t
 // is used.
 func (f *ScriptedClient) SetAfterSend(fn func(payload []byte)) {
 	f.afterSend = fn
+}
+
+// SetAfterRead has fn see the cleartext payload of every frame Read and
+// TryRead return (so of every ReadQueued frame), before they return it. fn
+// runs on the reading goroutine and must not keep or change the payload. Set
+// it before the client is used.
+func (f *ScriptedClient) SetAfterRead(fn func(payload []byte)) {
+	f.afterRead = fn
 }
 
 // SetQueued has ReadQueued and ExpectNoFrame ask queued instead of waiting
@@ -201,6 +212,9 @@ func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
 	}
 	if f.cipher != nil {
 		f.cipher.Decrypt(payload)
+	}
+	if f.afterRead != nil {
+		f.afterRead(payload)
 	}
 	return payload, nil
 }
@@ -339,6 +353,9 @@ func (f *ScriptedClient) Read() []byte {
 	}
 	if f.cipher != nil {
 		f.cipher.Decrypt(payload)
+	}
+	if f.afterRead != nil {
+		f.afterRead(payload)
 	}
 	return payload
 }

@@ -20,4 +20,6 @@ bypass npc_{udan}_Quest
   S NpcHtmlMessage obj=udan item=0 page=script/quest/Q616_MagicalPowerOfFire_Part2/31379-02.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q616_MagicalPowerOfFire_Part2 31379-04.htm
+  rejected

@@ -31,7 +31,9 @@ npc klizard 20024 Monster 100 0 0
 npc ratman 20359 Monster 110 0 0
 npc baar 21118 Monster 120 0 0
 
+# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
 bypass Quest Q415_PathToAMonk 30587-09b.htm
+  rejected
 action aren
 action aren
   S ActionFailed
@@ -41,7 +43,9 @@ bypass npc_{aren}_Quest
   S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
   S ActionFailed
   S ActionFailed
+# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
 bypass Quest Q415_PathToAMonk 32056-03.htm
+  rejected
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -100,7 +104,9 @@ bypass npc_{aren}_Quest
   S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
   S ActionFailed
   S ActionFailed
+# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
 bypass Quest Q415_PathToAMonk 32056-08.htm
+  rejected
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -122,4 +128,6 @@ bypass npc_{moira}_Quest
   S NpcHtmlMessage obj=moira item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
   S ActionFailed
   S ActionFailed
+# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
 bypass Quest Q415_PathToAMonk 31979-03.htm
+  rejected
