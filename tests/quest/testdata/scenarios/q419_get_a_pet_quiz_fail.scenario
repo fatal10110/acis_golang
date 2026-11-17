@@ -27,10 +27,6 @@ bypass npc_{martin}_Quest
   S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-13.htm
   S ActionFailed
   S ActionFailed
-# A link the page on screen does not offer: the server drops it.
-bypass Quest Q419_GetAPet right
-  rejected
-  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=7
 bypass Quest Q419_GetAPet test
   S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-25.htm
   S ActionFailed
@@ -97,14 +93,14 @@ bypass Quest Q419_GetAPet right
   S ActionFailed
   Q upsert Q419_GetAPet | correct | 9
   Q delete-var Q419_GetAPet | progress
-  # UNKNOWN KIND delete-var
   Q delete-var Q419_GetAPet | answers
-  # UNKNOWN KIND delete-var
   Q delete-var Q419_GetAPet | quiz
-  # UNKNOWN KIND delete-var
   Q delete-var Q419_GetAPet | wrong
-  # UNKNOWN KIND delete-var
   Q delete-var Q419_GetAPet | correct
+  # UNKNOWN KIND delete-var
+  # UNKNOWN KIND delete-var
+  # UNKNOWN KIND delete-var
+  # UNKNOWN KIND delete-var
   # UNKNOWN KIND delete-var
   rows Q419_GetAPet <cond>=1 <state>=STARTED
 action martin

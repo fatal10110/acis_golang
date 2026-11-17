@@ -1,0 +1,23 @@
+# Q316: ten fangs pay no bonus: 300.
+character Ranger 18
+class 18
+script quest.Q316_DestroyPlagueCarriers
+item 1042 1043
+page trainer/30155.htm
+page script/quest/Q316_DestroyPlagueCarriers/
+npc ellenia 30155 Trainer 10 0 0
+quest Q316_DestroyPlagueCarriers <cond>=1 <state>=STARTED
+hold 1042 10
+
+action ellenia
+action ellenia
+  S ActionFailed
+  S NpcHtmlMessage obj=ellenia item=0 page=trainer/30155.htm
+  S ActionFailed
+bypass npc_{ellenia}_Quest
+  S SystemMessage id=301 3:1042 6:10
+  S SystemMessage id=52 6:300
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-07.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=300 1042=0

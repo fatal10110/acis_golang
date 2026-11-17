@@ -1,0 +1,19 @@
+# Q316: Ellenia sends a human away (30155-00).
+character Ranger 18
+script quest.Q316_DestroyPlagueCarriers
+item 1042 1043
+page trainer/30155.htm
+page script/quest/Q316_DestroyPlagueCarriers/
+npc ellenia 30155 Trainer 10 0 0
+
+action ellenia
+action ellenia
+  S ActionFailed
+  S NpcHtmlMessage obj=ellenia item=0 page=trainer/30155.htm
+  S ActionFailed
+bypass npc_{ellenia}_Quest
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q316_DestroyPlagueCarriers CREATED
+  rows Q316_DestroyPlagueCarriers -

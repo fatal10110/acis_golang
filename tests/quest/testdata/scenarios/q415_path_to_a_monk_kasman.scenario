@@ -30,18 +30,39 @@ npc klizard 20024 Monster 100 0 0
 npc ratman 20359 Monster 110 0 0
 npc baar 21118 Monster 120 0 0
 
-# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+action gantaki
+action gantaki
+  S ActionFailed
+  S NpcHtmlMessage obj=gantaki item=0 page=default/30587.htm
+  S ActionFailed
+bypass npc_{gantaki}_Quest
+  S NpcHtmlMessage obj=gantaki item=0 page=script/quest/Q415_PathToAMonk/30587-09.htm
+  S ActionFailed
+  S ActionFailed
 bypass Quest Q415_PathToAMonk 30587-09a.htm
-  rejected
+  S QuestList 415:0x800001ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1604
+  S SystemMessage id=54 3:1605
+  S NpcHtmlMessage obj=gantaki item=0 page=script/quest/Q415_PathToAMonk/30587-09a.htm
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 9
 action kasman
 action kasman
   S ActionFailed
   S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
   S ActionFailed
 bypass npc_{kasman}_Quest
-  S NpcHtmlMessage obj=kasman item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S QuestList 415:0x800003ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1605
+  S SystemMessage id=54 3:1606
+  S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q415_PathToAMonk/30501-01.htm
   S ActionFailed
   S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 10
 action kasman
   S ActionFailed
   S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
@@ -51,7 +72,7 @@ action kasman
   S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
   S ActionFailed
 bypass npc_{kasman}_Quest
-  S NpcHtmlMessage obj=kasman item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q415_PathToAMonk/30501-02.htm
   S ActionFailed
   S ActionFailed
 action toruku
@@ -60,9 +81,15 @@ action toruku
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
   S ActionFailed
 bypass npc_{toruku}_Quest
-  S NpcHtmlMessage obj=toruku item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S QuestList 415:0x800007ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1606
+  S SystemMessage id=54 3:1607
+  S NpcHtmlMessage obj=toruku item=0 page=script/quest/Q415_PathToAMonk/30591-01.htm
   S ActionFailed
   S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 11
 action toruku
   S ActionFailed
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
@@ -72,25 +99,58 @@ action toruku
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
   S ActionFailed
 bypass npc_{toruku}_Quest
-  S NpcHtmlMessage obj=toruku item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=toruku item=0 page=script/quest/Q415_PathToAMonk/30591-02.htm
   S ActionFailed
   S ActionFailed
 kill lizard x3
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1612
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1612
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1612
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
 kill orc x3
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1609
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1609
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1609
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
 kill klizard x3
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1611
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1611
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1611
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
 kill ratman x3
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1610
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1610
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1610
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 415:0x80000fff
+  S ExShowQuestMark quest=415
+  S SystemMessage id=301 3:1609 6:3
+  S SystemMessage id=301 3:1610 6:3
+  S SystemMessage id=301 3:1611 6:3
+  S SystemMessage id=301 3:1612 6:3
+  S SystemMessage id=302 3:1607
+  S SystemMessage id=54 3:1608
+  Q upsert Q415_PathToAMonk | <cond> | 12
 action toruku
   S ActionFailed
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
@@ -100,9 +160,16 @@ action toruku
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
   S ActionFailed
 bypass npc_{toruku}_Quest
-  S NpcHtmlMessage obj=toruku item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S QuestList 415:0x80001fff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1608
+  S SystemMessage id=54 3:1613
+  S SystemMessage id=54 3:1614
+  S NpcHtmlMessage obj=toruku item=0 page=script/quest/Q415_PathToAMonk/30591-03.htm
   S ActionFailed
   S ActionFailed
+  Q upsert Q415_PathToAMonk | <cond> | 13
 action toruku
   S ActionFailed
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
@@ -112,7 +179,7 @@ action toruku
   S NpcHtmlMessage obj=toruku item=0 page=default/30591.htm
   S ActionFailed
 bypass npc_{toruku}_Quest
-  S NpcHtmlMessage obj=toruku item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=toruku item=0 page=script/quest/Q415_PathToAMonk/30591-04.htm
   S ActionFailed
   S ActionFailed
 action kasman
@@ -121,6 +188,15 @@ action kasman
   S NpcHtmlMessage obj=kasman item=0 page=trainer/30501.htm
   S ActionFailed
 bypass npc_{kasman}_Quest
-  S NpcHtmlMessage obj=kasman item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S SystemMessage id=302 3:1603
+  S SystemMessage id=302 3:1613
+  S SystemMessage id=302 3:1614
+  S SystemMessage id=54 3:1615
+  S SystemMessage id=95 1:3200 1:1500
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kasman item=0 page=script/quest/Q415_PathToAMonk/30501-04.htm
   S ActionFailed
   S ActionFailed
+  Q delete-quest Q415_PathToAMonk

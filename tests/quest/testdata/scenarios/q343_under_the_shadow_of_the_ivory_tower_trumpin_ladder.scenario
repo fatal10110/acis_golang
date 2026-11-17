@@ -1,0 +1,78 @@
+# Q343: Trumpin's ladder when the second card is the right one (30935-07 with param2 1): 08, 08a, 08b, 08c, 08d.
+character Mystic 40
+class 10
+quest Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=1
+hold 4364 20
+script quest.Q343_UnderTheShadowOfTheIvoryTower
+item 57 4364 4365 103 118 316 630 736 885 917 951 955 2510 2511
+page merchant/30834.htm
+page trainer/30835.htm
+page default/30934.htm
+page default/30935.htm
+page script/quest/Q343_UnderTheShadowOfTheIvoryTower/
+npc cema 30834 Merchant 10 0 0
+npc icarus 30835 Trainer -10 0 0
+npc marsha 30934 Folk 0 10 0
+npc trumpin 30935 Folk 0 -10 0
+
+action trumpin
+action trumpin
+  S ActionFailed
+  S NpcHtmlMessage obj=trumpin item=0 page=default/30935.htm
+  S ActionFailed
+bypass npc_{trumpin}_Quest
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+  random 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-07.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-08.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 1
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+  random 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-07.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-08a.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 2
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+  random 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-07.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-08b.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 3
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+  random 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-07.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-08c.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 4
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-03.htm
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-04.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 1
+  random 1
+bypass Quest Q343_UnderTheShadowOfTheIvoryTower 30935-07.htm
+  S SystemMessage id=53 3:4364 6:310
+  S NpcHtmlMessage obj=trumpin item=0 page=script/quest/Q343_UnderTheShadowOfTheIvoryTower/30935-08d.htm
+  S ActionFailed
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param1 | 0
+  Q upsert Q343_UnderTheShadowOfTheIvoryTower | param2 | 2

@@ -1,0 +1,34 @@
+# Q333: 50 drop items pay 35 each, with a claw for each band from 20, 50 and 100.
+character Mercenary 25
+quest Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=0
+hold 1369 1
+hold 3671 1
+hold 3848 50
+script quest.Q333_HuntOfTheBlackLion
+item 57 735 736 1061 1369 1463 2510 3440 3441 3442 3443 3444 3445 3446 3447 3448 3449 3450 3451 3452 3453 3454 3455 3456 3457 3458 3459 3460 3461 3462 3463 3464 3465 3466 3671 3672 3673 3674 3675 3676 3677 3848 3849 3850 3851
+page default/30735.htm
+page default/30736.htm
+page trainer/30471.htm
+page default/30130.htm
+page default/30531.htm
+page default/30737.htm
+page script/quest/Q333_HuntOfTheBlackLion/
+npc sophya 30735 Folk 10 0 0
+npc redfoot 30736 Folk 20 0 0
+npc rupio 30471 Trainer 30 0 0
+npc undrias 30130 Folk -10 0 0
+npc lockirin 30531 Folk -20 0 0
+npc morgan 30737 Folk -30 0 0
+
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S SystemMessage id=301 3:3848 6:50
+  S SystemMessage id=52 6:1750
+  S SystemMessage id=53 3:3675 6:2
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-22.htm
+  S ActionFailed
+  S ActionFailed

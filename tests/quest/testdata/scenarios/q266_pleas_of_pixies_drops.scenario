@@ -1,0 +1,51 @@
+# Q266: the gray predator drops 2 or 3 fangs by its roll, the red 1 or 2, the young 80% and the red 60%.
+character Pixie 3
+class 18
+script quest.Q266_PleasOfPixies
+item 1334 1336 1337 1338 1339
+page default/31852.htm
+page script/quest/Q266_PleasOfPixies/
+npc murika 31852 Folk 10 0 0
+npc gray 20525 Monster 40 0 0
+npc young 20530 Monster 0 40 0
+npc red 20534 Monster -40 0 0
+quest Q266_PleasOfPixies <cond>=1 <state>=STARTED
+
+kill gray
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1334 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 0 0
+  items 1334=2
+kill gray
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1334 6:3
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 1 0
+  items 1334=5
+kill young
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1334
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 799999
+  items 1334=6
+kill young
+  S SystemMessage id=95 1:0 1:0
+  random 800000
+  items 1334=6
+kill red
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1334
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 0 0
+  items 1334=7
+kill red
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1334 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 1 0
+  items 1334=9
+kill red
+  S SystemMessage id=95 1:0 1:0
+  random 0 600000
+  items 1334=9

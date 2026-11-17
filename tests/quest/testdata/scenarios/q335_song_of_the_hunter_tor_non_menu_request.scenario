@@ -1,0 +1,29 @@
+# Q335: a four-digit request id that no menu of Tor lists is no link of the page on screen: the server drops it and no item is handed out.
+character Hunter 45
+quest Q335_SongOfTheHunter <cond>=2 <state>=STARTED
+random 0 0 0 0 0 0 1 2 3 4
+script quest.Q335_SongOfTheHunter
+item 3727 57
+page default/30745.htm
+page script/quest/Q335_SongOfTheHunter/
+npc tor 30745 Folk 10 0 0
+
+action tor
+action tor
+  S ActionFailed
+  S NpcHtmlMessage obj=tor item=0 page=default/30745.htm
+  S ActionFailed
+bypass npc_{tor}_Quest
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-03a.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter 30745-02.htm
+  S NpcHtmlMessage obj=tor item=0 page=script/quest/Q335_SongOfTheHunter/30745-02.htm
+  S ActionFailed
+bypass Quest Q335_SongOfTheHunter Tor_list_1
+  S NpcHtmlMessage obj=tor item=0 html="<html><body>Guild Member Tor:<br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3727\">C: 40 Totems of Kadesh</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3728\">C: 50 Jade Necklaces of Timak</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3729\">C: 50 Enchanted Golem Shards</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3730\">C: 30 Pieces Monster Eye Meat</a><br>\n<a action=\"bypass -h Quest Q335_SongOfTheHunter 3731\">C: 40 Eggs of Dire Wyrm</a><br>\n</body></html>\n"
+  S ActionFailed
+  Q upsert Q335_SongOfTheHunter | torOffer | 274960
+bypass Quest Q335_SongOfTheHunter 5779
+  rejected
+  items 3727=0 57=0

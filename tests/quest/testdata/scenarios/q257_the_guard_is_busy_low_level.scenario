@@ -1,0 +1,16 @@
+character Guardsman 5
+script quest.Q257_TheGuardIsBusy
+item 1084
+page guard/30039.htm
+page script/quest/Q257_TheGuardIsBusy/
+npc gilbert 30039 Guard 10 0 0
+
+action gilbert
+action gilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=gilbert item=0 page=guard/30039.htm
+  S ActionFailed
+bypass npc_{gilbert}_Quest
+  S NpcHtmlMessage obj=gilbert item=0 page=script/quest/Q257_TheGuardIsBusy/30039-01.htm
+  S ActionFailed
+  S ActionFailed

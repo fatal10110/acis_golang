@@ -1,0 +1,20 @@
+# Q320: Kaitar sends a dark elf below level 10 away (30359-02).
+character Bonereader 9
+class 31
+script quest.Q320_BonesTellTheFuture
+item 809
+page default/30359.htm
+page script/quest/Q320_BonesTellTheFuture/
+npc kaitar 30359 Folk 10 0 0
+
+action kaitar
+action kaitar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaitar item=0 page=default/30359.htm
+  S ActionFailed
+bypass npc_{kaitar}_Quest
+  S NpcHtmlMessage obj=kaitar item=0 page=script/quest/Q320_BonesTellTheFuture/30359-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q320_BonesTellTheFuture CREATED
+  rows Q320_BonesTellTheFuture -

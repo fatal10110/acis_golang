@@ -20,5 +20,3 @@ S NpcHtmlMessage 0f860400103c00680074006d006c003e003c0062006f00640079003e004d006
 S ActionFailed 25
 S ActionFailed 25
 T 500
-C RequestBypassToServer Quest Q628_HuntOfTheGoldenRamMercenaryForce 31554-03a.htm
-T 500

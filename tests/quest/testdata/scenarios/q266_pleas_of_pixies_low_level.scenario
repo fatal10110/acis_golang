@@ -1,0 +1,20 @@
+# Q266: Murika sends an elf below level 3 away (31852-01).
+character Pixie 2
+class 18
+script quest.Q266_PleasOfPixies
+item 1334 1336 1337 1338 1339
+page default/31852.htm
+page script/quest/Q266_PleasOfPixies/
+npc murika 31852 Folk 10 0 0
+
+action murika
+action murika
+  S ActionFailed
+  S NpcHtmlMessage obj=murika item=0 page=default/31852.htm
+  S ActionFailed
+bypass npc_{murika}_Quest
+  S NpcHtmlMessage obj=murika item=0 page=script/quest/Q266_PleasOfPixies/31852-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q266_PleasOfPixies CREATED
+  rows Q266_PleasOfPixies -

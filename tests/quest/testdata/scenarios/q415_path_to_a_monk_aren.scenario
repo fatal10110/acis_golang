@@ -31,21 +31,44 @@ npc klizard 20024 Monster 100 0 0
 npc ratman 20359 Monster 110 0 0
 npc baar 21118 Monster 120 0 0
 
-# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+action gantaki
+action gantaki
+  S ActionFailed
+  S NpcHtmlMessage obj=gantaki item=0 page=default/30587.htm
+  S ActionFailed
+bypass npc_{gantaki}_Quest
+  S NpcHtmlMessage obj=gantaki item=0 page=script/quest/Q415_PathToAMonk/30587-09.htm
+  S ActionFailed
+  S ActionFailed
 bypass Quest Q415_PathToAMonk 30587-09b.htm
-  rejected
+  S QuestList 415:0x800020ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1604
+  S NpcHtmlMessage obj=gantaki item=0 page=script/quest/Q415_PathToAMonk/30587-09b.htm
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <flags> | -2147475201
+  Q upsert Q415_PathToAMonk | <cond> | 14
 action aren
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
   S ActionFailed
 bypass npc_{aren}_Quest
-  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-01.htm
   S ActionFailed
   S ActionFailed
-# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+bypass Quest Q415_PathToAMonk 32056-02.htm
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-02.htm
+  S ActionFailed
 bypass Quest Q415_PathToAMonk 32056-03.htm
-  rejected
+  S QuestList 415:0x800060ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-03.htm
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <flags> | -2147458817
+  Q upsert Q415_PathToAMonk | <cond> | 15
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -55,17 +78,33 @@ action aren
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
   S ActionFailed
 bypass npc_{aren}_Quest
-  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-04.htm
   S ActionFailed
   S ActionFailed
 kill spider x3
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
 kill blade x3
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8545
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 415:0x8000e0ff
+  S ExShowQuestMark quest=415
+  Q upsert Q415_PathToAMonk | <flags> | -2147426049
+  Q upsert Q415_PathToAMonk | <cond> | 16
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -75,9 +114,15 @@ action aren
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
   S ActionFailed
 bypass npc_{aren}_Quest
-  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S QuestList 415:0x8001e0ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:8545 6:6
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-05.htm
   S ActionFailed
   S ActionFailed
+  Q upsert Q415_PathToAMonk | <flags> | -2147360513
+  Q upsert Q415_PathToAMonk | <cond> | 17
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -87,11 +132,17 @@ action aren
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
   S ActionFailed
 bypass npc_{aren}_Quest
-  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-06.htm
   S ActionFailed
   S ActionFailed
 kill baar
   S SystemMessage id=95 1:0 1:0
+  S QuestList 415:0x8003e0ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8546
+  Q upsert Q415_PathToAMonk | <flags> | -2147229441
+  Q upsert Q415_PathToAMonk | <cond> | 18
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -101,12 +152,23 @@ action aren
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
   S ActionFailed
 bypass npc_{aren}_Quest
-  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S QuestList 415:0x8007e0ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:8546
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-07.htm
   S ActionFailed
   S ActionFailed
-# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+  Q upsert Q415_PathToAMonk | <flags> | -2146967297
+  Q upsert Q415_PathToAMonk | <cond> | 19
 bypass Quest Q415_PathToAMonk 32056-08.htm
-  rejected
+  S QuestList 415:0x800fe0ff
+  S ExShowQuestMark quest=415
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-08.htm
+  S ActionFailed
+  Q upsert Q415_PathToAMonk | <flags> | -2146443009
+  Q upsert Q415_PathToAMonk | <cond> | 20
 action aren
   S ActionFailed
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
@@ -116,7 +178,7 @@ action aren
   S NpcHtmlMessage obj=aren item=0 page=default/32056.htm
   S ActionFailed
 bypass npc_{aren}_Quest
-  S NpcHtmlMessage obj=aren item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=aren item=0 page=script/quest/Q415_PathToAMonk/32056-09.htm
   S ActionFailed
   S ActionFailed
 action moira
@@ -125,9 +187,19 @@ action moira
   S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
   S ActionFailed
 bypass npc_{moira}_Quest
-  S NpcHtmlMessage obj=moira item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q415_PathToAMonk/31979-01.htm
   S ActionFailed
   S ActionFailed
-# The seeded page does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+bypass Quest Q415_PathToAMonk 31979-02.htm
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q415_PathToAMonk/31979-02.htm
+  S ActionFailed
 bypass Quest Q415_PathToAMonk 31979-03.htm
-  rejected
+  S SystemMessage id=302 3:1603
+  S SystemMessage id=54 3:1615
+  S SystemMessage id=95 1:3200 1:4230
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q415_PathToAMonk/31979-03.htm
+  S ActionFailed
+  Q delete-quest Q415_PathToAMonk

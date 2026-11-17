@@ -1,8 +1,8 @@
-# Path to an Artisan (Q418), Hitchi finishes the quest. Expectations replay the reference trace of this scenario.
+# Path to an Artisan (Q418), Hitchi finishes the quest through his pages 01, 06, 09 and 10. Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q418_path_to_an_artisan_hitchi_finish.golden
 character Fighter 19
 class 53
-quest Q418_PathToAnArtisan <cond>=12 <state>=STARTED
+quest Q418_PathToAnArtisan <cond>=9 <state>=STARTED
 hold 1633 1
 hold 1634 1
 hold 1641 1
@@ -33,9 +33,24 @@ action hitchi
   S NpcHtmlMessage obj=hitchi item=0 page=merchant/31963.htm
   S ActionFailed
 bypass npc_{hitchi}_Quest
-  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-08.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-01.htm
   S ActionFailed
   S ActionFailed
-# The page on screen does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+bypass Quest Q418_PathToAnArtisan 31963-06.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-06.htm
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 31963-09.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-09.htm
+  S ActionFailed
 bypass Quest Q418_PathToAnArtisan 31963-10.htm
-  rejected
+  S SystemMessage id=302 3:1633
+  S SystemMessage id=302 3:1634
+  S SystemMessage id=302 3:1641
+  S SystemMessage id=54 3:1635
+  S SystemMessage id=95 1:3200 1:3490
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-10.htm
+  S ActionFailed
+  Q delete-quest Q418_PathToAnArtisan

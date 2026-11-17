@@ -1,0 +1,21 @@
+# Q503: at cond 5 with nine nebulite crystals Balthazar asks for more (30764-07).
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=5 <state>=STARTED
+hold 3844 9
+hold 3846 10
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3869 3870 3871
+page default/30764.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc balthazar 30764 Folk 10 0 0
+
+action balthazar
+action balthazar
+  S ActionFailed
+  S NpcHtmlMessage obj=balthazar item=0 page=default/30764.htm
+  S ActionFailed
+bypass npc_{balthazar}_Quest
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-07.htm
+  S ActionFailed
+  S ActionFailed

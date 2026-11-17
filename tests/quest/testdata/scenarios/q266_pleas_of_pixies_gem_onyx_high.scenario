@@ -1,0 +1,29 @@
+# Q266: 100 fangs turn into a gem by the roll: below 10 the emerald, below 30 the blue onyx, below 60 the onyx,
+# # else the glass shard. Roll 59 gives item 1339.
+character Pixie 3
+class 18
+script quest.Q266_PleasOfPixies
+item 1334 1336 1337 1338 1339
+page default/31852.htm
+page script/quest/Q266_PleasOfPixies/
+npc murika 31852 Folk 10 0 0
+quest Q266_PleasOfPixies <cond>=2 <state>=STARTED
+hold 1334 100
+
+action murika
+action murika
+  S ActionFailed
+  S NpcHtmlMessage obj=murika item=0 page=default/31852.htm
+  S ActionFailed
+bypass npc_{murika}_Quest
+  S SystemMessage id=301 3:1334 6:100
+  S SystemMessage id=54 3:1339
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=murika item=0 page=script/quest/Q266_PleasOfPixies/31852-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q266_PleasOfPixies
+  random 59
+  items 1334=0 1339=1
+  state Q266_PleasOfPixies -
