@@ -40,12 +40,13 @@ func (s *Server) StartDailyRecommendationRefresh(tb testing.TB) (wait func()) {
 	}
 }
 
-// ExpectEveryLanePaused is for a suite that holds a persistence lane while
-// a scheduled start's offloaded work pauses every lane behind it (the daily
-// recommendation refresh): until resume is called (also on cleanup), the
-// catch-up before a client read flushes no lane, since none can drain, and
-// the read does not wait out catchUpTimeout. Call resume once that work has
-// returned, which Settle waits for.
+// ExpectEveryLanePaused is for a suite that keeps a scheduled start's
+// offloaded work waiting (on a held lane or a locked table) while it pauses
+// every persistence lane (the daily recommendation refresh): until resume is
+// called (also on cleanup), the catch-up before a client read flushes no
+// lane, since none can drain, and the read does not wait out
+// catchUpTimeout. Call resume once that work has returned, which Settle
+// waits for.
 func (s *Server) ExpectEveryLanePaused(tb testing.TB) (resume func()) {
 	tb.Helper()
 	resume = s.holdEveryLane()
