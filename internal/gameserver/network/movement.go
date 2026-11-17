@@ -11,6 +11,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
+// maxMoveDistance is how far from the packet's own origin a requested walk
+// target may lie; anything at or past it is refused.
+const maxMoveDistance = 9900
+
 // moveLivePlayer handles a client MoveBackwardToLocation request. target and
 // packetOrigin are the packet's raw target/origin coordinates, before the
 // floor-to-head Z conversion below.
@@ -40,9 +44,9 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 	if l.moveByTeleport(live, target) {
 		return
 	}
-	// Reject any target 9900 units or more from the packet's own origin (not
-	// the server-authoritative position used below to simulate the walk).
-	if target.Distance3D(packetOrigin) >= 9900 {
+	// Reject any target maxMoveDistance or more from the packet's own origin
+	// (not the server-authoritative position used below to simulate the walk).
+	if target.Distance3D(packetOrigin) >= maxMoveDistance {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

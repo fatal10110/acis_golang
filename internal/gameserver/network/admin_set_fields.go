@@ -339,10 +339,10 @@ func (l *GameClientLink) broadcastNPCInfo(obj world.Tracked, info func() serverp
 		l.addNPCCrest(obj, &s)
 		return serverpackets.FrameNPCInfo(s)
 	}, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(obj, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(obj) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }

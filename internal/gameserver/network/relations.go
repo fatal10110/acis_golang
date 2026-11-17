@@ -114,11 +114,11 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 			PvPFlag:  int32(live.PvPFlagState()),
 		}))
 	}
-	l.world.ForEachKnown(live, func(o world.Tracked) {
+	for o := range l.world.KnownPlayers(live) {
 		if observer, ok := o.(*livePlayer); ok {
 			l.sendRelations(live, pet, observer.Character, observer.BroadcastFrame)
 		}
-	})
+	}
 }
 
 // broadcastSummonSpawnRelation sends live a self-view RelationChanged for its
@@ -144,15 +144,15 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet *sum
 		PvPFlag:  pvpFlag,
 	}))
 
-	l.world.ForEachKnown(live, func(o world.Tracked) {
+	for o := range l.world.KnownPlayers(live) {
 		observer, ok := o.(*livePlayer)
 		if !ok {
-			return
+			continue
 		}
 		observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: pet.ObjectID(), Relation: l.relationTo(live.Character, observer.Character),
 			IsAutoAttackable: pet.AttackableWithoutForceBy(observer.Character),
 			Karma:            karma, PvPFlag: pvpFlag,
 		}))
-	})
+	}
 }

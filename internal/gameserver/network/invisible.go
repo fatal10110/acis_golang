@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // hiddenFrom reports whether viewer must draw live invisible: live is
@@ -42,10 +41,10 @@ func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Insta
 	}
 	defer frames[0].release()
 	defer frames[1].release()
-	l.world.ForEachKnown(live, func(o world.Tracked) {
+	for o := range l.world.KnownPlayers(live) {
 		receiver, ok := o.(frameReceiver)
 		if !ok {
-			return
+			continue
 		}
 		hidden := 0
 		if hiddenFrom(live, o) {
@@ -55,7 +54,7 @@ func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Insta
 		if observer, ok := o.(*livePlayer); ok {
 			l.sendRelations(live, pet, observer.Character, observer.BroadcastFrame)
 		}
-	})
+	}
 }
 
 // petAbnormalEffect is a's abnormal visual as its owner's pet window shows

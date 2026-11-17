@@ -21,7 +21,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // summonSink maps one live summon's events to packets and follow-up actions.
@@ -723,11 +722,11 @@ func (l *GameClientLink) broadcastSummon(actor *summon.Actor, build func() wire.
 		return
 	}
 	broadcastFrame(build, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(actor, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(actor) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 
@@ -738,10 +737,10 @@ func (l *GameClientLink) broadcastSummonFrame(actor *summon.Actor, frame wire.Fr
 		if l.world == nil {
 			return
 		}
-		l.world.ForEachKnown(actor, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(actor) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }

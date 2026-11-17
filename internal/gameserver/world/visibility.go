@@ -651,10 +651,18 @@ func Knows(t, target Tracked) bool {
 }
 
 // ForEachKnown calls fn for every object in t's surrounding regions,
-// excluding t itself. It does nothing when t is off the grid.
+// excluding t itself. It does nothing when t is off the grid. The objects are
+// collected into pooled scratch first, so no region lock is held while fn
+// runs. A caller that wants only players uses KnownPlayers.
 func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
-	var buf [32]Tracked
-	for _, o := range s.AppendKnown(buf[:0], t) {
+	scratch := knownScratch.Get().(*[]Tracked)
+	known := s.AppendKnown((*scratch)[:0], t)
+	defer func() {
+		clear(known)
+		*scratch = known[:0]
+		knownScratch.Put(scratch)
+	}()
+	for _, o := range known {
 		fn(o)
 	}
 }
@@ -705,7 +713,7 @@ func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
 		if r == nil {
 			return
 		}
-		scratch := knownPlayersScratch.Get().(*[]Tracked)
+		scratch := knownScratch.Get().(*[]Tracked)
 		players := (*scratch)[:0]
 		var regionBuf [9]*Region
 		for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
@@ -714,7 +722,7 @@ func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
 		defer func() {
 			clear(players)
 			*scratch = players[:0]
-			knownPlayersScratch.Put(scratch)
+			knownScratch.Put(scratch)
 		}()
 		for _, p := range players {
 			if !yield(p) {
@@ -724,9 +732,9 @@ func (s *State) KnownPlayers(t Tracked) iter.Seq[Tracked] {
 	}
 }
 
-// knownPlayersScratch holds the reusable collection slices of KnownPlayers;
-// each one serves a single iteration at a time.
-var knownPlayersScratch = sync.Pool{New: func() any { return new([]Tracked) }}
+// knownScratch holds the reusable collection slices of ForEachKnown and
+// KnownPlayers; each one serves a single iteration at a time.
+var knownScratch = sync.Pool{New: func() any { return new([]Tracked) }}
 
 // AppendAround appends every object in the regions surrounding the one
 // holding (x, y) to out, excluding the object except: what an object in

@@ -20,7 +20,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // useItem handles UseItem. ctrl is the client's Ctrl modifier, carried into
@@ -934,11 +933,11 @@ func (l *GameClientLink) broadcastLooks(live *livePlayer, items []*item.Instance
 		return
 	}
 	broadcastFrame(func() wire.Frame { return serverpackets.FramePcMorphInfo(live.Character, *form) }, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(live) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 

@@ -35,11 +35,11 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 		if l.world == nil {
 			return
 		}
-		l.world.ForEachKnown(attacker, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(attacker) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 
@@ -1144,11 +1144,11 @@ func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.
 	broadcastFrame(func() wire.Frame {
 		return serverpackets.FrameTargetSelected(live.ObjectID(), target.ObjectID(), at)
 	}, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(live) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 
@@ -1164,11 +1164,11 @@ func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
 		if l.world == nil {
 			return
 		}
-		l.world.ForEachKnown(live, func(o world.Tracked) {
+		for o := range l.world.KnownPlayers(live) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}
-		})
+		}
 	})
 }
 
