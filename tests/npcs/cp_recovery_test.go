@@ -188,6 +188,15 @@ func testCPRecoveryCastsRestore(t *testing.T, manager arenaManager) {
 	}
 
 	frames := w.tickAI(t)
+	// The cast's effect lands on the talker's queue; on the real pool that can
+	// be after the tick settled, so collect frames until the restore arrives.
+	w.srv.AdvanceUntil(t, "the restore reaching the talker", func() bool {
+		if _, ok := firstOpcode(frames, serverpackets.OpcodeSystemMessage); ok {
+			return true
+		}
+		frames = append(frames, drainFrames(t, w.c)...)
+		return false
+	})
 	use, ok := firstOpcode(frames, serverpackets.OpcodeMagicSkillUse)
 	if !ok {
 		t.Fatalf("AI tick frames %x, want the arena manager's MagicSkillUse", opcodes(frames))

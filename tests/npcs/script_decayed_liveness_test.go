@@ -62,9 +62,9 @@ func TestScriptDecayedHookSeesALeavingLivingNPCDead(t *testing.T) {
 				} else {
 					h.DeleteMe()
 				}
-				if !h.Decayed() {
-					t.Fatal("the NPC did not leave")
-				}
+				// The despawn timer fires a few milliseconds after its delay on the
+				// wall clock, so wait on the NPC leaving and its hook running.
+				w.srv.AdvanceUntil(t, "the NPC leaving", func() bool { return h.Decayed() && len(d.seen()) > 0 })
 				if got := d.seen(); len(got) != 1 || !got[0] {
 					t.Fatalf("decayed hooks saw the NPC dead = %v, want [true]", got)
 				}
