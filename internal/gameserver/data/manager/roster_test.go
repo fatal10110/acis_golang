@@ -60,7 +60,7 @@ func newTestRoster(t *testing.T, deleteAfter time.Duration, now func() time.Time
 	db := sqltest.SharedDB(t)
 	characters := sql.NewCharacterStore(db)
 	items := sql.NewItemStore(db)
-	roster := NewRoster(characters, items, nil, humanFighterTemplate(t), starterItemTable(), table, &sequentialIDs{next: 0x10000000}, deleteAfter, now)
+	roster := NewRoster(characters, humanFighterTemplate(t), starterItemTable(), table, &sequentialIDs{next: 0x10000000}, deleteAfter, now)
 	return roster, characters, items
 }
 
@@ -394,7 +394,7 @@ func TestRoster_Create_SeedsTutorialBookAndAutoGetSkillShortcuts(t *testing.T) {
 	characters := sql.NewCharacterStore(db)
 	items := sql.NewItemStore(db)
 	shortcuts := sql.NewShortcutStore(db)
-	roster := NewRoster(characters, items, shortcuts, mysticTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, DefaultDeleteAfter, nil)
+	roster := NewRoster(characters, mysticTemplate(t), starterItemTable(), npc.NewTable(nil), &sequentialIDs{next: 0x10000000}, DefaultDeleteAfter, nil)
 
 	c, outcome, err := roster.Create(ctx, "acct1", CreateRequest{
 		Name: "Mystic", ClassID: 10, Race: 0, Sex: player.SexMale,

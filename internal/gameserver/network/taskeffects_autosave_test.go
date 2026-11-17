@@ -24,14 +24,14 @@ import (
 // TestAutosaveSaveSkipsDetachingSession guards against the online-status
 // race described on the #1744/#1815/#1773/#1743 PR review: TaskEffects.Save
 // (the autosave tick's write) must not run against a session whose detach
-// has already begun, because detachLivePlayer's own SaveOfflineRecency call
+// has already begun, because detachLivePlayer's own SaveOffline call
 // (online = 0) can complete before autosave's roster.Save call (which now
 // also sets online = 1), leaving online stuck at 1 for a character that
 // already logged out.
 func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 	db, chars := autosaveCharacters(t, 42)
 	state := world.New()
-	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
 	live := queuedTestLive(t, 42)
 	sim.RunOwned(live.Queue(), live.markDetaching)
@@ -52,7 +52,7 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 	db, chars := autosaveCharacters(t, 43)
 	state := world.New()
-	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
 	live := queuedTestLive(t, 43)
 	state.AddPlayer(live)
@@ -75,7 +75,7 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 func TestAutosaveSavePersistsPosition(t *testing.T) {
 	db, chars := autosaveCharacters(t, 44)
 	state := world.New()
-	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
 	live := queuedTestLive(t, 44)
 	live.Character.SetLastKnownPosition(location.Location{X: 100, Y: 200, Z: 300}, 12345)
@@ -118,7 +118,7 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 		}
 	}}
 	state := world.New()
-	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 	worker := persist.New(zerolog.Nop())
 	defer worker.Close(context.Background())
 
@@ -209,7 +209,7 @@ func queuedTestLive(t *testing.T, id int32) *livePlayer {
 func TestAutosaveSaveSkipsANewerSessionOfTheSameCharacter(t *testing.T) {
 	db, chars := autosaveCharacters(t, 46)
 	state := world.New()
-	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
 	stale := queuedTestLive(t, 46)
 	state.AddPlayer(queuedTestLive(t, 46))

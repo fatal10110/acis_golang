@@ -24,6 +24,7 @@ var ErrFault = errors.New("dbtest: database fault")
 // Arm and Disarm are safe to call while other goroutines use the handle.
 type Fault struct {
 	armed atomic.Bool
+	nth   nthFault
 }
 
 // Arm makes every later operation on f's handles fail until Disarm.
@@ -113,7 +114,7 @@ func (c faultConn) PrepareContext(ctx context.Context, query string) (driver.Stm
 		_ = st.Close()
 		return nil, fmt.Errorf("dbtest: driver statement %T lacks an interface the fault wrapper forwards", st)
 	}
-	return faultStmt{inner: full, fault: c.fault}, nil
+	return faultStmt{inner: full, fault: c.fault, query: query}, nil
 }
 
 func (c faultConn) Close() error { return c.inner.Close() }
@@ -136,6 +137,11 @@ func (c faultConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 func (c faultConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if c.fault.armed.Load() {
 		return nil, ErrFault
+	}
+	if c.fault.nth.targets(query) {
+		// database/sql retries a skipped statement prepared, where it is
+		// counted: counting here too would count it twice.
+		return nil, driver.ErrSkip
 	}
 	return c.inner.ExecContext(ctx, query, args)
 }
@@ -178,13 +184,14 @@ type driverStmt interface {
 type faultStmt struct {
 	inner driverStmt
 	fault *Fault
+	query string
 }
 
 func (s faultStmt) Close() error  { return s.inner.Close() }
 func (s faultStmt) NumInput() int { return s.inner.NumInput() }
 
 func (s faultStmt) Exec(args []driver.Value) (driver.Result, error) {
-	if s.fault.armed.Load() {
+	if s.fault.armed.Load() || s.fault.nth.hit(s.query) {
 		return nil, ErrFault
 	}
 	return s.inner.Exec(args) //nolint:staticcheck // forwards the legacy entry point database/sql may still call
@@ -198,7 +205,7 @@ func (s faultStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (s faultStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	if s.fault.armed.Load() {
+	if s.fault.armed.Load() || s.fault.nth.hit(s.query) {
 		return nil, ErrFault
 	}
 	return s.inner.ExecContext(ctx, args)

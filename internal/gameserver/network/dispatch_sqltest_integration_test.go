@@ -82,7 +82,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	}
 	sevenSigns.Start()
 	t.Cleanup(sevenSigns.Stop)
-	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(chars, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	gcl, err := NewGameClientLink(GameClientLinkConfig{
 		Flow: CharacterFlowConfig{Validator: validator, PlayerClock: playerClock},
 		Belongings: BelongingsConfig{

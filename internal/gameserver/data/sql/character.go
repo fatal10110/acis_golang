@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 )
 
 // ErrCharacterNotFound is returned when no characters row matches the given
@@ -49,8 +51,45 @@ func NewCharacterStore(db *sql.DB) *CharacterStore {
 // character only gains once it is actually played keep the schema's own
 // default until something sets them.
 func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error {
+	return insertCharacter(ctx, s.db, c)
+}
+
+// CreateWithStarters inserts c as Create does together with its starter
+// items and its starter shortcuts of the base class, as one transaction: a
+// failure at any row leaves none of them.
+func (s *CharacterStore) CreateWithStarters(ctx context.Context, c *player.Character, items []item.Instance, shortcuts []shortcut.Shortcut) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("create character %q: begin: %w", c.CharacterName(), err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := insertCharacter(ctx, tx, c); err != nil {
+		return err
+	}
+	for _, inst := range items {
+		if err := insertItem(ctx, tx, c.ID, inst); err != nil {
+			return err
+		}
+	}
+	for _, sc := range shortcuts {
+		if err := saveShortcut(ctx, tx, c.ID, 0, sc); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("create character %q: commit: %w", c.CharacterName(), err)
+	}
+	return nil
+}
+
+// execer runs a write on a handle or within a transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func insertCharacter(ctx context.Context, db execer, c *player.Character) error {
 	resources := c.ResourceValues()
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO characters
 				(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
 				 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel, online, lastAccess)
@@ -70,26 +109,64 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // karma/pvpkills/pkkills (clamped to their column ranges), death_penalty_level, the accumulated session
 // playtime, the personal-surrender flag, the noblesse status, the Seven Signs
 // dungeon membership, the Ketra/Varka faction standing, the face and hair,
-// the access level and each subclass's progression — so a later reload reflects everything
+// the access level, the position and heading, and each subclass's progression — so a later reload reflects everything
 // gained since the last save instead of the row's creation-time values.
-// Location columns are not written here. The row is also marked online: Save only runs
-// for characters currently in game. Online is 1, or 2 for a character lingering
-// after its connection dropped.
+// The row is also marked online: Save only runs for characters currently in
+// game. Online is 1, or 2 for a character lingering after its connection
+// dropped. lastAccess is left as it is.
+//
+// The characters row is one statement; with subclasses it and their rows
+// commit as one transaction, so a failure leaves all of them as they were.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
+	return s.save(ctx, st, saveCharacterQuery+" WHERE obj_Id = ?", onlineColumn(st.ClientDetached))
+}
+
+// SaveOffline is Save for a character leaving the game: the same write marks
+// the row offline and stamps lastAccess (epoch milliseconds), so a later
+// char-select reload highlights the most recently played character.
+func (s *CharacterStore) SaveOffline(ctx context.Context, st player.SaveState, lastAccess int64) error {
+	return s.save(ctx, st, saveCharacterQuery+", lastAccess = ? WHERE obj_Id = ?", 0, lastAccess)
+}
+
+// saveCharacterQuery is the column list Save and SaveOffline write, ending
+// with online; each completes it with its own tail.
+const saveCharacterQuery = `UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, accesslevel = ?, heading = ?, x = ?, y = ?, z = ?, online = ?`
+
+// save runs query, saveCharacterQuery completed by a tail whose arguments
+// are tail followed by the character's id, and writes st's subclass rows in
+// the same transaction.
+func (s *CharacterStore) save(ctx context.Context, st player.SaveState, query string, tail ...any) error {
 	resources, progression := st.Resources, st.Progression
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, accesslevel = ?, online = ?
-			 WHERE obj_Id = ?`,
+	args := append([]any{
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		progression.Exp, progression.ExpBeforeDeath, progression.SP, karmaColumn(int64(st.Karma)), killsColumn(int64(st.PvPKills)), killsColumn(int64(st.PKKills)), st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
-		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, st.Face, st.HairStyle, st.HairColor, st.AccessLevel, onlineColumn(st.ClientDetached), st.ID,
-	)
+		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, st.Face, st.HairStyle, st.HairColor, st.AccessLevel,
+		st.Heading, st.Location.X, st.Location.Y, st.Location.Z,
+	}, tail...)
+	args = append(args, st.ID)
+	if len(st.Subclasses) == 0 {
+		if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("save character %d: %w", st.ID, err)
+		}
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("save character %d: begin: %w", st.ID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
 	}
 	// The characters row carries the base class's progression; each
 	// subclass keeps its own in its row.
-	return updateSubclasses(ctx, s.db, st.ID, st.Subclasses)
+	if err := updateSubclasses(ctx, tx, st.ID, st.Subclasses); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save character %d: commit: %w", st.ID, err)
+	}
+	return nil
 }
 
 // Column ranges of the characters counters: pvpkills and pkkills are
@@ -260,31 +337,12 @@ func (s *CharacterStore) SetPosition(ctx context.Context, objectID int32, loc lo
 	return nil
 }
 
-// SetDeathPenaltyLevel updates the character's persisted death-penalty
-// debuff level.
-func (s *CharacterStore) SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error {
-	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET death_penalty_level = ? WHERE obj_Id = ?", level, objectID); err != nil {
-		return fmt.Errorf("set death penalty level for %d: %w", objectID, err)
-	}
-	return nil
-}
-
 // SetOnline marks the character in game and stamps lastAccess (epoch
 // milliseconds). It runs when a client enters the world, so external DB
-// consumers see the character as online from login until SetOffline.
+// consumers see the character as online from login until SaveOffline.
 func (s *CharacterStore) SetOnline(ctx context.Context, objectID int32, lastAccess int64) error {
 	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET online = 1, lastAccess = ? WHERE obj_Id = ?", lastAccess, objectID); err != nil {
 		return fmt.Errorf("set online recency for %d: %w", objectID, err)
-	}
-	return nil
-}
-
-// SetOffline marks the character offline and persists lastAccess (epoch
-// milliseconds), so a later char-select reload highlights the most recently
-// played character.
-func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAccess int64) error {
-	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET online = 0, lastAccess = ? WHERE obj_Id = ?", lastAccess, objectID); err != nil {
-		return fmt.Errorf("set offline recency for %d: %w", objectID, err)
 	}
 	return nil
 }

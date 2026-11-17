@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/rs/zerolog"
 )
@@ -71,33 +70,19 @@ type idAllocator interface {
 // characterStore is the persistence Roster needs for the characters table.
 // Satisfied by *sql.CharacterStore.
 type characterStore interface {
-	Create(ctx context.Context, c *player.Character) error
+	CreateWithStarters(ctx context.Context, c *player.Character, items []item.Instance, shortcuts []shortcut.Shortcut) error
 	Save(ctx context.Context, st player.SaveState) error
+	SaveOffline(ctx context.Context, st player.SaveState, lastAccess int64) error
 	Get(ctx context.Context, objectID int32) (*player.Character, error)
 	ListByAccount(ctx context.Context, accountName string) ([]*player.Character, error)
 	CountByAccount(ctx context.Context, accountName string) (int, error)
 	NameTaken(ctx context.Context, name string) (bool, error)
 	SetDeleteAt(ctx context.Context, objectID int32, at int64) error
-	SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error
-	SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error
 	SetNoble(ctx context.Context, objectID int32, noble bool) error
 	SetOnline(ctx context.Context, objectID int32, lastAccess int64) error
-	SetOffline(ctx context.Context, objectID int32, lastAccess int64) error
 	// Purge deletes the character together with every row it owns, as one
 	// atomic unit.
 	Purge(ctx context.Context, objectID int32) (bool, error)
-}
-
-// itemStore is the persistence Roster needs for the items table. Satisfied
-// by *sql.ItemStore.
-type itemStore interface {
-	Create(ctx context.Context, ownerID int32, inst item.Instance) error
-}
-
-// shortcutStore is the persistence Roster needs for character_shortcuts.
-// Satisfied by *sql.ShortcutStore.
-type shortcutStore interface {
-	Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error
 }
 
 // subclassStore is what Roster reads of character_subclasses. Satisfied by
@@ -107,14 +92,11 @@ type subclassStore interface {
 }
 
 // Roster creates, lists, deletes and restores the characters on an
-// account, keeping the characters and items tables consistent with each
-// other. Its only mutable state of its own is the set of names being taken
+// account. Its only mutable state of its own is the set of names being taken
 // (ReserveName), guarded by its own lock; otherwise it is safe for
 // concurrent use exactly to the extent its stores and id allocator are.
 type Roster struct {
 	characters characterStore
-	items      itemStore
-	shortcuts  shortcutStore
 	subclasses subclassStore
 	templates  *player.TemplateTable
 	itemTable  *item.Table
@@ -148,14 +130,12 @@ func (r *Roster) SetPurged(fn func(objectID int32)) { r.purged = fn }
 // deleteAfter is the grace period MarkForDeletion schedules (see
 // DefaultDeleteAfter); a zero value means deletion is immediate. now
 // defaults to time.Now when nil.
-func NewRoster(characters characterStore, items itemStore, shortcuts shortcutStore, templates *player.TemplateTable, itemTable *item.Table, npcs *npc.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
+func NewRoster(characters characterStore, templates *player.TemplateTable, itemTable *item.Table, npcs *npc.Table, ids idAllocator, deleteAfter time.Duration, now func() time.Time) *Roster {
 	if now == nil {
 		now = time.Now
 	}
 	return &Roster{
 		characters:  characters,
-		items:       items,
-		shortcuts:   shortcuts,
 		templates:   templates,
 		itemTable:   itemTable,
 		npcs:        npcs,
@@ -172,12 +152,9 @@ func NewRoster(characters characterStore, items itemStore, shortcuts shortcutSto
 // CreateOutcome distinguish success from an expected, client-triggerable
 // rejection (a fault always comes back as err, never as CreateRejected).
 //
-// A character row and its granted items are written as separate
-// statements, not one transaction: an error partway through Create can
-// leave a character row with only some of its starter items granted.
-// Reconciling that is a job for whatever boot or maintenance pass
-// eventually audits character/item consistency, not for Create to guess
-// at by retrying or rolling back.
+// The character row, its starter items and its starter shortcuts are
+// written as one transaction: an error partway through leaves none of them.
+// The object ids a failed creation took are not returned to the allocator.
 func (r *Roster) Create(ctx context.Context, accountName string, req CreateRequest) (*player.Character, CreateOutcome, error) {
 	if req.Race < 0 || req.Race > 4 {
 		return nil, CreateRejected, nil
@@ -252,18 +229,16 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	// enters the world, not stored at creation.
 	c.AccessLevel = r.accessLevels.Grant(req.AccessLevel, req.Name, r.log).Level
 
-	if err := r.characters.Create(ctx, c); err != nil {
-		return nil, CreateRejected, err
-	}
-
 	starterShortcuts := shortcut.Starter()
+	items := make([]item.Instance, 0, len(tmpl.Items))
 	for _, grant := range tmpl.Items {
-		objectID, err := r.grantItem(ctx, c.ID, grant)
+		inst, err := r.starterItem(grant)
 		if err != nil {
 			return nil, CreateRejected, err
 		}
+		items = append(items, inst)
 		if grant.ItemID == shortcut.TutorialBookItemID {
-			starterShortcuts = append(starterShortcuts, shortcut.TutorialBookShortcut(objectID))
+			starterShortcuts = append(starterShortcuts, shortcut.TutorialBookShortcut(inst.ObjectID))
 		}
 	}
 	autoGet := make(map[int32]int32)
@@ -272,33 +247,23 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	}
 	starterShortcuts = append(starterShortcuts, shortcut.AutoGetSkillShortcuts(autoGet)...)
 
-	if r.shortcuts != nil {
-		for _, sc := range starterShortcuts {
-			if err := r.shortcuts.Save(ctx, c.ID, 0, sc); err != nil {
-				return nil, CreateRejected, err
-			}
-		}
+	if err := r.characters.CreateWithStarters(ctx, c, items, starterShortcuts); err != nil {
+		return nil, CreateRejected, err
 	}
-
 	return c, CreateOK, nil
 }
 
-func (r *Roster) grantItem(ctx context.Context, ownerID int32, grant player.StarterItem) (int32, error) {
+// starterItem numbers a new instance of grant.
+func (r *Roster) starterItem(grant player.StarterItem) (item.Instance, error) {
 	tmpl, ok := r.itemTable.Get(int32(grant.ItemID))
 	if !ok {
-		return 0, fmt.Errorf("player roster: starter item %d has no template", grant.ItemID)
+		return item.Instance{}, fmt.Errorf("player roster: starter item %d has no template", grant.ItemID)
 	}
-
 	itemID, err := r.ids.NextID()
 	if err != nil {
-		return 0, fmt.Errorf("player roster: grant item %d: %w", grant.ItemID, err)
+		return item.Instance{}, fmt.Errorf("player roster: grant item %d: %w", grant.ItemID, err)
 	}
-
-	inst := item.NewStackOrEquip(itemID, tmpl, grant.Count, grant.Equipped)
-	if err := r.items.Create(ctx, ownerID, inst); err != nil {
-		return 0, err
-	}
-	return itemID, nil
+	return item.NewStackOrEquip(itemID, tmpl, grant.Count, grant.Equipped), nil
 }
 
 // hairStyleLimit returns the highest hairstyle index sex may choose: male
@@ -399,21 +364,18 @@ func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 }
 
 // Save persists the live character's full in-memory stats (level, exp, sp,
-// cur/max HP/CP/MP), as the periodic and disconnect autosaves write them.
+// cur/max HP/CP/MP), position and subclasses, as the periodic autosave
+// writes them, marking the row online.
 func (r *Roster) Save(ctx context.Context, st player.SaveState) error {
 	return r.characters.Save(ctx, st)
 }
 
-// SavePosition persists the live character's latest world position and
-// heading for the next character-list, relog, or server restart load.
-func (r *Roster) SavePosition(ctx context.Context, st player.SaveState) error {
-	return r.characters.SetPosition(ctx, st.ID, st.Location, st.Heading)
-}
-
-// SaveDeathPenaltyLevel persists the live character's current death-penalty
-// debuff level for the next relog or server restart load.
-func (r *Roster) SaveDeathPenaltyLevel(ctx context.Context, st player.SaveState) error {
-	return r.characters.SetDeathPenaltyLevel(ctx, st.ID, st.DeathPenaltyLevel)
+// SaveOffline is Save for a character leaving the game: the same write marks
+// the row offline and stamps the current epoch-millisecond time as its
+// lastAccess, so char-select highlights it as the most recently played
+// character on the next reload.
+func (r *Roster) SaveOffline(ctx context.Context, st player.SaveState) error {
+	return r.characters.SaveOffline(ctx, st, r.now().UnixMilli())
 }
 
 // SaveNoble persists the live character's noblesse status as soon as it
@@ -425,14 +387,7 @@ func (r *Roster) SaveNoble(ctx context.Context, objectID int32, noble bool) erro
 // SaveOnlineRecency marks the live character in game and stamps the
 // current epoch-millisecond time as its lastAccess, so external DB
 // consumers see the character as online from the moment it enters the
-// world until SaveOfflineRecency marks it offline again.
+// world until SaveOffline marks it offline again.
 func (r *Roster) SaveOnlineRecency(ctx context.Context, c *player.Character) error {
 	return r.characters.SetOnline(ctx, c.ID, r.now().UnixMilli())
-}
-
-// SaveOfflineRecency marks the live character offline and stamps the
-// current epoch-millisecond time as its lastAccess, so char-select
-// highlights it as the most recently played character on the next reload.
-func (r *Roster) SaveOfflineRecency(ctx context.Context, c *player.Character) error {
-	return r.characters.SetOffline(ctx, c.ID, r.now().UnixMilli())
 }

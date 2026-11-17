@@ -18,7 +18,7 @@ func TestRosterPurgesOnDelete(t *testing.T) {
 		{0, true},
 		{-24 * time.Hour, true},
 	} {
-		r := NewRoster(nil, nil, nil, nil, nil, nil, nil, tc.after, nil)
+		r := NewRoster(nil, nil, nil, nil, nil, tc.after, nil)
 		if got := r.PurgesOnDelete(); got != tc.want {
 			t.Errorf("PurgesOnDelete() with %v = %v, want %v", tc.after, got, tc.want)
 		}

@@ -20,7 +20,7 @@ import (
 const livePlayerDetachSaveTimeout = 2 * time.Second
 
 // detachLivePlayer takes live out of the world and enqueues its final saves:
-// the character row, position, death penalty, offline mark and skill state,
+// the character row with its position and offline mark, and skill state,
 // then the container flushes, on the owners' lanes, and an active pet's row
 // on its control item's lane. Values are copied before the teardown below
 // changes them, and every save is enqueued before live leaves world state, so
@@ -97,17 +97,8 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 			defer cancel()
 			if roster != nil {
-				if err := roster.Save(ctx, charState); err != nil {
-					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player full stats")
-				}
-				if err := roster.SavePosition(ctx, charState); err != nil {
-					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player position")
-				}
-				if err := roster.SaveDeathPenaltyLevel(ctx, charState); err != nil {
-					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player death penalty level")
-				}
-				if err := roster.SaveOfflineRecency(ctx, character); err != nil {
-					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player offline recency")
+				if err := roster.SaveOffline(ctx, charState); err != nil {
+					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player")
 				}
 			}
 			if err := skills.Save(ctx, skillState); err != nil {

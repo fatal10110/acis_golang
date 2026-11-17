@@ -156,9 +156,6 @@ func (l *GameClientLink) storeLive(live *livePlayer) {
 		if err := roster.Save(ctx, charState); err != nil {
 			log.Error().Err(err).Int32("object_id", charState.ID).Msg("admin: store player")
 		}
-		if err := roster.SavePosition(ctx, charState); err != nil {
-			log.Error().Err(err).Int32("object_id", charState.ID).Msg("admin: store player position")
-		}
 		if skills == nil {
 			return
 		}
