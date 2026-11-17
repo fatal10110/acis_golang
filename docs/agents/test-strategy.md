@@ -76,7 +76,7 @@ Rules:
   | `pool-admin-npcs` | 214 s | 173 s | npcs 63 s, admin 44 s |
   | `pool-skills-pets` | 165 s | 125 s | skills 94 s, pets 64 s |
   | `pool-rest` | 157 s | 62 s (+ 52 s static, no race) | character 39 s, lifecycle 20 s, trade 15 s, social 15 s |
-  | `pool-small` | 135 s | 93 s | clan 58 s, party 34 s, duel 25 s, boat 13 s, petition 12 s, bbs 10 s, botswarm 5 s, wedding 4 s, fishchamp 2 s, lottery 2 s, perf 1 s |
+  | `pool-small` | 135 s | 93 s | clan 58 s, party 34 s, duel 25 s, boat 13 s, petition 12 s, bbs 10 s, botswarm 5 s, wedding 4 s, fishchamp 2 s, lottery 2 s, perf 1 s, idfactory under 1 s |
   | `pool-combat-items` | 129 s | 97 s | combat 74 s, items 61 s |
 
   The longest pool job (214 s) is shorter than the inline `lint` (450 s), `suites` (408 s) and
