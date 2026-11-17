@@ -465,16 +465,23 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 	if !ok || live.Dead() {
 		return
 	}
-	coefficient := 0.001724
-	if player.ClassMage(live.ClassID()) {
-		coefficient = 0.002698
-	}
-	damage := live.MaxHPValue() * live.Race.BreathMultiplier() * coefficient
+	damage := drownDamage(live.MaxHPValue(), live.Race, player.ClassMage(live.ClassID()))
 	// Drowning damage is a plain HP reduction with isDOT=false, so
 	// drowning still allows the 1-in-10 STUN-break
 	// roll, unlike a real damage-over-time skill tick.
 	live.ReduceHPByDOT(damage, live, false)
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDrownDamage, int32(damage)))
+}
+
+// drownDamage is the HP a swimmer past its breath loses each second: max HP
+// times the race's breath multiplier times a per-second rate that is higher
+// for a mage class.
+func drownDamage(maxHP float64, race player.Race, mage bool) float64 {
+	rate := 0.001724
+	if mage {
+		rate = 0.002698
+	}
+	return maxHP * race.BreathMultiplier() * rate
 }
 
 // Save persists actor's full character stats, position, live skill state and

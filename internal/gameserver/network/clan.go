@@ -25,15 +25,16 @@ import (
 // when its clan's hall lease is unpaid; it takes the siege state of a siege
 // in progress its clan fights, the attacker state when its clan attacks a
 // clan hall siege being fought; and it gets its own roster row and the
-// rosters, the main clan's then each sub-unit's.
+// rosters, the main clan's then each sub-unit's. A member its clan removed
+// while its selection was in flight enters clanless, under the leave the
+// removal stored, and none of this is sent.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
-	cl, ok := l.clanService().ClanOf(c)
+	cl, ok := l.clanService().Enter(c)
 	if !ok {
 		return
 	}
 	client.Session.SendFrame(framePledgeSkillList(cl))
-	cl.SetOnline(c.ID, clan.LiveMember(c))
 	l.giveClanSkills(live, cl, c.PledgeClass())
 	if l.leadsSiegeClan(live, cl) {
 		l.giveSiegeSkills(live)
@@ -80,10 +81,12 @@ func (l *GameClientLink) tellMentorLoggedIn(c *player.Character) {
 
 // leaveClanOnLogout marks live offline in its clan and shows the rest of
 // the clan its row going offline. Its pending invitation, if any, is left
-// to its partner.
+// to its partner. One leaving before it entered the world takes a removal
+// its clan kept for it, so its last save stores the leave.
 func (l *GameClientLink) leaveClanOnLogout(live *livePlayer) {
 	c := live.Character
 	l.clanService().Invites().Left(c.ID)
+	l.clanService().EndEntry(c)
 	cl, ok := l.clanService().ClanOf(c)
 	if !ok {
 		return
@@ -286,8 +289,9 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 // requestOustPledgeMember expels the member live names from live's clan.
 // An expelled member online learns it on its own queue, where a castle's
 // clan first checks what it wears (checkLeaverItems); an offline one's
-// circlets go back to its inventory. One lingering after its connection
-// dropped leaves as an online one does, its client told nothing.
+// circlets go back to its inventory, unless its selection is under way and
+// already loaded them. One lingering after its connection dropped leaves as
+// an online one does, its client told nothing.
 func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpackets.RequestOustPledgeMember) {
 	online := func(id int32) *player.Character {
 		if target, ok := l.livePlayerByID(id); ok {
@@ -317,9 +321,13 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 	if m.Online {
 		target, _ = l.livePlayerByID(m.ObjectID)
 	}
-	if target == nil {
+	switch {
+	case target == nil && !m.Entering:
 		l.unequipLeaverCirclets(cl, m.ObjectID)
-	} else {
+	case target == nil:
+		// Its selection already loaded what it wears, which it keeps, as a
+		// member online does; it takes the leave as it enters the world.
+	default:
 		postLive(target, func() {
 			l.checkLeaverItems(target, cl)
 			l.clanService().ApplyLeft(target.Character, m, now)
