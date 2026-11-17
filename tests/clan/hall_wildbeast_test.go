@@ -164,6 +164,7 @@ func bootBeastFarm(t *testing.T, s flagWarSetup) *flagWarWorld {
 		gameservertest.WithItemTemplates(item.NewTable(append(gameservertest.ItemTemplates().All(), questItem(crystalOfPurityID), questItem(trainerLicenseID)))),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithReuseDelays(0, 0),
+		inventorySlotsOption(s.slots),
 		gameservertest.WithLog(zerolog.New(zerolog.NewTestWriter(t)).Level(zerolog.WarnLevel)),
 		gameservertest.WithClanSeed(func(db *sql.DB) { seedBeastFarm(t, db, s, w.date) }),
 	)
