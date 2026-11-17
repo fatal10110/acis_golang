@@ -119,12 +119,15 @@ func findNPCs() *npc.Table {
 // searched; a page below the first falls back as the reference does.
 func TestAdminFind(t *testing.T) {
 	t.Parallel()
+	// Alt is on the account before the client logs in: the selection takes
+	// the account's other characters from the list the client was sent.
 	srv, _ := bootAdmin(t, adminLevel,
+		gameservertest.WithCharacter("Alt", 1, 0),
+		gameservertest.WithWantChars(2),
 		gameservertest.WithHTMLPages(shippedAdminPages(t, findPages...)),
 		gameservertest.WithItemTemplates(findItems()),
 		gameservertest.WithNPCs(findNPCs()))
 	gm := srv.Client
-	srv.SeedCharacterFor(t, "player1", "Alt", 1, 0)
 	enterWorld(t, gm)
 	other, _ := addPlayer(t, srv, "other", "Other", userLevel)
 	drain(t, gm)

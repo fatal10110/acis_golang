@@ -150,6 +150,10 @@ func (c faultConn) QueryContext(ctx context.Context, query string, args []driver
 	if c.fault.armed.Load() {
 		return nil, ErrFault
 	}
+	if c.fault.nth.targets(query) {
+		// As in ExecContext: the prepared retry counts it.
+		return nil, driver.ErrSkip
+	}
 	return c.inner.QueryContext(ctx, query, args)
 }
 
@@ -198,7 +202,7 @@ func (s faultStmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (s faultStmt) Query(args []driver.Value) (driver.Rows, error) {
-	if s.fault.armed.Load() {
+	if s.fault.armed.Load() || s.fault.nth.hit(s.query) {
 		return nil, ErrFault
 	}
 	return s.inner.Query(args) //nolint:staticcheck // forwards the legacy entry point database/sql may still call
@@ -212,7 +216,7 @@ func (s faultStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (d
 }
 
 func (s faultStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	if s.fault.armed.Load() {
+	if s.fault.armed.Load() || s.fault.nth.hit(s.query) {
 		return nil, ErrFault
 	}
 	return s.inner.QueryContext(ctx, args)

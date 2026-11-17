@@ -91,6 +91,7 @@ import (
 // of its rows in one transaction or none of them.
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
+	ListByOwnerAndLocations(ctx context.Context, ownerID int32, locs ...item.Location) ([]*item.Instance, error)
 	WriteBatch(ctx context.Context, batch item.FlushBatch) error
 	DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error)
 	SetEnchantOwned(ctx context.Context, ownerID, objectID int32, enchant int) (bool, error)

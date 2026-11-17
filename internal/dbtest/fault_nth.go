@@ -5,11 +5,11 @@ import (
 	"sync"
 )
 
-// FailNth makes the n-th statement executed from now on f's handles whose
-// SQL contains match fail with ErrFault, once; every other statement, before
-// and after it, runs. A suite uses it to fail one write in the middle of a
-// chain, such as the second row of a multi-row insert. A later call replaces
-// a pending one.
+// FailNth makes the n-th statement executed or query run from now on f's
+// handles whose SQL contains match fail with ErrFault, once; every other
+// statement, before and after it, runs. A suite uses it to fail one write in
+// the middle of a chain, such as the second row of a multi-row insert, or to
+// prove a read is not repeated. A later call replaces a pending one.
 func (f *Fault) FailNth(match string, n int) {
 	f.nth.mu.Lock()
 	defer f.nth.mu.Unlock()

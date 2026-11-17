@@ -237,13 +237,14 @@ func (l *GameClientLink) findHenna(symbolID int) (henna.Henna, bool) {
 	return l.belongings.hennaTable.Find(symbolID)
 }
 
-// restoreSelected restores the character c a selection picked: its items,
+// restoreSelected restores the character c a selection picked from chars,
+// the account's characters as its character list read them: its items,
 // skills, shortcuts, hennas, macros, recipes, recommendations and storage,
 // attached as a live player with its own queue, and its row marked online.
 // The player is neither spawned nor registered in the world here; the
 // selection registers it and EnterWorld spawns it. Every failure returns
 // nil: no live player is handed back, and none is registered.
-func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
+func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, chars []*player.Character, c *player.Character) (*livePlayer, bool) {
 	tmpl, ok := l.templates.Get(c.ClassID())
 	if !ok {
 		l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
@@ -307,7 +308,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 
 	// Split off before the inventory restore below takes its rows: the
 	// warehouse and freight rows are the rest of the same set.
-	storage := l.restoreStorage(ctx, client.AccountName(), c, items)
+	storage := l.restoreStorage(ctx, chars, c, items)
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("select character: attach live player")

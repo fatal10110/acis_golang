@@ -2113,6 +2113,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// which stands for a server with its own database, use rowsDB, which a
 	// WithDBFault fault never takes away.
 	rowsDB := sqltest.SharedDB(t)
+	// The pooled schema is the shipped one; the server adds its indexes at
+	// boot, as a deployed server does.
+	if err := gamesql.EnsureIndexes(context.Background(), rowsDB); err != nil {
+		t.Fatalf("add database indexes: %v", err)
+	}
 	db := rowsDB
 	if o.dbFault != nil {
 		db = o.dbFault.Wrap(t, rowsDB)
