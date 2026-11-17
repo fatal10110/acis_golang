@@ -372,6 +372,7 @@ func (w *frWorld) exitShots(t *testing.T, f *npc.Hostile, first time.Duration, c
 func TestFollowerOfFrintezzaChangesBodyAndIsBeaten(t *testing.T) {
 	t.Parallel()
 	w := bootFollower(t, frLiveRow(5), "GrandBoss")
+	needsDrivenClock(t, w.srv)
 	f := w.follower(t)
 	n := script.NPCOf(f)
 	id := f.ObjectID()
@@ -449,6 +450,7 @@ func TestFollowerOfFrintezzaChangesBodyAndIsBeaten(t *testing.T) {
 func TestFollowerOfFrintezzaDies(t *testing.T) {
 	t.Parallel()
 	w := bootFollower(t, frLiveRow(6), "GrandBoss")
+	needsDrivenClock(t, w.srv)
 	f := w.follower(t)
 	n := script.NPCOf(f)
 	id := f.ObjectID()

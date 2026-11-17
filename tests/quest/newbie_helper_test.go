@@ -165,6 +165,22 @@ func (w *newbieWorld) after(t *testing.T, d time.Duration) []string {
 	return w.render(t, w.srv.ReadQueued(t, w.srv.Client))
 }
 
+// afterWant is after for a span that ends on a timer's deadline: it keeps
+// letting time pass in small steps until the player has been sent at least n
+// rendered lines, since on the wall clock the timer's callback can run a few
+// milliseconds after the span ends. It adds nothing on a driven clock, where
+// the timer has fired by the time the span has passed.
+func (w *newbieWorld) afterWant(t *testing.T, d time.Duration, n int) []string {
+	t.Helper()
+	w.srv.Advance(t, d)
+	var got []string
+	w.srv.AdvanceUntil(t, "the timer's lines", func() bool {
+		got = append(got, w.render(t, w.srv.ReadQueued(t, w.srv.Client))...)
+		return len(got) >= n
+	})
+	return got
+}
+
 // render writes the frames a newbie helper flow is judged by, one line
 // each, in order: pages (by datapack file), ActionFailed, sounds, tutorial
 // question marks, radar controls, item drops and skill casts. Other frames
@@ -290,7 +306,7 @@ func TestNewbieHelperRecommendationShotsAndRadar(t *testing.T) {
 	expectVars(t, w, newbieHelper, map[string]string{"<state>": "STARTED", "step": "1"})
 	expectVars(t, w, tutorial, map[string]string{"<state>": "STARTED", "onlyone": "1", "Ex": "0"})
 	expectLines(t, "before 30 s", w.after(t, 29*time.Second))
-	expectLines(t, "helper timer", w.after(t, time.Second), "sound tutorial_voice_009a")
+	expectLines(t, "helper timer", w.afterWant(t, time.Second, 1), "sound tutorial_voice_009a")
 	expectVars(t, w, tutorial, map[string]string{"<state>": "STARTED", "onlyone": "1", "Ex": "1"})
 
 	gremlinTmpl := timakArcher()
@@ -300,7 +316,7 @@ func TestNewbieHelperRecommendationShotsAndRadar(t *testing.T) {
 	killer := playerCombatant(t, w.srv, w.player)
 	onNPCQueue(t, gremlin, func() { gremlin.Kill(killer) })
 	w.srv.ReadQueued(t, w.srv.Client)
-	expectLines(t, "gremlin dying", w.after(t, 3*time.Second),
+	expectLines(t, "gremlin dying", w.afterWant(t, 3*time.Second, 4),
 		"question mark 3", "sound tutorial_voice_011", fmt.Sprintf("drop %d x1", blueGem), "sound "+script.SoundTutorial)
 	expectVars(t, w, tutorial, map[string]string{"<state>": "STARTED", "onlyone": "1", "Ex": "2"})
 
@@ -329,7 +345,7 @@ func TestNewbieHelperRecommendationShotsAndRadar(t *testing.T) {
 	expectCount(t, w, beginnerShots, 200)
 	expectVars(t, w, newbieHelper, map[string]string{"<state>": "STARTED", "step": "2"})
 	expectVars(t, w, tutorial, map[string]string{"<state>": "STARTED", "onlyone": "1", "Ex": "3", "ucMemo": "3", "Gemstone": "1"})
-	expectLines(t, "helper timer again", w.after(t, 30*time.Second), "sound tutorial_voice_010a")
+	expectLines(t, "helper timer again", w.afterWant(t, 30*time.Second, 1), "sound tutorial_voice_010a")
 	expectVars(t, w, tutorial, map[string]string{"<state>": "STARTED", "onlyone": "1", "Ex": "4", "ucMemo": "3", "Gemstone": "1"})
 
 	expectLines(t, "guide with the recommendation", w.talk(t, roien.ObjectID()), "ActionFailed", "page 30008-02.htm", "ActionFailed")
@@ -409,9 +425,9 @@ func TestNewbieGuideBuffsAndBlessing(t *testing.T) {
 	w.srv.AddPlayerLevel(t, w.player, 1)
 	w.srv.ReadQueued(t, w.srv.Client)
 	expectLines(t, "first buff", w.event(t, "SupportMagic"), "cast 4322-1 player->player", "message 110")
-	expectLines(t, "second buff", w.after(t, time.Second), "cast 4323-1 player->player", "message 110")
+	expectLines(t, "second buff", w.afterWant(t, time.Second, 2), "cast 4323-1 player->player", "message 110")
 	expectLines(t, "no third buff", w.after(t, time.Second))
 
 	expectLines(t, "blessing asked", w.event(t, "GiveBlessing"))
-	expectLines(t, "blessing", w.after(t, time.Second), "cast 5182-1 player->player")
+	expectLines(t, "blessing", w.afterWant(t, time.Second, 1), "cast 5182-1 player->player")
 }

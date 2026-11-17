@@ -238,6 +238,7 @@ func valakasShot(shot string) string { return "S SpecialCamera obj=valakas shot=
 // seven death shots follow, 3.5, 4.5, 0.5, 4.6, 0.75 and 2.5 s apart. The db value 0 is saved.
 func TestValakasSleepsAndDies(t *testing.T) {
 	w := bootValakas(t, nil, valakasQuietDraws)
+	needsDrivenClock(t, w.srv)
 	boss := soleBaiumNPC(t, w, valakasID).(*npc.Hostile)
 	handle := script.NPCOf(boss)
 	if handle.DBLoaded() || handle.DBValue() != 0 {

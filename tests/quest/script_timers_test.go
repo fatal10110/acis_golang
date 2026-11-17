@@ -85,6 +85,22 @@ func (l *timerLog) take() []string {
 	return out
 }
 
+// takeWant is take for a span that ends on the timers' deadline: it keeps
+// letting time pass in small steps until n lines are logged, since on the
+// wall clock a timer's callback can run a few milliseconds after the span
+// ends. It adds nothing on a driven clock, where the timers have fired by the
+// time the span has passed.
+func (l *timerLog) takeWant(t *testing.T, srv *gameservertest.Server, n int) []string {
+	t.Helper()
+	srv.AdvanceUntil(t, "the timers' firings", func() bool {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		return len(l.lines) >= n
+	})
+	srv.Settle(t)
+	return l.take()
+}
+
 // bootTimers boots one character with a hostile template, the timer
 // behavior bound to it and the plain timer script, and returns the
 // server, the character's id and a spawner.
@@ -181,7 +197,7 @@ func TestPlayerTimersStopAtRelog(t *testing.T) {
 	p := fmt.Sprint(objID)
 	// Timers due together fire in any order on the pool, as in the
 	// reference's.
-	got := log.take()
+	got := log.takeWant(t, srv, 2)
 	slices.Sort(got)
 	if want := []string{"TimerQuest remind npc=none player=" + p, "TimerQuest tick npc=none player=" + p}; !slices.Equal(got, want) {
 		t.Fatalf("fired %q, want %q", got, want)
@@ -195,7 +211,7 @@ func TestPlayerTimersStopAtRelog(t *testing.T) {
 		t.Fatal("a timer bound to the departed player is still pending")
 	}
 	srv.Advance(t, time.Second)
-	if got, want := log.take(), []string{"TimerQuest engine npc=none player=none"}; !slices.Equal(got, want) {
+	if got, want := log.takeWant(t, srv, 1), []string{"TimerQuest engine npc=none player=none"}; !slices.Equal(got, want) {
 		t.Fatalf("after the restart fired %q, want only the timer bound to no one", got)
 	}
 
@@ -210,7 +226,7 @@ func TestPlayerTimersStopAtRelog(t *testing.T) {
 		}
 	})
 	srv.Advance(t, 200*time.Millisecond)
-	if got, want := log.take(), []string{"TimerQuest remind npc=none player=" + p}; !slices.Equal(got, want) {
+	if got, want := log.takeWant(t, srv, 1), []string{"TimerQuest remind npc=none player=" + p}; !slices.Equal(got, want) {
 		t.Fatalf("after the relog fired %q, want %q", got, want)
 	}
 	if got := sounds(t, srv); len(got) != 1 {

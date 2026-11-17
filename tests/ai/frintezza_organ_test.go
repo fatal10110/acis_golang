@@ -308,6 +308,7 @@ func (w *frWorld) film(t *testing.T, name string, f *npc.Folk, shots []foShot, a
 func TestOrganDummyFilmsTheAwakening(t *testing.T) {
 	t.Parallel()
 	w := bootOrgan(t, foBoot{atHall: true, frintezza: true, row: fzHallRow(3)})
+	needsDrivenClock(t, w.srv)
 	fz := w.frintezza(t)
 	f := w.organ(t)
 	if x, y, z := f.Position(); x != foHall.X || y != foHall.Y || z != foHall.Z || f.Heading() != 16384 {
@@ -359,6 +360,7 @@ func fzHallRow(value int) *spawn.State {
 func TestOrganDummyGuardsFrintezza(t *testing.T) {
 	t.Parallel()
 	w := bootOrgan(t, foBoot{atHall: true, frintezza: true, row: fzHallRow(4)})
+	needsDrivenClock(t, w.srv)
 	fz := w.frintezza(t)
 	f := w.organ(t)
 	w.srv.Advance(t, time.Second-time.Millisecond)
@@ -393,6 +395,7 @@ func TestOrganDummyGuardsFrintezza(t *testing.T) {
 func TestOrganDummyFilmsTheEnd(t *testing.T) {
 	t.Parallel()
 	w := bootOrgan(t, foBoot{atHall: true, frintezza: true, row: fzHallRow(4)})
+	needsDrivenClock(t, w.srv)
 	fz := w.frintezza(t)
 	f := w.organ(t)
 	w.srv.Advance(t, time.Second)
@@ -502,6 +505,7 @@ func TestFrintezzaSeekerCallsFrintezza(t *testing.T) {
 func TestFollowerDummyCastsAndLeaves(t *testing.T) {
 	t.Parallel()
 	w := bootOrgan(t, foBoot{})
+	needsDrivenClock(t, w.srv)
 	if !w.srv.RunScript(t, w.player.ObjectID(), frDirector, func(s *script.Script, _ *script.Player) {
 		s.Spawner().AddSpawn(foDummyID, script.Loc{X: w.at.X + 100, Y: w.at.Y, Z: w.at.Z}, false, 0)
 	}) {
