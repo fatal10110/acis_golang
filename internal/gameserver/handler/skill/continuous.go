@@ -3,16 +3,10 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
-
-// fearImmunePlayableSkillIDs are the skills whose FEAR effect must not land on
-// a player-controlled target even when the success roll would otherwise pass.
-// The list is fixed by the fear effect itself; the continuous handler applies
-// it as a caster-side gate, and a PDAM among them skips playable targets
-// outright.
-var fearImmunePlayableSkillIDs = map[modelskill.ID]bool{98: true, 1272: true, 1381: true}
 
 type continuousHandler struct {
 	defs Definitions
@@ -77,7 +71,7 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 				continue
 			}
 		case "FEAR":
-			if effected.Kind().Playable() && fearImmunePlayableSkillIDs[def.ID] {
+			if effected.Kind().Playable() && effect.FearSparesPlayables(def.ID) {
 				continue
 			}
 		}

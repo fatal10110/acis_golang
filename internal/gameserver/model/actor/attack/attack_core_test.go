@@ -54,7 +54,7 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
 	target := &timingTarget{id: 2}
 	clock := newTimingClock()
-	ctrl := NewCreature(actor, nil)
+	ctrl := newCreatureController(actor, nil)
 	ctrl.SetQueue(clock.q)
 	rec := &event.Recorder{}
 	ctrl.sink = rec
@@ -127,7 +127,7 @@ func TestControllerSwingStepsRoundDownToWholeMilliseconds(t *testing.T) {
 			actor := &timingActor{attackType: tt.weapon, attackSpeed: 402}
 			target := &timingTarget{id: 2}
 			clock := newTimingClock()
-			ctrl := NewCreature(actor, nil)
+			ctrl := newCreatureController(actor, nil)
 			ctrl.SetQueue(clock.q)
 			rec := &event.Recorder{}
 			ctrl.sink = rec
@@ -159,7 +159,7 @@ func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
 	actor := &timingActor{attackSpeed: 500}
 	target := &timingTarget{id: 2}
 	clock := newTimingClock()
-	ctrl := NewCreature(actor, nil)
+	ctrl := newCreatureController(actor, nil)
 	ctrl.SetQueue(clock.q)
 
 	ctrl.DoAttack(target)
@@ -206,7 +206,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 func TestControllerBowFireSkipsPlayerPacketsForCreatures(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponBow, attackSpeed: 500}
 	target := &timingTarget{id: 2}
-	ctrl := NewCreature(actor, nil)
+	ctrl := newCreatureController(actor, nil)
 	ctrl.SetQueue(newTimingClock().q)
 
 	ctrl.DoAttack(target)
@@ -266,7 +266,7 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	}
 	actor.known = []attackable.Combatant{actor, primary, outsideCone, first, second, beyondCap, behind, outOfRange, notAttackable}
 	clock := newTimingClock()
-	ctrl := NewCreature(actor, nil)
+	ctrl := newCreatureController(actor, nil)
 	ctrl.SetQueue(clock.q)
 	rec := &event.Recorder{}
 	ctrl.sink = rec
@@ -325,7 +325,7 @@ func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
 		known:       []attackable.Combatant{secondary},
 	}
 	clock := newTimingClock()
-	ctrl := NewCreature(actor, nil)
+	ctrl := newCreatureController(actor, nil)
 	ctrl.SetQueue(clock.q)
 
 	ctrl.DoAttack(primary)
@@ -543,7 +543,7 @@ func (t *timingTarget) TakeDamage(_ int, _ attackable.Combatant) bool {
 func TestControllerRejectsOutOfRangeWhenMovementDisabled(t *testing.T) {
 	actor := &timingActor{attackSpeed: 300, movementDisabled: true, outOfRange: true}
 	target := &timingTarget{id: 2, attackable: true}
-	ctrl := NewCreature(actor, nil)
+	ctrl := newCreatureController(actor, nil)
 
 	if ctrl.CanAttack(target) {
 		t.Fatal("CanAttack() = true when movement-disabled and out of range")
@@ -711,7 +711,7 @@ func TestControllerFinishClosesHitAnimation(t *testing.T) {
 func TestControllerAttackRethinkOnlyForNPCs(t *testing.T) {
 	newCtrl := map[string]func(*timingPlayer) *Controller{
 		"npc":      func(a *timingPlayer) *Controller { return NewAttackable(&a.timingActor, nil) },
-		"creature": func(a *timingPlayer) *Controller { return NewCreature(&a.timingActor, nil) },
+		"creature": func(a *timingPlayer) *Controller { return newCreatureController(&a.timingActor, nil) },
 		"player":   func(a *timingPlayer) *Controller { return NewPlayer(a, nil) },
 	}
 	for name, build := range newCtrl {
@@ -1218,4 +1218,10 @@ func TestControllerSwingSpendsAndRechargesShotsOnce(t *testing.T) {
 	if got := event.Count[event.ShotsRechargeRequested](npcRec); got != 0 {
 		t.Fatalf("NPC swing recharges = %d, want 0", got)
 	}
+}
+
+// newCreatureController returns a controller with only the base creature
+// rules: no playable or player surface.
+func newCreatureController(actor CreatureActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, sink: sink}
 }

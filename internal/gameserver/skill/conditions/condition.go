@@ -6,9 +6,10 @@ package conditions
 // model/item.UseCondition, which already owns it. Nothing in this package
 // duplicates that.
 
-// Condition is this package's own cast-time gate contract, decoupled from
-// effect.Condition: a stat function is gated by its owner alone, while a
-// cast condition needs both sides of the cast plus the skill being cast.
+// Condition is a gate over both sides of a cast or calculation plus the skill
+// it runs for. It is this package's own contract, decoupled from
+// effect.Condition, which reads the same three inputs through the stat
+// owner's surface.
 type Condition interface {
 	Test(effector, effected Actor, skill Skill) bool
 }

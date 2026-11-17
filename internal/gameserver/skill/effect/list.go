@@ -271,16 +271,9 @@ func NewList(owner StatOwner, opts ...Option) *List {
 	return l
 }
 
-// Flags returns the union of every visible held effect's flag bits — the
-// active member of each stack group. Stacked-but-inactive members live only
-// in the stacks map and contribute nothing here, although the specified
-// flag union ORs every held buff and debuff, stacked-but-not-in-use ones
-// included. The difference is
-// unreachable for the crowd-control flags that consume this surface: the
-// kinds carrying them either reject same-flag re-application
-// (rejectsIfAffected) or activate the next stack member the instant the
-// active one leaves, so the union stays continuous either way. It is
-// recomputed from the current buffs and debuffs on every call rather than
+// Flags returns the union of the flag bits of every held buff and debuff,
+// a stack member that is held but not in use included (see addStacked). It
+// is recomputed from the current buffs and debuffs on every call rather than
 // cached, matching how rarely a caller needs it compared to how often the
 // list itself changes.
 func (l *List) Flags() Flag {
@@ -321,18 +314,17 @@ func (l *List) IsAffected(flag Flag) bool {
 }
 
 // crowdControlVisuals pairs crowd-control flags with the client
-// abnormal-visual bit (the datapack abnormal name in the comment) a creature
-// shows while any of them is set.
+// abnormal-visual bit a creature shows while any of them is set.
 var crowdControlVisuals = [...]struct {
 	flags Flag
 	mask  int
 }{
-	{FlagStunned, 0x000040},                   // stun
-	{FlagRooted, 0x000200},                    // root
-	{FlagSleep, 0x000080},                     // sleep
-	{FlagConfused | FlagFear, 0x000020},       // fear
-	{FlagMuted | FlagPhysicalMuted, 0x000100}, // mute
-	{FlagMeditating, 0x020000},                // floatroot
+	{FlagStunned, modelskill.AbnormalStun},
+	{FlagRooted, modelskill.AbnormalRoot},
+	{FlagSleep, modelskill.AbnormalSleep},
+	{FlagConfused | FlagFear, modelskill.AbnormalFear},
+	{FlagMuted | FlagPhysicalMuted, modelskill.AbnormalMute},
+	{FlagMeditating, modelskill.AbnormalFloatRoot},
 }
 
 // CrowdControlAbnormalEffect returns the abnormal-visual bits derived from

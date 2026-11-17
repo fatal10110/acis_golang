@@ -12,6 +12,10 @@ func TimeBetweenAttacks(pAtkSpd int) int {
 	return d
 }
 
+// AttackSpeedBase is the attack or casting speed at which a timing runs
+// unscaled; a faster actor shortens it in proportion.
+const AttackSpeedBase = 333
+
 // AtkSpd returns the delay, in milliseconds, for a skill cast of
 // skillTime (its configured base cast time), given the attacker's
 // already-computed attack-speed stat: mAtkSpd when magic is true (the
@@ -19,7 +23,7 @@ func TimeBetweenAttacks(pAtkSpd int) int {
 // stat must be positive.
 func AtkSpd(magic bool, mAtkSpd, pAtkSpd int, skillTime float64) int {
 	if magic {
-		return int(skillTime * 333 / float64(mAtkSpd))
+		return int(skillTime * AttackSpeedBase / float64(mAtkSpd))
 	}
-	return int(skillTime * 333 / float64(pAtkSpd))
+	return int(skillTime * AttackSpeedBase / float64(pAtkSpd))
 }

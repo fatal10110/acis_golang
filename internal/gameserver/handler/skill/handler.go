@@ -510,19 +510,6 @@ func NewRegistry(handlers ...Handler) *Registry {
 	return r
 }
 
-// NewDefaultRegistry returns the representative handlers that currently have
-// enough surrounding model support to run deterministically.
-func NewDefaultRegistry() *Registry {
-	return NewDefaultRegistryWithDefinitions(nil)
-}
-
-// NewDefaultRegistryWithDefinitions returns the default handlers with the
-// shipped MagicFailures=true, providing loaded skill definitions to handlers
-// that need cross-skill effect lookup.
-func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
-	return newDefaultRegistry(defs, true, nil)
-}
-
 func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable) *Registry {
 	failures := &magicFailureSwitch{}
 	failures.on.Store(magicFailures)

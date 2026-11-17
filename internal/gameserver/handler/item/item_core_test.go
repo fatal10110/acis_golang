@@ -755,7 +755,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 	def := modelskill.Definition{ID: 100, Level: 1, Potion: true, Target: modelskill.TargetSelf, SkillType: "HEAL_PERCENT", Power: 50}
 	effects := actorcast.EffectHandlers{
 		Targets: skilltarget.NewRegistry(noKnownCreatures{}),
-		Skills:  handlerskill.NewDefaultRegistry(),
+		Skills:  handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{}),
 	}
 
 	for _, tc := range []struct {

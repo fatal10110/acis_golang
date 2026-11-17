@@ -570,7 +570,7 @@ func TestAIControllerCastStreamsHandlerMessagesToOnHitResult(t *testing.T) {
 		Definitions: definitions(def),
 		Effects: EffectHandlers{
 			Targets: skilltarget.NewRegistry(effectsKnown{}),
-			Skills:  handlerskill.NewDefaultRegistry(),
+			Skills:  handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{}),
 		},
 		Caster: caster,
 		OnHitResult: func(result EffectResult) {

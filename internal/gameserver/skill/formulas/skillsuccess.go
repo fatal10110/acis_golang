@@ -124,8 +124,8 @@ func RevivePower(witBonus, skillPower float64) float64 {
 
 // CancelSuccessRate returns the percent chance, clamped to [minRate,
 // maxRate], that one cancel roll strips an active effect: effectPeriod is
-// the effect's remaining duration in seconds (divided down with integer
-// arithmetic); diffLevel is the cancel skill's magic
+// the effect's full period in seconds (its template time, not the time left;
+// divided down with integer arithmetic); diffLevel is the cancel skill's magic
 // level minus the target's level; baseRate is the cancel skill's power;
 // vuln is the target's already-resolved cancel-vulnerability multiplier.
 func CancelSuccessRate(effectPeriod, diffLevel int, baseRate, vuln float64, minRate, maxRate int) float64 {
@@ -153,7 +153,7 @@ func CancelSucceeds(rate float64, roll int) bool {
 // and only the power term is scaled by vulnerability: casterMagicLevel is
 // the cancel effect's own owning-skill magic level, candidateMagicLevel and
 // candidatePeriod are the candidate effect's owning-skill magic level and
-// remaining duration in seconds, and power*vuln truncates to an integer
+// full period in seconds (its template time, not the time left), and power*vuln truncates to an integer
 // before it's added in.
 func EffectCancelSuccessRate(casterMagicLevel, candidateMagicLevel, candidatePeriod int, power, vuln float64) int {
 	rate := 2*(casterMagicLevel-candidateMagicLevel) + candidatePeriod/120 + int(power*vuln)

@@ -9,10 +9,10 @@ import (
 
 // applyEffects instantiates each of templates and adds it to effected's
 // effect list, attributed to effector. def carries the owning skill's
-// identity and stacking classification. A template naming an effect core
-// this port hasn't wired yet (see effect.New) is skipped rather than
-// failing the whole batch, matching how partially-modeled skill data
-// degrades elsewhere in this package.
+// identity and stacking classification. A template whose attached condition
+// rejects the pair is skipped rather than failing the whole batch; a
+// template naming no effect core never gets this far, since its skill fails
+// to load.
 func applyEffects(effector effect.Actor, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate) {
 	applyEffectsWithLanding(effector, effected, def, templates, formulas.ShieldFailed, false)
 }

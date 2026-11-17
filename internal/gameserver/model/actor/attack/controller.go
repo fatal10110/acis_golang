@@ -9,6 +9,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -178,11 +179,6 @@ func (c *Controller) SetQueue(q *sim.Queue) {
 // among them AttackStanceRequested, as each damaging hit lands, and
 // AttackFinished, once the swing finishes (the swing lands and, for non-bow
 // weapons, the actor is free to attack again). A nil sink drops them all.
-
-// NewCreature returns a base creature attack controller.
-func NewCreature(actor CreatureActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, sink: sink}
-}
 
 // NewPlayable returns an attack controller with playable-specific rules.
 func NewPlayable(actor PlayableActor, sink event.Sink) *Controller {
@@ -486,6 +482,11 @@ func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index 
 			c.scheduleHitLocked(seq, groups, index+1, finishAt, finish)
 			return
 		}
+		// The finish runs as its own task, even a bow shot's, which finishes
+		// at its landing: a task queued on the actor between the two still
+		// sees the attack in flight and runs behind the shot instead of at
+		// once. Accepted simplification: the gap is one queue hop, and the
+		// finish takes c.mu, which this landing holds until it returns.
 		c.scheduleLocked(max(time.Duration(0), finishAt-group.delay), finish)
 	})
 }
@@ -688,7 +689,7 @@ func (c *Controller) reflectedDamage(hit Hit) int {
 		return 0
 	}
 	if hit.Target.RaidRelated() {
-		if level, ok := c.actingPlayerLevel(); ok && level > hit.Target.Level()+8 {
+		if level, ok := c.actingPlayerLevel(); ok && level > hit.Target.Level()+creature.RaidCurseLevelGap {
 			return 0
 		}
 	}
@@ -846,12 +847,16 @@ func (c *Controller) clearBowCooldown(seq uint64) {
 	c.emit(event.AttackFinished{BowReuse: true})
 }
 
+// bowReuseSpeedBase is the attack speed at which a bow's reuse delay runs
+// unscaled; a faster bow shortens it in proportion.
+const bowReuseSpeedBase = 345
+
 func (c *Controller) scaledBowReuse() time.Duration {
 	reuse := c.actor.WeaponReuseDelay()
 	if reuse <= 0 {
 		return 0
 	}
-	return time.Duration(int64(reuse) * 345 / int64(max(1, c.actor.AttackSpeed())))
+	return time.Duration(int64(reuse) * bowReuseSpeedBase / int64(max(1, c.actor.AttackSpeed())))
 }
 
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
