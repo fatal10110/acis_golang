@@ -270,14 +270,17 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 	}
 	objectID, err := l.ids.NextID()
 	if err != nil {
+		l.log.Error().Err(err).Int("npc_id", template.ID).Msg("decoration: allocate object id")
 		return nil
 	}
 	instance, err := npc.NewInstance(objectID, template)
 	if err != nil {
+		l.log.Error().Err(err).Int("npc_id", template.ID).Msg("decoration: build instance")
 		return nil
 	}
 	decoration, err := npc.NewDecoration(instance, title)
 	if err != nil {
+		l.log.Error().Err(err).Int("npc_id", template.ID).Msg("decoration: build npc")
 		return nil
 	}
 	decoration.RespawnDelay = respawn
