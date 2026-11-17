@@ -84,9 +84,11 @@ type EnchantSkill struct {
 	ItemCount int
 }
 
+// EnchantRoute1Start and EnchantRoute2Start are the first skill levels of
+// the two enchant routes; a route's i-th enchant (from 0) is level start+i.
 const (
-	enchantRoute1Start = 101
-	enchantRoute2Start = 141
+	EnchantRoute1Start = 101
+	EnchantRoute2Start = 141
 	enchantRouteLength = 30
 )
 
@@ -150,9 +152,9 @@ func (e EnchantSkill) SuccessRateForLevel(level int) (int, bool) {
 // level is outside the two shipped enchant ranges.
 func (e EnchantSkill) Route() int {
 	switch {
-	case e.Level >= enchantRoute1Start && e.Level < enchantRoute1Start+enchantRouteLength:
+	case e.Level >= EnchantRoute1Start && e.Level < EnchantRoute1Start+enchantRouteLength:
 		return 1
-	case e.Level >= enchantRoute2Start && e.Level < enchantRoute2Start+enchantRouteLength:
+	case e.Level >= EnchantRoute2Start && e.Level < EnchantRoute2Start+enchantRouteLength:
 		return 2
 	default:
 		return 0
@@ -164,9 +166,9 @@ func (e EnchantSkill) Route() int {
 func (e EnchantSkill) RouteStep() int {
 	switch e.Route() {
 	case 1:
-		return e.Level - enchantRoute1Start + 1
+		return e.Level - EnchantRoute1Start + 1
 	case 2:
-		return e.Level - enchantRoute2Start + 1
+		return e.Level - EnchantRoute2Start + 1
 	default:
 		return 0
 	}
@@ -320,5 +322,5 @@ func enchantSkillAllowed(defs *Table, known SkillLevels, skillID ID, level int) 
 	if current == level-1 {
 		return true
 	}
-	return (level == enchantRoute1Start || level == enchantRoute2Start) && current == defs.MaxLevel(skillID)
+	return (level == EnchantRoute1Start || level == EnchantRoute2Start) && current == defs.MaxLevel(skillID)
 }

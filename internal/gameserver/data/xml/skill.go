@@ -210,7 +210,7 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 			forIndex, fors = levels, el.For
 		}
 		if err := sl.applyTemplatesAt(built, levels+i, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, 101+i, err)
+			return nil, fmt.Errorf("skill %d level %d: %w", id, skill.EnchantRoute1Start+i, err)
 		}
 	}
 
@@ -224,7 +224,7 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 			forIndex, fors = levels, el.For
 		}
 		if err := sl.applyTemplatesAt(built, levels+enchant1+i, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			return nil, fmt.Errorf("skill %d level %d: %w", id, 141+i, err)
+			return nil, fmt.Errorf("skill %d level %d: %w", id, skill.EnchantRoute2Start+i, err)
 		}
 	}
 
@@ -253,12 +253,12 @@ func (sl *skillLoader) buildLevels(name string, sets levelSets, levels, enchant1
 		}
 	}
 	route(levels, 1, func(i int) map[string]string { return sl.resolveLevel(sets.regular, i+1) })
-	route(enchant1, 101, func(i int) map[string]string {
+	route(enchant1, skill.EnchantRoute1Start, func(i int) map[string]string {
 		vals := sl.resolveLevel(sets.regular, levels)
 		sl.applyAttrs(vals, sets.enchant1, i+1)
 		return vals
 	})
-	route(enchant2, 141, func(i int) map[string]string {
+	route(enchant2, skill.EnchantRoute2Start, func(i int) map[string]string {
 		vals := sl.resolveLevel(sets.regular, levels)
 		sl.applyAttrs(vals, sets.enchant2, i+1)
 		return vals
