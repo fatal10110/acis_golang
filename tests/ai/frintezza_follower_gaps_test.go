@@ -9,8 +9,7 @@ import (
 // TestFollowerOfFrintezzaJumpsToAnAttackerItCannotReach ports the
 // stuck-path teleport of the attacked hook: hit after more than 10 failed
 // paths, hurt, by the creature it wants most, the follower is teleported
-// onto it; at 10 failed paths, or with the hit coming from a creature it
-// does not want most, it stays.
+// onto it; at 10 failed paths it stays.
 func TestFollowerOfFrintezzaJumpsToAnAttackerItCannotReach(t *testing.T) {
 	for _, row := range []struct {
 		name  string

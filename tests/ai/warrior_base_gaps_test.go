@@ -448,6 +448,9 @@ func TestWarriorBaseExplodesWhenItsSelfExplosionEnds(t *testing.T) {
 			w.draws.set(row.draw)
 
 			w.hit(t, h, 1)
+			if d, ok := desire(h, actorai.IntentionCast); ok != row.explode || (ok && d.Weight != 1000000) {
+				t.Fatalf("cast desire = %+v (%v), want a self explosion at 1000000: %v", d, ok, row.explode)
+			}
 			var frames [][]byte
 			for range 5 {
 				frames = append(frames, w.ticks(t, 1)...)
