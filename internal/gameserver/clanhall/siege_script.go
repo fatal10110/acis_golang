@@ -105,6 +105,18 @@ func (s *HallSiege) UpdateNextSiege() {
 	s.hs.updateNextSiegeLocked(s.h)
 }
 
+// WithRegistration runs register, one clan's registration with the siege from
+// its first check through its payment to its joining, as a single step
+// against every other registration of the hall: two clans never both take
+// its last place, and a clan refused for a full siege has paid nothing.
+// register may take the hall's locks; none is held while waiting here.
+func (s *HallSiege) WithRegistration(register func()) {
+	mu := &s.h.siege.registering
+	mu.Lock()
+	defer mu.Unlock()
+	register()
+}
+
 // AddAttacker makes clanID an attacker of the siege, and stores it,
 // reporting false when no script runs the siege, the clan attacks it
 // already, or it bids on a hall at auction: it could win both halls.

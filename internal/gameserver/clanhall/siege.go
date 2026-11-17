@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -168,6 +169,9 @@ type hallSiege struct {
 	// restartPoints are where the players of a clan restart to town while
 	// the siege's battlefield is on, by clan.
 	restartPoints map[int32]location.Location
+	// registering serializes the clans' registrations (WithRegistration); it is
+	// taken before mu and siegeMu.
+	registering sync.Mutex
 }
 
 // HallSiege is one siegable hall's siege, as readers and its script see it.
