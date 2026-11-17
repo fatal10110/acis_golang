@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -63,13 +64,16 @@ func TestLootProtectionLiftsAtItsDeadline(t *testing.T) {
 			}
 
 			// The looter stands on the drop, so a click picks it up with
-			// no walk and no time passing.
+			// no walk and no time passing. A teleporting player picks
+			// nothing up, so the looter finishes its teleport first.
 			obj, _ := g.srv.State.Player(g.players[1].id)
 			looter, ok := network.OnlineCharacter(obj)
 			if !ok {
 				t.Fatalf("Looter is %T", obj)
 			}
 			looter.TeleportTo(drop.X, drop.Y, drop.Z, 0)
+			g.srv.Settle(t)
+			g.players[1].c.Send(encodeSingle(clientpackets.OpcodeAppearing))
 			g.srv.Settle(t)
 			g.quiet(t)
 

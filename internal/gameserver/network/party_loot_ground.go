@@ -28,20 +28,15 @@ func (l *GameClientLink) partyLootView(live *livePlayer, ground *grounditem.Item
 }
 
 // pickupGroundForParty finishes live's pickup of the claimed ground item
-// under its party's loot rule and reports whether the item was taken. Only
-// finders-keepers needs room in the picker's own inventory: the other rules
-// hand the item to a member with room, or to the picker when none has any.
+// under its party's loot rule and reports whether the item was taken. The
+// caller has already refused a full picker under finders-keepers; the other
+// rules hand the item to a member with room, or to the picker when none has
+// any.
 // Adena is shared among the members in range and the picked-up stack
 // destroyed; anything else goes to the member the rule picks, and the
 // others are told who took it.
 func (l *GameClientLink) pickupGroundForParty(live *livePlayer, ground *grounditem.Item, view party.View[*livePlayer]) bool {
-	inv := live.Inventory()
 	st := ground.Instance.Snapshot()
-	if view.Loot == party.LootFindersKeepers && !inv.ValidateCapacity(inv.SlotsNeededFor(&ground.Instance, ground.Template)) {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
-		return false
-	}
 	if invops.LootLocked(st.OwnerID, live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
