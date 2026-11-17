@@ -201,8 +201,11 @@ func (cl *Clan) learnRefusalLocked(trees *modelskill.Trees, id, level int) (mode
 // LearnSkill has c's clan learn skill id at level, the next level the
 // clan can learn of it, for its reputation cost and, when the item is
 // required, one of its item paid through payItem. Only the clan's leader
-// may. The reputation check is repeated once the item is paid, under the
-// same hold of the clan's lock that takes the cost and adds the skill.
+// may. The reputation is checked once, before the item is paid: a paid
+// item always buys the skill, its cost taken from whatever reputation the
+// clan has left by then, even below 0. Only a change to the clan's level
+// or skills while the item is paid, which leaves the skill no longer its
+// next learnable level, refuses it after the payment.
 func (s *Service) LearnSkill(c *player.Character, trees *modelskill.Trees, id, level int, payItem func(itemID int32) bool) []any {
 	cl, ok := s.ClanOf(c)
 	if !ok || !cl.IsLeader(c.ID) {
@@ -219,8 +222,8 @@ func (s *Service) LearnSkill(c *player.Character, trees *modelskill.Trees, id, l
 	}
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
-	if _, refusal := cl.learnRefusalLocked(trees, id, level); refusal != nil {
-		return []any{refusal}
+	if _, ok := trees.ClanSkillFor(cl.level, cl.skillLevelsLocked(), modelskill.ID(id), level); !ok {
+		return []any{SkillUnavailable{}}
 	}
 	var notices []any
 	change, changed := s.addReputationLocked(cl, -node.Cost)

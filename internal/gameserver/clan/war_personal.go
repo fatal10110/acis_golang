@@ -1,7 +1,6 @@
 package clan
 
 import (
-	"context"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -30,8 +29,10 @@ func (s *Service) SurrenderPersonally(c *player.Character, targetName string) (W
 // member of war.Clan but one wants peace; peace reports whether a member is
 // online and, if so, whether it wants peace. Every member must be online to
 // be counted: one offline member leaves the war on, as the count cannot be
-// taken. The end stops both wars: war.Clan's on war.Target, as a stop is,
-// with its penalty, and war.Target's own on war.Clan, if any, with none.
+// taken. The end stops war.Clan's war on war.Target, as a stop is, with
+// its penalty. war.Target's own war on war.Clan, if any, ends in memory
+// only: war.Clan still counts war.Target among its attackers, and the
+// stored row stays, so that war comes back on the next restore.
 func (s *Service) EndSurrenderedWar(war War, peace func(objectID int32) (wants, online bool), now time.Time) bool {
 	cl, target := war.Clan, war.Target
 	members := cl.Members()
@@ -53,11 +54,6 @@ func (s *Service) EndSurrenderedWar(war War, peace func(objectID int32) (wants, 
 	if !s.endWarLocked(cl, target, now) {
 		return false
 	}
-	if target.wars.Has(cl.id) {
-		target.wars.Remove(cl.id)
-		cl.attackers.Remove(target.id)
-		clanID, targetID := target.id, cl.id
-		s.write(clanID, "end clan war", func(ctx context.Context, st Store) error { return st.EndWar(ctx, clanID, targetID, 0) })
-	}
+	target.wars.Remove(cl.id)
 	return true
 }
