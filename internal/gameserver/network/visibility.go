@@ -89,8 +89,8 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 				HeroAura:           p.link.heroAura(o),
 				SpawnProtectedTeam: p.link.spawnProtectedTeam(o),
 			}))
-			if o.throne != nil {
-				p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
+			if chairID, ok := o.throneID(); ok {
+				p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), chairID))
 			}
 		}
 		// Both players learn their relation to the other: p gets o's (and

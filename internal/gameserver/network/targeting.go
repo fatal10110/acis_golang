@@ -823,7 +823,7 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) 
 	if !ok || !staticobject.ClaimChair(live, chair, staticobject.ChairInteractionDistance) {
 		return false
 	}
-	live.throne = chair
+	live.takeThrone(chair)
 	if !l.changeLiveWaitType(live, false) {
 		live.releaseChair()
 		return false
