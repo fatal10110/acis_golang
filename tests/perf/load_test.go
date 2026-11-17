@@ -280,7 +280,11 @@ func TestLoadBaseline(t *testing.T) {
 		}
 	}
 	if v.catalog {
-		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed", len(cat.templates), clients, len(cat.list))
+		heard := cat.attacked.Load()
+		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed, attacked hooks=%d", len(cat.templates), clients, len(cat.list), heard)
+		if heard == 0 {
+			t.Errorf("the catalog variant ran no script hook: the shipped scripts were not bound")
+		}
 	}
 	if strayReplies > 0 {
 		t.Errorf("%d clients got a probe-reply count different from their probe count; an unsolicited SkillList would corrupt the latency samples", strayReplies)

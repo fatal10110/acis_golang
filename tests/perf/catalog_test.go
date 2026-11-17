@@ -5,6 +5,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
@@ -31,6 +32,8 @@ type prodCatalog struct {
 	templates []*npc.Template
 	// table holds templates, for the boot.
 	table *npc.Table
+	// attacked counts the attack hooks the picked scripts ran.
+	attacked *atomic.Int64
 }
 
 // loadProdCatalog loads the shipped data (skipping without a datapack) and
@@ -75,6 +78,7 @@ func loadProdCatalog(t *testing.T, n int) *prodCatalog {
 	kindOf := script.NPCKindOf(npcs)
 	taken := map[int32]bool{}
 	var picks []*npc.Template
+	attacked := new(atomic.Int64)
 	for _, l := range listed {
 		s := joined[l.Path]()
 		if !s.Behavior || s.Hooks.OnAttacked == nil {
@@ -94,13 +98,25 @@ func loadProdCatalog(t *testing.T, n int) *prodCatalog {
 			return cmp.Or(cmp.Compare(a.Level, b.Level), cmp.Compare(a.ID, b.ID))
 		})
 		taken[int32(best.ID)] = true
+		// The pick counts its attack hook, then runs the shipped one.
+		ctor := joined[l.Path]
+		joined[l.Path] = func() script.Script {
+			s := ctor()
+			shipped := s.Hooks.OnAttacked
+			s.Hooks.OnAttacked = func(self *script.Script, e script.Attacked) {
+				attacked.Add(1)
+				shipped(self, e)
+			}
+			return s
+		}
 		// A copy: the run tunes the attack power, never the shipped table.
 		tmpl := *best
 		tmpl.PAtk = 0.25
 		tmpl.HPMax = 1000 // a shipped low-level monster would die to a single hit between two refills
 		tmpl.CanMove = true
-		// 200 clients share one spot: an aggressive monster, or one that calls
-		// its clan-mates, would have a crowd of monsters on one client.
+		// Zeroed so ACIS_PERF_REGIONS below the client count, which puts
+		// several clients in one region, does not gather a crowd of monsters
+		// on one client.
 		tmpl.AggroRange = 0
 		tmpl.Clans, tmpl.ClanRange = nil, 0
 		picks = append(picks, &tmpl)
@@ -114,5 +130,5 @@ func loadProdCatalog(t *testing.T, n int) *prodCatalog {
 	if len(picks) == 0 {
 		t.Fatal("no catalog script binds a hostile NPC to the attack hook")
 	}
-	return &prodCatalog{list: listed, catalog: joined, skills: skills, templates: picks, table: npc.NewTable(picks)}
+	return &prodCatalog{list: listed, catalog: joined, skills: skills, templates: picks, table: npc.NewTable(picks), attacked: attacked}
 }

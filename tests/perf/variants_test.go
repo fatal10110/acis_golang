@@ -43,7 +43,8 @@ import (
 //	         cast variant covers casting). It skips without a datapack.
 //	         ACIS_PERF_CATALOG_NPCS bounds how many templates. It implies
 //	         spread, one region per client unless ACIS_PERF_REGIONS says
-//	         otherwise, so the behaviors' aggro sees only their own client
+//	         otherwise: the shipped attacked reactions (call for help) pulled
+//	         monsters onto neighbouring clients when regions were shared
 //	fixture  the database holds a production-sized item and character
 //	         population (ACIS_PERF_ITEMS per client, ACIS_PERF_BG_CHARS other
 //	         characters, ACIS_PERF_BG_ITEMS other item rows), and the run
@@ -89,9 +90,9 @@ func variantsFromEnv(t *testing.T) variants {
 			}
 		}
 	}
-	// The shipped behaviors aggro and call for help: 200 clients at one spot
-	// would have crowds of monsters on the first few of them, so each client
-	// of the catalog variant stands in a region of its own.
+	// The shipped attacked reactions call for help: monsters of shared
+	// regions were pulled onto clients 0 and 1, so each client of the catalog
+	// variant stands in a region of its own.
 	if v.catalog {
 		v.spread = true
 	}
