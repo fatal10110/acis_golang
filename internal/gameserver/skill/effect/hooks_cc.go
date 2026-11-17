@@ -38,7 +38,7 @@ func fearStart(e *Effect) bool {
 	if e.Effected.FearImmune() {
 		return false
 	}
-	if isPlayable(e.Effected) && fearSkippedPlayableSkillIDs[e.Skill.ID] {
+	if isPlayable(e.Effected) && FearSparesPlayables(e.Skill.ID) {
 		return false
 	}
 	if e.Effected.EffectList().StartedAffected(FlagFear) {
@@ -160,25 +160,25 @@ func physicalMuteStart(e *Effect) bool {
 }
 
 func paralyzeStart(e *Effect) bool {
-	startAbnormalEffect(e.Effected, 0x000400)
+	startAbnormalEffect(e.Effected, modelskill.AbnormalHold1)
 	e.Effected.AbortAll(false)
 	return true
 }
 
 func paralyzeExit(e *Effect) {
-	stopAbnormalEffect(e.Effected, 0x000400)
+	stopAbnormalEffect(e.Effected, modelskill.AbnormalHold1)
 	thinkIfNotPlayer(e.Effected)
 }
 
 func petrificationStart(e *Effect) bool {
-	startAbnormalEffect(e.Effected, 0x000800)
+	startAbnormalEffect(e.Effected, modelskill.AbnormalHold2)
 	e.Effected.AbortAll(false)
 	e.Effected.SetInvul(true)
 	return true
 }
 
 func petrificationExit(e *Effect) {
-	stopAbnormalEffect(e.Effected, 0x000800)
+	stopAbnormalEffect(e.Effected, modelskill.AbnormalHold2)
 	thinkIfNotPlayer(e.Effected)
 	e.Effected.SetInvul(false)
 }
@@ -211,7 +211,7 @@ func silentMoveAction(e *Effect) bool {
 	if e.Skill.SkillType != "CONT" {
 		return false
 	}
-	return manaDrainTick(e)
+	return manaDrain(e, true)
 }
 
 func stunSelfStart(e *Effect) bool {

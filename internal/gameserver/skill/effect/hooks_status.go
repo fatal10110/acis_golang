@@ -4,41 +4,39 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
+// spoilStart marks the effected monster's spoil pool for the effector on a
+// successful roll. Only a player spoils: any other effector fails the start.
 func spoilStart(e *Effect) bool {
-	caster := e.Effector
-	if caster == nil {
+	player, ok := asPlayer(e.Effector)
+	if !ok {
 		return false
 	}
 	target, ok := asNPC(e.Effected)
 	if !ok || target.Dead() {
 		return false
 	}
-	player, casterIsPlayer := asPlayer(caster)
 	pool := target.SpoilPool()
-	if pool == nil || pool.IsSpoiled() {
-		if casterIsPlayer && pool != nil {
-			player.NotifySpoilAlready()
-		}
+	if pool == nil {
+		return false
+	}
+	if pool.IsSpoiled() {
+		player.NotifySpoilAlready()
 		return false
 	}
 
-	penalty := casterIsPlayer && player.WeaponGradePenalty()
-	rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, penalty)
+	rate := formulas.MagicSuccessRate(target.Level(), player.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, player.WeaponGradePenalty())
 	if formulas.MagicSucceeds(rate, rnd.Get(spoilRoll)) {
 		// Another spoiler can mark the pool between the check above and
 		// here; losing that race is the already-spoiled branch.
-		if !pool.Mark(caster.ObjectID()) {
-			if casterIsPlayer {
-				player.NotifySpoilAlready()
-			}
+		if !pool.Mark(player.ObjectID()) {
+			player.NotifySpoilAlready()
 			return false
 		}
-		if casterIsPlayer {
-			player.NotifySpoilSuccess()
-		}
+		player.NotifySpoilSuccess()
 	}
 	return true
 }
@@ -80,7 +78,7 @@ func growStart(e *Effect) bool {
 		return false
 	}
 	target.SetCollisionRadius(target.CollisionRadius() * growRadiusScale)
-	startAbnormalEffect(e.Effected, 0x010000)
+	startAbnormalEffect(e.Effected, modelskill.AbnormalGrow)
 	return true
 }
 
@@ -92,7 +90,7 @@ func growExit(e *Effect) {
 		return
 	}
 	target.ResetCollisionRadius()
-	stopAbnormalEffect(e.Effected, 0x010000)
+	stopAbnormalEffect(e.Effected, modelskill.AbnormalGrow)
 }
 
 // recoveryStart lowers the target's death-penalty debuff level by one,
@@ -220,7 +218,7 @@ func relaxAction(e *Effect) bool {
 			return false
 		}
 	}
-	return manaDrainTick(e)
+	return manaDrain(e, true)
 }
 
 // chameleonRestStart sits the target down; it always reports success.
@@ -239,7 +237,7 @@ func chameleonRestAction(e *Effect) bool {
 	if player, ok := asPlayer(e.Effected); ok && player.Standing() {
 		return false
 	}
-	return manaDrainTick(e)
+	return manaDrain(e, true)
 }
 
 func fakeDeathStart(e *Effect) bool {
@@ -252,7 +250,7 @@ func fakeDeathStart(e *Effect) bool {
 // fakeDeathAction drains MP each tick, reusing the same lack-MP handling
 // as the other mana-drain ticks in this file.
 func fakeDeathAction(e *Effect) bool {
-	return manaDrainTick(e)
+	return manaDrain(e, true)
 }
 
 // fakeDeathExit stands the target back up and starts its recent-fake-death

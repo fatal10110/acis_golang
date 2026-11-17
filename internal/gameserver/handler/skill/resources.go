@@ -212,6 +212,11 @@ func (h cpDamagePercentHandler) Use(cast Cast) {
 // cast break rolls first, the caster hears of the damage, the CP drops and
 // the target's status reports it, and last the target hears who dealt the
 // damage — all of it even for a target left with no CP to lose.
+//
+// No shield roll is made and no effect template lands on the target.
+// Accepted simplification: the only CPDAMPERCENT skill shipped, Wrath (320),
+// carries no effect, so neither is observable. A CPDAMPERCENT skill that
+// gains an effect needs both, the shield result passed to its landing.
 func (cpDamagePercentHandler) UseResult(cast Cast) Result {
 	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {

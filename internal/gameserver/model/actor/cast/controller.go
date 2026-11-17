@@ -949,7 +949,7 @@ func ReuseKey(def *modelskill.Definition) int32 {
 	if def.SharedReuse != nil {
 		ref = *def.SharedReuse
 	}
-	return int32(ref.ID)*256 + int32(ref.Level)
+	return int32(ref.ID)*modelskill.KeyLevels + int32(ref.Level)
 }
 
 // FusionTimeline reports whether a player cast of def runs the fusion-cast
@@ -960,6 +960,22 @@ func ReuseKey(def *modelskill.Definition) int32 {
 func FusionTimeline(def *modelskill.Definition) bool {
 	return def.SkillType == "FUSION" || def.SkillType == "SIGNET_CASTTIME"
 }
+
+// Cast timing constants, in milliseconds unless noted.
+const (
+	// spiritshotCastRate scales a charged magic cast's hit and cool time.
+	spiritshotCastRate = 0.70
+	// minScaledHitTime floors the scaled hit time of a skill whose
+	// template hit time is at least that long.
+	minScaledHitTime = 500
+	// interruptLead is how far before the end of the hit time the plan's
+	// InterruptAfter mark sits.
+	interruptLead = 200
+	// launchHitSplit is how long before the hit a long cast launches; a
+	// hit time over launchSplitMin splits into launch and hit phases.
+	launchHitSplit = 400
+	launchSplitMin = 410
+)
 
 func (c *Controller) buildPlan(def *modelskill.Definition) Plan {
 	// A fusion-timeline cast reads its hit time, cool time and reuse delay
@@ -975,31 +991,31 @@ func (c *Controller) buildPlan(def *modelskill.Definition) Plan {
 			coolTime = formulas.AtkSpd(def.Magic, positive(c.actor.AttackSpeed(true)), positive(c.actor.AttackSpeed(false)), float64(coolTime))
 		}
 		if def.Magic && (c.actor.SpiritshotCharged() || c.actor.BlessedSpiritshotCharged()) {
-			hitTime = int(0.70 * float64(hitTime))
-			coolTime = int(0.70 * float64(coolTime))
+			hitTime = int(spiritshotCastRate * float64(hitTime))
+			coolTime = int(spiritshotCastRate * float64(coolTime))
 		}
-		if def.HitTime >= 500 && hitTime < 500 {
-			hitTime = 500
+		if def.HitTime >= minScaledHitTime && hitTime < minScaledHitTime {
+			hitTime = minScaledHitTime
 		}
 	}
 
 	reuseDelay := def.ReuseDelay
 	if !def.StaticReuse && !fusion {
 		reuseDelay = int(float64(reuseDelay) * c.actor.ReuseRate(def.Magic))
-		reuseDelay = int(float64(reuseDelay) * (333.0 / float64(positive(c.actor.AttackSpeed(def.Magic)))))
+		reuseDelay = int(float64(reuseDelay) * (formulas.AttackSpeedBase / float64(positive(c.actor.AttackSpeed(def.Magic)))))
 	}
 
 	plan := Plan{
 		HitTime:        ms(hitTime),
 		CoolTime:       ms(coolTime),
 		ReuseDelay:     ms(reuseDelay),
-		InterruptAfter: ms(hitTime - 200),
+		InterruptAfter: ms(hitTime - interruptLead),
 		ReuseKey:       ReuseKey(def),
 		SkillMastery:   c.actor.SkillMastery(def),
 	}
-	if hitTime > 410 {
-		plan.LaunchDelay = ms(hitTime - 400)
-		plan.HitDelay = 400 * time.Millisecond
+	if hitTime > launchSplitMin {
+		plan.LaunchDelay = ms(hitTime - launchHitSplit)
+		plan.HitDelay = launchHitSplit * time.Millisecond
 		plan.GaugeDuration = plan.HitTime
 		if coolTime > 0 {
 			plan.FinalDelay = plan.CoolTime

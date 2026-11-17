@@ -137,8 +137,8 @@ func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
 
-	if !ApplyEffects(handlers, caster, target, def) {
-		t.Fatal("ApplyEffects() = false, want true")
+	if !applyEffectsHandled(handlers, caster, target, def) {
+		t.Fatal("applyEffectsHandled() = false, want true")
 	}
 	if len(caster.calls) != 1 {
 		t.Fatalf("PvP status calls = %d, want 1", len(caster.calls))
@@ -159,8 +159,8 @@ func TestApplyEffectsAbortsWhenPlayableSkillSeeCurseBlocks(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
 
-	if ApplyEffects(handlers, caster, target, def) {
-		t.Fatal("ApplyEffects() = true, want false after skill-see curse")
+	if applyEffectsHandled(handlers, caster, target, def) {
+		t.Fatal("applyEffectsHandled() = true, want false after skill-see curse")
 	}
 	if len(rec.calls) != 0 {
 		t.Fatalf("skill handler calls = %d, want 0", len(rec.calls))
@@ -179,8 +179,8 @@ func TestApplyEffectsContinuesWhenPlayableSkillSeeCurseAllows(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
 
-	if !ApplyEffects(handlers, caster, target, def) {
-		t.Fatal("ApplyEffects() = false, want true")
+	if !applyEffectsHandled(handlers, caster, target, def) {
+		t.Fatal("applyEffectsHandled() = false, want true")
 	}
 	if len(rec.calls) != 1 {
 		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
@@ -197,8 +197,8 @@ func TestApplyEffectsToggleSkipsSkillSeeCurse(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Activation: modelskill.ActivationToggle, SkillType: "DUMMY"}
 
-	if !ApplyEffects(handlers, caster, target, def) {
-		t.Fatal("ApplyEffects(toggle) = false, want true")
+	if !applyEffectsHandled(handlers, caster, target, def) {
+		t.Fatal("applyEffectsHandled(toggle) = false, want true")
 	}
 	if len(rec.calls) != 1 {
 		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
@@ -213,8 +213,8 @@ func TestApplyEffectsAreaTargetReachesEveryAffectedCreature(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{caster, selected, bystander}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetArea, Offensive: true, Radius: 900, SkillType: "DUMMY"}
 
-	if !ApplyEffects(handlers, caster, selected, def) {
-		t.Fatal("ApplyEffects(area) = false, want true")
+	if !applyEffectsHandled(handlers, caster, selected, def) {
+		t.Fatal("applyEffectsHandled(area) = false, want true")
 	}
 	if len(rec.calls) != 1 {
 		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
@@ -236,8 +236,8 @@ func TestApplyEffectsAuraTargetSweepsRadiusAroundCaster(t *testing.T) {
 
 	// Aura skills have no selected target: the caster is both the anchor
 	// and the resolved target.
-	if !ApplyEffects(handlers, caster, nil, def) {
-		t.Fatal("ApplyEffects(aura) = false, want true")
+	if !applyEffectsHandled(handlers, caster, nil, def) {
+		t.Fatal("applyEffectsHandled(aura) = false, want true")
 	}
 	if len(rec.calls) != 1 || len(rec.calls[0].Targets) != 1 {
 		t.Fatalf("recorded call = %+v, want one call with one target", rec.calls)
@@ -255,8 +255,8 @@ func TestApplyEffectsCorpseMobTargetRequiresPendingCorpse(t *testing.T) {
 
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "SWEEP", rec)
-	if !ApplyEffects(handlers, caster, corpse, def) {
-		t.Fatal("ApplyEffects(corpse mob, has corpse) = false, want true")
+	if !applyEffectsHandled(handlers, caster, corpse, def) {
+		t.Fatal("applyEffectsHandled(corpse mob, has corpse) = false, want true")
 	}
 	if len(rec.calls) != 1 || len(rec.calls[0].Targets) != 1 || rec.calls[0].Targets[0] != any(corpse) {
 		t.Fatalf("recorded call = %+v, want one call targeting the corpse", rec.calls)
@@ -264,8 +264,8 @@ func TestApplyEffectsCorpseMobTargetRequiresPendingCorpse(t *testing.T) {
 
 	rec2 := &recordingSkillHandler{}
 	handlers2 := newEffectHandlers(effectsKnown{}, "SWEEP", rec2)
-	if ApplyEffects(handlers2, caster, live, def) {
-		t.Fatal("ApplyEffects(corpse mob, no corpse) = true, want false")
+	if applyEffectsHandled(handlers2, caster, live, def) {
+		t.Fatal("applyEffectsHandled(corpse mob, no corpse) = true, want false")
 	}
 	if len(rec2.calls) != 0 {
 		t.Fatalf("skill handler calls = %d, want 0 for a target with no corpse", len(rec2.calls))
@@ -279,8 +279,8 @@ func TestApplyEffectsSummonTargetResolvesCasterOwnedSummon(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 103, Target: modelskill.TargetSummon, SkillType: "DUMMY"}
 
-	if !ApplyEffects(handlers, caster, nil, def) {
-		t.Fatal("ApplyEffects(summon) = false, want true")
+	if !applyEffectsHandled(handlers, caster, nil, def) {
+		t.Fatal("applyEffectsHandled(summon) = false, want true")
 	}
 	if len(rec.calls) != 1 || len(rec.calls[0].Targets) != 1 || rec.calls[0].Targets[0] != any(summon) {
 		t.Fatalf("recorded call = %+v, want one call targeting the caster's summon", rec.calls)
@@ -290,8 +290,8 @@ func TestApplyEffectsSummonTargetResolvesCasterOwnedSummon(t *testing.T) {
 	rec2 := &recordingSkillHandler{}
 	handlers2 := newEffectHandlers(effectsKnown{}, "DUMMY", rec2)
 	summonless := &effectsActor{id: 4, kind: modelactor.KindPlayer}
-	if ApplyEffects(handlers2, summonless, nil, def) {
-		t.Fatal("ApplyEffects(summon, no summon) = true, want false")
+	if applyEffectsHandled(handlers2, summonless, nil, def) {
+		t.Fatal("applyEffectsHandled(summon, no summon) = true, want false")
 	}
 	if len(rec2.calls) != 0 {
 		t.Fatalf("skill handler calls = %d, want 0 for a caster without a summon", len(rec2.calls))
@@ -304,8 +304,8 @@ func TestApplyEffectsUnresolvedTargetTypeIsNoop(t *testing.T) {
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 104, Target: modelskill.TargetEnemySummon, SkillType: "DUMMY"}
 
-	if ApplyEffects(handlers, caster, nil, def) {
-		t.Fatal("ApplyEffects(unregistered target type) = true, want false")
+	if applyEffectsHandled(handlers, caster, nil, def) {
+		t.Fatal("applyEffectsHandled(unregistered target type) = true, want false")
 	}
 	if len(rec.calls) != 0 {
 		t.Fatalf("skill handler calls = %d, want 0", len(rec.calls))
@@ -316,11 +316,11 @@ func TestApplyEffectsNilRegistriesAreNoop(t *testing.T) {
 	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	def := modelskill.Definition{ID: 105, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
 
-	if ApplyEffects(EffectHandlers{}, caster, nil, def) {
-		t.Fatal("ApplyEffects(zero-value handlers) = true, want false")
+	if applyEffectsHandled(EffectHandlers{}, caster, nil, def) {
+		t.Fatal("applyEffectsHandled(zero-value handlers) = true, want false")
 	}
-	if ApplyEffects(EffectHandlers{}, nil, nil, def) {
-		t.Fatal("ApplyEffects(nil caster) = true, want false")
+	if applyEffectsHandled(EffectHandlers{}, nil, nil, def) {
+		t.Fatal("applyEffectsHandled(nil caster) = true, want false")
 	}
 }
 
@@ -357,8 +357,8 @@ func TestApplyEffectsRejectsNonCreatureSelection(t *testing.T) {
 	if _, ok := SelectTarget(caster, door, &def); !ok {
 		t.Fatal("SelectTarget(door) ok = false, want true: a non-creature Tracked value still selects")
 	}
-	if ApplyEffects(handlers, caster, door, def) {
-		t.Fatal("ApplyEffects(door selection) = true, want false")
+	if applyEffectsHandled(handlers, caster, door, def) {
+		t.Fatal("applyEffectsHandled(door selection) = true, want false")
 	}
 	if len(rec.calls) != 0 {
 		t.Fatalf("skill handler calls = %d, want 0 (door never reaches a skill handler)", len(rec.calls))
@@ -446,8 +446,8 @@ func TestApplyEffectsAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
 			if !ok {
 				t.Fatal("SelectTarget() ok = false, want true")
 			}
-			if got := ApplyEffects(handlers, caster, selected, tc.def); got != tc.want {
-				t.Fatalf("ApplyEffects() = %v, want %v", got, tc.want)
+			if got := applyEffectsHandled(handlers, caster, selected, tc.def); got != tc.want {
+				t.Fatalf("applyEffectsHandled() = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -493,4 +493,9 @@ func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {
 
 func (*effectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
 	return false
+}
+
+// applyEffectsHandled reports whether ApplyEffectsResult ran a skill handler.
+func applyEffectsHandled(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) bool {
+	return ApplyEffectsResult(handlers, caster, resolved, def).Handled
 }

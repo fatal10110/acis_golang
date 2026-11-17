@@ -42,10 +42,6 @@ type AttackStanceCubic interface {
 	Action()
 }
 
-type attackStanceOwner interface {
-	Owner() AttackStanceActor
-}
-
 type attackStanceSummoner interface {
 	Summon() AttackStanceActor
 }
@@ -113,18 +109,19 @@ func (a *AttackStance) Add(actor AttackStanceActor) {
 	a.add(actor.ObjectID(), actor, a.now().Add(AttackStancePeriod))
 }
 
-// Remove stops tracking actor and reports whether it had been tracked.
+// Remove stops tracking actor and reports whether it had been tracked. The
+// registry is keyed by the actor passed in: a caller removing a summon's
+// stance passes the summon's owner.
 func (a *AttackStance) Remove(actor AttackStanceActor) bool {
-	actor = stanceOwner(actor)
 	if actor == nil {
 		return false
 	}
 	return a.remove(actor.ObjectID())
 }
 
-// InAttackStance reports whether actor is currently tracked.
+// InAttackStance reports whether actor is currently tracked, keyed the same
+// way as Remove.
 func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
-	actor = stanceOwner(actor)
 	if actor == nil {
 		return false
 	}
@@ -175,16 +172,4 @@ func (a *AttackStance) stop(actor AttackStanceActor) {
 			a.effects.AutoAttackStop(summon)
 		}
 	}
-}
-
-func stanceOwner(actor AttackStanceActor) AttackStanceActor {
-	if actor == nil {
-		return nil
-	}
-	if s, ok := actor.(attackStanceOwner); ok {
-		if owner := s.Owner(); owner != nil {
-			return owner
-		}
-	}
-	return actor
 }

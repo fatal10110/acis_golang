@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -332,16 +333,21 @@ func (c *Calculator) RemoveOwner(owner ModOwner) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	kept := make([]Mod, 0, len(c.mods))
-	for _, m := range c.mods {
+	first := slices.IndexFunc(c.mods, func(m Mod) bool { return m.Owner.is(owner) })
+	if first < 0 {
+		return 0
+	}
+	// The chain is replaced, never edited in place: a Calc running beside
+	// this keeps reading the chain it started with.
+	kept := make([]Mod, first, len(c.mods)-1)
+	copy(kept, c.mods[:first])
+	for _, m := range c.mods[first+1:] {
 		if !m.Owner.is(owner) {
 			kept = append(kept, m)
 		}
 	}
 	removed := len(c.mods) - len(kept)
-	if removed > 0 {
-		c.mods = kept
-	}
+	c.mods = kept
 	return removed
 }
 

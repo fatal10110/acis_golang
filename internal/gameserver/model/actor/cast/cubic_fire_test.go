@@ -182,7 +182,7 @@ func (f *fakeCubicEffectTarget) EffectList() *effect.List { return f.list }
 // landing roll never reached the caller and the cubic's owner never saw
 // ATTACK_FAILED, unlike the reference's useContinuousSkill.
 func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *testing.T) {
-	registry := handlerskill.NewDefaultRegistry()
+	registry := handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{})
 	caster := &fakeCubicEffectCaster{id: 1}
 	target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil), perfectBlock: true}
 
@@ -229,7 +229,7 @@ func (f *fakeCubicShotOwner) SetChargedShot(kind item.ShotKind, charged bool) {
 // it, although the same skill types cast by a player discharge it
 // (Cubic.java:378-480 never calls setChargedShot).
 func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testing.T) {
-	registry := handlerskill.NewDefaultRegistry()
+	registry := handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{})
 	for _, def := range []modelskill.Definition{
 		{ID: 4052, SkillType: "POISON", Offensive: true, Debuff: true},
 		{ID: 4053, SkillType: "DEBUFF", Offensive: true, Debuff: true},

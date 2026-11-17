@@ -106,11 +106,13 @@ func calcSkill(def modelskill.Definition) conditions.Skill { return conditions.S
 
 // casterSkillPower is the physical/magic/mana skill-power term: DEATHLINK
 // and FATAL scale with the caster's current/max HP ratio; every other type
-// returns the definition's raw power. Blow keeps raw power at its own
-// resolver. A caster without an HP surface is treated as a missing actor
-// and returns the unscaled value.
+// returns the definition's raw power without reading the caster's HP. Blow
+// keeps raw power at its own resolver.
 func casterSkillPower(attacker FormulaActor, def modelskill.Definition) float64 {
 	power := float64(def.Power)
+	if !formulas.SkillPowerScalesWithHP(def.SkillType) {
+		return power
+	}
 	return formulas.SkillPowerFor(def.SkillType, power, attacker.HP()/attacker.MaxHPValue())
 }
 

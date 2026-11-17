@@ -19,17 +19,12 @@ import (
 type attackStanceFakeActor struct {
 	id       int32
 	queue    *sim.Queue
-	owner    AttackStanceActor
 	summon   AttackStanceActor
 	cubics   []AttackStanceCubic
 	inCombat bool
 }
 
 func (a *attackStanceFakeActor) ObjectID() int32 { return a.id }
-
-func (a *attackStanceFakeActor) Owner() AttackStanceActor {
-	return a.owner
-}
 
 func (a *attackStanceFakeActor) Summon() AttackStanceActor {
 	return a.summon
@@ -316,27 +311,6 @@ func TestAttackStanceTimeoutClearsCombatFlag(t *testing.T) {
 	testLoop.Run()
 	if actor.inCombat {
 		t.Fatal("combat flag should clear after attack stance timeout")
-	}
-}
-
-func TestAttackStanceSummonUsesOwnerRegistration(t *testing.T) {
-	effects := &attackStanceFakeEffects{}
-	stance, _ := NewAttackStance(effects, nil)
-	owner := &attackStanceFakeActor{id: 100}
-	summon := &attackStanceFakeActor{id: 200, owner: owner}
-
-	stance.Add(owner)
-	if !stance.InAttackStance(summon) {
-		t.Fatal("summon should report owner's attack stance")
-	}
-	if !stance.Remove(summon) {
-		t.Fatal("Remove(summon) should remove the owner entry")
-	}
-	if stance.InAttackStance(owner) {
-		t.Fatal("owner should no longer be in attack stance after removing summon")
-	}
-	if got := effects.take(); len(got) != 0 {
-		t.Fatalf("Remove should not emit stop packet itself, got %v", got)
 	}
 }
 

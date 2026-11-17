@@ -17,6 +17,10 @@ type Ref struct {
 	Level int
 }
 
+// KeyLevels is how many levels one skill id spans in a combined (id, level)
+// key, id*KeyLevels+level: the skill table's key and a cast's reuse key.
+const KeyLevels = 256
+
 // heroSkillIDs are the skills a character earns by holding hero status.
 var heroSkillIDs = map[ID]bool{395: true, 396: true, 1374: true, 1375: true, 1376: true}
 
@@ -37,7 +41,7 @@ var offensiveSkillTypes = map[string]bool{
 
 // Definition holds one level's static data for one skill: its timing,
 // consumption, range, and the raw classification tags (skill/effect type,
-// formula stat key) that a not-yet-built effect engine interprets to decide
+// formula stat key) that the skill handlers and effects interpret to decide
 // what casting the skill actually does. This type carries that data without
 // acting on it — building the effect itself, evaluating its conditions, and
 // resolving a weapon-type restriction to an equipment mask are some other
@@ -98,9 +102,9 @@ type Definition struct {
 	IgnoreShield bool
 
 	// SkillType and EffectType are the raw effect-classification tags a
-	// skill and its (optional, separately classified) side effect carry.
-	// Interpreting them — building the actual damage/buff/debuff behavior —
-	// belongs to the not-yet-built effect engine.
+	// skill and its (optional, separately classified) side effect carry. The
+	// loader rejects an unknown SkillType (see KnownSkillType); the skill
+	// handler registry dispatches on it.
 	SkillType  string
 	EffectType string
 

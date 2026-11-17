@@ -354,9 +354,8 @@ func compileUsingAttr(_, value string) (Condition, error) {
 }
 
 // compileGameAttr reads the one <game> attribute a data file can set,
-// "night". A chance roll is a GameChance built in code (weapon cast/crit
-// triggers), never a <game chance> attribute, which is ignored like any
-// other unrecognized one.
+// "night". A <game chance> attribute is ignored like any other unrecognized
+// one.
 func compileGameAttr(_, value string) (Condition, error) {
 	return GameTime{Night: parseBool(value)}, nil
 }

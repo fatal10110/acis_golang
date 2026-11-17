@@ -176,7 +176,7 @@ func TestPartyOtherHandlerGatesSelfMageClassAndPartyMembership(t *testing.T) {
 	mage := &targetActor{id: 2, kind: actor.KindPlayer, mageClass: true}
 	fighter := &targetActor{id: 3, kind: actor.KindPlayer}
 	deadPlayer := &targetActor{id: 4, kind: actor.KindPlayer, dead: true}
-	casterSummon := &targetActor{id: 5, kind: actor.KindPlayer, owner: caster}
+	casterSummon := &targetActor{id: 5, kind: actor.KindSummon, owner: caster}
 	otherPlayer := &targetActor{id: 6, kind: actor.KindPlayer}
 
 	registry := NewRegistry(knownList{})
@@ -381,6 +381,8 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	// Party fixtures: the party is 21 and 22; 23 is the caster's summon.
 	partyCaster := &targetActor{id: 20, kind: actor.KindPlayer, inParty: true, partyMembers: map[int32]bool{21: true, 22: true, 25: true}}
 	partyCasterSummon := &targetActor{id: 23, kind: actor.KindSummon, owner: partyCaster}
+	// An ownerless summon is still no player.
+	ownerlessSummon := &targetActor{id: 25, kind: actor.KindSummon}
 	partyCaster.summon = partyCasterSummon
 	partyFighter := &targetActor{id: 21, kind: actor.KindPlayer}
 	partyMage := &targetActor{id: 22, kind: actor.KindPlayer, mageClass: true}
@@ -482,6 +484,8 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 
 		{"party other self", modelskill.TargetPartyOther, partyCaster, partyCaster, regular, CastRejectCannotUseOnYourself},
 		{"party other own summon", modelskill.TargetPartyOther, partyCaster, partyCasterSummon, regular, CastRejectInvalidTarget},
+		{"party other ownerless summon", modelskill.TargetPartyOther, partyCaster, ownerlessSummon, regular, CastRejectInvalidTarget},
+		{"party member summon friend on ownerless summon", modelskill.TargetPartyMember, partyCaster, ownerlessSummon, summonFriend, CastRejectCannotUseSkill},
 		{"party other dead party player", modelskill.TargetPartyOther, partyCaster, deadPartyMate, regular, CastRejectInvalidTarget},
 		{"party other 426 on mage", modelskill.TargetPartyOther, partyCaster, partyMage, &modelskill.Definition{ID: dualcastManaSkillID, Level: 1}, CastRejectCannotUseSkill},
 		{"party other 427 on fighter", modelskill.TargetPartyOther, partyCaster, partyFighter, &modelskill.Definition{ID: dualcastHealSkillID, Level: 1}, CastRejectCannotUseSkill},

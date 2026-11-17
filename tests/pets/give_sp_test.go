@@ -17,7 +17,7 @@ func TestGiveSPGrantsPetSP(t *testing.T) {
 	pet, _ := h.spawnWolf(t)
 	before := pet.SP()
 
-	handlerskill.NewDefaultRegistry().Use(handlerskill.Cast{
+	handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{}).Use(handlerskill.Cast{
 		Caster:  pet,
 		Skill:   modelskill.Definition{ID: 2167, Level: 1, SkillType: "GIVE_SP", Power: 500},
 		Targets: []handlerskill.Actor{pet},

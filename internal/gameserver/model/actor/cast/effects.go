@@ -71,26 +71,16 @@ type SkillCaster interface {
 	NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
 }
 
-// ApplyEffects resolves def's affected target set from caster and the
-// already cast-validated single selection, then routes the skill's effects
-// to the resolved set. It reports whether a skill handler actually ran.
+// ApplyEffectsResult resolves def's affected target set from caster and the
+// already cast-validated single selection, routes the skill's effects to it,
+// and returns any caster-visible result the selected skill handler produced.
 //
-// caster only needs to satisfy the target-resolution surface
-// (skilltarget.Actor), not any player-specific type, so this is the same
-// resolution and dispatch path any caster drives — a live player today, and
-// eventually an NPC- or summon-initiated cast once that scheduling exists —
-// rather than a player-only shortcut. A caster or resolved selection that
-// doesn't satisfy the target-resolution surfaces, a target type with no
-// registered handler, a target type that rejects the cast, or a skill type
-// with no registered effect handler all result in no effect applied; that
-// mirrors the graceful degradation the effect handlers already use for
-// actor state this port hasn't modeled yet, rather than failing the caller.
-func ApplyEffects(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) bool {
-	return ApplyEffectsResult(handlers, caster, resolved, def).Handled
-}
-
-// ApplyEffectsResult resolves def's affected targets and returns any
-// caster-visible result the selected skill handler produced.
+// caster only needs the target-resolution surface (skilltarget.Actor), so
+// any caster drives this same path. A caster or selection that doesn't
+// satisfy the target-resolution surfaces, a target type with no registered
+// handler, a target type that rejects the cast, or a skill type with no
+// registered effect handler all apply nothing (Handled stays false) rather
+// than failing the caller.
 func ApplyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) EffectResult {
 	return applyEffectsResult(handlers, caster, resolved, def, nil)
 }
@@ -135,26 +125,14 @@ func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resol
 	return dispatchEffects(handlers, caster, affected, def, item)
 }
 
-// ResolveAffected resolves def's affected set at an AI cast's launch, for a
-// caller that must broadcast it (MagicSkillLaunched) and then reuse that
-// exact list — not a fresh resolution — when Hit dispatches effects: the
-// launch assigns the target list once and the hit timer's skill call
-// reuses that same list rather than re-deriving it. The target conditions are not
-// judged again here: a playable caster's were checked when the cast
-// committed, with its CTRL state, and an NPC caster's are never checked.
-// ok is false if resolution failed for any reason (unresolvable
-// caster/target, no registered handler, or an empty affected set);
-// affected is nil in that case.
-func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
-	affected, ok = resolveLaunchTargets(handlers, caster, resolved, def)
-	if !ok {
-		return nil, false
-	}
-	return nonEmpty(affected)
-}
-
-// resolveLaunchTargets is ResolveAffected keeping an empty affected set:
-// ok is true whenever def's target handler ran, whatever it found.
+// resolveLaunchTargets resolves def's affected set at an AI cast's launch,
+// for a caller that broadcasts it (MagicSkillLaunched) and then reuses that
+// exact list, not a fresh resolution, when Hit dispatches effects. The target
+// conditions are not judged again here: a playable caster's were checked
+// when the cast committed, with its CTRL state, and an NPC caster's are never
+// checked. ok is true whenever def's target handler ran, even when it found
+// no target; it is false for an unresolvable caster or selection or a target
+// type with no registered handler.
 func resolveLaunchTargets(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
 	if caster == nil || handlers.Targets == nil {
 		return nil, false
@@ -171,10 +149,9 @@ func resolveLaunchTargets(handlers EffectHandlers, caster skilltarget.Actor, res
 }
 
 // ApplyResolvedEffectsResult dispatches def's effects to affected — an
-// already-resolved target set, typically the one ResolveAffected returned
-// at launch and frozen for reuse at Hit — instead of re-resolving from a
-// single selection. See ResolveAffected's doc for why a caller needs this
-// split.
+// already-resolved target set, typically the one resolved at launch and
+// frozen for reuse at Hit — instead of re-resolving from a single selection.
+// See resolveLaunchTargets for why a caller needs this split.
 func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition) EffectResult {
 	return ApplyResolvedItemEffectsResult(handlers, caster, affected, def, nil)
 }

@@ -5,10 +5,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// skillKeyLevels is how many levels one skill id spans in the skill table's
-// combined (id, level) key: the key is id*skillKeyLevels+level.
-const skillKeyLevels = 256
-
 // TopLevelDefinitions returns every loaded skill at its highest regular
 // (non-enchant) level, ordered by id.
 func (p *Persistence) TopLevelDefinitions() []modelskill.Definition {
@@ -23,11 +19,11 @@ func (p *Persistence) TopLevelDefinitions() []modelskill.Definition {
 // level outside 0-255 lands on another id's level, and the definition at
 // that key is returned.
 func (p *Persistence) KeyedDefinition(id, level int32) (*modelskill.Definition, bool) {
-	key := id*skillKeyLevels + level
+	key := id*modelskill.KeyLevels + level
 	if key < 0 {
 		return nil, false
 	}
-	return p.definition(modelskill.Ref{ID: modelskill.ID(key / skillKeyLevels), Level: int(key % skillKeyLevels)})
+	return p.definition(modelskill.Ref{ID: modelskill.ID(key / modelskill.KeyLevels), Level: int(key % modelskill.KeyLevels)})
 }
 
 // ForgetSkill takes skillID away from c with its passive stats. With store

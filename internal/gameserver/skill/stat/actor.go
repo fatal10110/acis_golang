@@ -1,8 +1,7 @@
 package stat
 
 // Actor is the live combat data every skill/effect Mod/Condition reads from
-// its effector. It stands in for the not-yet-built creature runtime; a
-// future concrete actor type satisfies it structurally.
+// its effector. Every creature kind satisfies it structurally.
 type Actor interface {
 	STR() int
 	CON() int
