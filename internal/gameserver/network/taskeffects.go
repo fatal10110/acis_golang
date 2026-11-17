@@ -482,7 +482,7 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 // on the owner's persistence lane.
 //
 // A session mid-detach is skipped: detachLivePlayer writes the same columns
-// and then marks the row offline, and Roster.Save marks it online. Save runs
+// marking the row offline, and Roster.Save marks it online. Save runs
 // on the player's queue, as detach does, so an autosave job either sits ahead
 // of detach's jobs on the lane or is never enqueued. Its online write
 // therefore cannot land after detach's offline write (#1948).
@@ -516,9 +516,6 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		defer cancel()
 		if err := roster.Save(ctx, charState); err != nil {
 			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player stats")
-		}
-		if err := roster.SavePosition(ctx, charState); err != nil {
-			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player position")
 		}
 		if err := skills.Save(ctx, skillState); err != nil {
 			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player skill state")

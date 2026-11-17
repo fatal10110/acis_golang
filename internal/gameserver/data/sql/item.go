@@ -21,7 +21,11 @@ func NewItemStore(db *sql.DB) *ItemStore {
 
 // Create inserts inst as a new items row owned by ownerID.
 func (s *ItemStore) Create(ctx context.Context, ownerID int32, inst item.Instance) error {
-	_, err := s.db.ExecContext(ctx,
+	return insertItem(ctx, s.db, ownerID, inst)
+}
+
+func insertItem(ctx context.Context, db execer, ownerID int32, inst item.Instance) error {
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO items
 			(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
