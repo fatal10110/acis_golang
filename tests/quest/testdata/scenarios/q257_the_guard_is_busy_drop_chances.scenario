@@ -1,5 +1,5 @@
 # Q257: a werewolf's fang drops with 20% (20342), 40% (20343) and 50% (20132); the draw just under the
-# # chance drops it, the draw at the chance does not.
+# chance drops it, the draw at the chance does not.
 character Guardsman 6
 script quest.Q257_TheGuardIsBusy
 item 1084 752 1085 1086 5789

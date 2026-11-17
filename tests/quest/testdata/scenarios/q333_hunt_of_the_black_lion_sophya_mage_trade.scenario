@@ -1,4 +1,4 @@
-# Q333: a mage gets spiritshots for the 50 to 75 roll (50 with fewer than 5 eyes).
+# Q333: a mage gets spiritshots for a roll of 25 to 49.
 character Mercenary 25
 class 10
 quest Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=0

@@ -1,5 +1,5 @@
 # Q266: 100 fangs turn into a gem by the roll: below 10 the emerald, below 30 the blue onyx, below 60 the onyx,
-# # else the glass shard. Roll 59 gives item 1339.
+# else the glass shard. Roll 59 gives item 1339.
 character Pixie 3
 class 18
 script quest.Q266_PleasOfPixies

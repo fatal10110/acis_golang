@@ -1,5 +1,5 @@
 # Q333: ten claws for an eye and a prize: with 5 to 8 eyes the page is 30735-18b (one eye more, prize by roll of 100: healing 25,
-# # soulshots 200, escape 20, swift attack 3), with 9 eyes 19b (no eye, healing 50, soulshots 400, escape 30, swift 4).
+# soulshots 200, escape 20, swift attack 3), with 9 eyes 19b (no eye, healing 50, soulshots 400, escape 30, swift 4).
 character Mercenary 25
 quest Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=0
 hold 1369 1

@@ -1,5 +1,5 @@
 # Q343: Icarus's reward by roll of 1000, each side of every band: below 120 the D scroll, 170 the C scroll, 330 the C shots,
-# # 560 the D shots, 562 sage blood, 579 square shield, 580 necklace, 582 ring, 583 tower shield, 585 mermaid, else escape.
+# 560 the D shots, 562 sage blood, 579 square shield, 580 necklace, 582 ring, 583 tower shield, 585 mermaid, else escape.
 character Mystic 40
 class 10
 quest Q343_UnderTheShadowOfTheIvoryTower <cond>=1 <state>=STARTED memoState=1 memoStateEx=1
