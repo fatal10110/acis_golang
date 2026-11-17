@@ -26,7 +26,13 @@ bypass npc_{bella}_Quest
   S NpcHtmlMessage obj=bella item=0 page=script/quest/Q419_GetAPet/30256-01.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q419_GetAPet 30256-02.htm
+  S NpcHtmlMessage obj=bella item=0 page=script/quest/Q419_GetAPet/30256-02.htm
+  S ActionFailed
 bypass Quest Q419_GetAPet 30256-03.htm
+  S NpcHtmlMessage obj=bella item=0 page=script/quest/Q419_GetAPet/30256-03.htm
+  S ActionFailed
+  Q upsert Q419_GetAPet | progress | 1
 action metty
 action metty
   S ActionFailed
@@ -39,8 +45,8 @@ bypass npc_{metty}_Quest
 bypass Quest Q419_GetAPet 30072-02.htm
   S NpcHtmlMessage obj=metty item=0 page=script/quest/Q419_GetAPet/30072-02.htm
   S ActionFailed
-  Q upsert Q419_GetAPet | progress | 2
-  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=2
+  Q upsert Q419_GetAPet | progress | 3
+  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=3
   state Q419_GetAPet STARTED
 action ellie
 action ellie
@@ -52,10 +58,11 @@ bypass npc_{ellie}_Quest
   S ActionFailed
   S ActionFailed
 bypass Quest Q419_GetAPet 30091-02.htm
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
   S NpcHtmlMessage obj=ellie item=0 page=script/quest/Q419_GetAPet/30091-02.htm
   S ActionFailed
-  Q upsert Q419_GetAPet | progress | 6
-  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=6
+  Q upsert Q419_GetAPet | progress | 7
+  rows Q419_GetAPet <cond>=1 <state>=STARTED progress=7
   state Q419_GetAPet STARTED
 action martin
 action martin
@@ -63,6 +70,6 @@ action martin
   S NpcHtmlMessage obj=martin item=0 page=merchant/30731.htm
   S ActionFailed
 bypass npc_{martin}_Quest
-  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-16.htm
+  S NpcHtmlMessage obj=martin item=0 page=script/quest/Q419_GetAPet/30731-13.htm
   S ActionFailed
   S ActionFailed

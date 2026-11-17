@@ -208,6 +208,10 @@
 //	                       the packets of the first N-1 sends are dropped (a teleport one of them started is answered with
 //	                       Appearing before the next) and the step's S lines are the last send's; the checks of the step
 //	                       show the others happened, a count the first N-1 changed
+//	                       the server drops an npc_, admin_ or Quest command that the last page the client was sent
+//	                       does not link, and answers nothing: such a step fails unless a `rejected` line under it
+//	                       says it is dropped (the line takes no S, to, Q or M line and no xN, and fails a
+//	                       command the page does offer)
 //	as <mate> <action|bypass|link> ...
 //	                       the step is played by that mate, on its client: its packets are the S lines, and what
 //	                       the character was sent the `to player` lines
@@ -690,6 +694,10 @@ type Step struct {
 	// Repeat is how many times a bypass step sends its command (0 without an
 	// xN: once).
 	Repeat int
+	// Rejected marks a bypass step the server must drop: its command is a
+	// validated one (npc_, admin_ or Quest) that the last page the client
+	// received does not offer. It answers nothing.
+	Rejected bool
 	// Packets, Statements and Memos are the S, Q and M lines without their
 	// prefix.
 	Packets    []string
@@ -951,6 +959,9 @@ func (sc *Scenario) checkFlow() error {
 			if st.Verb == "restart" {
 				inWorld = false
 			}
+		}
+		if st.Rejected && (st.Repeat > 0 || len(st.Packets) > 0 || len(st.To) > 0 || len(st.Statements) > 0 || len(st.Memos) > 0) {
+			return fmt.Errorf("%d: a rejected bypass is sent once and answers nothing: it takes no xN, S, to, Q or M line", st.Line)
 		}
 		for _, ck := range st.Checks {
 			if !inWorld && ck.Kind != "rows" {
@@ -1397,6 +1408,11 @@ func (s *Step) expect(n int, line string) error {
 	switch kind {
 	case "S":
 		s.Packets = append(s.Packets, rest)
+	case "rejected":
+		if s.Verb != "bypass" || rest != "" || s.Rejected {
+			return fmt.Errorf("rejected is one bare line under a bypass step")
+		}
+		s.Rejected = true
 	case "to":
 		name, packet, ok := strings.Cut(rest, " ")
 		if !ok || packet == "" {
@@ -1449,7 +1465,10 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Random = rd
-	case "items", "rows", "state", "hate", "desires", "at", "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows", "open", "dungeon", "standing":
+	default:
+		if _, ok := checkKinds[kind]; !ok {
+			return fmt.Errorf("unknown expectation %q", kind)
+		}
 		args := strings.Fields(rest)
 		if kind == "rows" {
 			var err error
@@ -1461,10 +1480,33 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Checks = append(s.Checks, Check{Line: n, Kind: kind, Args: args})
-	default:
-		return fmt.Errorf("unknown expectation %q", kind)
 	}
 	return nil
+}
+
+// checkFamily is the group of check kinds that one parser and one evaluator
+// handle.
+type checkFamily int
+
+const (
+	checkItems checkFamily = iota + 1
+	checkRows
+	checkQuest
+	checkSeed
+	checkFight
+	checkState
+)
+
+// checkKinds maps every check kind a step takes to its family. The parser
+// accepts exactly these kinds and the runner evaluates exactly these, so a
+// kind cannot be accepted and then pass unchecked.
+var checkKinds = map[string]checkFamily{
+	"items": checkItems, "rows": checkRows, "state": checkQuest,
+	"open": checkSeed, "dungeon": checkSeed, "standing": checkSeed,
+	"hate": checkFight, "desires": checkFight, "at": checkFight,
+	"mem": checkState, "hp": checkState, "mp": checkState, "privates": checkState, "master": checkState,
+	"top": checkState, "effect": checkState, "dead": checkState, "inworld": checkState, "stance": checkState,
+	"reach": checkState, "shows": checkState,
 }
 
 // splitQuoted splits line into fields on blanks, as strings.Fields does,
@@ -1565,14 +1607,14 @@ func checkMemo(line string) error {
 }
 
 func checkCheck(kind string, args []string) error {
-	switch kind {
-	case "hate", "desires", "at":
+	switch checkKinds[kind] {
+	case checkFight:
 		return checkFightCheck(kind, args)
-	case "mem", "hp", "mp", "privates", "master", "top", "effect", "dead", "inworld", "stance", "reach", "shows":
+	case checkState:
 		return checkStateCheck(kind, args)
-	case "open", "dungeon", "standing":
+	case checkSeed:
 		return checkSeedCheck(kind, args)
-	case "items":
+	case checkItems:
 		if len(args) == 0 {
 			return fmt.Errorf("items takes one or more <id>=<count>")
 		}
@@ -1589,7 +1631,7 @@ func checkCheck(kind string, args []string) error {
 				return fmt.Errorf("item %q is not <id>=<count>", a)
 			}
 		}
-	case "rows":
+	case checkRows:
 		if len(args) < 2 {
 			return fmt.Errorf("rows <quest> <var>=<value> ... | -")
 		}
@@ -1601,7 +1643,7 @@ func checkCheck(kind string, args []string) error {
 				return fmt.Errorf("row %q is not <var>=<value>", a)
 			}
 		}
-	case "state":
+	case checkQuest:
 		if len(args) != 2 {
 			return fmt.Errorf("state <quest> <status> | -")
 		}

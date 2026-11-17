@@ -21,4 +21,12 @@ bypass npc_{romp}_Quest
   S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-06.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q386_StolenDignity 30843-09.htm
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-09.htm
+  S ActionFailed
+bypass Quest Q386_StolenDignity 30843-07.htm
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-07.htm
+  S ActionFailed
 bypass Quest Q386_StolenDignity 30843-12.htm
+  S NpcHtmlMessage obj=romp item=0 page=script/quest/Q386_StolenDignity/30843-11.htm
+  S ActionFailed

@@ -35,7 +35,20 @@ bypass npc_{kluto}_Quest
   S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-01.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q418_PathToAnArtisan 30317-02.htm
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-02.htm
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 30317-03.htm
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-03.htm
+  S ActionFailed
 bypass Quest Q418_PathToAnArtisan 30317-04.htm
+  S QuestList 418:0x8000000f
+  S ExShowQuestMark quest=418
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1638
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-04.htm
+  S ActionFailed
+  Q upsert Q418_PathToAnArtisan | <cond> | 4
 action kluto
   S ActionFailed
   S NpcHtmlMessage obj=kluto item=0 page=trainer/30317.htm
@@ -45,7 +58,7 @@ action kluto
   S NpcHtmlMessage obj=kluto item=0 page=trainer/30317.htm
   S ActionFailed
 bypass npc_{kluto}_Quest
-  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-01.htm
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-08.htm
   S ActionFailed
   S ActionFailed
 action pinter
@@ -54,10 +67,21 @@ action pinter
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
   S ActionFailed
 bypass npc_{pinter}_Quest
-  S NpcHtmlMessage obj=pinter item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-01.htm
   S ActionFailed
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 30298-02.htm
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-02.htm
   S ActionFailed
 bypass Quest Q418_PathToAnArtisan 30298-03.htm
+  S QuestList 418:0x8000001f
+  S ExShowQuestMark quest=418
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1638
+  S SystemMessage id=54 3:1639
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-03.htm
+  S ActionFailed
+  Q upsert Q418_PathToAnArtisan | <cond> | 5
 action pinter
   S ActionFailed
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
@@ -67,11 +91,16 @@ action pinter
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
   S ActionFailed
 bypass npc_{pinter}_Quest
-  S NpcHtmlMessage obj=pinter item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-04.htm
   S ActionFailed
   S ActionFailed
 kill thief
   S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1640
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 418:0x8000003f
+  S ExShowQuestMark quest=418
+  Q upsert Q418_PathToAnArtisan | <cond> | 6
 action pinter
   S ActionFailed
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
@@ -81,10 +110,20 @@ action pinter
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
   S ActionFailed
 bypass npc_{pinter}_Quest
-  S NpcHtmlMessage obj=pinter item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-05.htm
   S ActionFailed
   S ActionFailed
 bypass Quest Q418_PathToAnArtisan 30298-06.htm
+  S QuestList 418:0x8000007f
+  S ExShowQuestMark quest=418
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1639
+  S SystemMessage id=302 3:1640
+  S SystemMessage id=54 3:1634
+  S SystemMessage id=54 3:1641
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-06.htm
+  S ActionFailed
+  Q upsert Q418_PathToAnArtisan | <cond> | 7
 action pinter
   S ActionFailed
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
@@ -94,7 +133,7 @@ action pinter
   S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
   S ActionFailed
 bypass npc_{pinter}_Quest
-  S NpcHtmlMessage obj=pinter item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q418_PathToAnArtisan/30298-07.htm
   S ActionFailed
   S ActionFailed
 action kluto
@@ -103,6 +142,6 @@ action kluto
   S NpcHtmlMessage obj=kluto item=0 page=trainer/30317.htm
   S ActionFailed
 bypass npc_{kluto}_Quest
-  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-01.htm
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-09.htm
   S ActionFailed
   S ActionFailed

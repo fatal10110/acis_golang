@@ -20,7 +20,9 @@ action pierce
   S ActionFailed
   S NpcHtmlMessage obj=pierce item=0 page=default/31553.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass npc_{pierce}_Quest
+  rejected
   state Q109_InSearchOfTheNest STARTED
   rows Q109_InSearchOfTheNest <cond>=1 <state>=STARTED
 

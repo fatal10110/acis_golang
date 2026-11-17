@@ -94,7 +94,10 @@ bypass npc_{grave}_Quest
 
 # The first song, a wrong last note, then again.
 bypass Quest Q126_TheNameOfEvil_2 32122-21.htm
+  rejected
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q126_TheNameOfEvil_2 32122-24.htm
+  rejected
 bypass Quest Q126_TheNameOfEvil_2 DOOne
   S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-26.htm
   S ActionFailed

@@ -39,7 +39,9 @@ bypass Quest Q221_TestimonyOfProsperity 30531-03.htm
   S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q221_TestimonyOfProsperity/30531-03.htm
   S ActionFailed
   items 3246=1 3247=1 3248=1 3249=1 3250=1 3251=1
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q221_TestimonyOfProsperity 30531-02.htm
+  rejected
 action lockirin
   S ActionFailed
   S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm

@@ -34,5 +34,7 @@ bypass npc_{vulcan}_Quest
   S NpcHtmlMessage obj=vulcan item=0 page=script/quest/Q617_GatherTheFlames/31539-05.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q617_GatherTheFlames 31539-05.htm
+  rejected
   items 7264=0 7580=1

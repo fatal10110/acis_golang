@@ -42,16 +42,31 @@ bypass npc_{klaus}_Quest
 bypass Quest Q402_PathToAHumanKnight 30417-05.htm
   S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-05.htm
   S ActionFailed
+bypass Quest Q402_PathToAHumanKnight 30417-06.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-06.htm
+  S ActionFailed
+bypass Quest Q402_PathToAHumanKnight 30417-07.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-07.htm
+  S ActionFailed
 bypass Quest Q402_PathToAHumanKnight 30417-08.htm
+  S QuestList 402:0x80000001
+  S ExShowQuestMark quest=402
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1271
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-08.htm
+  S ActionFailed
+  Q upsert Q402_PathToAHumanKnight | <state> | STARTED
+  Q upsert Q402_PathToAHumanKnight | <cond> | 1
+  state Q402_PathToAHumanKnight STARTED
 relog
-  state Q402_PathToAHumanKnight -
+  state Q402_PathToAHumanKnight STARTED
 action klaus
 action klaus
   S ActionFailed
   S NpcHtmlMessage obj=klaus item=0 page=default/30417.htm
   S ActionFailed
 bypass npc_{klaus}_Quest
-  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-01.htm
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q402_PathToAHumanKnight/30417-09.htm
   S ActionFailed
   S ActionFailed
-  state Q402_PathToAHumanKnight CREATED
+  state Q402_PathToAHumanKnight STARTED

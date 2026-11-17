@@ -25,13 +25,25 @@ bypass npc_{neti}_Quest
   S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-01.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q403_PathToARogue 30425-02.htm
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-02.htm
+  S ActionFailed
 bypass Quest Q403_PathToARogue 30425-05.htm
+  S QuestList 403:0x80000003
+  S ExShowQuestMark quest=403
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1180
+  S SystemMessage id=54 3:1181
+  S SystemMessage id=54 3:1182
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-05.htm
+  S ActionFailed
+  Q upsert Q403_PathToARogue | <cond> | 2
 action neti
   S ActionFailed
   S NpcHtmlMessage obj=neti item=0 page=default/30425.htm
   S ActionFailed
 bypass npc_{neti}_Quest
-  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-01.htm
+  S NpcHtmlMessage obj=neti item=0 page=script/quest/Q403_PathToARogue/30425-06.htm
   S ActionFailed
   S ActionFailed
 action bezique
@@ -40,6 +52,6 @@ action bezique
   S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm
   S ActionFailed
 bypass npc_{bezique}_Quest
-  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-07.htm
+  S NpcHtmlMessage obj=bezique item=0 page=script/quest/Q403_PathToARogue/30379-10.htm
   S ActionFailed
   S ActionFailed

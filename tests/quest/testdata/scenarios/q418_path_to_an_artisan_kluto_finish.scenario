@@ -27,7 +27,6 @@ npc ratman 20389 Monster 40 0 0
 npc leader 20390 Monster 50 0 0
 npc thief 20017 Monster 60 0 0
 
-bypass Quest Q418_PathToAnArtisan 30317-10.htm
 action kluto
 action kluto
   S ActionFailed
@@ -37,3 +36,15 @@ bypass npc_{kluto}_Quest
   S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-09.htm
   S ActionFailed
   S ActionFailed
+bypass Quest Q418_PathToAnArtisan 30317-10.htm
+  S SystemMessage id=302 3:1633
+  S SystemMessage id=302 3:1634
+  S SystemMessage id=302 3:1641
+  S SystemMessage id=54 3:1635
+  S SystemMessage id=95 1:3200 1:6980
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-10.htm
+  S ActionFailed
+  Q delete-quest Q418_PathToAnArtisan

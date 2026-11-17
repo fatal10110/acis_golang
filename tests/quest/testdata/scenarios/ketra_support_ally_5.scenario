@@ -124,15 +124,20 @@ action asefa
   S ActionFailed
 # The no-alliance pages carry no blessing, withdrawal or teleport link, so each answers nothing.
 bypass Quest KetraOrcSupport 0
+  rejected
 action jaff
 action jaff
   S ActionFailed
   S NpcHtmlMessage obj=jaff item=0 page=script/feature/KetraOrcSupport/31374-no.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest KetraOrcSupport Withdraw
+  rejected
 action kurfa
 action kurfa
   S ActionFailed
   S NpcHtmlMessage obj=kurfa item=0 page=script/feature/KetraOrcSupport/31376-no.htm
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest KetraOrcSupport Teleport
+  rejected

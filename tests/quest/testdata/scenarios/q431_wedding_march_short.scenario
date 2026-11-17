@@ -20,7 +20,9 @@ bypass npc_{kanta}_Quest
   S NpcHtmlMessage obj=kanta item=0 page=script/quest/Q431_WeddingMarch/31042-03.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q431_WeddingMarch 31042-05.htm
+  rejected
   items 7540=49 7062=0
   rows Q431_WeddingMarch <cond>=2 <state>=STARTED
   state Q431_WeddingMarch STARTED

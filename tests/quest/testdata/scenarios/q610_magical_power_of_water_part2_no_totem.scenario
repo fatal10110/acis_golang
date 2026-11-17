@@ -20,4 +20,6 @@ bypass npc_{asefa}_Quest
   S NpcHtmlMessage obj=asefa item=0 page=script/quest/Q610_MagicalPowerOfWater_Part2/31372-02.htm
   S ActionFailed
   S ActionFailed
+# A link the page on screen does not offer: the server drops it.
 bypass Quest Q610_MagicalPowerOfWater_Part2 31372-04.htm
+  rejected
