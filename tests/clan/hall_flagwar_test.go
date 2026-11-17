@@ -165,6 +165,8 @@ type flagWarSetup struct {
 	q504 bool
 	// items are what the Attacker holds as it enters the world.
 	items map[int32]int32
+	// slots is the inventory size of the Attacker; 0 for the shipped one.
+	slots int
 }
 
 // flagWarWorld is the Attacker, leading Besiegers, in the world beside
@@ -227,6 +229,7 @@ func bootFlagWar(t *testing.T, s flagWarSetup) *flagWarWorld {
 		gameservertest.WithItemTemplates(item.NewTable(append(gameservertest.ItemTemplates().All(), questItem(tarlkAmuletID), questItem(contestCertificateID), questItem(trophyID)))),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithReuseDelays(0, 0),
+		inventorySlotsOption(s.slots),
 		gameservertest.WithLog(zerolog.New(zerolog.NewTestWriter(t)).Level(zerolog.WarnLevel)),
 		gameservertest.WithClanSeed(func(db *sql.DB) { seedFlagWar(t, db, s, w.date) }),
 	)
