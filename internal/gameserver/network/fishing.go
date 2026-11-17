@@ -237,6 +237,7 @@ func (l *GameClientLink) lookForFish(live *livePlayer) bool {
 
 // fightFish runs one second of live's fight with its hooked fish.
 func (l *GameClientLink) fightFish(live *livePlayer) {
+	sim.AssertOwner(live.Queue())
 	kind, gauge, broadcast := live.fishing.stance.Tick(l.fishing.dice)
 	switch kind {
 	case fishing.TickStolen:

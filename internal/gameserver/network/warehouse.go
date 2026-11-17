@@ -538,6 +538,7 @@ func sortRecipients(r []serverpackets.PackageRecipient) {
 // items and returns the other characters whose freight it holds, whose
 // lanes the logout also waits on.
 func (l *GameClientLink) releaseStorage(live *livePlayer) []int32 {
+	sim.AssertOwner(live.Queue())
 	st := &live.storage
 	st.active = activeStore{}
 	if st.warehouse != nil {
