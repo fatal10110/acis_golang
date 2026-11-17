@@ -8,15 +8,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 const aggroListMonsterID = 31912
 
-// aggroListWorld boots two players, a (the founder) and b standing 100
-// east of it, and spawns through the server's NPC population a monster of
-// aggroRange 50 east of a, with no hate against anyone. It returns the
-// server, the monster and both players.
+// aggroListWorld boots two players, a (the founder) and b standing 150
+// east of it (arrived through a completed teleport), and spawns through the
+// server's NPC population a monster of the given aggro range 50 east of a,
+// with no hate against anyone: a is 50 from the monster, b 100. Both are
+// known to the monster. It returns the server, the monster and both players.
 func aggroListWorld(t *testing.T, aggroRange int) (*gameservertest.Server, *npc.Hostile, attackable.Combatant, attackable.Combatant) {
 	t.Helper()
 	tmpl := &npc.Template{
@@ -47,7 +49,9 @@ func aggroListWorld(t *testing.T, aggroRange int) (*gameservertest.Server, *npc.
 	if !ok {
 		t.Fatalf("%T is not an online character", obj)
 	}
-	pc.TeleportTo(x+100, y, z, 0)
+	pc.TeleportTo(x+150, y, z, 0)
+	bc.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	drainUntilQuiet(t, bc)
 	if err := srv.NpcSpawns.SpawnFixed(tmpl, x+50, y, z, 0, 0); err != nil {
 		t.Fatalf("spawn the monster: %v", err)
 	}
@@ -62,7 +66,13 @@ func aggroListWorld(t *testing.T, aggroRange int) (*gameservertest.Server, *npc.
 	}
 	drainUntilQuiet(t, bc)
 	drainUntilQuiet(t, c)
-	return srv, monster, combatant(aID), combatant(bID)
+	a, b := combatant(aID), combatant(bID)
+	onQueue(t, monster.Queue(), func() {
+		if !monster.Knows(a) || !monster.Knows(b) {
+			t.Errorf("monster knows a=%v b=%v, want both", monster.Knows(a), monster.Knows(b))
+		}
+	})
+	return srv, monster, a, b
 }
 
 // attackDesireWeights returns the queued attack desires' weights by target.
@@ -164,7 +174,7 @@ func TestReconsiderTargetFallsBackToTheKnownList(t *testing.T) {
 	t.Run("a positive range limits the known-list pick", func(t *testing.T) {
 		t.Parallel()
 		_, monster, a, b := aggroListWorld(t, 400)
-		// a stands 50 from the monster, b 50 on the other side of a.
+		// a stands 50 from the monster, b 100 (known, inside the aggro range).
 		got, ok := reconsider(t, monster, 60)
 		if !ok || got.ObjectID() != a.ObjectID() {
 			t.Fatalf("ReconsiderTarget(60) = %v, %v, want the player 50 away", got, ok)

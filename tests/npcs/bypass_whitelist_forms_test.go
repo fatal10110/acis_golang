@@ -79,8 +79,10 @@ func TestRequestLinkHTMLRefusalsAreSilent(t *testing.T) {
 	if got := w.linkPage(t, "test/any.htm"); got != anyNpcPage+"\n" {
 		t.Fatalf("link page after the refusals = %q, want %q", got, anyNpcPage)
 	}
-	// ".html" holds ".htm": a page of that name is looked up, and missing.
-	if got := w.linkPage(t, "test/any.html"); got == anyNpcPage+"\n" {
-		t.Fatal("test/any.html opened test/any.htm")
+	// ".html" holds ".htm": a page of that name is looked up, and missing:
+	// the notice names the link as sent.
+	const missing = "<html><body>My html is missing:<br>test/any.html</body></html>"
+	if got := w.linkPage(t, "test/any.html"); got != missing {
+		t.Fatalf("test/any.html answered %q, want the missing-page notice %q", got, missing)
 	}
 }
