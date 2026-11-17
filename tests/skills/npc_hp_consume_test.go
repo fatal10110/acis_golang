@@ -83,6 +83,14 @@ func TestCastingNPCDeathCancelsBeforeFinalStatusAndDie(t *testing.T) {
 	if got := wireReader(died[1:]).ReadInt32(); got != hostile.ObjectID() {
 		t.Fatalf("dead NPC = %d, want %d", got, hostile.ObjectID())
 	}
+	// The dead monster idles into its walk stance.
+	stance := c.Read()
+	assertFrameOpcode(t, stance, serverpackets.OpcodeChangeMoveType, "dead NPC ChangeMoveType")
+	r := wireReader(stance[1:])
+	if id, running := r.ReadInt32(), r.ReadInt32(); id != hostile.ObjectID() || running != 0 {
+		t.Fatalf("dead NPC ChangeMoveType = {id %d, running %d}, want {%d, 0}", id, running, hostile.ObjectID())
+	}
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeNPCInfo, "dead NPC NpcInfo")
 
 	onNPCQueue(t, hostile, func() {
 		if hostile.Die(nil, nil) {

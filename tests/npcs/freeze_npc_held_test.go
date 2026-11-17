@@ -138,9 +138,17 @@ func TestScriptEquipItemAndEnchantShowNewLook(t *testing.T) {
 		t.Fatal("the monster did not die")
 	}
 	w.srv.Settle(t)
+	// The death's walk stance is the only NpcInfo: a corpse no one can
+	// attack, still in the look the monster died with, since putting the
+	// template's items back and dropping the glow come after it and tell no
+	// one.
 	for name, c := range map[string]*testsupport.ScriptedClient{"first": w.first, "second": w.second} {
-		if infos := pick(w.srv.ReadQueued(t, c), serverpackets.OpcodeNPCInfo); len(infos) != 0 {
-			t.Fatalf("%s was sent NpcInfo % x at the death, want none", name, infos)
+		infos := pick(w.srv.ReadQueued(t, c), serverpackets.OpcodeNPCInfo)
+		if len(infos) != 1 {
+			t.Fatalf("%s was sent NpcInfo % x at the death, want the walk stance's only", name, infos)
+		}
+		if got, want := readNPCLook(t, infos[0], mob.ObjectID()), (npcLook{0, heldBowID, 0, 15}); got != want {
+			t.Fatalf("%s saw the dying monster as %+v, want %+v", name, got, want)
 		}
 	}
 	if s := mob.NPCInfoSnapshot(); s.RightHand != heldSwordID || s.LeftHand != 0 || s.EnchantEffect != 0 {

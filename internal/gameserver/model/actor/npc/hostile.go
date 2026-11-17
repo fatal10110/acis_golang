@@ -1057,6 +1057,7 @@ func (h *Hostile) MarkDead() bool {
 // Die runs this NPC's death sequence: the once-only dead-state
 // transition, the strip of every effect that does not last through death,
 // the corpse's registration with the decay task, then its reward hook, then
+// the death broadcast and the idle it leaves the NPC in (deathIdle), then
 // its dying hooks, its party's and its clan's calls (partyDied,
 // raiseClanDied). rewards may be nil: the corpse still decays, and the kill
 // pays nothing. It reports whether the death was newly applied by this
@@ -1079,6 +1080,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	h.BroadcastStatus()
 	h.clearAttackers()
 	h.BroadcastDie()
+	h.deathIdle()
 	if h.RaidBoss() && killedByPlayer(killer) {
 		h.emit(event.RaidBossKilled{})
 	}
