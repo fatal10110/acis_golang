@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
@@ -90,10 +89,6 @@ type War struct {
 	accomplished *script.BoolCell
 
 	npcSpawns, tentSpawns, clanlessNPCSpawns, clanlessTentSpawns *script.ListCell[*script.NPC]
-
-	// registering serializes the registrations clan leaders talk through,
-	// each run on its leader's own queue; see Registering.
-	registering sync.Mutex
 }
 
 // New returns the flag war of the hall cfg describes, in its first phase
@@ -163,16 +158,6 @@ func (w *War) AddMember(h *script.Hall, clanID, objectID int32) {
 	}
 	cd.Players.Add(objectID)
 	h.StoreFlagWarMember(clanID, objectID)
-}
-
-// Registering runs register, one leader's registration from its first
-// check through its payment to RegisterClan, as a single step against every
-// other: two clans never both take the last slot or share a flag, and a
-// clan refused for a full war has paid nothing.
-func (w *War) Registering(register func() string) string {
-	w.registering.Lock()
-	defer w.registering.Unlock()
-	return register()
 }
 
 // RegisterClan registers clanID, its leader as its first member, and

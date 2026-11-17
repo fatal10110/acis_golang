@@ -149,7 +149,7 @@ func onEvent(s *script.Script, w *flagwar.War, e script.Event) string {
 		case !h.WaitingBattle():
 			html = datedPage(s, h, "azit_messenger_q0504_03.htm")
 		case clan == nil || h.OwnerID() != p.ClanID():
-			html = w.Registering(func() string { return clanRegisterStatus(s, w, h, p, false) })
+			html = h.WithRegistration(func() string { return clanRegisterStatus(s, w, h, p, false) })
 		default:
 			html = "agit_oel_mahum_messeger_22.htm"
 		}
@@ -166,7 +166,7 @@ func onEvent(s *script.Script, w *flagwar.War, e script.Event) string {
 		if !h.WaitingBattle() {
 			html = datedPage(s, h, "azit_messenger_q0504_03.htm")
 		} else {
-			html = w.Registering(func() string { return clanRegisterStatus(s, w, h, p, true) })
+			html = h.WithRegistration(func() string { return clanRegisterStatus(s, w, h, p, true) })
 		}
 	case strings.EqualFold(event, "select_clan_npc") || strings.EqualFold(event, "view_clan_npc"):
 		if !h.WaitingBattle() {

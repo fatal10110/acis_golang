@@ -192,6 +192,17 @@ func (h *Hall) Attackers() []int32 { return h.s.Attackers() }
 // auction.
 func (h *Hall) AddAttacker(clanID int32) bool { return h.s.AddAttacker(clanID) }
 
+// WithRegistration runs register, one clan's registration with the hall's siege
+// from its first check through its payment to its joining, as a single
+// step against every other registration of the hall, and returns its
+// answer: two clans never both take the last place or the same flag, and a
+// clan refused for a full siege has paid nothing.
+func (h *Hall) WithRegistration(register func() string) string {
+	var html string
+	h.s.WithRegistration(func() { html = register() })
+	return html
+}
+
 // ClanBidding reports whether clanID bids on a hall at auction: such a clan
 // may not join a hall's siege, since it could win both halls.
 func (h *Hall) ClanBidding(clanID int32) bool { return h.s.Bidding(clanID) }
