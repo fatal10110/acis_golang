@@ -78,8 +78,9 @@ func (l *GameClientLink) replacedIntention(live *livePlayer) (rerun func(), keep
 		return nil, true
 	}
 	if live.combat != nil && live.combat.Target() != nil {
-		// ponytail: an approach already under way toward a target that has
-		// not moved is not broadcast again (#2926).
+		// The re-run re-sends a free player's walk toward the target even
+		// when an approach to an unmoved target is already under way (see
+		// move.Controller.MaybeStartOffensiveFollow).
 		return live.thinkAttack, false
 	}
 	if live.hasPickup() {

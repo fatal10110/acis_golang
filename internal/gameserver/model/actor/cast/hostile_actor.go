@@ -49,8 +49,9 @@ func (a HostileActor) HP() int {
 // MPInitialCost and MPCost apply the caster's magical/physical MP-consume
 // rate to def's raw cost, a rule shared by every creature type rather than
 // overridden per Player/Npc.
-// Unlike PlayerActor, there is no Dance/song surcharge: Bard/Warsmith dance
-// skills are never cast by a hostile NPC caster.
+// Unlike PlayerActor, there is no dance or song surcharge: no NPC skill list
+// carries a dance or song skill (ids 264-277, 304-311, 349, 363-366), so the
+// per-active-dance cost is never reached.
 func (a HostileActor) MPInitialCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }

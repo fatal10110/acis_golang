@@ -82,6 +82,17 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 	return clampDamage(damage)
 }
 
+// SkillPowerScalesWithHP reports whether SkillPowerFor scales skillType's
+// power by the caster's HP ratio: DEATHLINK and FATAL do.
+func SkillPowerScalesWithHP(skillType string) bool {
+	switch strings.ToUpper(strings.TrimSpace(skillType)) {
+	case "DEATHLINK", "FATAL":
+		return true
+	default:
+		return false
+	}
+}
+
 // SkillPowerFor returns the caster-relative skill power physical, magic, and
 // mana damage formulas consume. DEATHLINK and FATAL grow as the caster's
 // HP ratio falls; every other skill type returns power unchanged.

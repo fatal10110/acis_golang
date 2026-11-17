@@ -140,7 +140,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 		// A fear-bearing strike that spares playables skips them whole: no
 		// evasion, effects, damage or lethal strike.
-		if obj.Kind().Playable() && fearImmunePlayableSkillIDs[cast.Skill.ID] {
+		if obj.Kind().Playable() && effect.FearSparesPlayables(cast.Skill.ID) {
 			continue
 		}
 		in, ok := target.PhysicalSkillInput(cast.Caster, cast.Skill)

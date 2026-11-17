@@ -3,6 +3,7 @@ package target
 import (
 	"slices"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -26,16 +27,10 @@ func actingPlayerOf(caster Actor) (Actor, bool) {
 	return caster, true
 }
 
-// isPlayerLike reports whether creature should be treated as a player for
-// single-target gating. The closest available signal in this layer is a
-// playable actor with no owner; the social layer (M8) owns the real player
-// distinction.
-func isPlayerLike(creature Actor) bool {
-	if creature == nil || !isPlayable(creature) {
-		return false
-	}
-	_, owned := ownerOf(creature)
-	return !owned
+// isPlayer reports whether creature is a player. A summon never is, even one
+// whose owner is gone.
+func isPlayer(creature Actor) bool {
+	return creature != nil && creature.Kind() == actor.KindPlayer
 }
 
 func sameParty(a, b Actor) bool { return a.IsInSameParty(b) }
@@ -218,7 +213,7 @@ func partyMemberCastRejection(caster, target Actor, skill *modelskill.Definition
 		return CastRejectNone
 	}
 	if skill != nil && skill.ID == summonFriendSkillID {
-		if !isPlayerLike(target) || target.Dead() {
+		if !isPlayer(target) || target.Dead() {
 			return CastRejectCannotUseSkill
 		}
 	} else {
@@ -259,7 +254,7 @@ func partyOtherCastRejection(caster, target Actor, skill *modelskill.Definition)
 	if sameCreature(caster, target) {
 		return CastRejectCannotUseOnYourself
 	}
-	if !isPlayerLike(target) || target.Dead() {
+	if !isPlayer(target) || target.Dead() {
 		return CastRejectInvalidTarget
 	}
 	if skill != nil {
@@ -291,7 +286,7 @@ func (h corpseAllyHandler) Targets(caster, _ Actor, skill *modelskill.Definition
 	}
 	var out []Actor
 	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Actor) {
-		if !creature.Dead() || !isPlayerLike(creature) {
+		if !creature.Dead() || !isPlayer(creature) {
 			return
 		}
 		if !sameClan(player, creature) && !sameAlly(player, creature) {

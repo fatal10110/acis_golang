@@ -15,8 +15,10 @@ const (
 	// RaidCurseSkillSeeRadius is the known-Attackable scan used by the
 	// beneficial skill-see silence branch.
 	RaidCurseSkillSeeRadius = 1000
-	raidCurseLevelGap       = 8
-	raidCurseSkillLevel     = 1
+	// RaidCurseLevelGap is how many levels a player may stand above a
+	// raid-related target before the target curses it and reflects nothing.
+	RaidCurseLevelGap   = 8
+	raidCurseSkillLevel = 1
 )
 
 // RaidCurseSkills looks up loaded curse skill definitions.
@@ -106,7 +108,7 @@ func TestCursesOnAttack(in RaidCurseInput) bool {
 		return false
 	}
 
-	if in.Attacker.Level()-target.Level() > raidCurseLevelGap {
+	if in.Attacker.Level()-target.Level() > RaidCurseLevelGap {
 		if blocked := applyRaidCurse(in, target, modelskill.RaidCurse2SkillID, true); blocked {
 			return true
 		}
@@ -130,7 +132,7 @@ func TestCursesOnSkillSee(in RaidCurseSkillInput) bool {
 			if t.Raid == nil {
 				continue
 			}
-			if in.Caster.Level()-t.Raid.Level() > raidCurseLevelGap {
+			if in.Caster.Level()-t.Raid.Level() > RaidCurseLevelGap {
 				if applyRaidCurse(skillSeeAsAttack(in), t.Raid, modelskill.RaidCurse2SkillID, true) {
 					return true
 				}
@@ -149,7 +151,7 @@ func TestCursesOnSkillSee(in RaidCurseSkillInput) bool {
 			if raid == nil || !raid.Attackable() || !raid.RaidRelated() {
 				continue
 			}
-			if in.Caster.Level()-raid.Level() <= raidCurseLevelGap {
+			if in.Caster.Level()-raid.Level() <= RaidCurseLevelGap {
 				continue
 			}
 			if raid.AggroHate(t.Helped) <= 0 {

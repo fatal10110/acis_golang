@@ -139,7 +139,7 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 				ID: 7, Level: 20, SkillType: "BLOW", Target: modelskill.TargetOne, Offensive: true,
 				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
 			}
-			skills := handlerskill.NewDefaultRegistry()
+			skills := handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{})
 			// Production cubic fire and applyCastHit stream through the
 			// player's message sink rather than flushing after the handler.
 			sink := link.playerMessageSink(live, nil)
@@ -396,7 +396,7 @@ func TestMdamDamageResistDamageFrameOrder(t *testing.T) {
 	hit := &mdamOrderActor{orderedSkillActor: orderedSkillActor{id: 3, kind: actor.KindNPC, effects: effect.NewList(nil)}, hp: 5000, magic: in, unrollable: true}
 	caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
 
-	result, ok := handlerskill.NewDefaultRegistry().UseResult(handlerskill.Cast{
+	result, ok := handlerskill.NewDefaultRegistryWithSignet(nil, true, nil, handlerskill.SignetDeps{}).UseResult(handlerskill.Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
 		Targets: []handlerskill.Actor{resister, hit},

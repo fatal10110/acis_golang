@@ -32,29 +32,6 @@ func damageOverTimeAction(e *Effect) bool {
 	return result.Continue
 }
 
-func manaDamageOverTimeAction(e *Effect) bool {
-	target := e.Effected
-	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
-		Dead:   target.Dead(),
-		MP:     target.MPValue(),
-		Damage: e.Template.Value,
-		Toggle: e.Skill.Toggle,
-	})
-	if result.RemovedForLackMP {
-		if player, ok := asPlayer(target); ok {
-			player.NotifyEffectRemovedDueLackMP(e)
-		}
-	}
-	// An MP reduction that would apply zero is a no-op and skips the
-	// broadcast, so no pointless packet is sent — gate on ReduceMP's returned
-	// applied amount, not the requested tick damage, so an already-empty
-	// target doesn't get a spurious broadcast.
-	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
-		broadcastStatus(e.Effected)
-	}
-	return result.Continue
-}
-
 func manaHealOverTimeAction(e *Effect) bool {
 	target := e.Effected
 	if !target.CanBeHealed() {
@@ -68,33 +45,32 @@ func manaHealOverTimeAction(e *Effect) bool {
 	return true
 }
 
-// manaDrainTick runs one ManaDamageOverTimeTick against e's target and
-// applies its result, shared by relax, chameleon rest, fake death and silent
-// move.
+// manaDrain runs one ManaDamageOverTimeTick against e's target and applies
+// its result: the mana-damage-over-time effect's tick, and the upkeep of
+// relax, chameleon rest, fake death and silent move.
 //
-// Toggle is forced true regardless of e.Skill.Toggle: the relax and
-// chameleon-rest effects check "cost exceeds current MP" unconditionally,
-// not only for toggle skills (unlike the mana-damage-over-time effect, whose
-// lack-MP check really is toggle-gated). Every skill carrying either effect in the
-// current datapack happens to be TOGGLE-typed, so reading e.Skill.Toggle
-// would produce the same result today — but that's a data coincidence, not
-// a contract; force true here so a future non-toggle skill using these
-// effects still gets the unconditional check.
-func manaDrainTick(e *Effect) bool {
+// toggleGate is the tick's Toggle input. The mana-damage-over-time effect
+// passes e.Skill.Toggle: its lack-MP check really is toggle-gated. The
+// upkeep kinds pass true: they check "cost exceeds current MP"
+// unconditionally. Every skill carrying one of them is TOGGLE-typed today,
+// so e.Skill.Toggle would read the same, but that is a data coincidence, not
+// a contract.
+func manaDrain(e *Effect, toggleGate bool) bool {
 	target := e.Effected
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
 		MP:     target.MPValue(),
 		Damage: e.Template.Value,
-		Toggle: true,
+		Toggle: toggleGate,
 	})
 	if result.RemovedForLackMP {
 		if player, ok := asPlayer(target); ok {
 			player.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
-	// See manaDamageOverTimeAction: gate the broadcast on ReduceMP's applied
-	// amount, not the requested tick damage.
+	// An MP reduction that would apply zero is a no-op and skips the
+	// broadcast: gate on ReduceMP's applied amount, not the requested tick
+	// damage, so an already-empty target gets no status update.
 	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
 		broadcastStatus(e.Effected)
 	}

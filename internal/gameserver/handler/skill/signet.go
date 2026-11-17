@@ -33,12 +33,6 @@ type signetTemplates interface {
 	Get(id int) (*npc.Template, bool)
 }
 
-// signetPositioned is implemented by a caster whose world position a
-// signet actor spawns at.
-type signetPositioned interface {
-	Position() (x, y, z int)
-}
-
 // signetGrounded optionally reports the ground point a player caster picked
 // for a ground-targeted signet; a caster without one spawns the actor on
 // itself.
@@ -146,8 +140,7 @@ func (h signetHandler) useCasttime(cast Cast) {
 
 // newSelfEffect builds the caster-hosted tick effect for one of def's
 // self-effect templates, dispatching by the template's core-effect name. It
-// returns nil for a template this port doesn't carry a signet self-effect
-// kind for, matching newActorEffect's dispatch for actor-hosted templates.
+// returns nil for a template that names no signet self-effect kind, matching newActorEffect's dispatch for actor-hosted templates.
 func (h signetHandler) newSelfEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	switch tmpl.Name {
 	case "SignetMDam":
@@ -185,11 +178,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	point.Attach(npc.Runtime{World: h.world, Sink: h.newSink(point)})
 	point.SetZones(h.zones)
 
-	pos, ok := caster.(signetPositioned)
-	if !ok {
-		return nil, false
-	}
-	x, y, z := pos.Position()
+	x, y, z := caster.Position()
 	// Only a player owns a picked ground point; any other caster of a
 	// ground-targeted signet spawns the point on itself.
 	if caster.Kind() == actor.KindPlayer && def.Target == modelskill.TargetGround {
@@ -223,7 +212,7 @@ func signetEffectMeta(def modelskill.Definition) effect.Skill {
 
 // newActorEffect builds the actor-hosted tick effect for one of def's
 // effect templates, dispatching by the template's core-effect name. It
-// returns nil for a template this port doesn't carry a signet kind for.
+// returns nil for a template that names no signet kind.
 func (h signetHandler) newActorEffect(def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate, actor *npc.EffectPoint) *effect.Effect {
 	switch tmpl.Name {
 	case "Signet":

@@ -19,11 +19,9 @@ var ErrUnsupportedCoreEffect = errors.New("effect: unsupported core effect")
 type Flag uint32
 
 const (
-	// FlagNone is the default effect flag mask.
-	FlagNone Flag = 1 << iota
 	// FlagCharmOfCourage marks a player as carrying Charm of Courage, shown
 	// in its status window.
-	FlagCharmOfCourage
+	FlagCharmOfCourage Flag = 1 << iota
 	// FlagCharmOfLuck marks a target as carrying Charm of Luck, consulted by
 	// systems that exempt a lucky death from raising its own penalties.
 	FlagCharmOfLuck
@@ -63,10 +61,6 @@ const (
 	FlagFakeDeath
 )
 
-// magicCircleAbnormalMask is the client's magic-circle abnormal-effect
-// bitmask, ClanGate's abnormal-effect icon.
-const magicCircleAbnormalMask = 0x800000
-
 // clanGateOpener is a ClanGate target that tells the other online members
 // of its clan, if it has one, that the portal opened.
 type clanGateOpener interface {
@@ -74,9 +68,7 @@ type clanGateOpener interface {
 }
 
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
-// upkeep tick, or a plain continuous mana-drain buff. Declared here rather
-// than alongside the other Type constants so this file's additions stay
-// out of the effect list's stacking logic.
+// upkeep tick, or a plain continuous mana-drain buff.
 const TypeManaDamOverTime Type = "MANA_DMG_OVER_TIME"
 
 // Type values for the additional effect kinds wired below. Each names the
@@ -313,11 +305,19 @@ var coreKinds = map[string]kind{
 	"ClanGate":         {typ: TypeClanGate},
 }
 
-var fearSkippedPlayableSkillIDs = map[modelskill.ID]bool{
+// fearSparedPlayableSkillIDs are the skills whose fear never lands on a
+// playable.
+var fearSparedPlayableSkillIDs = map[modelskill.ID]bool{
 	98:   true,
 	1272: true,
 	1381: true,
 }
+
+// FearSparesPlayables reports whether skill id's fear must not land on a
+// player-controlled target even when its success roll passes. The fear
+// effect refuses to start on one; the skill handlers apply the same set as a
+// caster-side gate, and a PDAM among them skips playable targets outright.
+func FearSparesPlayables(id modelskill.ID) bool { return fearSparedPlayableSkillIDs[id] }
 
 // fearHalvedDurationPlayableSkillIDs are skill ids whose fear effect runs at
 // half its configured tick count against a playable target.
@@ -364,9 +364,10 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 // Apply instantiates each of templates as a fresh live effect of effector on
 // effected and hosts it where Attach places it. It rolls no landing chance
 // and checks no landing gate; callers decide that first (see Lands). A
-// template whose attached condition rejects the pair (see Admits), or one
-// naming an effect core this port hasn't wired yet, is skipped rather than
-// failing the whole batch.
+// template whose attached condition rejects the pair (see Admits) is
+// skipped rather than failing the whole batch; a template naming no effect
+// core never gets this far, since its skill or item fails to load (see
+// Known).
 func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate) {
 	for _, tmpl := range templates {
 		if !Admits(effector, effected, meta, tmpl) {
@@ -470,9 +471,6 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 			return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 		}
 	}
-	if k.flag == 0 {
-		k.flag = FlagNone
-	}
 
 	// A seed effect's Level is a charge counter (IncreasePower), not the
 	// applied skill level: it always starts at 1, regardless of the skill
@@ -523,7 +521,7 @@ func wireHooks(e *Effect) {
 	case TypeDamOverTime:
 		e.OnAction = damageOverTimeAction
 	case TypeManaDamOverTime:
-		e.OnAction = manaDamageOverTimeAction
+		e.OnAction = func(e *Effect) bool { return manaDrain(e, e.Skill.Toggle) }
 	case TypeFear:
 		e.OnStart = fearStart
 		e.OnAction = fearAction
@@ -611,10 +609,10 @@ func wireHooks(e *Effect) {
 		e.OnStart = spoilStart
 	case TypeBigHead:
 		e.OnStart = func(e *Effect) bool {
-			startAbnormalEffect(e.Effected, 0x002000)
+			startAbnormalEffect(e.Effected, modelskill.AbnormalBigHead)
 			return true
 		}
-		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, 0x002000) }
+		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, modelskill.AbnormalBigHead) }
 	case TypeCancelDebuff:
 		e.OnStart = cancelDebuffStart
 	case TypeRelax:
@@ -656,13 +654,13 @@ func wireHooks(e *Effect) {
 		e.OnStart = func(*Effect) bool { return false }
 	case TypeClanGate:
 		e.OnStart = func(e *Effect) bool {
-			startAbnormalEffect(e.Effected, magicCircleAbnormalMask)
+			startAbnormalEffect(e.Effected, modelskill.AbnormalMagicCircle)
 			if opener, ok := e.Effected.(clanGateOpener); ok {
 				opener.NotifyClanGateOpened()
 			}
 			return true
 		}
-		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, magicCircleAbnormalMask) }
+		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, modelskill.AbnormalMagicCircle) }
 	}
 	wireTemplateAbnormal(e)
 }

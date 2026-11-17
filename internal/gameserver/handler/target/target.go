@@ -151,7 +151,7 @@ type Registry struct {
 	handlers map[modelskill.Target]Handler
 }
 
-// NewRegistry returns a registry with the currently ported target handlers.
+// NewRegistry returns a registry holding every target handler.
 func NewRegistry(known Known) *Registry {
 	r := &Registry{handlers: make(map[modelskill.Target]Handler)}
 	r.Register(selfHandler{})

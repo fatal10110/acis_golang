@@ -33,20 +33,32 @@ type cubicEnemy interface {
 	AttackableWithoutForceBy(caster skilltarget.Actor) bool
 }
 
+const (
+	// beginnerLifeCubicSkill is Life Cubic for Beginners, which always
+	// grants its cubic at beginnerLifeCubicLevel.
+	beginnerLifeCubicSkill = 4338
+	beginnerLifeCubicLevel = 8
+	// enchantedLevelBase is the last regular skill level; an enchanted
+	// granting skill fires its cubic at enchantedCubicLevelBase plus one
+	// level per enchantedLevelsPerCubicLevel enchant levels.
+	enchantedLevelBase           = 100
+	enchantedLevelsPerCubicLevel = 7
+	enchantedCubicLevelBase      = 8
+)
+
 // CubicGrantedLevel resolves the level a granted cubic actually fires its
-// skills at: skill 4338 (Life Cubic for Beginners) always grants level 8,
-// and any granting-skill level above 100 (enchanted skill levels) collapses
-// through a truncating integer-division formula before the cubic is added
-// or refreshed.
+// skills at: Life Cubic for Beginners always grants level 8, and any
+// granting-skill level above 100 (enchanted skill levels) collapses through
+// a truncating integer-division formula before the cubic is added or
+// refreshed.
 func CubicGrantedLevel(def modelskill.Definition) int {
 	switch {
-	case int(def.ID) == 4338:
-		return 8
-	case def.Level > 100:
-		// ((level - 100) / 7) + 8 in all-int arithmetic, truncating toward
-		// zero; rounding the result is a no-op since it is already an
-		// integer. Go's integer division truncates toward zero the same way.
-		return (def.Level-100)/7 + 8
+	case def.ID == beginnerLifeCubicSkill:
+		return beginnerLifeCubicLevel
+	case def.Level > enchantedLevelBase:
+		// ((level - 100) / 7) + 8 in all-int arithmetic; Go's integer
+		// division truncates toward zero.
+		return (def.Level-enchantedLevelBase)/enchantedLevelsPerCubicLevel + enchantedCubicLevelBase
 	default:
 		return def.Level
 	}

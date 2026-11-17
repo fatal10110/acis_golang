@@ -29,6 +29,10 @@ func (a FolkActor) HP() int { return int(a.Folk.HP()) }
 
 // MPInitialCost and MPCost apply the caster's magical or physical MP
 // consume rate to def's raw cost.
+//
+// No dance or song surcharge applies, unlike a player's cast: no NPC skill
+// list carries a dance or song skill (ids 264-277, 304-311, 349, 363-366), so
+// the per-active-dance cost is never reached.
 func (a FolkActor) MPInitialCost(def *modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }

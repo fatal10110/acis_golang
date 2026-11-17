@@ -82,44 +82,44 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		debuff      bool
 		wantRejects bool
 	}{
-		{"Debuff", TypeDebuff, FlagNone, false, false},
+		{"Debuff", TypeDebuff, 0, false, false},
 		{"Stun", TypeStun, FlagStunned, false, true},
 		{"Root", TypeRoot, FlagRooted, false, true},
 		{"Sleep", TypeSleep, FlagSleep, false, true},
 		{"Fear", TypeFear, FlagFear, false, true},
-		{"DamOverTime", TypeDamOverTime, FlagNone, false, false},
-		{"ManaDamOverTime", TypeManaDamOverTime, FlagNone, false, false},
-		{"AbortCast", TypeAbortCast, FlagNone, false, false},
+		{"DamOverTime", TypeDamOverTime, 0, false, false},
+		{"ManaDamOverTime", TypeManaDamOverTime, 0, false, false},
+		{"AbortCast", TypeAbortCast, 0, false, false},
 		{"ImmobileUntilAttacked", TypeImmobileUntilAttacked, FlagMeditating, false, false},
-		{"ImobileBuff", TypeImmobilizeEffector, FlagNone, false, false},
-		{"Invincible", TypeInvincible, FlagNone, false, false},
-		{"ManaHealOverTime", TypeManaHealOverTime, FlagNone, false, false},
+		{"ImobileBuff", TypeImmobilizeEffector, 0, false, false},
+		{"Invincible", TypeInvincible, 0, false, false},
+		{"ManaHealOverTime", TypeManaHealOverTime, 0, false, false},
 		{"Mute", TypeMute, FlagMuted, false, false},
 		{"NoblesseBless", TypeNoblesseBless, flagNoblesseBlessing, false, false},
 		{"Paralyze", TypeParalyze, FlagParalyzed, false, false},
 		{"Petrification", TypePetrification, FlagParalyzed, false, false},
 		{"PhysicalMute", TypePhysicalMute, FlagPhysicalMuted, false, false},
-		{"RemoveTarget", TypeRemoveTarget, FlagNone, false, false},
+		{"RemoveTarget", TypeRemoveTarget, 0, false, false},
 		{"SilenceMagicPhysical", TypeSilenceAll, FlagMuted | FlagPhysicalMuted, false, false},
 		{"SilentMove", TypeSilentMove, FlagSilentMove, false, false},
 		{"StunSelf", TypeStunSelf, FlagStunned, false, false},
-		{"Heal", TypeHeal, FlagNone, false, false},
-		{"HealOverTime", TypeHealOverTime, FlagNone, false, false},
-		{"ManaHeal", TypeManaHeal, FlagNone, false, false},
-		{"TargetMe", TypeTargetMe, FlagNone, false, false},
-		{"Bluff", TypeBluff, FlagNone, false, false},
+		{"Heal", TypeHeal, 0, false, false},
+		{"HealOverTime", TypeHealOverTime, 0, false, false},
+		{"ManaHeal", TypeManaHeal, 0, false, false},
+		{"TargetMe", TypeTargetMe, 0, false, false},
+		{"Bluff", TypeBluff, 0, false, false},
 		{"CharmOfCourage", TypeCharmOfCourage, FlagCharmOfCourage, false, false},
 		{"CharmOfLuck", TypeCharmOfLuck, FlagCharmOfLuck, false, false},
 		{"PhoenixBless", TypePhoenixBless, FlagPhoenixBlessing, false, false},
-		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
-		{"BlockDebuff", TypeBlockDebuff, FlagNone, false, false},
+		{"BlockBuff", TypeBlockBuff, 0, false, false},
+		{"BlockDebuff", TypeBlockDebuff, 0, false, false},
 		{"ProtectionBlessing", TypeProtectionBless, FlagProtectionBlessing, false, false},
-		{"PolearmTargetSingle", TypePolearmTargetSingle, FlagNone, false, false},
+		{"PolearmTargetSingle", TypePolearmTargetSingle, 0, false, false},
 		{"BigHead", TypeBigHead, flagBigHead, false, false},
-		{"Spoil", TypeSpoil, FlagNone, false, false},
-		{"CancelDebuff", TypeCancelDebuff, FlagNone, false, false},
-		{"ImobilePetBuff", TypeImmobilizePetBuff, FlagNone, false, false},
-		{"Distrust", TypeDistrust, FlagNone, false, false},
+		{"Spoil", TypeSpoil, 0, false, false},
+		{"CancelDebuff", TypeCancelDebuff, 0, false, false},
+		{"ImobilePetBuff", TypeImmobilizePetBuff, 0, false, false},
+		{"Distrust", TypeDistrust, 0, false, false},
 		{"Confusion", TypeConfusion, FlagConfused, false, false},
 		{"Betray", TypeBetray, FlagBetrayed, false, false},
 	}
@@ -232,8 +232,8 @@ func TestPolearmTargetSingleEffectCarriesNoHooks(t *testing.T) {
 	if e.OnStart != nil || e.OnExit != nil {
 		t.Fatal("PolearmTargetSingle must carry no start/exit hooks, only a classification marker")
 	}
-	if e.Flag != FlagNone {
-		t.Fatalf("Flag = %v, want FlagNone", e.Flag)
+	if e.Flag != 0 {
+		t.Fatalf("Flag = %v, want 0", e.Flag)
 	}
 }
 
@@ -245,7 +245,7 @@ func TestBigHeadEffectCarriesVisibleAbnormalHooks(t *testing.T) {
 	if e.OnStart == nil || e.OnExit == nil {
 		t.Fatal("BigHead must start and stop its visible abnormal effect")
 	}
-	if e.Flag == FlagNone {
+	if e.Flag == 0 {
 		t.Fatal("BigHead must carry a distinct, non-zero flag")
 	}
 }
@@ -302,13 +302,13 @@ func TestClanGateEffectStartsAndStopsMagicCircle(t *testing.T) {
 	if !e.OnStart(e) {
 		t.Fatal("ClanGate OnStart() = false, want true")
 	}
-	want := []string{fmt.Sprintf("start:%#x", magicCircleAbnormalMask), "abnormal"}
+	want := []string{fmt.Sprintf("start:%#x", modelskill.AbnormalMagicCircle), "abnormal"}
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("start events = %#v, want %#v", target.events, want)
 	}
 
 	e.OnExit(e)
-	want = append(want, fmt.Sprintf("stop:%#x", magicCircleAbnormalMask), "abnormal")
+	want = append(want, fmt.Sprintf("stop:%#x", modelskill.AbnormalMagicCircle), "abnormal")
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("events after exit = %#v, want %#v", target.events, want)
 	}
