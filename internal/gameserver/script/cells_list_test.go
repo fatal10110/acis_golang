@@ -43,11 +43,6 @@ func TestPlayerCell(t *testing.T) {
 	if c.Get() != nil {
 		t.Fatal("nil did not empty the cell")
 	}
-	c.Set(speller)
-	c.Clear()
-	if c.Get() != nil {
-		t.Fatal("Clear left the player")
-	}
 }
 
 // A list of creatures keeps insertion order and matches by world

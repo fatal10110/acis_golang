@@ -21,7 +21,7 @@ import (
 // //respawnall reloads. A hook that returns only an error reads its files and
 // swaps the loaded table in place for every holder, keeping the table as it was
 // when the files cannot be read; a nil hook leaves its table as booted, and
-// //reload answers its type as not ported yet.
+// //reload answers its type as having no reload hook.
 type DataReloads struct {
 	// Admin reloads the access levels and admin commands.
 	Admin func() error
@@ -85,14 +85,13 @@ type DataReloads struct {
 	Zones func() (*zone.Index, error)
 }
 
-// errReloadNotPorted answers a //reload type whose table has no reload
-// hook yet.
-var errReloadNotPorted = errors.New("reload not ported yet")
+// errNoReloadHook answers a //reload type whose table has no reload hook.
+var errNoReloadHook = errors.New("no reload hook")
 
-// reloadHook runs hook, errReloadNotPorted without one.
+// reloadHook runs hook, errNoReloadHook without one.
 func reloadHook(hook func() error) error {
 	if hook == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	return hook()
 }
@@ -144,8 +143,8 @@ var reloadUsage = []string{
 // adminReload answers //reload <type>...: each type in turn reloads its data
 // and tells gm so; a token naming no type answers the usage and the next
 // one is read. Without a type, or when a reload fails, the usage is sent and
-// the command ends there. A type whose reload is not ported yet is logged
-// and answered with ActionFailed, as an unported command is.
+// the command ends there. A type with no reload hook is logged and answered
+// with ActionFailed, as a command with no handler is.
 func (l *GameClientLink) adminReload(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
@@ -180,8 +179,8 @@ func (l *GameClientLink) reloadTokens(gm *livePlayer, tokens []string) {
 			err = typ.run(l)
 		}
 		switch {
-		case errors.Is(err, errReloadNotPorted):
-			l.log.Warn().Str("type", typ.word).Msg("admin: //reload type not implemented yet")
+		case errors.Is(err, errNoReloadHook):
+			l.log.Warn().Str("type", typ.word).Msg("admin: //reload type has no reload hook")
 			gm.SendFrame(serverpackets.FrameActionFailed())
 		case err != nil:
 			l.log.Error().Err(err).Str("type", typ.word).Msg("admin: //reload failed; the data stays as it was")
@@ -227,7 +226,7 @@ func (l *GameClientLink) reloadNPCs() error {
 // at once put their settings in force one after the other, each whole.
 func (l *GameClientLink) reloadConfig() error {
 	if l.reloads.Config == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	settings, err := l.reloads.Config()
 	if err != nil {
@@ -243,7 +242,7 @@ func (l *GameClientLink) reloadConfig() error {
 // the gatekeeper.
 func (l *GameClientLink) reloadTeleports() error {
 	if l.reloads.Teleports == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	teleports, instants, err := l.reloads.Teleports()
 	if err != nil {
@@ -260,7 +259,7 @@ const reloadBuyListsTimeout = 30 * time.Second
 // which rebuilds their limited stock from the saved rows.
 func (l *GameClientLink) reloadBuyLists() error {
 	if l.reloads.BuyLists == nil || l.merchant == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	lists, err := l.reloads.BuyLists()
 	if err != nil {
@@ -275,7 +274,7 @@ func (l *GameClientLink) reloadBuyLists() error {
 // the ones standing there.
 func (l *GameClientLink) reloadDoors() error {
 	if l.reloads.Doors == nil || l.doors == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	doors, err := l.reloads.Doors()
 	if err != nil {

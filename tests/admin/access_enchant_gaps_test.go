@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"encoding/binary"
+	"strconv"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -19,10 +20,12 @@ const undefinedLevel = 77
 // Player.setAccessLevel resets it to the user level) plays as a user: from
 // CharSelected on the title is the user level's name, the name and title
 // take the user colors, it is no game master and is on no GM list. The
-// level above 0 still sets the title.
+// level above 0 still sets the title. The row keeps the stored level until
+// the character's first save, which writes the user level and its title
+// (storeCharBase writes the resolved getAccessLevel().getLevel()).
 func TestAccessLevelUndefinedAtLogin(t *testing.T) {
 	t.Parallel()
-	srv, _ := bootAdmin(t, undefinedLevel)
+	srv, objID := bootAdmin(t, undefinedLevel)
 	c := srv.Client
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
 	w.WriteInt32(0)
@@ -63,6 +66,17 @@ func TestAccessLevelUndefinedAtLogin(t *testing.T) {
 		t.Fatalf("EnterWorld UserInfo = %+v, want %+v", *got, want)
 	}
 	assertNoGM(t, exchange(t, c, encodeGmList()))
+
+	if got := storedNow(t, srv, objID, "accesslevel"); got != strconv.Itoa(undefinedLevel) {
+		t.Fatalf("stored access level before the first save = %s, want %d", got, undefinedLevel)
+	}
+	srv.TickAutosave(t)
+	if got := storedNow(t, srv, objID, "accesslevel"); got != "0" {
+		t.Fatalf("stored access level after the first save = %s, want the user level 0", got)
+	}
+	if got := storedNow(t, srv, objID, "title"); got != "User" {
+		t.Fatalf("stored title after the first save = %q, want User", got)
+	}
 }
 
 // TestAdminSetAccessRowWaitsForSave: //set access on an online player

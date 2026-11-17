@@ -15,10 +15,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// systemMessageApplicantInformationIncorrect answers a //spawn whose NPC
-// cannot be placed.
-const systemMessageApplicantInformationIncorrect = 12
-
 // adminListSpawnsPageLimit is how many NPCs a page of //list_spawns shows.
 const adminListSpawnsPageLimit = 8
 
@@ -66,7 +62,7 @@ func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 		tmpl, ok = l.npcs.GetByName(strings.ReplaceAll(idOrName, "_", " "))
 	}
 	if !ok || !l.placeAdminSpawn(tmpl, adminSpawnPoint(gm), respawn) {
-		gm.SendFrame(serverpackets.FrameSystemMessage(systemMessageApplicantInformationIncorrect))
+		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageApplicantInformationIncorrect))
 		return
 	}
 	sendText(gm, "You spawned "+tmpl.Name+". - Cmd: admin_spawn")

@@ -103,6 +103,7 @@ const (
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
 	SystemMessageApplicantInformationIncorrect     = 12
+	SystemMessageNpcServerNotOperating             = 1278
 	SystemMessageSweeperFailedTargetNotSpoiled     = 343
 	SystemMessageSweepNotAllowed                   = 683
 	SystemMessageHarvestFailedSeedNotSown          = 893

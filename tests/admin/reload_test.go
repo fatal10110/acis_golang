@@ -70,8 +70,8 @@ func (c *countedReloads) reloads() network.DataReloads {
 // npc and script, which must be spelled out; each type reloads and answers
 // its own message, tokens stacking left to right. A token naming no type
 // answers the usage and the next token is still read; no token, or a
-// reload that fails, answers the usage and ends the command. A type whose
-// reload is not ported yet only releases the client.
+// reload that fails, answers the usage and ends the command. A type with
+// no reload hook only releases the client.
 func TestAdminReload(t *testing.T) {
 	t.Parallel()
 	hooks := &countedReloads{}

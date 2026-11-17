@@ -2,7 +2,9 @@
 
 Status: decided 2026-10-05, amended the same day with the owner decisions on the alliance
 level (X4), the script-event consumer (E8) and the stand-in deletion (section 8).
-Implementation has not started.
+Implemented: the engine (M9) and the closed content set (M10) live in
+`internal/gameserver/script/`. The sections below are the rules in force; the context below
+and section 8 record the state before the port.
 
 ## Context
 
@@ -20,9 +22,10 @@ listed in the datapack `data/xml/scripts.xml`, is 857 scripts:
 
 Spawn makers (43 classes) are a separate mechanism bound from the spawnlist XML.
 
-Go has no script engine: `internal/gameserver/script/` holds package stubs only. Several
-basics are missing because the reference implements them in scripts: monsters do not aggro on
-sight, hostile NPCs never cast on their own, quests and the tutorial do not exist.
+Before this plan Go had no script engine: `internal/gameserver/script/` held package stubs
+only. Several basics were missing because the reference implements them in scripts: monsters
+did not aggro on sight, hostile NPCs never cast on their own, quests and the tutorial did not
+exist.
 
 **Owner constraint.** No new scripts will be authored in the near future. The set is closed.
 The design therefore optimizes for a faithful one-time port by parallel lanes and for
@@ -311,7 +314,7 @@ A nil NPC or player means "bound to none", never a wildcard.
 - Range checks are strict `<`, centre to centre. `party.InRange` (`<=` plus collision radii)
   is not reused.
 
-## 8. Stand-ins (deleted)
+## 8. Former stand-ins (removed in M12, history)
 
 Until #3497 (M12), an NPC id with no bound behavior ran built-in stand-ins: idle wander and
 follow, `attackedHateWeight`, Warrior-style party assist, the shot-recharge roll, the walker

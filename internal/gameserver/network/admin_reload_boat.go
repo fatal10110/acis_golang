@@ -20,7 +20,7 @@ import (
 // dropped when gm left the world meanwhile.
 func (l *GameClientLink) reloadBoats(gm *livePlayer, then func()) error {
 	if l.reloads.BoatRoutes == nil || l.boats == nil || l.world == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	itineraries, err := l.reloads.BoatRoutes()
 	if err != nil {

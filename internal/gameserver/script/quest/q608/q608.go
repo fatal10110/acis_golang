@@ -1,7 +1,7 @@
 // Package q608 is the quest Slay the Enemy Commander: Kadun Zu Ketra asks a
-// Ketra ally of level 4 or more for the head of Mos, the Varka raid boss,
-// and pays for it with the Totem of Wisdom. Every ally of the killer's
-// party near Mos gets a head.
+// level 75 Ketra ally of alliance level 4 or more for the head of Mos, the
+// Varka raid boss, and pays for it with the Totem of Wisdom. Every ally of
+// the killer's party near Mos gets a head.
 package q608
 
 import (
@@ -70,8 +70,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk offers the quest to a level 75 Ketra ally of level 4 or more who
-// holds the level 4 alliance mark and no totem yet.
+// onTalk offers the quest to a level 75 Ketra ally of alliance level 4 or
+// more who holds the level 4 alliance mark and no totem yet.
 func onTalk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
 	st := s.QuestState(e.Player, questName)

@@ -48,7 +48,7 @@ func (l *GameClientLink) wireZones(ix *zone.Index) {
 // around it.
 func (l *GameClientLink) reloadZones() error {
 	if l.reloads.Zones == nil || l.zones == nil {
-		return errReloadNotPorted
+		return errNoReloadHook
 	}
 	l.zoneReloadMu.Lock()
 	defer l.zoneReloadMu.Unlock()
