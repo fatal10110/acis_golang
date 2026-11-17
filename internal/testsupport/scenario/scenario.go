@@ -15,6 +15,8 @@
 //	                                          Script.Now and game tick read) starts at that time of day (UTC) on
 //	                                          2026-01-01, so a script reading the minute finds a known one; without it
 //	                                          the clock starts at the wall time of the run
+//	driven                                    optional: the scenario pins a timer's deadline to the millisecond, which the
+//	                                          wall clock of a real-pool pass does not meet; that pass skips it
 //	character <name> <level>                  the character the client plays, with the experience its level starts at
 //	class <class id>                          optional: the character's class, and so its race (default 0, a human
 //	                                          fighter); every class then has a template with the fixture's
@@ -478,8 +480,10 @@ type Scenario struct {
 	Trace string
 	// Clock is the clock line's time of day, the driven clock's start;
 	// HasClock tells a line was given.
-	Clock     time.Duration
-	HasClock  bool
+	Clock    time.Duration
+	HasClock bool
+	// Driven is the driven line: the scenario needs the driven clock.
+	Driven    bool
 	Character string
 	Level     int
 	// Class is the character's class id: its base class.
@@ -1051,6 +1055,11 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			return err
 		}
 		sc.Clock, sc.HasClock = d, true
+	case "driven":
+		if len(args) != 0 || sc.Driven {
+			return fmt.Errorf("one driven line, no arguments")
+		}
+		sc.Driven = true
 	case "random":
 		if sc.Random != nil {
 			return fmt.Errorf("one random line")

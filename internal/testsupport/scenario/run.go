@@ -468,8 +468,8 @@ func (r *run) boot(t *testing.T, cfg Config) {
 			r.corpses.respawnHook.Store(&hook)
 		}
 	}
-	if r.sc.HasClock && !r.srv.DrivesClock() {
-		t.Skipf("%s: the clock line needs the driven clock; the real pool runs on the wall clock", r.sc.Name)
+	if (r.sc.HasClock || r.sc.Driven) && !r.srv.DrivesClock() {
+		t.Skipf("%s: the clock or driven line needs the driven clock; the real pool runs on the wall clock", r.sc.Name)
 	}
 	if wait := r.sc.killTime(); wait > poolKillBudget && !r.srv.DrivesClock() {
 		t.Skipf("%s: its kill steps wait %v on the wall clock, over the %v a real-pool pass spends on one scenario; the driven clock covers it", r.sc.Name, wait, poolKillBudget)

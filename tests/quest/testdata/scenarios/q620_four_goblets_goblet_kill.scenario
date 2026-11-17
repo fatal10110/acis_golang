@@ -1,4 +1,5 @@
 # Four Goblets (Q620): a raid boss drops a goblet to a character on the quest, who can then see the ghost of Wigoth. Expectations replay the reference trace of this scenario.
+driven
 trace internal/gameserver/script/testdata/oracle/scenarios/q620_four_goblets_goblet_kill.golden
 character Hero 74
 quest Q620_FourGoblets <cond>=1 <state>=STARTED
