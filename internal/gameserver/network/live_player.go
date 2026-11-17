@@ -50,11 +50,14 @@ type livePlayer struct {
 	session func(wire.Frame) bool
 	npcs    *npc.Table
 	items   []*item.Instance
-	throne  staticobject.Chair
-	attack  *attack.Controller
-	move    *move.Controller
-	combat  *ai.PlayerAttack
-	cast    *actorcast.Controller
+	// throne holds the chair the player sits on, nil while it sits on none.
+	// Its own queue writes it; observers discovering or forgetting the
+	// player read it from their own goroutines.
+	throne atomic.Pointer[throneSeat]
+	attack *attack.Controller
+	move   *move.Controller
+	combat *ai.PlayerAttack
+	cast   *actorcast.Controller
 	// petRestoreInFlight is set while a summon cast that has already hit is
 	// still waiting for its pets-row read, and cleared when that read lands
 	// however it ends.
@@ -1127,20 +1130,48 @@ func (p *livePlayer) SendInventoryUpdate(updates []itemcontainer.Update) {
 	p.SendFrame(frame)
 }
 
-func (p *livePlayer) seated() bool {
-	return p != nil && p.throne != nil
+// throneSeat boxes a claimed chair for livePlayer.throne.
+type throneSeat struct{ chair staticobject.Chair }
+
+// takeThrone seats p on chair. It runs on p's queue.
+func (p *livePlayer) takeThrone(chair staticobject.Chair) {
+	p.throne.Store(&throneSeat{chair: chair})
 }
 
+// throneID is the static object id of the chair p sits on, ok false while
+// it sits on none. Any goroutine may call it.
+func (p *livePlayer) throneID() (id int, ok bool) {
+	if p == nil {
+		return 0, false
+	}
+	seat := p.throne.Load()
+	if seat == nil {
+		return 0, false
+	}
+	return seat.chair.StaticObjectID(), true
+}
+
+// seated reports whether p sits on a chair. Any goroutine may call it.
+func (p *livePlayer) seated() bool {
+	return p != nil && p.throne.Load() != nil
+}
+
+// freeChair frees the chair p sits on for others to claim, p keeping its
+// seat. It runs on p's queue.
 func (p *livePlayer) freeChair() {
-	if p == nil || p.throne == nil {
+	if p == nil {
 		return
 	}
-	p.throne.SetBusy(false)
+	if seat := p.throne.Load(); seat != nil {
+		seat.chair.SetBusy(false)
+	}
 }
 
+// releaseChair frees the chair p sits on and unseats p. It runs on p's
+// queue.
 func (p *livePlayer) releaseChair() {
 	p.freeChair()
 	if p != nil {
-		p.throne = nil
+		p.throne.Store(nil)
 	}
 }

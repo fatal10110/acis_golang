@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // friendsCleared is the message clearing the friends list on the board
@@ -86,6 +87,7 @@ func boardSelection(command string) (string, int32, bool) {
 }
 
 func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id int32) {
+	sim.AssertOwner(live.Queue())
 	session := &live.board
 	switch action {
 	case "select":
@@ -135,6 +137,7 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 }
 
 func (l *GameClientLink) boardBlockAction(live *livePlayer, action string, id int32) {
+	sim.AssertOwner(live.Queue())
 	session := &live.board
 	confirm := false
 	switch action {

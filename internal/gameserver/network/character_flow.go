@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -348,6 +349,7 @@ func (l *GameClientLink) enterWorld(client *Client, live *livePlayer) bool {
 // the EnterWorld burst, on live's queue. It reports false when the login
 // cannot complete.
 func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer) bool {
+	sim.AssertOwner(live.Queue())
 	// Same constructor RequestItemList uses, so the login snapshot comes from
 	// the live inventory instead of the raw restored rows. Built before the
 	// burst starts and before anything is published into the world, so a

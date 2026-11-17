@@ -4,6 +4,7 @@ import (
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -29,6 +30,7 @@ const (
 func (l *GameClientLink) moveByTeleport(live *livePlayer, target location.Location) bool {
 	switch live.teleportMode {
 	case teleportModeOnce:
+		sim.AssertOwner(live.Queue())
 		live.teleportMode = teleportModeNone
 	case teleportModeAlways:
 	default:
@@ -77,6 +79,7 @@ func (l *GameClientLink) adminTeleport(gm *livePlayer, line string) {
 }
 
 func (l *GameClientLink) adminInstantMove(gm *livePlayer, args []string) {
+	sim.AssertOwner(gm.Queue())
 	if len(args) == 0 {
 		gm.teleportMode = teleportModeOnce
 		return
@@ -94,6 +97,7 @@ func (l *GameClientLink) adminInstantMove(gm *livePlayer, args []string) {
 // then gm is teleported where it stands. While the camera is on, the
 // position gm's client reports is taken as is (adoptCameraPosition).
 func (l *GameClientLink) adminCamera(gm *livePlayer, _ string) {
+	sim.AssertOwner(gm.Queue())
 	if gm.teleportMode != teleportModeCamera {
 		gm.teleportMode = teleportModeCamera
 		gm.SetInvisible(true)

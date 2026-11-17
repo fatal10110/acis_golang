@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -83,6 +84,7 @@ func fitsLimit(size, slots, limit int) bool {
 // activatePrivateWarehouse makes live's private warehouse the active
 // store, limited to live's warehouse size.
 func activatePrivateWarehouse(live *livePlayer) *itemcontainer.Container {
+	sim.AssertOwner(live.Queue())
 	wh := live.storage.warehouse
 	live.storage.active = activeStore{store: wh, private: true, fits: func(slots int) bool {
 		return fitsLimit(wh.Size(), slots, live.Character.WarehouseLimit())
@@ -101,6 +103,7 @@ func (l *GameClientLink) openScriptWithdraw(live *livePlayer) {
 // activateOwnFreight makes live's own freight the active store, limited to
 // live's freight size.
 func activateOwnFreight(live *livePlayer) *itemcontainer.Freight {
+	sim.AssertOwner(live.Queue())
 	f := live.storage.freight
 	live.storage.active = activeStore{store: f, fits: func(slots int) bool {
 		return fitsLimit(f.VisibleSize(), slots, live.Character.FreightLimit())
@@ -112,6 +115,7 @@ func activateOwnFreight(live *livePlayer) *itemcontainer.Freight {
 // active store, or reports false when it is not loaded. Another
 // character's freight holds the configured base size.
 func (l *GameClientLink) activateDeposit(live *livePlayer, id int32) (*itemcontainer.Freight, bool) {
+	sim.AssertOwner(live.Queue())
 	f := live.storage.deposits[id]
 	if f == nil {
 		return nil, false
@@ -279,6 +283,7 @@ func (l *GameClientLink) sendPackageSendableItemList(live *livePlayer, objectID 
 // closes its window when it sends the request, so no click is left
 // pending.
 func (l *GameClientLink) warehouseRequestGate(live *livePlayer) (activeStore, bool) {
+	sim.AssertOwner(live.Queue())
 	if l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID()) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 		return activeStore{}, false
@@ -533,6 +538,7 @@ func sortRecipients(r []serverpackets.PackageRecipient) {
 // items and returns the other characters whose freight it holds, whose
 // lanes the logout also waits on.
 func (l *GameClientLink) releaseStorage(live *livePlayer) []int32 {
+	sim.AssertOwner(live.Queue())
 	st := &live.storage
 	st.active = activeStore{}
 	if st.warehouse != nil {

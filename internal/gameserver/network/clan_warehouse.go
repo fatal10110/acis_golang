@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // clanWarehouseRestoreTimeout bounds the read of a clan warehouse's rows.
@@ -74,6 +75,7 @@ func (b *clanWarehouseBook) holds(clanID int32, store invops.Store) bool {
 // the gate drops one from a player who already left the clan, and nothing
 // is charged.
 func (l *GameClientLink) storeStillOpen(live *livePlayer, active activeStore) bool {
+	sim.AssertOwner(live.Queue())
 	if active.clanID == 0 || l.clanWarehouses.holds(active.clanID, active.store) {
 		return true
 	}
@@ -111,6 +113,7 @@ func (l *GameClientLink) clanWarehouse(clanID int32) (*itemcontainer.Container, 
 // store, limited to the configured clan warehouse size, or reports false
 // when it cannot be read.
 func (l *GameClientLink) activateClanWarehouse(live *livePlayer, cl *clan.Clan) (*itemcontainer.Container, bool) {
+	sim.AssertOwner(live.Queue())
 	wh, err := l.clanWarehouse(cl.ID())
 	if err != nil {
 		l.log.Error().Err(err).Int32("clan_id", cl.ID()).Msg("warehouse: restore clan warehouse")
