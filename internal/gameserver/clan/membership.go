@@ -307,7 +307,9 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 }
 
 // remove drops objectID from cl's roster and queues its row under cl.mu:
-// live is its character when online, nil otherwise.
+// live is its character when online, nil otherwise. A member offline whose
+// selection is in flight comes back Entering, its removal kept for the
+// character the selection loaded.
 func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *player.Character, now time.Time) (Member, bool) {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
@@ -335,8 +337,12 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 			row.JoinExpiry = live.ClanJoinExpiryTime()
 		}
 	}
+	out := *m
+	if live == nil {
+		out.Entering = s.entries.depart(row)
+	}
 	s.write(objectID, "remove clan member", func(ctx context.Context, st Store) error { return st.RemoveMembership(ctx, row) })
-	return *m, true
+	return out, true
 }
 
 // ApplyLeft clears the clan state of m, removed at now, on its live

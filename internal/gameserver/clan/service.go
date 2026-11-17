@@ -92,6 +92,8 @@ type Service struct {
 	allyMu sync.Mutex
 	// dissolutions holds the timers of the pending dissolutions.
 	dissolutions dissolutions
+	// entries holds the characters whose selection is in flight.
+	entries entries
 }
 
 // NewService returns a Service over table. Writes go to store through
@@ -152,8 +154,9 @@ func (s *Service) ClanOf(c *player.Character) (*Clan, bool) {
 
 // RestoreMembership settles c's clan state as its row is loaded at
 // selection: a clan that no longer exists, or no longer lists c, leaves it
-// clanless, in its row too; a penalty already over is cleared; the pledge class
-// follows the clan.
+// clanless, in its row too, and one that removed it since the selection
+// began (BeginEntry) gives it the leave the removal stored; a penalty
+// already over is cleared; the pledge class follows the clan.
 func (s *Service) RestoreMembership(c *player.Character, now time.Time) {
 	nowMs := now.UnixMilli()
 	if c.ClanJoinExpiryTime() < nowMs {
@@ -164,7 +167,11 @@ func (s *Service) RestoreMembership(c *player.Character, now time.Time) {
 	}
 	cl, ok := s.table.Get(c.ClanID())
 	if !ok || !cl.IsMember(c.ID) {
-		s.leaveStaleClan(c)
+		if row, departed := s.entries.take(c.ID, false); departed {
+			s.applyDeparture(c, row)
+		} else {
+			s.leaveStaleClan(c)
+		}
 	}
 	if ok {
 		c.SetPledgeClass(s.pledgeClass(c))

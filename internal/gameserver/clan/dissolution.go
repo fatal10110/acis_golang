@@ -119,10 +119,10 @@ type Dissolution struct {
 
 // Destroy dissolves cl as of now, reporting false when it is already gone,
 // or, when due is set (a scheduled dissolution coming due), when its
-// dissolution was called off since. The clan leaves the registry; every
-// clan at war with it, either way, forgets the war; every member leaves it
-// as a member who withdrew does, without a join penalty, its leader with
-// the creation penalty a leader leaving takes; then its rows go: the clan,
+// dissolution was called off since. Every clan at war with it, either
+// way, forgets the war; every member leaves it as a member who withdrew
+// does, without a join penalty, its leader with the creation penalty a
+// leader leaving takes; then it leaves the registry and its rows go: the clan,
 // its privileges, skills, sub-units, wars and siege registrations, and the
 // tax of a castle it held is reset. online resolves a member's live
 // character, nil when it is not in the world. The members' live state is
@@ -139,10 +139,13 @@ func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Charact
 	cl.destroyed = true
 	leaderID, castleID := cl.leaderID, cl.castleID
 	cl.mu.Unlock()
-	s.table.remove(cl.id)
 	s.dissolutions.cancel(cl.id)
 	s.forgetWars(cl)
 
+	// The members leave while cl is still registered: a member entering
+	// the world meanwhile either finds itself still listed and enters
+	// online, or finds itself gone with its removal kept for it, never a
+	// clan missing with its removal still to come.
 	out := Dissolution{LeaderID: leaderID}
 	for _, m := range cl.Members() {
 		var live *player.Character
@@ -153,6 +156,7 @@ func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Charact
 			out.Members = append(out.Members, removed)
 		}
 	}
+	s.table.remove(cl.id)
 	cl.mu.Lock()
 	clanID := cl.id
 	s.write(clanID, "delete clan", func(ctx context.Context, st Store) error { return st.DeleteClan(ctx, clanID, castleID) })

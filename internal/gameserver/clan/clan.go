@@ -49,6 +49,11 @@ type Member struct {
 	// for a member that never did, which is what marks an academy member.
 	LvlJoinedAcademy int
 	Online           bool
+	// Entering marks a member removed while offline with its selection in
+	// flight: the character already loaded takes the leave as it enters the
+	// world (Service.Enter), so nothing changes its stored rows behind it.
+	// Only a removal's copy carries it.
+	Entering bool
 }
 
 // Clan is one clan. mu guards every field: members join and leave on their

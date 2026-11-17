@@ -100,7 +100,11 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 	for _, m := range out.Members {
 		live, ok := l.livePlayerByID(m.ObjectID)
 		if !m.Online || !ok {
-			l.unequipLeaverCirclets(cl, m.ObjectID)
+			// A member whose selection already loaded what it wears keeps
+			// it, and takes the leave as it enters the world.
+			if !m.Entering {
+				l.unequipLeaverCirclets(cl, m.ObjectID)
+			}
 			continue
 		}
 		leavers = append(leavers, leaver{live, m})

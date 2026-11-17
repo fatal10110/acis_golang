@@ -40,7 +40,7 @@ const (
 // From the wait for the saves until the selection is over, a pet corpse the
 // character left behind that settles is held for this selection
 // (selectingOwners), since the selection reads the rows such a settle writes.
-func (l *GameClientLink) selectCharacter(ctx context.Context, cs *connState, slot int32, c *player.Character) selectionOutcome {
+func (l *GameClientLink) selectCharacter(ctx context.Context, cs *connState, slot int32, c *player.Character) (outcome selectionOutcome) {
 	conn, client, chars := cs.conn, cs.client, cs.chars
 	objectID := c.ObjectID()
 	// One selection of a character at a time: a second one while the first
@@ -76,6 +76,16 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, cs *connState, slo
 			return selectionRefused
 		}
 	}
+	// From here until the character enters the world, its clan keeps a
+	// removal for the character this selection loads: the clan sees it
+	// offline, so the removal stores the leave on its rows only. A selection
+	// that does not hand the character to EnterWorld ends that here.
+	l.clanService().BeginEntry(objectID)
+	defer func() {
+		if outcome != selectionEntering {
+			l.clanService().EndEntry(c)
+		}
+	}()
 	// A previous session of this character has left the world, so every
 	// save it queued is on the lane. Wait for them, then read the row fresh:
 	// the character list may predate those saves, and selection restores the

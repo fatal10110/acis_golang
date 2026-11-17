@@ -15,7 +15,7 @@ func (s *CharacterStore) FindByName(ctx context.Context, name string) (relation.
 		return relation.Named{}, false, nil
 	}
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT obj_Id, char_name, COALESCE(accesslevel,0) FROM characters WHERE LOWER(char_name) = LOWER(?) ORDER BY obj_Id", name)
+		"SELECT obj_Id, char_name, COALESCE(accesslevel,0) FROM characters WHERE char_name = ? ORDER BY obj_Id", name)
 	if err != nil {
 		return relation.Named{}, false, fmt.Errorf("find character %q: %w", name, err)
 	}
