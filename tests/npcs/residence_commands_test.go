@@ -541,6 +541,7 @@ func TestMassGatekeeperTeleport(t *testing.T) {
 		t.Fatalf("before the delay: % x, pending %v", opcodes(frames), f.MassTeleportPending())
 	}
 	w.srv.Advance(t, 10*time.Second)
+	w.awaitMassTeleport(t, f)
 	frames := w.srv.ReadQueued(t, w.c)
 	if _, ok := firstOpcode(frames, serverpackets.OpcodeNpcSay); ok {
 		t.Fatal("shout outside the siege")
@@ -573,6 +574,7 @@ func TestMassGatekeeperTeleportUnderSiege(t *testing.T) {
 		t.Fatalf("before the delay: % x", opcodes(frames))
 	}
 	w.srv.Advance(t, 30*time.Second)
+	w.awaitMassTeleport(t, f)
 	frames := w.srv.ReadQueued(t, w.c)
 	say := slices.IndexFunc(frames, func(fr []byte) bool { return fr[0] == serverpackets.OpcodeNpcSay })
 	tele := slices.IndexFunc(frames, func(fr []byte) bool { return fr[0] == serverpackets.OpcodeTeleportToLocation })
@@ -605,12 +607,21 @@ func TestMassGatekeeperTeleportUnderSiegeWithLifeTower(t *testing.T) {
 		t.Fatalf("before the delay: % x, pending %v", opcodes(frames), f.MassTeleportPending())
 	}
 	w.srv.Advance(t, 10*time.Second)
+	w.awaitMassTeleport(t, f)
 	frames := w.srv.ReadQueued(t, w.c)
 	say := slices.IndexFunc(frames, func(fr []byte) bool { return fr[0] == serverpackets.OpcodeNpcSay })
 	tele := slices.IndexFunc(frames, func(fr []byte) bool { return fr[0] == serverpackets.OpcodeTeleportToLocation })
 	if say < 0 || tele < 0 || say > tele {
 		t.Fatalf("oust under siege = % x, want the shout, then the teleport", opcodes(frames))
 	}
+}
+
+// awaitMassTeleport lets the armed teleport of mass gatekeeper f run out. On
+// the real pool its timer can fire a little after the delay the test has
+// advanced, so ReadQueued alone could look before the oust.
+func (w *folkWorld) awaitMassTeleport(t *testing.T, f *npc.Folk) {
+	t.Helper()
+	w.srv.AdvanceUntil(t, "mass teleport", func() bool { return !f.MassTeleportPending() })
 }
 
 // assertMassGatekeeperChat talks to f and checks its page comes alone after
