@@ -54,7 +54,11 @@ func (s *ShortcutStore) ListByOwner(ctx context.Context, ownerID int32, classInd
 
 // Save inserts or replaces sc for ownerID's class index classIndex.
 func (s *ShortcutStore) Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error {
-	_, err := s.db.ExecContext(ctx,
+	return saveShortcut(ctx, s.db, ownerID, classIndex, sc)
+}
+
+func saveShortcut(ctx context.Context, db execer, ownerID int32, classIndex int, sc shortcut.Shortcut) error {
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO character_shortcuts
 			(char_obj_id, slot, page, type, id, level, class_index)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)

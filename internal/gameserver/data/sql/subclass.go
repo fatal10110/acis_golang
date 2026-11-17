@@ -66,7 +66,7 @@ func (s *SubclassStore) Delete(ctx context.Context, charID int32, index int) err
 
 // updateSubclasses writes each subclass's progression and class back to
 // its row of charID.
-func updateSubclasses(ctx context.Context, db *sql.DB, charID int32, subs []player.SubClass) error {
+func updateSubclasses(ctx context.Context, db execer, charID int32, subs []player.SubClass) error {
 	for _, sub := range subs {
 		if _, err := db.ExecContext(ctx,
 			`UPDATE character_subclasses SET exp = ?, sp = ?, level = ?, class_id = ? WHERE char_obj_id = ? AND class_index = ?`,

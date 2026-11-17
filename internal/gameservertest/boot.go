@@ -2351,7 +2351,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if rosterNPCs == nil {
 		rosterNPCs = npc.NewTable(nil)
 	}
-	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold}, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
 	if o.admin != nil {
 		roster.SetAccessLevels(o.admin, o.log)

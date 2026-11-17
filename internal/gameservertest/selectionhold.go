@@ -5,6 +5,8 @@ import (
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 )
 
 // WithSelectionHold runs hold inside every character selection, after the
@@ -34,13 +36,13 @@ type holdingCharacterStore struct {
 	createHold func(name string) error
 }
 
-func (s holdingCharacterStore) Create(ctx context.Context, c *player.Character) error {
+func (s holdingCharacterStore) CreateWithStarters(ctx context.Context, c *player.Character, items []item.Instance, shortcuts []shortcut.Shortcut) error {
 	if s.createHold != nil {
 		if err := s.createHold(c.CharacterName()); err != nil {
 			return err
 		}
 	}
-	return s.CharacterStore.Create(ctx, c)
+	return s.CharacterStore.CreateWithStarters(ctx, c, items, shortcuts)
 }
 
 func (s holdingCharacterStore) SetOnline(ctx context.Context, objectID int32, lastAccess int64) error {
