@@ -1,5 +1,5 @@
 #!/bin/sh
-# Regenerates the lottery, fishchamp and castlemanor dst.golden files: runs
+# Regenerates the lottery, fishchamp, castlemanor and sevensigns dst.golden files: runs
 # DstProbe on a JDK in Docker.
 # usage: run.sh   (PROBE_IMAGE overrides the JDK image)
 set -eu
@@ -10,7 +10,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cp "$here/DstProbe.java" "$work/"
 docker run --rm -v "$work:/probe" "$image" sh -c 'cd /probe && javac -d . DstProbe.java' 
-for pair in lottery:lottery fishing:fishchamp manor:castlemanor; do
+for pair in lottery:lottery fishing:fishchamp manor:castlemanor sevensigns:sevensigns; do
 	kind=${pair%%:*}
 	pkg=${pair##*:}
 	mkdir -p "$root/$pkg/testdata"

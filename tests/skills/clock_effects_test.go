@@ -26,9 +26,20 @@ func TestShadowSenseReappliesAtEachDayNightCrossingInWorld(t *testing.T) {
 		// A crossing more than 720 game minutes in also carries the activity
 		// reminder; it is not what this test is about.
 		var got []int32
-		for _, id := range systemMessageIDs(readUntilQuiet(t, c)) {
-			if id != serverpackets.SystemMessagePlayingForLongTime {
-				got = append(got, id)
+		for _, frame := range readUntilQuiet(t, c) {
+			if frame[0] != serverpackets.OpcodeSystemMessage {
+				continue
+			}
+			r := wireReader(frame[1:])
+			id := r.ReadInt32()
+			if id == serverpackets.SystemMessagePlayingForLongTime {
+				continue
+			}
+			got = append(got, id)
+			// The announcement names Shadow Sense: one skill-name parameter
+			// carrying skill 294 at level 1.
+			if params, kind, skill, level := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); params != 1 || kind != serverpackets.SystemMessageParamSkillName || skill != 294 || level != 1 {
+				t.Errorf("crossing %d message %d params = (count %d, type %d, skill %d, level %d), want one skill-name parameter 294/1", crossing+1, id, params, kind, skill, level)
 			}
 		}
 		if len(got) != 1 || got[0] != want {

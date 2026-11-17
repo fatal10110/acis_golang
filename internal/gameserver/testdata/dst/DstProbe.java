@@ -5,10 +5,11 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Replays the three calendar schedules that run on the server's wall clock
- * (lottery drawing, fishing championship end, castle manor mode change) in
- * zones with daylight saving, with the calendar code the reference runs.
- * Each line: kind zone local-input => input-epoch-ms output-epoch-ms.
+ * Replays the four calendar schedules that run on the server's wall clock
+ * (lottery drawing, fishing championship end, castle manor mode change,
+ * Seven Signs period change) in zones with daylight saving, with the calendar
+ * code the reference runs. Each line: kind zone local-input => input-epoch-ms
+ * output-epoch-ms.
  */
 public class DstProbe
 {
@@ -42,6 +43,31 @@ public class DstProbe
 		"2026-11-01T12:00:00.000"
 	};
 	
+	// Mondays one week either side of each clock change, probed before, at and
+	// after the 18:00 period change.
+	static final String[] MONDAYS =
+	{
+		"2026-03-02",
+		"2026-03-09",
+		"2026-03-23",
+		"2026-03-30",
+		"2026-04-06",
+		"2026-09-28",
+		"2026-10-05",
+		"2026-10-19",
+		"2026-10-26",
+		"2026-11-02"
+	};
+	
+	static final String[] MONDAY_TIMES =
+	{
+		"T10:00:00.000",
+		"T17:59:59.500",
+		"T18:00:00.000",
+		"T18:00:30.000",
+		"T20:00:00.000"
+	};
+	
 	// approve hour, approve min, refresh hour, refresh min, maintenance min
 	static final int[][] MANOR =
 	{
@@ -55,6 +81,9 @@ public class DstProbe
 		return LocalDateTime.parse(local).atZone(ZoneId.of(zone)).toInstant().toEpochMilli();
 	}
 	
+	// The reference builds its calendars with the JVM default locale, whose first
+	// day of the week the week-based schedules depend on; these rows pin the
+	// Sunday-first (US) case. The Monday-first question is tracked in #5345.
 	static Calendar at(String zone, long millis)
 	{
 		final Calendar cal = Calendar.getInstance(TimeZone.getTimeZone(zone), Locale.US);
@@ -88,6 +117,24 @@ public class DstProbe
 		return cal.getTimeInMillis();
 	}
 	
+	// Mirrors the calendar arithmetic of the period change for the two major
+	// periods; the minor ones add a fixed length and have no calendar step.
+	static long sevenSigns(String zone, long now)
+	{
+		final Calendar next = at(zone, now);
+		int numDays = next.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY;
+		int daysToChange = numDays < 0 ? 0 - numDays : 7 - numDays;
+		if (daysToChange == 7 && (next.get(Calendar.HOUR_OF_DAY) < 18 || (next.get(Calendar.HOUR_OF_DAY) == 18 && next.get(Calendar.MINUTE) < 0)))
+			daysToChange = 0;
+		if (daysToChange > 0)
+			next.add(Calendar.DATE, daysToChange);
+		next.set(Calendar.HOUR_OF_DAY, 18);
+		next.set(Calendar.MINUTE, 0);
+		next.set(Calendar.SECOND, 0);
+		next.set(Calendar.MILLISECOND, 0);
+		return next.getTimeInMillis();
+	}
+	
 	static long manor(String zone, long now, String mode, int[] c)
 	{
 		final Calendar next = at(zone, now);
@@ -112,11 +159,29 @@ public class DstProbe
 		return next.getTimeInMillis();
 	}
 	
+	static java.util.List<String> sevenSignsInputs()
+	{
+		final java.util.List<String> all = new java.util.ArrayList<>(java.util.Arrays.asList(INPUTS));
+		for (String monday : MONDAYS)
+			for (String time : MONDAY_TIMES)
+				all.add(monday + time);
+		return all;
+	}
+	
 	public static void main(String[] args)
 	{
 		final String kind = args[0];
 		for (String zone : ZONES)
 		{
+			if (kind.equals("sevensigns"))
+			{
+				for (String local : sevenSignsInputs())
+				{
+					final long in = epoch(zone, local);
+					System.out.println("sevensigns " + zone + " " + local + " => " + in + " " + sevenSigns(zone, in));
+				}
+				continue;
+			}
 			for (String local : INPUTS)
 			{
 				final long in = epoch(zone, local);

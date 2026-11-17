@@ -13,7 +13,7 @@ import (
 // that cannot be read does here: the load fails with an error naming the
 // file, and returns no properties. The reference logs the error and goes on
 // with an empty set, so every key takes its default; that difference is
-// recorded on the oracle-gap issue, not pinned as correct.
+// tracked in #4772 (owner decision), not pinned as correct.
 func TestLoadFileRefusesMissingAndMalformedFiles(t *testing.T) {
 	dir := t.TempDir()
 	missing := filepath.Join(dir, "absent.properties")
