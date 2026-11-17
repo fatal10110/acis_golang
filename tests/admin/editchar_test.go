@@ -61,7 +61,6 @@ func selectPlayer(t *testing.T, gm, user *testsupport.ScriptedClient, id int32) 
 	settle(t, user)
 }
 
-// storedColumn waits for the characters column of objID to read want.
 // storedNow reads column of objID's characters row once every queued
 // write landed.
 func storedNow(t *testing.T, srv *gameservertest.Server, objID int32, column string) string {
@@ -74,6 +73,7 @@ func storedNow(t *testing.T, srv *gameservertest.Server, objID int32, column str
 	return got
 }
 
+// storedColumn waits for the characters column of objID to read want.
 func storedColumn(t *testing.T, srv *gameservertest.Server, objID int32, column, want string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

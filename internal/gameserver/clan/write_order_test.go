@@ -100,6 +100,8 @@ func (f *fakeStore) RemoveMembership(_ context.Context, r RemovalRow) error {
 	return nil
 }
 
+func (f *fakeStore) ClearClanID(context.Context, int32, int32) error { return nil }
+
 func (f *fakeStore) SetPowerGrade(_ context.Context, objectID int32, grade int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
