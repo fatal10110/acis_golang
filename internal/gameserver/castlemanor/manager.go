@@ -486,6 +486,9 @@ func (m *Manager) rolloverLocked() []func() {
 				}
 			}
 			if left > 0 {
+				// A 32-bit product, wrapping on overflow as ManorCost's
+				// does: at a crop rate high enough to wrap it negative,
+				// seed income drops the whole refund.
 				refund += int64(left * crop.Price)
 			}
 		}

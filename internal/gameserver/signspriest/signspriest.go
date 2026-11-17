@@ -21,16 +21,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
-// Items and prices of the Seven Signs priest dialog.
-const (
-	RecordID                int32 = 5707
-	CertificateOfApprovalID int32 = 6388
-	RecordCost                    = 500
-	JoinDawnCost                  = 50000
+// The record of the Seven Signs a priest sells, and the dialog's prices.
+const RecordID int32 = 5707
 
-	BlueStoneID  int32 = 6360
-	GreenStoneID int32 = 6361
-	RedStoneID   int32 = 6362
+const (
+	RecordCost   = 500
+	JoinDawnCost = 50000
 )
 
 // Contribution points one seal stone of each color is worth.
@@ -312,7 +308,7 @@ func (h *handler) participate() Reply {
 // Certificate of Approval.
 func (h *handler) participationFee() Reply {
 	inv := h.t.Inventory
-	if inv != nil && (inv.Adena() >= JoinDawnCost || inv.HasItem(CertificateOfApprovalID)) {
+	if inv != nil && (inv.Adena() >= JoinDawnCost || inv.HasItem(sevensigns.CertificateOfApprovalID)) {
 		return chat("signs_33_dawn.htm")
 	}
 	return chat("signs_33_dawn_no.htm")
@@ -338,7 +334,7 @@ func (h *handler) signUp() Reply {
 		if cabal == sevensigns.Dusk && h.t.CastleClan {
 			return chat("signs_33_dusk_no.htm")
 		}
-		if cabal == sevensigns.Dawn && !h.t.CastleClan && !h.destroyItems(CertificateOfApprovalID, 1, false) && !h.reduceAdena(JoinDawnCost, false) {
+		if cabal == sevensigns.Dawn && !h.t.CastleClan && !h.destroyItems(sevensigns.CertificateOfApprovalID, 1, false) && !h.reduceAdena(JoinDawnCost, false) {
 			return chat("signs_33_dawn_no.htm")
 		}
 	}
@@ -364,7 +360,7 @@ func (h *handler) contributeStones() Reply {
 	if inv == nil {
 		return Reply{}
 	}
-	blue, green, red := firstCount(inv, BlueStoneID), firstCount(inv, GreenStoneID), firstCount(inv, RedStoneID)
+	blue, green, red := firstCount(inv, sevensigns.BlueStoneID), firstCount(inv, sevensigns.GreenStoneID), firstCount(inv, sevensigns.RedStoneID)
 	score, signed := h.s.state.PlayerContribScore(h.t.ObjectID)
 	limit := h.s.cfg.MaxPlayerContrib
 	if score == limit {
@@ -376,11 +372,11 @@ func (h *handler) contributeStones() Reply {
 	var id int32
 	switch stoneType {
 	case 1:
-		color, id, count = "Blue", BlueStoneID, blue
+		color, id, count = "Blue", sevensigns.BlueStoneID, blue
 	case 2:
-		color, id, count = "Green", GreenStoneID, green
+		color, id, count = "Green", sevensigns.GreenStoneID, green
 	case 3:
-		color, id, count = "Red", RedStoneID, red
+		color, id, count = "Red", sevensigns.RedStoneID, red
 	case 4:
 		// Without a sign-up the stones would be taken and lost; no page
 		// offers the command to a talker who never signed up.
@@ -394,13 +390,13 @@ func (h *handler) contributeStones() Reply {
 		blueCount := min((limit-left)/blueValue, blue)
 		found := false
 		if redCount > 0 {
-			found = h.destroyItems(RedStoneID, redCount, true) || found
+			found = h.destroyItems(sevensigns.RedStoneID, redCount, true) || found
 		}
 		if greenCount > 0 {
-			found = h.destroyItems(GreenStoneID, greenCount, true) || found
+			found = h.destroyItems(sevensigns.GreenStoneID, greenCount, true) || found
 		}
 		if blueCount > 0 {
-			found = h.destroyItems(BlueStoneID, blueCount, true) || found
+			found = h.destroyItems(sevensigns.BlueStoneID, blueCount, true) || found
 		}
 		if !found {
 			return h.chat(signs(6, h.side+"_no_stones"))
@@ -437,11 +433,11 @@ func (h *handler) contributeAmount(command string) Reply {
 	limit := h.s.cfg.MaxPlayerContrib
 	most := 0
 	switch int32(itemID) {
-	case BlueStoneID:
+	case sevensigns.BlueStoneID:
 		most = (limit - score) / blueValue
-	case GreenStoneID:
+	case sevensigns.GreenStoneID:
 		most = (limit - score) / greenValue
-	case RedStoneID:
+	case sevensigns.RedStoneID:
 		most = (limit - score) / redValue
 	}
 	count = min(count, most)
@@ -449,11 +445,11 @@ func (h *handler) contributeAmount(command string) Reply {
 		return h.chat(signs(6, h.side+"_low_stones"))
 	}
 	switch int32(itemID) {
-	case BlueStoneID:
+	case sevensigns.BlueStoneID:
 		score = h.addContrib(count, 0, 0)
-	case GreenStoneID:
+	case sevensigns.GreenStoneID:
 		score = h.addContrib(0, count, 0)
-	case RedStoneID:
+	case sevensigns.RedStoneID:
 		score = h.addContrib(0, 0, count)
 	}
 	h.notice(ContribIncreased{Score: score})
@@ -552,13 +548,13 @@ func (h *handler) exchangeStonesPage(command string) Reply {
 	value := 0
 	switch stoneType {
 	case 1:
-		color, id, value = "blue", BlueStoneID, blueValue
+		color, id, value = "blue", sevensigns.BlueStoneID, blueValue
 	case 2:
-		color, id, value = "green", GreenStoneID, greenValue
+		color, id, value = "green", sevensigns.GreenStoneID, greenValue
 	case 3:
-		color, id, value = "red", RedStoneID, redValue
+		color, id, value = "red", sevensigns.RedStoneID, redValue
 	case 4:
-		blue, green, red := firstCount(inv, BlueStoneID), firstCount(inv, GreenStoneID), firstCount(inv, RedStoneID)
+		blue, green, red := firstCount(inv, sevensigns.BlueStoneID), firstCount(inv, sevensigns.GreenStoneID), firstCount(inv, sevensigns.RedStoneID)
 		reward := sevensigns.StoneScore(blue, green, red)
 		if reward == 0 {
 			return chat(signs(18, h.side+"_no_stones"))
@@ -566,7 +562,7 @@ func (h *handler) exchangeStonesPage(command string) Reply {
 		for _, stone := range [...]struct {
 			id    int32
 			count int
-		}{{BlueStoneID, blue}, {GreenStoneID, green}, {RedStoneID, red}} {
+		}{{sevensigns.BlueStoneID, blue}, {sevensigns.GreenStoneID, green}, {sevensigns.RedStoneID, red}} {
 			if stone.count > 0 {
 				h.destroyItems(stone.id, stone.count, true)
 			}
@@ -607,11 +603,11 @@ func (h *handler) exchangeStones(command string) Reply {
 	}
 	reward := 0
 	switch int32(itemID) {
-	case BlueStoneID:
+	case sevensigns.BlueStoneID:
 		reward = sevensigns.StoneScore(amount, 0, 0)
-	case GreenStoneID:
+	case sevensigns.GreenStoneID:
 		reward = sevensigns.StoneScore(0, amount, 0)
-	case RedStoneID:
+	case sevensigns.RedStoneID:
 		reward = sevensigns.StoneScore(0, 0, amount)
 	}
 	if !h.destroyItems(int32(itemID), amount, true) {
@@ -740,7 +736,9 @@ func (h *handler) add(itemID int32, count int) {
 }
 
 // isStone reports whether id is a seal stone.
-func isStone(id int32) bool { return id == BlueStoneID || id == GreenStoneID || id == RedStoneID }
+func isStone(id int32) bool {
+	return id == sevensigns.BlueStoneID || id == sevensigns.GreenStoneID || id == sevensigns.RedStoneID
+}
 
 // firstCount is the count of the first stack of templateID held, 0 for
 // none (getItemByItemId(id).getCount()).

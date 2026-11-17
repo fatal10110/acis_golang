@@ -17,7 +17,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishing"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
@@ -40,9 +42,6 @@ const (
 	refreshDelay = time.Minute
 	// noLength is the shortest catch of an empty ranking.
 	noLength = 99999.
-	// prizeLureFirst and prizeLureLast are the prize-winning lures, which
-	// can make a catch up to 3 longer.
-	prizeLureFirst, prizeLureLast = 8484, 8486
 )
 
 // Reward is where a fisher stands: in the running week, a winner yet to
@@ -279,11 +278,7 @@ func (c *Championship) finish() {
 // the Tuesday of the week, running Sunday to Saturday, that holds the day
 // six days after from. The milliseconds of from are kept.
 func NextEnd(from int64, loc *time.Location) int64 {
-	t := time.UnixMilli(from).In(loc)
-	y, m, d := t.Date()
-	day := time.Date(y, m, d+6, 12, 0, 0, 0, loc)
-	ms := t.Nanosecond() / int(time.Millisecond) * int(time.Millisecond)
-	return time.Date(y, m, d+6+int(time.Tuesday-day.Weekday()), endHour, 0, 0, ms, loc).UnixMilli()
+	return commons.WeekdayAt(time.UnixMilli(from).In(loc), 6, time.Tuesday, endHour).UnixMilli()
 }
 
 // NewFish measures the fish name caught on lureID and ranks it: a fisher
@@ -298,7 +293,7 @@ func (c *Championship) NewFish(name string, lureID int32) (catch Catch, ok bool)
 	c.mu.Lock()
 	defer c.unlock()
 	length := float64(60+c.roll(30)) + float64(c.roll(1001))/1000.
-	if lureID >= prizeLureFirst && lureID <= prizeLureLast {
+	if fishing.PrizeLure(lureID) {
 		length += float64(c.roll(3001)) / 1000.
 	}
 	catch.Length = length

@@ -262,9 +262,16 @@ func (o *Olympiad) Points(objectID int32) int {
 	return n.Points
 }
 
+// The points a noble trades for Noblesse Gate Passes: at most
+// maxPassPoints count, and fewer than minPassPoints count as none.
+const (
+	maxPassPoints = 1000
+	minPassPoints = 50
+)
+
 // Passes trades objectID's points for Noblesse Gate Passes during the
-// validation period after an Olympiad's end, once a cycle: its points, at most 1000 and none
-// below 50, plus HeroPoints for a hero (hero set), times GPPerPoint. The
+// validation period after an Olympiad's end, once a cycle: its points, at
+// most maxPassPoints and none below minPassPoints, plus HeroPoints for a hero (hero set), times GPPerPoint. The
 // record is then marked rewarded with no points, whatever it paid, and
 // stored before Passes returns, so a second claim pays nothing even across
 // a restart. Without a record, outside the validation period or once
@@ -285,8 +292,8 @@ func (o *Olympiad) Passes(ctx context.Context, objectID int32, hero bool) (int, 
 		o.order.Unlock()
 		return 0, nil
 	}
-	points := min(1000, n.Points)
-	if points < 50 {
+	points := min(maxPassPoints, n.Points)
+	if points < minPassPoints {
 		points = 0
 	}
 	if hero {

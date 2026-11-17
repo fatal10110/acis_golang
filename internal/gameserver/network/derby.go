@@ -222,5 +222,5 @@ func (h derbyHolder) Item(objectID int32) (derby.Ticket, bool) {
 
 func derbyTicket(inst *item.Instance) derby.Ticket {
 	st := inst.Snapshot()
-	return derby.Ticket{ObjectID: st.ObjectID, Race: st.EnchantLevel, Lane: st.CustomType1, Hundreds: st.CustomType2}
+	return derby.Ticket{ObjectID: st.ObjectID, ItemID: inst.TemplateID, Race: st.EnchantLevel, Lane: st.CustomType1, Hundreds: st.CustomType2}
 }

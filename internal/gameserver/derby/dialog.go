@@ -39,9 +39,11 @@ type Picks struct {
 
 // Ticket is an item the race manager reads as a ticket: its enchant level
 // is the race, its first custom type the lane and its second the price in
-// hundreds of adena.
+// hundreds of adena. ItemID is the item's template; only a TicketItemID is
+// a race ticket.
 type Ticket struct {
 	ObjectID int32
+	ItemID   int32
 	Race     int
 	Lane     int
 	Hundreds int
@@ -51,7 +53,8 @@ type Ticket struct {
 type Holder interface {
 	// Tickets returns every race ticket held, in inventory order.
 	Tickets() []Ticket
-	// Item returns the held item objectID, read as a ticket whatever it is.
+	// Item returns the held item objectID read as a ticket, whatever its
+	// template.
 	Item(objectID int32) (Ticket, bool)
 }
 
@@ -287,15 +290,17 @@ func (d dialog) calculateWin(holder Holder, command string) Reply {
 	return Reply{Redeem: &Redemption{ObjectID: ticket.ObjectID, Payout: payout}, Chat: true}
 }
 
-// ticketRecord finds held item objectID and the record of its race. It
-// reports false for an object id of 0, an item not held, or a race with no
-// record.
+// ticketRecord finds held race ticket objectID and the record of its race.
+// It reports false for an object id of 0, an item not held or not a race
+// ticket, or a race with no record. No page offers another item's id, so
+// the template check only keeps a page echoing an item id from turning the
+// manager into an exchange.
 func (d dialog) ticketRecord(holder Holder, objectID int) (Ticket, History, bool) {
 	if objectID == 0 {
 		return Ticket{}, History{}, false
 	}
 	ticket, ok := holder.Item(int32(objectID))
-	if !ok {
+	if !ok || ticket.ItemID != TicketItemID {
 		return Ticket{}, History{}, false
 	}
 	h, ok := d.t.history[ticket.Race]
