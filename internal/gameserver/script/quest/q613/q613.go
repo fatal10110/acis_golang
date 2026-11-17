@@ -1,7 +1,7 @@
 // Package q613 is the quest Prove your courage!: Ashas Varka Durai asks a
-// Varka ally of level 75 or more for the head of Hekaton, the Ketra raid
-// boss, and pays for it with the Feather of Valor. Every ally of the
-// killer's party near Hekaton gets a head.
+// level 75 Varka ally of alliance level 3 or more for the head of Hekaton,
+// the Ketra raid boss, and pays for it with the Feather of Valor. Every ally
+// of the killer's party near Hekaton gets a head.
 package q613
 
 import (
@@ -70,8 +70,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk offers the quest to a level 75 Varka ally of level 3 or more who
-// holds the level 3 alliance mark and no feather yet.
+// onTalk offers the quest to a level 75 Varka ally of alliance level 3 or
+// more who holds the level 3 alliance mark and no feather yet.
 func onTalk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
 	st := s.QuestState(e.Player, questName)

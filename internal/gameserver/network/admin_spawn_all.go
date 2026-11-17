@@ -8,10 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// systemMessageNpcServerNotOperating is NPC_SERVER_NOT_OPERATING, which
-// //unspawnall tells every player.
-const systemMessageNpcServerNotOperating = 1278
-
 // respawnAllTimeout bounds the spawn data save and load of //respawnall.
 const respawnAllTimeout = 30 * time.Second
 
@@ -21,7 +17,9 @@ const respawnAllTimeout = 30 * time.Second
 func (l *GameClientLink) adminUnspawnAll(_ *livePlayer, _ string) {
 	l.spawnAll.Lock()
 	defer l.spawnAll.Unlock()
-	l.toAllPlayers(func() wire.Frame { return serverpackets.FrameSystemMessage(systemMessageNpcServerNotOperating) })
+	l.toAllPlayers(func() wire.Frame {
+		return serverpackets.FrameSystemMessage(serverpackets.SystemMessageNpcServerNotOperating)
+	})
 	if npcs := l.npcSpawns.Load(); npcs != nil {
 		npcs.DespawnAll()
 	}

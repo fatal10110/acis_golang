@@ -1,7 +1,7 @@
-// Package q607 is the quest Prove Your Courage: Kadun Zu Ketra asks a
-// Ketra ally of level 3 or more for the head of Shadith, the Varka raid
-// boss, and pays for it with the Totem of Valor. Every ally of the killer's
-// party near Shadith gets a head.
+// Package q607 is the quest Prove Your Courage: Kadun Zu Ketra asks a level
+// 75 Ketra ally of alliance level 3 or more for the head of Shadith, the
+// Varka raid boss, and pays for it with the Totem of Valor. Every ally of
+// the killer's party near Shadith gets a head.
 package q607
 
 import (
@@ -70,8 +70,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk offers the quest to a level 75 Ketra ally of level 3 or more who
-// holds the level 3 alliance mark and no totem yet.
+// onTalk offers the quest to a level 75 Ketra ally of alliance level 3 or
+// more who holds the level 3 alliance mark and no totem yet.
 func onTalk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
 	st := s.QuestState(e.Player, questName)
