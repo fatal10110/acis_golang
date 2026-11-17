@@ -1,0 +1,52 @@
+# Q214_TrialOfTheScholar, start with the diamonds already paid: the character holds the secondClassChange35 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Scholar 36
+class 11
+memo secondClassChange35 true
+hold 2687 4
+script quest.Q214_TrialOfTheScholar
+item 2674 2675 2676 2677 2678 2679 2680 2681 2682 2683 2684 2685 2686 2687 2688 2689 2690 2691 2692 2693 2694 2695 2696 2697 2698 2699 2700 2701 2702 2703 2704 2705 2706 2707 2708 2709 2710 2711 2713 2714 2715 2716 2717 2718 2719 2720 7562
+page trainer/30461.htm
+page villagemaster/30070.htm
+page guard/30071.htm
+page default/30608.htm
+page default/30609.htm
+page script/quest/Q214_TrialOfTheScholar/
+npc mirien 30461 Trainer 10 0 0
+npc sylvain 30070 VillageMasterPriest -10 0 0
+npc lucas 30071 Guard 0 10 0
+npc valkon 30103 WarehouseKeeper 0 -10 0
+npc dieter 30111 Trainer 10 10 0
+npc jurek 30115 VillageMasterMystic -10 10 0
+npc edroc 30230 Merchant 10 -10 0
+npc raut 30316 WarehouseKeeper -10 -10 0
+npc poitan 30458 Trainer 20 0 0
+npc maria 30608 Folk -20 0 0
+npc creta 30609 Folk 0 20 0
+npc cronos 30610 Folk 0 -20 0
+npc triff 30611 Folk 20 20 0
+npc casian 30612 Folk -20 20 0
+npc leto 20580 Monster -60 0 0
+
+action mirien
+action mirien
+  S ActionFailed
+  S NpcHtmlMessage obj=mirien item=0 page=trainer/30461.htm
+  S ActionFailed
+bypass npc_{mirien}_Quest
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q214_TrialOfTheScholar 30461-04.htm
+  S QuestList 214:0x80000001
+  S ExShowQuestMark quest=214
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2675
+  S NpcHtmlMessage obj=mirien item=0 page=script/quest/Q214_TrialOfTheScholar/30461-04.htm
+  S ActionFailed
+  Q upsert Q214_TrialOfTheScholar | <state> | STARTED
+  Q upsert Q214_TrialOfTheScholar | <cond> | 1
+  items 2675=1 7562=0
+  state Q214_TrialOfTheScholar STARTED
+  rows Q214_TrialOfTheScholar <state>=STARTED <cond>=1

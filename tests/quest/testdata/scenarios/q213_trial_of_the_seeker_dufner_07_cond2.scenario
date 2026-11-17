@@ -1,0 +1,40 @@
+# Trial of the Seeker (Q213), cond 2: Dufner, asked with no report in the bag, says so (30106-07)
+# Hand-written from the quest script (no reference trace).
+character Waiter 36
+class 7
+quest Q213_TrialOfTheSeeker <cond>=2 <state>=STARTED
+script quest.Q213_TrialOfTheSeeker
+item 2647 2648 2649 2650 2651 2652 2653 2654 2655 2656 2657 2658 2659 2660 2661 2662 2663 2664 2665 2666 2667 2668 2669 2670 2671 2672 2673 7562
+page trainer/30106.htm
+page trainer/30064.htm
+page trainer/30526.htm
+page merchant/30684.htm
+page trainer/30715.htm
+page script/quest/Q213_TrialOfTheSeeker/
+npc dufner 30106 Trainer 10 0 0
+npc terry 30064 Trainer -10 0 0
+npc brunon 30526 Trainer 0 10 0
+npc viktor 30684 Merchant 0 -10 0
+npc marina 30715 Trainer 20 20 0
+npc ghoul 20198 Monster 40 0 0
+npc antcaptain 20080 Monster -40 0 0
+npc olmahum 20211 Monster 0 40 0
+npc bugbear 20249 Monster 0 -40 0
+npc turek 20495 Monster 40 40 0
+npc medusa 20158 Monster -40 -40 0
+npc stakato 20234 Monster 40 -40 0
+npc breka 20270 Monster -40 40 0
+npc antwarrior 20088 Monster 60 0 0
+npc leto 20580 Monster -60 0 0
+
+action dufner
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-07.htm
+  S ActionFailed
+  S ActionFailed
+  state Q213_TrialOfTheSeeker STARTED
+  rows Q213_TrialOfTheSeeker <cond>=2 <state>=STARTED

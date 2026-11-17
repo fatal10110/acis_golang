@@ -1,0 +1,27 @@
+# Step into the Future (Q006), cond 2 without Baulro's letter: Sir Collin still answers his first page,
+# whose link asks to take the letter, and with none in the bag he answers the no-letter page and
+# nothing else: no cond change, no sound, no quest update.
+# Hand-written from the quest script (no reference trace).
+character Walker 3
+script quest.Q006_StepIntoTheFuture
+item 7571 7559 7570
+page default/30311.htm
+page script/quest/Q006_StepIntoTheFuture/
+quest Q006_StepIntoTheFuture <cond>=2 <state>=STARTED
+npc collin 30311 Folk 30 0 0
+
+action collin
+action collin
+  S ActionFailed
+  S NpcHtmlMessage obj=collin item=0 page=default/30311.htm
+  S ActionFailed
+bypass npc_{collin}_Quest
+  S NpcHtmlMessage obj=collin item=0 page=script/quest/Q006_StepIntoTheFuture/30311-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q006_StepIntoTheFuture 30311-02.htm
+  S NpcHtmlMessage obj=collin item=0 html="<html><body>Collin Windawood:<br>\nSo where is Baulro's letter? Did you miss something?<br>\nHurry up and bring me the letter!\n</body></html>\n"
+  S ActionFailed
+  state Q006_StepIntoTheFuture STARTED
+  rows Q006_StepIntoTheFuture <cond>=2 <state>=STARTED
+  items 7571=0

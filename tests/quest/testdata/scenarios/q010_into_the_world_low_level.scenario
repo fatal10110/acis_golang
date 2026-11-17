@@ -1,0 +1,22 @@
+# Into the World (Q010), refused: a dwarf of level 2 is turned away by Balanki
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 2
+class 53
+script quest.Q010_IntoTheWorld
+item 7574 7559 7570
+page default/30533.htm
+page script/quest/Q010_IntoTheWorld/
+npc balanki 30533 Folk 10 0 0
+
+action balanki
+action balanki
+  S ActionFailed
+  S NpcHtmlMessage obj=balanki item=0 page=default/30533.htm
+  S ActionFailed
+bypass npc_{balanki}_Quest
+  S NpcHtmlMessage obj=balanki item=0 page=script/quest/Q010_IntoTheWorld/30533-01a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q010_IntoTheWorld CREATED
+  rows Q010_IntoTheWorld -

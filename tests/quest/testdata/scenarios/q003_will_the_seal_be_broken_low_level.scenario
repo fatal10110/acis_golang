@@ -1,0 +1,22 @@
+# Will the Seal Be Broken (Q003), refused: a dark elf of level 15 is turned away by Talloth
+# Hand-written from the quest script (no reference trace): the first talk of a character that cannot
+# take the quest shows the refusal page and starts nothing.
+character Visitor 15
+class 31
+script quest.Q003_WillTheSealBeBroken
+item 1081 1082 1083 956
+page default/30141.htm
+page script/quest/Q003_WillTheSealBeBroken/
+npc talloth 30141 Folk 10 0 0
+
+action talloth
+action talloth
+  S ActionFailed
+  S NpcHtmlMessage obj=talloth item=0 page=default/30141.htm
+  S ActionFailed
+bypass npc_{talloth}_Quest
+  S NpcHtmlMessage obj=talloth item=0 page=script/quest/Q003_WillTheSealBeBroken/30141-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q003_WillTheSealBeBroken CREATED
+  rows Q003_WillTheSealBeBroken -

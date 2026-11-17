@@ -1,0 +1,54 @@
+# Q218_TestimonyOfLife, start with the diamonds already paid: the character holds the secondClassChange37 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Lively 38
+class 19
+memo secondClassChange37 true
+equip 3026
+script quest.Q218_TestimonyOfLife
+item 3026 3140 3141 3142 3143 3144 3145 3146 3147 3148 3149 3150 3151 3152 3153 3154 3155 3156 3157 3158 3159 3160 3161 3162 3163 3164 3165 3166 3167 3168 3169 3170 3171 7562
+page villagemaster/30154.htm
+page trainer/30300.htm
+page default/30371.htm
+page trainer/30375.htm
+page default/30419.htm
+page trainer/30460.htm
+page default/30655.htm
+page script/quest/Q218_TestimonyOfLife/
+npc cardien 30460 Trainer 10 0 0
+npc asterios 30154 VillageMasterPriest -10 0 0
+npc thalia 30371 Folk 0 10 0
+npc pushkin 30300 Trainer 0 -10 0
+npc arkenia 30419 Folk 20 20 0
+npc adonius 30375 Trainer -20 20 0
+npc isael 30655 Folk 20 -20 0
+npc basilisk 20550 Monster 40 0 0
+npc wyrm 20176 Monster -40 0 0
+npc ant 20082 Monster 0 40 0
+npc spider 20233 Monster 0 -40 0
+npc harpy 20145 Monster 40 40 0
+npc shaman 20581 Monster -40 40 0
+npc unicorn 27077 Monster 40 -40 0
+
+
+action cardien
+action cardien
+  S ActionFailed
+  S NpcHtmlMessage obj=cardien item=0 page=trainer/30460.htm
+  S ActionFailed
+bypass npc_{cardien}_Quest
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30460-04.htm
+  S QuestList 218:0x80000001
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3141
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-04.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <state> | STARTED
+  Q upsert Q218_TestimonyOfLife | <cond> | 1
+  items 3141=1 7562=0
+  state Q218_TestimonyOfLife STARTED
+  rows Q218_TestimonyOfLife <state>=STARTED <cond>=1

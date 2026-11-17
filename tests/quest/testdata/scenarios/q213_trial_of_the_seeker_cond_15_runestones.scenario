@@ -1,0 +1,56 @@
+# Trial of the Seeker (Q213), the abyss runestones dropped while the quest is at cond 15.
+# Hand-written from the quest script (no reference trace).
+character Seeker 36
+class 7
+random always 0
+quest Q213_TrialOfTheSeeker <cond>=15 <state>=STARTED
+script quest.Q213_TrialOfTheSeeker
+item 2647 2648 2649 2650 2651 2652 2653 2654 2655 2656 2657 2658 2659 2660 2661 2662 2663 2664 2665 2666 2667 2668 2669 2670 2671 2672 2673 7562
+page trainer/30106.htm
+page trainer/30064.htm
+page trainer/30526.htm
+page merchant/30684.htm
+page trainer/30715.htm
+page script/quest/Q213_TrialOfTheSeeker/
+npc dufner 30106 Trainer 10 0 0
+npc terry 30064 Trainer -10 0 0
+npc brunon 30526 Trainer 0 10 0
+npc viktor 30684 Merchant 0 -10 0
+npc marina 30715 Trainer 20 20 0
+npc ghoul 20198 Monster 40 0 0
+npc antcaptain 20080 Monster -40 0 0
+npc olmahum 20211 Monster 0 40 0
+npc bugbear 20249 Monster 0 -40 0
+npc turek 20495 Monster 40 40 0
+npc medusa 20158 Monster -40 -40 0
+npc stakato 20234 Monster 40 -40 0
+npc breka 20270 Monster -40 40 0
+npc antwarrior 20088 Monster 60 0 0
+npc leto 20580 Monster -60 0 0
+
+# At cond 15 (the third-order route) the four abyss runestones drop as at cond 16; the fourth ends the hunt.
+kill stakato
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2668
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2668=1
+kill breka
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2669
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2669=1
+kill antwarrior
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2670
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 2670=1
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2671
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 213:0x80017fff
+  S ExShowQuestMark quest=213
+  Q upsert Q213_TrialOfTheSeeker | <flags> | -2147385345
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 17
+  items 2671=1
+  rows Q213_TrialOfTheSeeker <cond>=17 <flags>=-2147385345 <state>=STARTED

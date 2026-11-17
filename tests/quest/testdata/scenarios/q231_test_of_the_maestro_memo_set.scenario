@@ -1,0 +1,52 @@
+# Q231_TestOfTheMaestro, start with the diamonds already paid: the character holds the secondClassChange39 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Artisan 39
+class 56
+memo secondClassChange39 true
+hold 2876 9
+hold 2877 9
+hold 2878 9
+hold 2916 1
+script quest.Q231_TestOfTheMaestro
+item 2864 2865 2866 2867 2868 2869 2870 2871 2872 2873 2874 2875 2876 2877 2878 2916 7562
+page default/30531.htm
+page default/30533.htm
+page default/30671.htm
+page default/30536.htm
+page default/30556.htm
+page default/30535.htm
+page default/30673.htm
+page script/quest/Q231_TestOfTheMaestro/
+npc lockirin 30531 Folk 10 0 0
+npc balanki 30533 Folk -10 0 0
+npc croto 30671 Folk 0 10 0
+npc arin 30536 Folk 0 -10 0
+npc toma 30556 Folk 10 10 0
+npc filaur 30535 Folk -10 10 0
+npc lorain 30673 Folk 10 -10 0
+npc eyelord 27133 Monster 40 0 0
+npc leech 20225 Monster -40 0 0
+npc wasp 20229 Monster 0 40 0
+npc spider 20233 Monster 0 -40 0
+
+action lockirin
+action lockirin
+  S ActionFailed
+  S NpcHtmlMessage obj=lockirin item=0 page=default/30531.htm
+  S ActionFailed
+bypass npc_{lockirin}_Quest
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q231_TestOfTheMaestro/30531-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q231_TestOfTheMaestro CREATED
+bypass Quest Q231_TestOfTheMaestro 30531-04.htm
+  S QuestList 231:0x80000001
+  S ExShowQuestMark quest=231
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lockirin item=0 page=script/quest/Q231_TestOfTheMaestro/30531-04.htm
+  S ActionFailed
+  Q upsert Q231_TestOfTheMaestro | <state> | STARTED
+  Q upsert Q231_TestOfTheMaestro | <cond> | 1
+  state Q231_TestOfTheMaestro STARTED
+  rows Q231_TestOfTheMaestro <state>=STARTED <cond>=1

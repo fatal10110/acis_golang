@@ -1,0 +1,45 @@
+# Trial of the Pilgrim (Q215), cond 12: Petron, asked after the statue was handed over, says so (30036-04)
+# Hand-written from the quest script (no reference trace).
+character Waiter 36
+class 15
+quest Q215_TrialOfThePilgrim <cond>=12 <state>=STARTED
+script quest.Q215_TrialOfThePilgrim
+item 2721 2722 2723 2724 2725 2726 2727 2728 2729 2730 2731 2732 2733 57 7562
+page default/30648.htm
+page trainer/30571.htm
+page default/30649.htm
+page default/30550.htm
+page default/30651.htm
+page default/30650.htm
+page trainer/30117.htm
+page trainer/30036.htm
+page default/30362.htm
+page default/30652.htm
+page default/30612.htm
+page script/quest/Q215_TrialOfThePilgrim/
+npc santiago 30648 Folk 10 0 0
+npc tanapi 30571 Trainer -10 0 0
+npc martankus 30649 Folk 0 10 0
+npc gauri 30550 Folk 0 -10 0
+npc dorf 30651 Folk 20 20 0
+npc gerald 30650 Folk -20 20 0
+npc primos 30117 Trainer 20 -20 0
+npc petron 30036 Trainer -20 -20 0
+npc andellia 30362 Folk 30 0 0
+npc uruha 30652 Folk -30 0 0
+npc casian 30612 Folk 0 30 0
+npc salamander 27116 Monster 40 0 0
+npc nahir 27117 Monster -40 0 0
+npc willow 27118 Monster 0 -40 0
+
+action petron
+action petron
+  S ActionFailed
+  S NpcHtmlMessage obj=petron item=0 page=trainer/30036.htm
+  S ActionFailed
+bypass npc_{petron}_Quest
+  S NpcHtmlMessage obj=petron item=0 page=script/quest/Q215_TrialOfThePilgrim/30036-04.htm
+  S ActionFailed
+  S ActionFailed
+  state Q215_TrialOfThePilgrim STARTED
+  rows Q215_TrialOfThePilgrim <cond>=12 <state>=STARTED

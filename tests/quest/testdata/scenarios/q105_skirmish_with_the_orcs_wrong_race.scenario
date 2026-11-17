@@ -1,0 +1,24 @@
+# Skirmish with the Orcs (Q105), refused: a human of level 10 is turned away by Kendell (elves only)
+# Hand-written from the quest script (no reference trace).
+character Visitor 10
+script quest.Q105_SkirmishWithTheOrcs
+item 1836 1837 1838 1839 1840 1841 1842 1843 1844 1845 754 981 1060 1835 2509 4412 4413 4414 4415 4416 5789
+page guard/30218.htm
+page script/quest/Q105_SkirmishWithTheOrcs/
+npc kendell 30218 Guard 10 0 0
+npc uoph 27059 Monster 40 0 0
+npc batoh 27061 Monster 0 40 0
+npc roko 27065 Monster -40 0 0
+npc murtika 27068 Monster 0 -40 0
+
+action kendell
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+bypass npc_{kendell}_Quest
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q105_SkirmishWithTheOrcs CREATED
+  rows Q105_SkirmishWithTheOrcs -

@@ -1,0 +1,24 @@
+# Sword of Solidarity (Q101), cond 2: Roien, asked while the player still hunts the blade halves, sends the player on (30008-03a)
+# Hand-written from the quest script (no reference trace).
+character Waiter 9
+quest Q101_SwordOfSolidarity <cond>=2 <state>=STARTED
+script quest.Q101_SwordOfSolidarity
+item 739 740 741 796 937 742 738 1060 4412 4413 4414 4415 4416 5789
+page default/30008.htm
+page default/30283.htm
+page script/quest/Q101_SwordOfSolidarity/
+npc roien 30008 Folk 10 0 0
+npc altran 30283 Folk 20 0 0
+npc marksman 20361 Monster 40 0 0
+
+action roien
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+bypass npc_{roien}_Quest
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-03a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q101_SwordOfSolidarity STARTED
+  rows Q101_SwordOfSolidarity <cond>=2 <state>=STARTED

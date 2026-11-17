@@ -1,0 +1,56 @@
+# Q216_TrialOfTheGuildsman, start with the diamonds already paid: the character holds the secondClassChange35 memo, so the start event gives no
+# Dimensional Diamonds (no item message, no memo write) and the accept page is the plain one, not the "a" page.
+# Hand-written from the quest script (no reference trace).
+character Artisan 36
+class 56
+memo secondClassChange35 true
+hold 57 2000
+hold 3139 7
+script quest.Q216_TrialOfTheGuildsman
+item 3119 3024 3025 3120 3121 3122 3123 3124 3125 3126 3127 3128 3129 3130 3131 3132 3133 3134 3135 3136 3137 3138 3139 57 7562
+page warehouse/30103.htm
+page warehouse/30210.htm
+page default/30283.htm
+page trainer/30298.htm
+page trainer/30688.htm
+page script/quest/Q216_TrialOfTheGuildsman/
+npc valkon 30103 WarehouseKeeper 10 0 0
+npc norman 30210 WarehouseKeeper -10 0 0
+npc altran 30283 Folk 0 10 0
+npc pinter 30298 Trainer 0 -10 0
+npc duning 30688 Trainer 20 20 0
+npc mandragora 20154 Monster 40 0 0
+npc breka 20271 Monster -40 0 0
+npc strain 20200 Monster 0 40 0
+npc golem 20083 Monster 0 -40 0
+npc seeker 20202 Monster 40 40 0
+npc silenos 20168 Monster -40 -40 0
+npc ant 20079 Monster 40 -40 0
+
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q216_TrialOfTheGuildsman CREATED
+bypass Quest Q216_TrialOfTheGuildsman 30103-04.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-04.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-05.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-05.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-06.htm
+  S QuestList 216:0x80000001
+  S ExShowQuestMark quest=216
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:2000
+  S SystemMessage id=54 3:3120
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-06.htm
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <state> | STARTED
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 1
+  items 57=0 3120=1 7562=0

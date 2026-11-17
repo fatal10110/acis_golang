@@ -1,0 +1,52 @@
+# Test of the Healer (Q226), cond 10: Sorius, asked after his order was handed over, says so (30327-02)
+# Hand-written from the quest script (no reference trace).
+character Waiter 39
+class 15
+quest Q226_TestOfTheHealer <cond>=10 <state>=STARTED
+script quest.Q226_TestOfTheHealer
+item 2810 2811 2812 2813 2814 2815 2816 2817 2818 2819 2820 57 7562
+page trainer/30473.htm
+page trainer/30327.htm
+page default/30424.htm
+page default/30428.htm
+page default/30658.htm
+page default/30659.htm
+page default/30660.htm
+page default/30661.htm
+page default/30662.htm
+page default/30663.htm
+page default/30664.htm
+page default/30665.htm
+page default/30674.htm
+page script/quest/Q226_TestOfTheHealer/
+npc bandellos 30473 Trainer 10 0 0
+npc sorius 30327 Trainer -10 0 0
+npc allana 30424 Folk 0 10 0
+npc perrin 30428 Folk 0 -10 0
+npc gupu 30658 Folk 10 10 0
+npc orphan 30659 Folk -10 10 0
+npc windy 30660 Folk 10 -10 0
+npc darkelf 30661 Folk -10 -10 0
+npc piper 30662 Folk 20 0 0
+npc slein 30663 Folk -20 0 0
+npc kain 30664 Folk 0 20 0
+npc kristina 30665 Folk 0 -20 0
+npc daurin 30674 Folk 20 20 0
+npc tatoma 27134 Monster 40 0 0
+npc leader 27123 Monster -40 0 0
+npc assassin 27124 Monster 0 40 0
+npc sniper 27125 Monster 0 -40 0
+npc wizard 27126 Monster -40 40 0
+npc lord 27127 Monster 40 40 0
+
+action sorius
+action sorius
+  S ActionFailed
+  S NpcHtmlMessage obj=sorius item=0 page=trainer/30327.htm
+  S ActionFailed
+bypass npc_{sorius}_Quest
+  S NpcHtmlMessage obj=sorius item=0 page=script/quest/Q226_TestOfTheHealer/30327-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q226_TestOfTheHealer STARTED
+  rows Q226_TestOfTheHealer <cond>=10 <state>=STARTED
