@@ -2,7 +2,11 @@
 // schedule runner calls at the times their scripts.xml entry gives.
 package task
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"context"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+)
 
 // CastleTaxRefresh closes every castle's tax period.
 func CastleTaxRefresh() script.Script {
@@ -28,10 +32,13 @@ func ClanLeaderTransfer() script.Script {
 func SevenSignsUpdate() script.Script {
 	return script.Script{Hooks: script.Hooks{
 		OnStart: func(_ *script.Script, e script.Start) {
-			if !e.Server.SealValidationPeriod() {
-				e.Server.SaveFestivalScores(e.Ctx)
-			}
-			e.Server.SaveSevenSigns(e.Ctx)
+			festival := !e.Server.SealValidationPeriod()
+			e.Offload(func(ctx context.Context) {
+				if festival {
+					e.Server.SaveFestivalScores(ctx)
+				}
+				e.Server.SaveSevenSigns(ctx)
+			})
 		},
 	}}
 }
@@ -49,7 +56,7 @@ func ClanLadderRefresh() script.Script {
 func RecommendationUpdate() script.Script {
 	return script.Script{Hooks: script.Hooks{
 		OnStart: func(_ *script.Script, e script.Start) {
-			e.Server.RefreshRecommendations(e.Ctx)
+			e.Offload(func(ctx context.Context) { e.Server.RefreshRecommendations(ctx) })
 		},
 	}}
 }

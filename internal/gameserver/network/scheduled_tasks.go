@@ -9,7 +9,8 @@ import (
 )
 
 // scheduledSaveTimeout bounds one database save a scheduled task makes, so a
-// hung database cannot hold the schedule's queue.
+// hung database cannot hold the schedule's offloaded work, which runs one at
+// a time, for long.
 const scheduledSaveTimeout = 30 * time.Second
 
 var _ script.Server = (*GameClientLink)(nil)

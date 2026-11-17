@@ -1241,6 +1241,7 @@ type Server struct {
 	// zones is the zone index WithZones supplied; nil when none was.
 	zones        *zone.Index
 	queues       *queues
+	schedule     *script.Schedule // the WithScheduledTasks runner; nil without it
 	traffic      *traffic
 	heldLanes    [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
 	log          zerolog.Logger
@@ -1904,7 +1905,8 @@ func (s *Server) flushPersistence() error {
 }
 
 // Settle waits until the server has handled every frame a client already
-// wrote, then until every task already posted to an actor queue has run: a
+// wrote, then until the database work scheduled tasks already offloaded has
+// run, then until every task already posted to an actor queue has run: a
 // packet handler's follow-up, a timer that fired, or the per-actor work a
 // tick fanned out. Work those tasks post in turn may still be pending.
 //
@@ -1916,6 +1918,9 @@ func (s *Server) Settle(tb testing.TB) {
 	tb.Helper()
 	if err := s.awaitHandled(); err != nil {
 		tb.Fatal(err)
+	}
+	if s.schedule != nil {
+		s.schedule.Flush()
 	}
 	if err := s.queues.settle(); err != nil {
 		tb.Fatal(err)
@@ -2841,7 +2846,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Mailbox.Restore(mails)
 		restoreBoardForums(t, forumStore, favoriteStore, gclConfig.Forums, gclConfig.Favorites, gclConfig.Clans)
 	}
-	scheduleClock := startSchedule(t, o, quests.registry, gcl)
+	scheduleClock, schedule := startSchedule(t, o, quests.registry, gcl)
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)
@@ -2872,6 +2877,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		CastleManor:         gclConfig.CastleManor,
 		CastleManorClock:    castleManorClock,
 		ScheduleClock:       scheduleClock,
+		schedule:            schedule,
 		HallFunctions:       hallFunctions,
 		Halls:               halls,
 		SevenSigns:          sevenSigns,

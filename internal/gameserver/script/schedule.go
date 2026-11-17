@@ -15,9 +15,11 @@ type Server interface {
 	// SealValidationPeriod reports whether the Seven Signs are in their
 	// seal validation period.
 	SealValidationPeriod() bool
-	// SaveFestivalScores stores the festival's scores.
+	// SaveFestivalScores stores the festival's scores. It waits on the
+	// database: call it from Start.Offload.
 	SaveFestivalScores(ctx context.Context)
-	// SaveSevenSigns stores the Seven Signs sign-ups and status.
+	// SaveSevenSigns stores the Seven Signs sign-ups and status. It waits on the
+	// database: call it from Start.Offload.
 	SaveSevenSigns(ctx context.Context)
 	// TransferClanLeaders hands every clan with a pending leader
 	// nomination to its nominee.
@@ -25,7 +27,8 @@ type Server interface {
 	// RefreshClanLadder ranks the clans again by reputation.
 	RefreshClanLadder()
 	// RefreshRecommendations gives every player, online and stored, its
-	// daily recommendations.
+	// daily recommendations. It waits on the database: call it from
+	// Start.Offload.
 	RefreshRecommendations(ctx context.Context)
 	// RaidPointWinners returns the object ids of the first 100 players of
 	// the raid point ranking, first place first.
@@ -61,13 +64,15 @@ func dueWithin(now, next time.Time) (time.Duration, bool) {
 
 // Schedule runs the registry's scheduled tasks: every listed script with a
 // start hook whose entry names a schedule. All of its state belongs to its
-// queue.
+// queue; the database work its start hooks offload runs on the goroutine
+// off owns.
 type Schedule struct {
 	r      *Registry
 	queue  *sim.Queue
 	srv    Server
 	ctx    context.Context
 	cancel context.CancelFunc
+	off    *offload
 	tasks  []*scheduledTask
 }
 
@@ -88,7 +93,7 @@ type scheduledTask struct {
 // start hooks are handed a copy of the task's script that finds no world.
 func StartSchedule(r *Registry, queue *sim.Queue, srv Server) *Schedule {
 	ctx, cancel := context.WithCancel(context.Background())
-	sch := &Schedule{r: r, queue: queue, srv: srv, ctx: ctx, cancel: cancel}
+	sch := &Schedule{r: r, queue: queue, srv: srv, ctx: ctx, cancel: cancel, off: newOffload()}
 	queue.Post(func() {
 		now := queue.Now()
 		for _, e := range r.entries {
@@ -118,12 +123,18 @@ func startScript(s *Script) *Script {
 	return &c
 }
 
-// Stop stops every timer and cancels the context of a start hook still
-// running.
+// Stop stops every timer, cancels the context of a start hook still
+// running, drops the offloaded work not yet started and waits for the
+// offloaded work still running to return.
 func (sch *Schedule) Stop() {
 	sch.queue.Close()
 	sch.cancel()
+	sch.off.close()
 }
+
+// Flush returns once every work a start offloaded before the call has run,
+// or been dropped by Stop.
+func (sch *Schedule) Flush() { sch.off.flush() }
 
 // rescan arms each task whose next start falls within the coming period.
 func (sch *Schedule) rescan() {
@@ -147,8 +158,13 @@ func (sch *Schedule) arm(t *scheduledTask, d time.Duration) {
 func (sch *Schedule) fire(t *scheduledTask) {
 	t.timer = nil
 	t.next = t.sc.next(t.next)
-	e := Start{Ctx: sch.ctx, Server: sch.srv}
-	sch.r.run(t.s, hookStart, func() { t.s.Hooks.Start(t.s, e) })
+	s := t.s
+	e := Start{Ctx: sch.ctx, Server: sch.srv, offload: func(fn func(context.Context)) {
+		if !sch.off.push(func() { sch.r.run(s, hookStart, func() { fn(sch.ctx) }) }) {
+			sch.r.log.Warn().Str("script", s.path).Msg("script: schedule stopped, offloaded work dropped")
+		}
+	}}
+	sch.r.run(s, hookStart, func() { s.Hooks.Start(s, e) })
 	if d, ok := dueWithin(sch.queue.Now(), t.next); ok {
 		sch.arm(t, d)
 	}
