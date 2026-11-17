@@ -31,7 +31,7 @@ func TestConcurrentDoorOpenAndToggleKeepGeodataInStep(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			objects.ToggleDoor(19210001)
+			objects.SetDoorOpen(19210001, false)
 		}()
 		close(start)
 		wg.Wait()

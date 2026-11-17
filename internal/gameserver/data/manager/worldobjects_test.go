@@ -26,12 +26,11 @@ func (w *worldObjectIDs) NextID() (int32, error) {
 	return id, nil
 }
 
-// doorTimerRecorder is a task.DoorEffects that records fired door ids
-// instead of scheduling anything, for tests that only need to observe what
-// scheduleDoorTimer computed.
+// doorTimerRecorder is a task.DoorEffects that applies nothing, for tests
+// that only need to observe what scheduleDoorTimer scheduled.
 type doorTimerRecorder struct{}
 
-func (doorTimerRecorder) ToggleDoor(int) {}
+func (doorTimerRecorder) SetDoorOpen(int, bool) bool { return false }
 
 func newDoorGeo(t *testing.T) (*engine.Engine, int, int) {
 	t.Helper()
@@ -210,7 +209,7 @@ func TestSetDoorOpenSchedulesCloseTimerAfterOpening(t *testing.T) {
 	}
 }
 
-func TestToggleDoorFlipsStateAndReschedules(t *testing.T) {
+func TestSetDoorOpenMovesGeodataAndSchedulesChangeBack(t *testing.T) {
 	objects, geo, doorX, doorY, doorTimers := newTestWorldObjects(t, &door.Template{
 		ID: 19210001, Name: "gate", Kind: door.KindDoor, Level: 1,
 		OpenTime: 30, CloseTime: 60,
@@ -221,24 +220,26 @@ func TestToggleDoorFlipsStateAndReschedules(t *testing.T) {
 		t.Fatal("door should spawn closed")
 	}
 
-	objects.ToggleDoor(19210001)
+	objects.SetDoorOpen(19210001, true)
 	if !gate.Opened() {
-		t.Fatal("ToggleDoor should have opened the door")
+		t.Fatal("SetDoorOpen should have opened the door")
 	}
 	if !geo.CanMove(doorX, doorY, 0, engine.WorldX(1), doorY, 0) {
 		t.Fatal("opened door still blocks geodata movement")
 	}
 	if !doorTimers.Tracked(19210001) {
-		t.Fatal("door should have a pending auto-close timer after ToggleDoor opened it")
+		t.Fatal("door should have a pending auto-close timer after SetDoorOpen opened it")
 	}
 
-	objects.ToggleDoor(19210001)
+	objects.SetDoorOpen(19210001, false)
 	if gate.Opened() {
-		t.Fatal("ToggleDoor should have closed the door back")
+		t.Fatal("SetDoorOpen should have closed the door back")
 	}
 }
 
-func TestScheduleDoorTimerCancelsPendingWhenDelayBecomesZero(t *testing.T) {
+// A change whose own delay is zero schedules nothing and drops nothing: the
+// auto-open the closed door spawned with stays pending.
+func TestZeroDelayDoorChangeKeepsPendingTimer(t *testing.T) {
 	objects, _, _, _, doorTimers := newTestWorldObjects(t, &door.Template{
 		ID: 19210001, Name: "gate", Kind: door.KindDoor, Level: 1,
 		OpenTime: 30, CloseTime: 0,
@@ -247,9 +248,8 @@ func TestScheduleDoorTimerCancelsPendingWhenDelayBecomesZero(t *testing.T) {
 	if !objects.SetDoorOpen(19210001, true) {
 		t.Fatal("SetDoorOpen(open) = false, want a state change")
 	}
-	// closeTime is 0, so opening the door should leave no pending timer.
-	if doorTimers.Tracked(19210001) {
-		t.Fatal("door should have no pending timer when closeTime=0")
+	if !doorTimers.Tracked(19210001) {
+		t.Fatal("opening with closeTime=0 dropped the auto-open scheduled at spawn")
 	}
 }
 
