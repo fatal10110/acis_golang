@@ -1,7 +1,6 @@
 package network
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -221,7 +220,7 @@ func (w festivalWorld) SpawnMonster(npcID, x, y, z, bonus int) (festival.NPC, bo
 	if npcs == nil || !ok {
 		return nil, false
 	}
-	h, err := npcs.SpawnFixedHostile(tmpl, x, y, z, rnd.Get(65536))
+	h, err := npcs.SpawnFixedHostile(tmpl, x, y, z, location.RandomHeading())
 	if err != nil {
 		return nil, false
 	}

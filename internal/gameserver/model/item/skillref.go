@@ -15,6 +15,8 @@ type SkillRef struct {
 }
 
 // ParseSkillRef parses s, formatted "id-level", into a SkillRef.
+// Deliberately strict (issue #4779): extra "-" parts and, in
+// ParseSkillRefs, an empty trailing ";" part are errors, not ignored.
 func ParseSkillRef(s string) (SkillRef, error) {
 	id, level, ok := strings.Cut(s, "-")
 	if !ok {

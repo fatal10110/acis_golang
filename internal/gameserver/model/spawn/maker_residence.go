@@ -6,17 +6,6 @@ import (
 	"strings"
 )
 
-// residenceSpawnTimes are the spawn-time kinds whose first parameter names
-// the residence the maker's NPCs belong to: every kind but door_open.
-var residenceSpawnTimes = []string{
-	"agit_battle_royal_start",
-	"agit_final_start",
-	"agit_defend_warfare_start",
-	"agit_attack_warfare_start",
-	"siege_warfare_start",
-	"pc_siege_warfare_start",
-}
-
 // ResidenceParam returns the residence id the maker gives the NPCs it
 // spawns: the first parameter of a spawnTime such as
 // "siege_warfare_start(7)", when the kind is known and is not door_open and
@@ -30,14 +19,8 @@ func (m *Maker) ResidenceParam() (id int, ok bool) {
 	if len(parts) != 2 {
 		return 0, false
 	}
-	known := false
-	for _, kind := range residenceSpawnTimes {
-		if strings.EqualFold(kind, parts[0]) {
-			known = true
-			break
-		}
-	}
-	if !known {
+	// Every known kind but door_open names the residence first.
+	if kind := SpawnTimeKindOf(parts[0]); kind == SpawnTimeNone || kind == SpawnTimeDoorOpen {
 		return 0, false
 	}
 	param, _, _ := strings.Cut(parts[1], ";")

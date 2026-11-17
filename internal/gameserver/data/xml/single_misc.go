@@ -51,7 +51,9 @@ func (e soulCrystalElement) build() (item.SoulCrystal, error) {
 
 // soulCrystalNPCElement is one leveling-info <npc> element. id, chanceStage,
 // chanceBreak, absorbType and levelList are all required; skill defaults to
-// false.
+// false. Deliberately lenient (issue #4781): absorbType is kept as written,
+// so an unknown name loads and matches no absorb rule, and a missing skill
+// reads false instead of failing the file.
 type soulCrystalNPCElement struct {
 	ID          *coord32     `xml:"id,attr"`
 	ChanceStage *coord       `xml:"chanceStage,attr"`
@@ -261,7 +263,8 @@ func LoadHealSps(path string) (*skill.HealSpsTable, error) {
 }
 
 // newbieBuffElement is one <buff> element. Every attribute is required
-// except isMagicClass, which defaults to false.
+// except isMagicClass, which defaults to false (deliberately lenient, issue
+// #4781).
 type newbieBuffElement struct {
 	SkillID      *coord32 `xml:"skillId,attr"`
 	SkillLevel   *coord   `xml:"skillLevel,attr"`
@@ -378,7 +381,8 @@ func buildAccessLevel(a *attrValues) (admin.AccessLevel, error) {
 }
 
 // buildAdminCommand builds one <aCar> element. name and accessLevel are
-// required.
+// required and desc defaults to "" (issue #4781: a stricter accessLevel and
+// a blank default description; every shipped row sets both).
 func buildAdminCommand(a *attrValues) (admin.Command, error) {
 	a.prefix = "admin: command"
 	name := a.str("name")

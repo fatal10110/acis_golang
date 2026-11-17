@@ -30,8 +30,9 @@ type shutdownHarness struct {
 	synced    chan struct{}
 	syncMu    sync.Mutex
 
-	mu    sync.Mutex
-	stops []bool
+	mu     sync.Mutex
+	stops  []bool
+	listed []link.ServerType // every status sent to the login server, in order
 
 	// hold queues the login server's answers while a test holds them.
 	hold loginAnswerQueue
@@ -63,6 +64,11 @@ func (h *shutdownHarness) authResponse(resolve func(string, bool)) func(string, 
 func (h *shutdownHarness) wire(loginLink *network.LoginLink, maxPlayers int32, q *queues, notices shutdown.Notifier, log zerolog.Logger) (*network.LoginStatus, *shutdown.Countdown) {
 	h.loginLink = loginLink
 	status := network.NewLoginStatus(false, maxPlayers, func(st link.ServerStatus) {
+		if st.Status != nil {
+			h.mu.Lock()
+			h.listed = append(h.listed, *st.Status)
+			h.mu.Unlock()
+		}
 		_ = loginLink.SendServerStatus(st)
 	})
 	status.Registered(loginLink.ServerName)
@@ -81,6 +87,15 @@ func (s *Server) ServerStops() []bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return append([]bool(nil), h.stops...)
+}
+
+// ListedStatuses returns every status the server sent the login server so
+// far, in order, including each one that left the listing unchanged.
+func (s *Server) ListedStatuses() []link.ServerType {
+	h := s.shutdown
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]link.ServerType(nil), h.listed...)
 }
 
 // LoginEntry returns the login server's entry for this server, once it has

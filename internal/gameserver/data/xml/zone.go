@@ -235,6 +235,10 @@ func buildZone(build zoneBuilder, el zoneElement, dynamicID *int) (zone.Kind, er
 		return nil, fmt.Errorf("zone %d: %w", id, err)
 	}
 
+	// Stats fold into one map, exact-case keys, the last of a repeated name
+	// winning (issue #4781): a differently cased initialDelay/reuseDelay is
+	// ignored, a second skill stat replaces the first, and a malformed skill
+	// entry fails the zone. No shipped zone repeats or re-cases a stat.
 	stats := make(map[string]string, len(el.Stats))
 	for _, stat := range el.Stats {
 		stats[stat.Name] = stat.Val

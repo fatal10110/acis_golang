@@ -93,7 +93,6 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 			if err != nil {
 				return err
 			}
-			logUnsupportedSkillEffects(fresh, log)
 			data.Skills.Replace(fresh)
 			return nil
 		},

@@ -132,6 +132,8 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory, log ze
 	a := newAttrValues(foldAttrs(el.Attrs), "spawn maker")
 	logName := a.strDefault("name", "?")
 
+	// territory defaults to none instead of being required (issue #4781;
+	// every shipped maker names one).
 	refs := resolveTerritories(logName, a.strDefault("territory", ""), territories, log)
 	banned := resolveTerritories(logName, a.strDefault("ban", ""), territories, log)
 
@@ -221,7 +223,8 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 }
 
 // buildSpawnPrivate builds one private spawn row under a spawn entry's
-// <privates> block. id and weight are required; respawn defaults to 0.
+// <privates> block. id and weight are required; respawn defaults to 0
+// instead of being required (issue #4781; every shipped private sets it).
 func buildSpawnPrivate(a *attrValues) (spawn.Private, error) {
 	p := spawn.Private{
 		NPCID:        a.int32("id"),

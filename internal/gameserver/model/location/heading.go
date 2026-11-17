@@ -1,8 +1,20 @@
 package location
 
-import "math"
+import (
+	"math"
+
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+)
+
+// headingsPerCircle is the number of client heading units in a full turn.
+const headingsPerCircle = 65536
 
 const headingToDegrees = 182.04444444444444
+
+// RandomHeading returns a uniformly random client heading in [0, 65535].
+func RandomHeading() int {
+	return rnd.Get(headingsPerCircle)
+}
 
 // OrientedLocation is a world location with a client heading.
 type OrientedLocation struct {

@@ -1,9 +1,8 @@
 package manager
 
 import (
-	"math/rand/v2"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 )
 
@@ -20,7 +19,7 @@ func (n *Npcs) SpawnObservers(t *observer.Table) int {
 			n.log.Warn().Int("npc_id", s.NPCID).Msg("observer spawn references unknown npc template")
 			continue
 		}
-		id, err := n.spawnFixed(tmpl, s.Location.X, s.Location.Y, s.Location.Z, rand.IntN(65536))
+		id, err := n.spawnFixed(tmpl, s.Location.X, s.Location.Y, s.Location.Z, location.RandomHeading())
 		if err != nil {
 			n.log.Warn().Err(err).Int("npc_id", s.NPCID).Msg("observer spawn: cannot place npc")
 			continue
