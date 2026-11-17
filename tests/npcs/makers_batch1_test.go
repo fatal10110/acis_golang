@@ -300,11 +300,17 @@ func TestDefaultUseDBMakerRestoresAndWakesItsMaker(t *testing.T) {
 
 	boss := mw.inWorld(useDBBossID)[0]
 	boss.DeleteMe()
-	w.srv.Advance(t, time.Millisecond)
+	// The maker brings its guards in after the boss's leave is handled; on the
+	// real pool that lands after Advance returns, so wait on what the client
+	// sees: both guards shown and the boss deleted.
+	var frames [][]byte
+	w.srv.AdvanceUntil(t, "both guards spawned and shown", func() bool {
+		frames = append(frames, drainFrames(t, w.c)...)
+		return len(mw.inWorld(useDBGuardID)) == 2 && len(shown(frames)) >= 2 && len(deleted(frames)) >= 1
+	})
 	if got := len(mw.inWorld(useDBGuardID)); got != 2 {
 		t.Fatalf("guards after the boss left = %d, want 2", got)
 	}
-	frames := drainFrames(t, w.c)
 	if got := shown(frames); !slices.Equal(got, repeatID(useDBGuardID, 2)) {
 		t.Fatalf("NPCs shown after the boss left = %v, want the two guards", got)
 	}
