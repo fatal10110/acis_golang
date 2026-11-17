@@ -247,7 +247,7 @@ func (t *staleMergeTarget) ItemByTemplateID(templateID int32) *item.Instance {
 
 func TestContainer_Transfer_UsesFreightVisibleTownHooks(t *testing.T) {
 	src := NewContainer(0x10000001, item.LocationWarehouse, freightTestTemplates())
-	dst := NewFreight(0x10000002, freightTestTemplates())
+	dst := newFreight(0x10000002, freightTestTemplates())
 
 	dst.ActiveLocation = 1
 	townOne := dst.AddNew(freightTestStackableID, 10, 0x20000002)

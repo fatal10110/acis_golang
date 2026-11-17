@@ -276,26 +276,6 @@ func NewPlayerInventoryWithDelivery(ownerID int32, templates *item.Table, delive
 	return inv
 }
 
-// RestorePlayerInventory rebuilds a player inventory from persisted item
-// rows without queuing client update notifications. Items outside the
-// inventory/paperdoll locations are ignored; those belong to warehouses,
-// freight, pets, or ground state rather than the carried player inventory.
-func RestorePlayerInventory(ownerID int32, templates *item.Table, items []*item.Instance) *Inventory {
-	inv := NewPlayerInventory(ownerID, templates)
-	inv.Restore(items)
-	return inv
-}
-
-// RestorePlayerInventoryWithDelivery rebuilds a live player inventory without
-// queuing restore notifications; its delivery and persistence dependencies
-// are in place before the rows are restored, so restored items carry the
-// persister without being re-persisted.
-func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery, persist item.Persister) *Inventory {
-	inv := NewPlayerInventoryWithDelivery(ownerID, templates, delivery, persist)
-	inv.Restore(items)
-	return inv
-}
-
 // NewPetInventory returns an empty pet inventory for ownerID, the object id
 // of the player the pet belongs to: a pet's items are saved under its owner,
 // at the pet locations. A live pet must use NewPetInventoryWithDelivery to

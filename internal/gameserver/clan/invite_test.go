@@ -72,3 +72,25 @@ func TestInviteLeftFreesRelog(t *testing.T) {
 		t.Fatal("answered invitation still pending")
 	}
 }
+
+// TestInviteSendPurgesLapsedEntries drops every lapsed entry when a new
+// invitation is sent, so pairs that are never looked up again do not stay
+// in the book.
+func TestInviteSendPurgesLapsedEntries(t *testing.T) {
+	clock := &fakeClock{at: time.UnixMilli(1_800_000_000_000)}
+	b := NewInvites(clock.now)
+	for id := int32(10); id < 20; id += 2 {
+		if got := b.Send(InviteJoinPledge, id, "Lead", id+1, SubunitMain); got != InviteSent {
+			t.Fatalf("send from %d = %v, want InviteSent", id, got)
+		}
+	}
+	clock.at = clock.at.Add(InviteTimeout)
+	if got := b.Send(InviteJoinPledge, 1, "Lead", 2, SubunitMain); got != InviteSent {
+		t.Fatalf("send after the lapse = %v, want InviteSent", got)
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if len(b.entries) != 2 {
+		t.Fatalf("entries after send = %d, want only the new pair's 2", len(b.entries))
+	}
+}

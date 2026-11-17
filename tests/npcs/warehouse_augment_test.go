@@ -43,7 +43,7 @@ func bootAugmentedCaster(t *testing.T) *augmentedCaster {
 	prepare := func(srv *gameservertest.Server, sender int32, _ *player.Character) {
 		a.sword = srv.GiveItem(t, sender, swordID, 1)
 		ctx := context.Background()
-		if err := gamesql.NewAugmentationStore(srv.DB).Create(ctx, a.sword, a.aug); err != nil {
+		if err := gameservertest.SeedAugmentation(ctx, srv.DB, a.sword, a.aug); err != nil {
 			t.Fatalf("seed augmentation: %v", err)
 		}
 		if err := srv.KnownSkills.SetKnownSkill(ctx, sender, 0, longCastSkillID, 1); err != nil {
@@ -133,7 +133,7 @@ func TestAugmentedWeaponDepositRefusedWhileCasting(t *testing.T) {
 	if db[a.sword].loc != item.LocationWarehouse {
 		t.Fatalf("saved sword row at %v, want the warehouse", db[a.sword].loc)
 	}
-	aug, ok, err := gamesql.NewAugmentationStore(a.srv.DB).Get(context.Background(), a.sword)
+	aug, ok, err := gameservertest.StoredAugmentation(context.Background(), a.srv.DB, a.sword)
 	if err != nil || !ok || aug != a.aug {
 		t.Fatalf("stored sword's augmentation = %+v (found %v, err %v), want %+v", aug, ok, err, a.aug)
 	}

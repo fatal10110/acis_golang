@@ -286,6 +286,15 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 	l.refreshWarTags(live, cl)
 }
 
+// onlineCharacter returns the character of the live player id names, nil
+// when none is in the world.
+func (l *GameClientLink) onlineCharacter(id int32) *player.Character {
+	if live, ok := l.livePlayerByID(id); ok {
+		return live.Character
+	}
+	return nil
+}
+
 // requestOustPledgeMember expels the member live names from live's clan.
 // An expelled member online learns it on its own queue, where a castle's
 // clan first checks what it wears (checkLeaverItems); an offline one's
@@ -293,14 +302,8 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 // already loaded them. One lingering after its connection dropped leaves as
 // an online one does, its client told nothing.
 func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpackets.RequestOustPledgeMember) {
-	online := func(id int32) *player.Character {
-		if target, ok := l.livePlayerByID(id); ok {
-			return target.Character
-		}
-		return nil
-	}
 	now := time.Now()
-	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, online, l.clanMemberConnected, now)
+	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, l.onlineCharacter, l.clanMemberConnected, now)
 	switch refusal {
 	case clan.OustNotMember:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouAreNotAClanMember))

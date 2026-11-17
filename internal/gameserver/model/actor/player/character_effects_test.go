@@ -344,7 +344,7 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 	})
 	c := &Character{ID: 1}
 	delivery := &rewardInventoryDelivery{}
-	inv := itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, templates, nil, delivery, nil)
+	inv := itemcontainer.NewPlayerInventoryWithDelivery(c.ID, templates, delivery, nil)
 	c.AttachRuntime(&Template{}, inv)
 	rec := recordEvents(c)
 

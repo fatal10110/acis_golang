@@ -168,7 +168,7 @@ func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 		return
 	}
 	row := partyMemberRow(live)
-	l.broadcastToMembers(without(view.Members, live), func() wire.Frame {
+	sendToMembers(party.Without(view.Members, live.ObjectID()), func() wire.Frame {
 		return serverpackets.FramePartySmallWindowUpdate(row)
 	})
 }
@@ -193,18 +193,18 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			n.To.SendFrame(serverpackets.FramePartySmallWindowAll(n.Leader, int32(n.Loot), rows))
 		case party.WindowAdd[*livePlayer]:
 			row := partyMemberRow(n.Member)
-			l.broadcastToMembers(n.To, func() wire.Frame {
+			sendToMembers(n.To, func() wire.Frame {
 				return serverpackets.FramePartySmallWindowAdd(n.Leader, int32(n.Loot), row)
 			})
 		case party.WindowDelete[*livePlayer]:
-			l.broadcastToMembers(n.To, func() wire.Frame {
+			sendToMembers(n.To, func() wire.Frame {
 				return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.CharacterName())
 			})
 		case party.WindowDeleteAll[*livePlayer]:
 			n.To.SendFrame(serverpackets.FramePartySmallWindowDeleteAll())
 		case party.Msg[*livePlayer]:
 			id := partyMessages[n.ID]
-			l.broadcastToMembers(n.To, func() wire.Frame {
+			sendToMembers(n.To, func() wire.Frame {
 				if n.Name != "" {
 					return serverpackets.FrameSystemMessageString(id, n.Name)
 				}
@@ -223,11 +223,11 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			}
 			l.abortFusionTargeting(n.Member)
 		case party.ChannelOpen[*livePlayer]:
-			l.broadcastToMembers(n.To, serverpackets.FrameExOpenMPCC)
+			sendToMembers(n.To, serverpackets.FrameExOpenMPCC)
 		case party.ChannelClose[*livePlayer]:
-			l.broadcastToMembers(n.To, serverpackets.FrameExCloseMPCC)
+			sendToMembers(n.To, serverpackets.FrameExCloseMPCC)
 		case party.ChannelPartyUpdate[*livePlayer]:
-			l.broadcastToMembers(n.To, func() wire.Frame {
+			sendToMembers(n.To, func() wire.Frame {
 				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.CharacterName(), n.Leader.ObjectID(), int32(n.Count), n.Added)
 			})
 		case party.LeaderChanged[*livePlayer]:
@@ -259,11 +259,6 @@ func (l *GameClientLink) festivalPartyChanged(member *livePlayer, members []*liv
 	}
 }
 
-// broadcastToMembers sends each of members its own copy of one frame.
-func (l *GameClientLink) broadcastToMembers(members []*livePlayer, build func() wire.Frame) {
-	sendToMembers(members, build)
-}
-
 // sendToMembers sends each of members its own copy of one frame.
 func sendToMembers(members []*livePlayer, build func() wire.Frame) {
 	broadcastFrame(build, func(send func(frameReceiver)) {
@@ -289,16 +284,6 @@ func partyMemberRow(live *livePlayer) serverpackets.PartyMember {
 		ClassID:  int32(live.ClassID()),
 		Race:     int32(live.Race),
 	}
-}
-
-func without(members []*livePlayer, self *livePlayer) []*livePlayer {
-	out := make([]*livePlayer, 0, len(members))
-	for _, m := range members {
-		if m.ObjectID() != self.ObjectID() {
-			out = append(out, m)
-		}
-	}
-	return out
 }
 
 var partyMessages = map[party.MessageID]int{

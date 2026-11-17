@@ -7,15 +7,6 @@ type Edited[M Member] struct{ Leader M }
 
 func (Edited[M]) isNotice() {}
 
-// duellist is a member that may be in a duel.
-type duellist interface{ InDuel() bool }
-
-// inDuel reports whether m is in a duel.
-func inDuel[M Member](m M) bool {
-	d, ok := any(m).(duellist)
-	return ok && d.InDuel()
-}
-
 // LeaveChannelSilently takes the party memberID is in out of its command
 // channel, as a party duel does to both parties: the channel disbands when
 // only two parties were in it, and otherwise only the window updates are

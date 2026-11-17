@@ -212,7 +212,8 @@ func beastShotTemplate(id int32, handler string, skillID int32) *modelitem.Templ
 // beastShotStack returns an inventory carrying count units of tmpl as
 // object 10.
 func beastShotStack(tmpl *modelitem.Template, count int) (*itemcontainer.Inventory, *modelitem.Instance) {
-	inv := itemcontainer.RestorePlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(10, tmpl.ID, count)})
+	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
+	inv.Restore([]*modelitem.Instance{carried(10, tmpl.ID, count)})
 	return inv, inv.ItemByObjectID(10)
 }
 
@@ -683,7 +684,7 @@ func TestUseDrivesShortBuffForHPPotionFamily(t *testing.T) {
 	}
 	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
-	res := Use(req)
+	res := UseAll(req)[0]
 
 	if res.Outcome != Applied {
 		t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -703,7 +704,7 @@ func TestUseSkipsShortBuffForNonHPPotionSkill(t *testing.T) {
 	}
 	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
-	res := Use(req)
+	res := UseAll(req)[0]
 
 	if res.HasShortBuff {
 		t.Fatal("HasShortBuff = true, want false for a skill outside the HP-potion family")
@@ -722,7 +723,7 @@ func TestUseSkipsShortBuffWhenIDLosesToCurrent(t *testing.T) {
 	caster.UpdateShortBuff(2037, 1, 14)
 	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
-	res := Use(req)
+	res := UseAll(req)[0]
 
 	if res.HasShortBuff {
 		t.Fatal("HasShortBuff = true, want false when the new skill id loses to the currently-showing one")
@@ -739,7 +740,7 @@ func TestUseAllowsShortBuffWhenIDMatchesOrWins(t *testing.T) {
 		caster.UpdateShortBuff(showing, 1, 14)
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if !res.HasShortBuff {
 			t.Fatalf("HasShortBuff = false with %d showing, want true when the new skill id is numerically >= the currently-showing one", showing)
@@ -785,7 +786,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 				req.Summon = servitor
 			}
 
-			res := Use(req)
+			res := UseAll(req)[0]
 
 			if res.Outcome != Applied {
 				t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -845,7 +846,7 @@ func newUseRequest(t *testing.T, handler string, etcType modelitem.EtcItemType, 
 		},
 		AttachedSkills: []modelitem.SkillRef{{ID: int32(def.ID), Level: int32(def.Level)}},
 	}
-	inv := itemcontainer.RestorePlayerInventory(2, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(useStackID, tmpl.ID, 5)})
+	inv := restoredInventory(2, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(useStackID, tmpl.ID, 5)})
 
 	return UseRequest{
 		Caster:      caster,
@@ -864,7 +865,7 @@ func TestUse(t *testing.T) {
 	t.Run("potion consumes one unit", func(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -877,7 +878,7 @@ func TestUse(t *testing.T) {
 	t.Run("herb applies without consuming", func(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -892,7 +893,7 @@ func TestUse(t *testing.T) {
 		servitor := newServitor(t, 2, 1, 1)
 		req.Summon = servitor
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.MirroredSummon != servitor {
 			t.Fatalf("MirroredSummon = %v, want the servitor", res.MirroredSummon)
@@ -902,7 +903,7 @@ func TestUse(t *testing.T) {
 	t.Run("herb with no summon reports no MirroredSummon", func(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.MirroredSummon != nil {
 			t.Fatalf("MirroredSummon = %v, want nil", res.MirroredSummon)
@@ -913,7 +914,7 @@ func TestUse(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 		req.Summon = newServitor(t, 2, 1, 1)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.MirroredSummon != nil {
 			t.Fatalf("MirroredSummon = %v, want nil (non-herb never mirrors)", res.MirroredSummon)
@@ -924,7 +925,7 @@ func TestUse(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), true)
 		req.Summon = newServitor(t, 2, 1, 1)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.MirroredSummon != nil {
 			t.Fatalf("MirroredSummon = %v, want nil (pet caster never mirrors)", res.MirroredSummon)
@@ -936,7 +937,7 @@ func TestUse(t *testing.T) {
 		// The herb is no longer carried, so a destroy would fail.
 		req.Item = carried(useStackID+1, 1, 1)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -947,7 +948,7 @@ func TestUse(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 		req.Item = carried(useStackID+1, 1, 1)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != NotEnoughItems {
 			t.Fatalf("Outcome = %v, want NotEnoughItems", res.Outcome)
@@ -960,7 +961,7 @@ func TestUse(t *testing.T) {
 	t.Run("elixir applied for a player caster", func(t *testing.T) {
 		req := newUseRequest(t, ElixirsHandler, modelitem.EtcItemElixir, potion, newUseCaster(t), false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -973,7 +974,7 @@ func TestUse(t *testing.T) {
 	t.Run("elixir rejects a pet caster", func(t *testing.T) {
 		req := newUseRequest(t, ElixirsHandler, modelitem.EtcItemElixir, potion, newUseCaster(t), true)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != PetRejected {
 			t.Fatalf("Outcome = %v, want PetRejected", res.Outcome)
@@ -986,7 +987,7 @@ func TestUse(t *testing.T) {
 	t.Run("plain ItemSkills item ignores IsPet", func(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), true)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied (ItemSkillsHandler doesn't gate on IsPet)", res.Outcome)
@@ -998,7 +999,7 @@ func TestUse(t *testing.T) {
 		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
 		tmpl.Tradable = false
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != PetRejected {
 			t.Fatalf("Outcome = %v, want PetRejected", res.Outcome)
@@ -1013,7 +1014,7 @@ func TestUse(t *testing.T) {
 		caster.DisableSkill(actorcast.ReuseKey(&potion), time.Hour)
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != ReuseRejected {
 			t.Fatalf("Outcome = %v, want ReuseRejected", res.Outcome)
@@ -1037,13 +1038,13 @@ func TestUse(t *testing.T) {
 			},
 			AttachedSkills: []modelitem.SkillRef{{ID: int32(def.ID), Level: int32(def.Level)}},
 		}
-		inv := itemcontainer.RestorePlayerInventory(2, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(useStackID, tmpl.ID, 5)})
+		inv := restoredInventory(2, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(useStackID, tmpl.ID, 5)})
 		req := UseRequest{
 			Caster: caster, Inventory: inv, Item: inv.ItemByObjectID(useStackID),
 			Definitions: definitions(def), Effects: actorcast.EffectHandlers{}, Destroyer: destroyer(),
 		}
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
@@ -1063,7 +1064,7 @@ func TestUse(t *testing.T) {
 	t.Run("no shared reuse group reports -1", func(t *testing.T) {
 		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.SharedReuseGroup != -1 {
 			t.Fatalf("SharedReuseGroup = %d, want -1 (template default)", res.SharedReuseGroup)
@@ -1073,7 +1074,7 @@ func TestUse(t *testing.T) {
 	t.Run("unrelated handler not handled", func(t *testing.T) {
 		req := newUseRequest(t, "SomeOtherHandler", modelitem.EtcItemNone, potion, newUseCaster(t), false)
 
-		res := Use(req)
+		res := UseAll(req)[0]
 
 		if res.Outcome != NotHandled {
 			t.Fatalf("Outcome = %v, want NotHandled", res.Outcome)
@@ -1201,7 +1202,7 @@ func definitions(defs ...modelskill.Definition) *modelskill.Table {
 func newPlayer(id int32, templates []*modelitem.Template, items ...*modelitem.Instance) *player.Character {
 	ch := &player.Character{ID: id}
 	ch.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 100, CurrentMP: 100})
-	ch.AttachRuntime(&player.Template{}, itemcontainer.RestorePlayerInventory(id, modelitem.NewTable(templates), items))
+	ch.AttachRuntime(&player.Template{}, restoredInventory(id, modelitem.NewTable(templates), items))
 	return ch
 }
 
@@ -1250,4 +1251,12 @@ func (openGeo) ValidFlyLocation(_, _, _ int, _ float64, tx, ty, tz int) location
 
 func (openGeo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
+}
+
+// restoredInventory returns a player inventory holding items, restored
+// without queuing client updates.
+func restoredInventory(ownerID int32, templates *modelitem.Table, items []*modelitem.Instance) *itemcontainer.Inventory {
+	inv := itemcontainer.NewPlayerInventory(ownerID, templates)
+	inv.Restore(items)
+	return inv
 }

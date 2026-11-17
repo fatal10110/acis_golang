@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -41,11 +42,11 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 		return ok
 	}
 	activate := func() {
-		live.storage.active = activeStore{store: itemcontainer.NewClanWarehouse(clanID, testItemTemplates()), clanID: clanID}
+		live.storage.active = activeStore{store: itemcontainer.NewContainer(clanID, item.LocationClanWarehouse, testItemTemplates()), clanID: clanID}
 	}
 
 	// Another clan's warehouse is not the member's to use either.
-	live.storage.active = activeStore{store: itemcontainer.NewClanWarehouse(clanID+1, testItemTemplates()), clanID: clanID + 1}
+	live.storage.active = activeStore{store: itemcontainer.NewContainer(clanID+1, item.LocationClanWarehouse, testItemTemplates()), clanID: clanID + 1}
 	if ok := gate(); ok || live.storage.active.store != nil {
 		t.Fatalf("another clan's warehouse passed the gate (still active: %v)", live.storage.active.store != nil)
 	}

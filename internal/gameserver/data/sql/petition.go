@@ -122,7 +122,8 @@ func (s *PetitionStore) loadMessages(ctx context.Context, records []petition.Rec
 }
 
 // Save replaces the stored petitions and their chat lines with records, in
-// one transaction: a failed save leaves the previous rows in place.
+// one transaction: a failed save leaves the previous rows in place, so one
+// failing row never loses every petition.
 func (s *PetitionStore) Save(ctx context.Context, records []petition.Record) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

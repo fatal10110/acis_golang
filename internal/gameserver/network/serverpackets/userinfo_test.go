@@ -93,11 +93,13 @@ func liveStatsCharacter() *player.Character {
 	})
 	c := &player.Character{ID: 0x10000001, Race: player.RaceHuman, CharLevel: 1}
 	c.SetName("Buffed")
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, []*item.Instance{
+	inv := itemcontainer.NewPlayerInventory(c.ID, items)
+	inv.Restore([]*item.Instance{
 		{ObjectID: 100, TemplateID: 2, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand},
 		{ObjectID: 101, TemplateID: 3, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest},
 		{ObjectID: 102, TemplateID: 4, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.LFinger},
-	}))
+	})
+	c.AttachRuntime(tmpl, inv)
 	c.AddStatFuncs([]effect.Mod{
 		{Stat: stat.StatSTR, Op: effect.OpAdd, Value: 2},
 		{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.2},

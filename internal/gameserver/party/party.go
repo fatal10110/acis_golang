@@ -29,6 +29,8 @@ type Member interface {
 	// that Answer, under the registry lock, either runs before that Leave
 	// (which then takes the player out again) or sees the player gone.
 	Departed() bool
+	// InDuel reports whether the player is in a duel.
+	InDuel() bool
 }
 
 // LootRule is a party's item distribution rule, as the client numbers it.
@@ -343,7 +345,7 @@ func (r *Registry[M]) remove(out *notices, g *group[M], player M, reason Reason)
 	if isLeader {
 		r.changeLeader(out, g, g.others(player)[0], player.ObjectID())
 	}
-	g.members = without(g.members, player.ObjectID())
+	g.members = Without(g.members, player.ObjectID())
 	delete(r.byMember, player.ObjectID())
 	out.add(Edited[M]{Leader: g.leader})
 	g.recalculateLevel()
@@ -399,7 +401,7 @@ func (r *Registry[M]) ChangeLeader(requester M, name string) []Notice {
 		out.add(Msg[M]{To: []M{requester}, ID: MsgOnlyLeaderTransfers})
 		return out
 	}
-	if target, ok := g.byName(name); ok && !inDuel(target) {
+	if target, ok := g.byName(name); ok && !target.InDuel() {
 		r.changeLeader(&out, g, target, 0)
 	}
 	return out
@@ -414,10 +416,10 @@ func (r *Registry[M]) changeLeader(out *notices, g *group[M], player M, gone int
 	}
 	if c := g.channel; c != nil && c.leader.ObjectID() == g.leader.ObjectID() {
 		c.leader = player
-		out.add(Msg[M]{To: without(c.members(), gone), ID: MsgChannelLeaderNow, Name: player.CharacterName()})
+		out.add(Msg[M]{To: Without(c.members(), gone), ID: MsgChannelLeaderNow, Name: player.CharacterName()})
 	}
 	g.leader = player
-	for _, m := range without(g.members, gone) {
+	for _, m := range Without(g.members, gone) {
 		out.add(WindowDeleteAll[M]{To: m})
 		out.add(WindowAll[M]{To: m, Leader: player.ObjectID(), Loot: g.loot, Others: g.others(m)})
 		out.add(InfoRefresh[M]{Member: m})
@@ -465,7 +467,7 @@ func (g *group[M]) recalculateLevel() {
 
 // others returns g's members but self, in join order.
 func (g *group[M]) others(self M) []M {
-	return without(g.members, self.ObjectID())
+	return Without(g.members, self.ObjectID())
 }
 
 func (g *group[M]) byName(name string) (M, bool) {
@@ -478,7 +480,8 @@ func (g *group[M]) byName(name string) (M, bool) {
 	return zero, false
 }
 
-func without[M Member](members []M, id int32) []M {
+// Without returns members less the one whose object id is id.
+func Without[M Member](members []M, id int32) []M {
 	out := make([]M, 0, len(members))
 	for _, m := range members {
 		if m.ObjectID() != id {

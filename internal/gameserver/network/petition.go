@@ -114,7 +114,8 @@ func (l *GameClientLink) requestPetition(live *livePlayer, req clientpackets.Req
 	case petition.SubmitBadType, petition.SubmitNoID:
 		// A type the client cannot name is a malformed request; it
 		// carries no message of its own, but the petition window still
-		// waits on an answer.
+		// waits on an answer, so it is answered rather than left
+		// hanging.
 		l.log.Warn().Err(err).Int32("object_id", live.ObjectID()).Int32("type", req.Type).Msg("petition refused")
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case petition.Submitted:
