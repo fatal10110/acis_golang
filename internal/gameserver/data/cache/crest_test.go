@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,8 +62,17 @@ func TestLoadCrestsCopiesReturnedData(t *testing.T) {
 
 func TestLoadCrestsErrors(t *testing.T) {
 	t.Run("missing directory", func(t *testing.T) {
-		if c, _, err := LoadCrests(filepath.Join(t.TempDir(), "missing")); err == nil || c != nil {
-			t.Fatalf("LoadCrests(missing) = %v, %v; want no cache and an error", c, err)
+		c, _, err := LoadCrests(filepath.Join(t.TempDir(), "missing"))
+		if !errors.Is(err, os.ErrNotExist) || c == nil || c.Len() != 0 || !c.Partial() {
+			t.Fatalf("LoadCrests(missing) = %v, %v; want an empty partial cache and ErrNotExist", c, err)
+		}
+	})
+
+	t.Run("unreadable directory", func(t *testing.T) {
+		file := filepath.Join(t.TempDir(), "crests")
+		writeCrestFixture(t, filepath.Dir(file), "crests", nil)
+		if c, _, err := LoadCrests(file); err == nil || c != nil {
+			t.Fatalf("LoadCrests(file) = %v, %v; want no cache and an error", c, err)
 		}
 	})
 
@@ -86,27 +96,23 @@ func TestLoadCrestsErrors(t *testing.T) {
 		}
 	})
 
-	t.Run("bad id stops the load, keeps the partial cache and reports why", func(t *testing.T) {
+	t.Run("bad id is skipped, the rest loads and the error names it", func(t *testing.T) {
 		dir := t.TempDir()
 		valid := bytes.Repeat([]byte{0x11}, crestSize(PledgeCrest))
+		large := bytes.Repeat([]byte{0x22}, crestSize(LargePledgeCrest))
 		writeCrestFixture(t, dir, "Crest_101.dds", valid)
-		writeCrestFixture(t, dir, "Crest_bad.dds", bytes.Repeat([]byte{0x11}, crestSize(PledgeCrest)))
-		// Read after Crest_bad.dds in directory order, so never loaded.
-		writeCrestFixture(t, dir, "LargeCrest_103.dds", bytes.Repeat([]byte{0x22}, crestSize(LargePledgeCrest)))
+		writeCrestFixture(t, dir, "Crest_bad.dds", valid)
+		// Read after Crest_bad.dds in directory order.
+		writeCrestFixture(t, dir, "LargeCrest_103.dds", large)
 
 		crests, _, err := LoadCrests(dir)
 		if err == nil || !strings.Contains(err.Error(), "Crest_bad.dds") {
 			t.Fatalf("LoadCrests(%q) error = %v, want one naming Crest_bad.dds", dir, err)
 		}
-		if crests == nil {
-			t.Fatal("LoadCrests returned no cache, want the partial cache")
-		}
 		assertCrest(t, crests, PledgeCrest, 101, valid)
-		if crests.Has(LargePledgeCrest, 103) {
-			t.Fatal("LargeCrest_103 loaded after the bad file, want the load stopped there")
-		}
-		if crests.Len() != 1 {
-			t.Fatalf("Len() = %d, want 1", crests.Len())
+		assertCrest(t, crests, LargePledgeCrest, 103, large)
+		if crests.Len() != 2 || crests.Partial() {
+			t.Fatalf("Len() = %d, Partial() = %v; want 2 crests, not partial", crests.Len(), crests.Partial())
 		}
 	})
 }

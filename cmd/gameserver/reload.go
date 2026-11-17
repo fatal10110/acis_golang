@@ -43,15 +43,12 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 		BuyLists: func() (*buylist.Table, error) {
 			return gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), data.Items)
 		},
-		// A crest reload never fails: what was read before a bad file
-		// stays loaded, as at boot.
+		// A crest reload fails only on an unreadable crest directory: a bad
+		// crest file is skipped, as at boot.
 		Crests: func() error {
-			fresh, err := loadCrestCache(paths, log)
-			if err != nil {
-				return err
-			}
-			crests.Replace(fresh)
-			return nil
+			return crests.Reload(func(dir string) (*datacache.Crests, error) {
+				return loadCrestDir(dir, log)
+			})
 		},
 		CursedWeapons: func() (*entity.CursedWeaponTable, error) {
 			return gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), data.Skills)
