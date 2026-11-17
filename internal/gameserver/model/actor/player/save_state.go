@@ -38,6 +38,15 @@ type SaveState struct {
 	In7sDungeon bool
 	// VarkaKetraAlliance is the faction standing (see VarkaKetraAlliance).
 	VarkaKetraAlliance int
+	// ClanID is the clan the copy was taken in, 0 for none. The clan rows
+	// write Title and the clan penalties too, so a copy taken in a clan
+	// the row no longer records must not write them back.
+	ClanID int32
+	// Title is the title at the copy.
+	Title string
+	// ClanJoinExpiry and ClanCreateExpiry end the clan join and creation
+	// penalties, in epoch milliseconds (see ClanJoinExpiryTime).
+	ClanJoinExpiry, ClanCreateExpiry int64
 	// AccessLevel is the access level played under at the copy. The
 	// character model does not know it once in game, so the caller sets it.
 	AccessLevel int
@@ -87,5 +96,9 @@ func (c *Character) SaveState() SaveState {
 		Noble:              c.IsNoble(),
 		In7sDungeon:        c.In7sDungeon(),
 		VarkaKetraAlliance: c.VarkaKetraAlliance(),
+		ClanID:             c.ClanID(),
+		Title:              c.Title(),
+		ClanJoinExpiry:     c.ClanJoinExpiryTime(),
+		ClanCreateExpiry:   c.ClanCreateExpiryTime(),
 	}
 }

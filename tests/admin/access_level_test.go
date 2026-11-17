@@ -364,7 +364,16 @@ func TestAdminSetAccessSelf(t *testing.T) {
 		t.Fatalf("UserInfo = %+v, want %+v", got, want)
 	}
 	assertTexts(t, frames[1:], "Admin's access level is now set to 3.")
-	// The title is stored at once, the level with the next save.
+	// The title and the level reach the row with the next save
+	// (Player.setAccessLevel changes memory only).
+	srv.FlushPersistence(t)
+	var before string
+	if err := srv.DB.QueryRowContext(context.Background(), "SELECT title FROM characters WHERE obj_Id = ?", gmID).Scan(&before); err != nil {
+		t.Fatalf("read title: %v", err)
+	}
+	if before == "General GM" {
+		t.Fatal("title stored before the next save")
+	}
 	srv.TickAutosave(t)
 	storedAccessLevel(t, srv, gmID, generalGMLevel)
 	var title string

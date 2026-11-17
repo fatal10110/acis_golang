@@ -42,6 +42,9 @@ type Store interface {
 	SetPrivileges(ctx context.Context, clanID int32, rank int, privs int32) error
 	SaveMembership(ctx context.Context, r MembershipRow) error
 	RemoveMembership(ctx context.Context, r RemovalRow) error
+	// ClearClanID clears objectID's clan id while its row still records
+	// clanID, a clan it was found out of at selection.
+	ClearClanID(ctx context.Context, objectID, clanID int32) error
 	SetPowerGrade(ctx context.Context, objectID int32, grade int) error
 	// UpdateCrest stores one of the clan's own crest id columns: the
 	// pledge, large pledge or alliance crest, as typ names it.

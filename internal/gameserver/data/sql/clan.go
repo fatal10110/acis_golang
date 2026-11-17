@@ -204,6 +204,14 @@ func (s *ClanStore) RemoveMembership(ctx context.Context, r clan.RemovalRow) err
 	return nil
 }
 
+// ClearClanID clears objectID's clan id while its row still records clanID.
+func (s *ClanStore) ClearClanID(ctx context.Context, objectID, clanID int32) error {
+	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET clanid=0 WHERE obj_Id=? AND clanid=?`, objectID, clanID); err != nil {
+		return fmt.Errorf("clear clan id of %d: %w", objectID, err)
+	}
+	return nil
+}
+
 // SetPowerGrade stores a member's power grade.
 func (s *ClanStore) SetPowerGrade(ctx context.Context, objectID int32, grade int) error {
 	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET power_grade=? WHERE obj_Id=?`, grade, objectID); err != nil {

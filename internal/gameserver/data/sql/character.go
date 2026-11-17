@@ -109,7 +109,8 @@ func insertCharacter(ctx context.Context, db execer, c *player.Character) error 
 // karma/pvpkills/pkkills (clamped to their column ranges), death_penalty_level, the accumulated session
 // playtime, the personal-surrender flag, the noblesse status, the Seven Signs
 // dungeon membership, the Ketra/Varka faction standing, the face and hair,
-// the access level, the position and heading, and each subclass's progression — so a later reload reflects everything
+// the access level, the title and clan penalties (see clanColumnsQuery),
+// the position and heading, and each subclass's progression — so a later reload reflects everything
 // gained since the last save instead of the row's creation-time values.
 // The row is also marked online: Save only runs for characters currently in
 // game. Online is 1, or 2 for a character lingering after its connection
@@ -130,7 +131,15 @@ func (s *CharacterStore) SaveOffline(ctx context.Context, st player.SaveState, l
 
 // saveCharacterQuery is the column list Save and SaveOffline write, ending
 // with online; each completes it with its own tail.
-const saveCharacterQuery = `UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, accesslevel = ?, heading = ?, x = ?, y = ?, z = ?, online = ?`
+const saveCharacterQuery = `UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, face = ?, hairStyle = ?, hairColor = ?, accesslevel = ?, ` + clanColumnsQuery + `, heading = ?, x = ?, y = ?, z = ?, online = ?`
+
+// clanColumnsQuery writes the title and the clan penalties only while the
+// row still records the clan the copy was taken in. The clan rows write
+// these columns too, on the same lane, but a member removed by someone
+// else has its row written before its live character leaves the clan: a
+// copy taken in between, by an autosave or the logout save, would put its
+// old title back and lift the join penalty the removal stored.
+const clanColumnsQuery = `title = IF(COALESCE(clanid, 0) = ?, ?, title), clan_join_expiry_time = IF(COALESCE(clanid, 0) = ?, ?, clan_join_expiry_time), clan_create_expiry_time = IF(COALESCE(clanid, 0) = ?, ?, clan_create_expiry_time)`
 
 // save runs query, saveCharacterQuery completed by a tail whose arguments
 // are tail followed by the character's id, and writes st's subclass rows in
@@ -141,6 +150,7 @@ func (s *CharacterStore) save(ctx context.Context, st player.SaveState, query st
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		progression.Exp, progression.ExpBeforeDeath, progression.SP, karmaColumn(int64(st.Karma)), killsColumn(int64(st.PvPKills)), killsColumn(int64(st.PKKills)), st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
 		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, st.Face, st.HairStyle, st.HairColor, st.AccessLevel,
+		st.ClanID, st.Title, st.ClanID, st.ClanJoinExpiry, st.ClanID, st.ClanCreateExpiry,
 		st.Heading, st.Location.X, st.Location.Y, st.Location.Z,
 	}, tail...)
 	args = append(args, st.ID)
