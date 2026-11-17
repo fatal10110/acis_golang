@@ -107,6 +107,9 @@ func TestWanderingQuestGiversMoveThreeSecondsAfterTheQuestIsTaken(t *testing.T) 
 			if got := questRows(t, w.srv, w.player, tc.name)["<cond>"]; got != "1" {
 				t.Fatalf("cond = %q, want 1", got)
 			}
+			if !w.srv.DrivesClock() {
+				t.Skip("the next wait is pinned to the last 100 ms before a deadline, which the wall clock does not meet")
+			}
 			w.advance(t, 2900*time.Millisecond)
 			wantAt(t, "before the timer", npcsOf(w.srv, tc.giver), giver.ObjectID())
 			w.advance(t, 200*time.Millisecond)
