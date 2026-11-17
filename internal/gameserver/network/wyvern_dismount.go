@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // wyvernGraceDelay is how long a wyvern rider may stay over ground closed
@@ -60,6 +61,7 @@ func (l *GameClientLink) wyvernDismountTimer(a zone.Actor, entering bool) {
 // rider is taken off only if it still rides a wyvern then. It runs on
 // live's queue.
 func armWyvernDismount(live *livePlayer, arm bool) {
+	sim.AssertOwner(live.Queue())
 	if !arm {
 		if live.wyvernDismount != nil {
 			live.wyvernDismount.Stop()

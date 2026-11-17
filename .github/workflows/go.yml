@@ -160,6 +160,9 @@ jobs:
       # cast, swing and stand-up times, so far more tests than GOMAXPROCS
       # run at once. A single wait longer than 30 s skips the rest of its
       # test (gameservertest's Server.Advance); the inline pass covers it.
+      # The simdebug tag makes sim.AssertOwner also catch queue-owned state
+      # touched from another worker while its queue is busy, which only the
+      # pool's real interleavings can reach.
       - name: Test (real pool)
         if: matrix.shard.pool
         env:
@@ -167,7 +170,7 @@ jobs:
           PKGS: ${{ matrix.shard.pool }}
         run: |
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          .github/scripts/gotest.sh -race -parallel 16 $PKGS
+          .github/scripts/gotest.sh -race -tags simdebug -parallel 16 $PKGS
 
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'

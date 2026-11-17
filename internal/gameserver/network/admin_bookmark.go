@@ -8,6 +8,7 @@ import (
 
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/bookmark"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // bookmarkStore reads and writes the bookmarks rows of one game master.
@@ -79,6 +80,7 @@ func (l *GameClientLink) adminDeleteBookmark(gm *livePlayer, line string) {
 // use. A failed read is logged and gm works on an empty book until the
 // next command reads again.
 func (l *GameClientLink) bookmarkBook(gm *livePlayer) *bookmark.Book {
+	sim.AssertOwner(gm.Queue())
 	if gm.bookmarks != nil {
 		return gm.bookmarks
 	}

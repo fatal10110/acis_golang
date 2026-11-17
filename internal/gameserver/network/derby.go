@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -113,6 +114,7 @@ func (p *livePlayer) hideDerbyRunners(f *npc.Folk) {
 // reports false when the command was too malformed to answer, so that
 // nothing more is sent.
 func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command string) bool {
+	sim.AssertOwner(live.Queue())
 	if l.derby == nil {
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: no race track running")
 		return true

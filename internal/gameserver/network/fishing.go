@@ -148,6 +148,7 @@ func (l *GameClientLink) fishingBaitSpot(live *livePlayer) (location.Location, b
 // for a bite begins. A lure whose grade sets no look period never gets a
 // bite: its line stays cast with nothing looking for one.
 func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, lureID int32) {
+	sim.AssertOwner(live.Queue())
 	if live.Dead() {
 		return
 	}
@@ -214,6 +215,7 @@ func (l *GameClientLink) night() bool {
 // lookForFish looks once for a bite on live's line and reports whether the
 // wait goes on. A bite opens the fight; a wait run out ends the fishing.
 func (l *GameClientLink) lookForFish(live *livePlayer) bool {
+	sim.AssertOwner(live.Queue())
 	run := &live.fishing
 	kind, combat := run.stance.Look(live.Queue().Now(), l.night(), l.fishing.dice)
 	switch kind {
@@ -277,6 +279,7 @@ var fishingActionMessages = map[fishing.ActionMessage]int{
 // a fight it is refused; with a fishing rod in hand it acts on the hooked
 // fish, doubled and used up by a charged fishing shot.
 func (l *GameClientLink) useFishingAction(live *livePlayer, m skillhandler.FishingAction) {
+	sim.AssertOwner(live.Queue())
 	run := &live.fishing
 	if !run.stance.Fighting() {
 		msg := serverpackets.SystemMessageCanUsePumpingOnlyWhileFishing
@@ -327,6 +330,7 @@ func (l *GameClientLink) useFishingAction(live *livePlayer, m skillhandler.Fishi
 // fish, or on a few catches a monster at live's feet instead. A line cast
 // for no fish at all lost its bait.
 func (l *GameClientLink) endFishing(live *livePlayer, win bool) {
+	sim.AssertOwner(live.Queue())
 	run := &live.fishing
 	if win {
 		if fishing.CaughtMonster(l.fishing.dice(100)) {

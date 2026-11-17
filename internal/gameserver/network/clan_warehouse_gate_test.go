@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
@@ -34,13 +35,18 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 	live := newTestLivePlayer(t, memberID, capture)
 	live.Character.SetName("Member")
 	live.SetClanID(clanID)
+	// The gate runs on the member's queue.
+	gate := func() (ok bool) {
+		sim.RunOwned(live.Queue(), func() { _, ok = l.warehouseRequestGate(live) })
+		return ok
+	}
 	activate := func() {
 		live.storage.active = activeStore{store: itemcontainer.NewClanWarehouse(clanID, testItemTemplates()), clanID: clanID}
 	}
 
 	// Another clan's warehouse is not the member's to use either.
 	live.storage.active = activeStore{store: itemcontainer.NewClanWarehouse(clanID+1, testItemTemplates()), clanID: clanID + 1}
-	if _, ok := l.warehouseRequestGate(live); ok || live.storage.active.store != nil {
+	if ok := gate(); ok || live.storage.active.store != nil {
 		t.Fatalf("another clan's warehouse passed the gate (still active: %v)", live.storage.active.store != nil)
 	}
 
@@ -54,7 +60,7 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 	if live.ClanID() != clanID {
 		t.Fatal("the expulsion cleared the member's clan id off its queue")
 	}
-	if _, ok := l.warehouseRequestGate(live); ok {
+	if ok := gate(); ok {
 		t.Fatal("an expelled member's clan warehouse passed the gate")
 	}
 	if live.storage.active.store != nil {

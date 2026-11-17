@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // The clan window requests answer nothing when the player has no clan, or
@@ -243,6 +244,7 @@ func (l *GameClientLink) sendJoinedClan(live *livePlayer, cl *clan.Clan) {
 // clan's skills taken, its skill list, its status, and its clan window
 // closed.
 func (l *GameClientLink) sendLeftClan(live *livePlayer, cl *clan.Clan) {
+	sim.AssertOwner(live.Queue())
 	// Leaving closes whatever warehouse live had open, its own included.
 	live.storage.active = activeStore{}
 	l.takeClanSkills(live, cl)

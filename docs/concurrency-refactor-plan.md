@@ -82,7 +82,8 @@ writer drains — on a queue that would stall a pool worker. Phase 0 replaces th
 unbounded per-connection outbox and a byte high-water kick, after which every send path is
 non-blocking and `TrySendFrame` (with #2254's spin) is deleted.
 
-Enforced rules (`sim.AssertOwner(q)` under the `simdebug` build tag; CI runs suites with it):
+Enforced rules (`sim.AssertOwner(q)` under the `simdebug` build tag; CI runs the real-pool pass of
+the behavior suites, and the `sim` package tests, with it):
 1. Queue-owned state is touched only from its owner's queue.
 2. No mutex (`vitalsMu` or container) is held while calling into an actor or another container.
    Posting to a queue is non-blocking, so posting under a lock is allowed.
@@ -517,8 +518,9 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   on a client; a slow client costs memory up to the mark, then its connection, never a worker.
 
 ## Verification
-- Every PR: `gofmt`, `go vet ./...`, `go build ./...`, `go test -race ./...` and
-  `go test -race -tags simdebug ./...` with the shared MariaDB up (`make test-db-up`).
+- Every PR: `gofmt`, `go vet ./...`, `go build ./...`, `go test -race ./...` with the shared
+  MariaDB up (`make test-db-up`). CI adds `-tags simdebug` to the real-pool pass (the `pool` package
+  lists of `.github/workflows/go.yml`) and to `./internal/gameserver/sim/...`.
 - Phase 0: perf baseline numbers recorded on #2268 before Phase 2 starts; outbox test that a
   stalled reader is aborted at the high-water mark and a 200-frame burst to a healthy reader lands
   in order.

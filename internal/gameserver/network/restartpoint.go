@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -69,6 +70,7 @@ func (l *GameClientLink) siegeAttackerAt(live *livePlayer) bool {
 // wait ends with nothing done when the player was revived meanwhile or has
 // left the world.
 func (l *GameClientLink) delaySiegeRestart(live *livePlayer, requestType int32) {
+	sim.AssertOwner(live.Queue())
 	if live.siegeRestart != nil {
 		return
 	}
