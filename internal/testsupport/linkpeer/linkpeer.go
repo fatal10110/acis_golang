@@ -33,7 +33,8 @@ type Peer struct {
 // AuthResponse (serverID, name), then queues every later frame.
 func Start(t testing.TB, serverID byte, name string) *Peer {
 	t.Helper()
-	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	// The link takes the modulus as sent, whatever its size.
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("linkpeer: GenerateKey: %v", err)
 	}
