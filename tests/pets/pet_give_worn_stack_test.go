@@ -48,7 +48,7 @@ func TestGivePartOfWornStackToPetLeavesRestWorn(t *testing.T) {
 	}
 
 	h.sendAndTick(t, encodeRequestGiveItemToPet(lure, 1))
-	if got := h.collarItemCount(t, giveLureID); got != 1 {
+	if got := h.petRowCount(t, giveLureID); got != 1 {
 		t.Fatalf("pet lures = %d, want 1", got)
 	}
 	if got := h.ownerItemCount(t, giveLureID); got != 9 {

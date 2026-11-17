@@ -39,8 +39,7 @@ func TestDecreaseWeightRaisesPetWeightLimit(t *testing.T) {
 	t.Parallel()
 	decreaseWeight := decreaseWeightEffect(t)
 	saved := pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal}
-	h := bootBallastWolfCarrying(t, saved, 5451) // 54510: the unbuffed limit
-	wolf, burst := h.spawnWolf(t)
+	h, wolf, burst := bootBallastWolfCarrying(t, saved, 5451) // 54510: the unbuffed limit
 	if info, ok := firstOpcode(burst, serverpackets.OpcodePetInfo); !ok {
 		t.Fatalf("spawn burst has no PetInfo: opcodes %x", frameOpcodes(burst))
 	} else if got := readPetInfoLoad(t, info); got.weight != petWeightLimit || got.limit != petWeightLimit {
@@ -62,7 +61,7 @@ func TestDecreaseWeightRaisesPetWeightLimit(t *testing.T) {
 	requireWolfBand(t, "buffed", wolf, 3, 66)
 
 	frames := h.giveToPet(t, ballast, 1)
-	if got := h.collarItemCount(t, ballastID); got != 5452 {
+	if got := h.petRowCount(t, ballastID); got != 5452 {
 		t.Fatalf("pet ballast after a buffed give = %d, want 5452", got)
 	}
 	info, ok := firstOpcode(frames, serverpackets.OpcodePetInfo)
@@ -80,7 +79,7 @@ func TestDecreaseWeightRaisesPetWeightLimit(t *testing.T) {
 	requireWolfBand(t, "buff ended", wolf, 4, 0)
 
 	h.requireGiveRefused(t, ballast, "buff ended")
-	if got := h.collarItemCount(t, ballastID); got != 5452 {
+	if got := h.petRowCount(t, ballastID); got != 5452 {
 		t.Fatalf("pet ballast after the refused give = %d, want 5452", got)
 	}
 }

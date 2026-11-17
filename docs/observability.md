@@ -75,7 +75,7 @@ The shipped file produces no such event.
 
 An item record's `msg` is the change, `ADDED`, `MODIFIED` or `REMOVED`, and it carries `owner`
 (the character's name; for a pet's inventory, the name of the character it was called out for),
-`owner_id` (the character's object id, or the pet collar's), `item` (the template name),
+`owner_id` (the character's object id; for a pet's inventory, the owner's), `item` (the template name),
 `object_id`, `item_id`, `location` (the `items.loc` spelling after the change, `VOID` for a drop),
 `count` and `enchant`. Equipping or unequipping is `MODIFIED`, and so is each worn item put back on
 the paperdoll at login. Stackable items are never recorded.

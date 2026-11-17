@@ -1,7 +1,6 @@
 package pets
 
 import (
-	"context"
 	"math"
 	"testing"
 
@@ -15,15 +14,13 @@ import (
 // MaxInt32 is refused before the source is reduced, so no unit is destroyed
 // by the count clamp. A full refusal mirrors the trade count-overflow fix.
 
-// seedPetStack saves count of templateID as an item the pet carries, under
-// its collar, before the pet is summoned, and returns its object id.
+// seedPetStack loads count of templateID into the summoned pet and returns
+// its object id.
 func (h *petWorld) seedPetStack(t *testing.T, templateID, count int32) int32 {
 	t.Helper()
-	stack := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: templateID, OwnerID: h.collarID, Count: int(count), Location: item.LocationPet}
-	if err := h.srv.Items.Create(context.Background(), h.collarID, stack); err != nil {
-		t.Fatalf("seed pet stack: %v", err)
-	}
-	return stack.ObjectID
+	id := h.srv.GivePetItem(t, h.ownerID, templateID, count)
+	h.settleInventoryUpdates(t)
+	return id
 }
 
 // requireAdena checks the owner's and the pet's adena, in memory and in
@@ -44,7 +41,7 @@ func (h *petWorld) requireAdena(t *testing.T, wolf *summon.Actor, owner, pet int
 	if got := h.ownerItemCount(t, item.AdenaID); got != owner {
 		t.Fatalf("owner adena rows = %d, want %d", got, owner)
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != pet {
+	if got := h.petRowCount(t, item.AdenaID); got != pet {
 		t.Fatalf("pet adena rows = %d, want %d", got, pet)
 	}
 }
@@ -55,9 +52,8 @@ func (h *petWorld) requireAdena(t *testing.T, wolf *summon.Actor, owner, pet int
 func TestGiveToPetRefusesStackPastCountLimit(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 50})
-	h.seedPetStack(t, item.AdenaID, math.MaxInt32-10)
 	wolf, _ := h.spawnWolf(t)
-	h.settleInventoryUpdates(t)
+	h.seedPetStack(t, item.AdenaID, math.MaxInt32-10)
 	adena := h.seededItem(t, item.AdenaID)
 
 	frames := h.sendAndTick(t, encodeRequestGiveItemToPet(adena, 50))
@@ -77,9 +73,8 @@ func TestGiveToPetRefusesStackPastCountLimit(t *testing.T) {
 func TestGetItemFromPetRefusesStackPastCountLimit(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: math.MaxInt32 - 10})
-	carried := h.seedPetStack(t, item.AdenaID, 50)
 	wolf, _ := h.spawnWolf(t)
-	h.settleInventoryUpdates(t)
+	carried := h.seedPetStack(t, item.AdenaID, 50)
 
 	frames := h.sendAndTick(t, encodeRequestGetItemFromPet(carried, 50))
 	if len(frames) != 1 {
@@ -102,9 +97,8 @@ func TestGetItemFromPetRefusesStackPastCountLimit(t *testing.T) {
 func TestPetPickupRefusesStackPastCountLimit(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
-	carried := h.seedPetStack(t, item.AdenaID, math.MaxInt32-10)
 	wolf, _ := h.spawnWolf(t)
-	h.settleInventoryUpdates(t)
+	carried := h.seedPetStack(t, item.AdenaID, math.MaxInt32-10)
 	x, y, z := wolf.Position()
 	pile := h.seedGroundAt(t, item.AdenaID, 50, x+10, y, z)
 

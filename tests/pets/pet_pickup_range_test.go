@@ -97,7 +97,7 @@ func TestPetWalksToFarItemBeforePickingItUp(t *testing.T) {
 	if d := at.Distance3D(spot); d >= petPickupReach {
 		t.Fatalf("pet took the adena %.1f units away, want within %d", d, petPickupReach)
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 40 {
+	if got := h.petRowCount(t, item.AdenaID); got != 40 {
 		t.Fatalf("pet adena rows = %d, want 40", got)
 	}
 }
@@ -125,7 +125,7 @@ func TestStunnedPetRefusesPickupAndOrders(t *testing.T) {
 	if _, ok := h.srv.State.Object(groundID); !ok {
 		t.Fatal("stunned pet picked the adena up")
 	}
-	if got := h.collarItemCount(t, item.AdenaID); got != 0 {
+	if got := h.petRowCount(t, item.AdenaID); got != 0 {
 		t.Fatalf("pet adena rows = %d, want none", got)
 	}
 
@@ -153,7 +153,7 @@ func TestPetPickupRefusesOnlyAmmunition(t *testing.T) {
 
 	token := h.seedGroundAt(t, boundTokenID, 3, x+10, y, z)
 	requirePickupHead(t, h.petPickup(t, token), wolf, token)
-	if got := h.collarItemCount(t, boundTokenID); got != 3 {
+	if got := h.petRowCount(t, boundTokenID); got != 3 {
 		t.Fatalf("pet bound tokens = %d, want 3", got)
 	}
 

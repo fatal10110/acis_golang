@@ -88,7 +88,7 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 		if detach {
 			sim.RunOwned(live.Queue(), func() { link.detachLivePlayer(live) })
 		}
-		(&gameSummonSpawner{link: link, live: live}).spawnRestoredPet(collar, summonItem, npcTmpl, petmodel.State{}, false, nil)
+		(&gameSummonSpawner{link: link, live: live}).spawnRestoredPet(collar, summonItem, npcTmpl, petmodel.State{}, false)
 		_, spawned := state.Summon(live.ObjectID())
 		return live, spawned
 	}

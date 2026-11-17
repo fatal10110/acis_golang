@@ -56,7 +56,7 @@ func TestGiveWornItemToPetTakesItsStatsOff(t *testing.T) {
 	if !hasOpcode(frames, serverpackets.OpcodeUserInfo) {
 		t.Fatalf("give frames = %x, want the owner's UserInfo", frameOpcodes(frames))
 	}
-	if got := h.collarItemCount(t, hpSwordID); got != 1 {
+	if got := h.petRowCount(t, hpSwordID); got != 1 {
 		t.Fatalf("pet swords = %d, want 1", got)
 	}
 
@@ -78,7 +78,7 @@ func TestDeadOwnerGivesItemToPet(t *testing.T) {
 	h.srv.MarkPlayerDead(t, h.ownerID)
 
 	h.sendAndTick(t, encodeRequestGiveItemToPet(adena, 10))
-	if got := h.collarItemCount(t, item.AdenaID); got != 10 {
+	if got := h.petRowCount(t, item.AdenaID); got != 10 {
 		t.Fatalf("pet adena = %d, want 10", got)
 	}
 	if got := h.ownerItemCount(t, item.AdenaID); got != 90 {

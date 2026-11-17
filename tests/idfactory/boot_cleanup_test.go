@@ -91,17 +91,21 @@ func TestBootCleanupRestoresDatabaseIntegrity(t *testing.T) {
 	seedRow(t, db,
 		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 1, 'INVENTORY')", charID, liveItemID)
 
-	// A pet's item, saved under its collar, whose pets row stands; and one
-	// saved under an object id that is nobody's.
+	// A pet's item, saved under its owner; one saved under the pet's collar,
+	// whose pets row stands, which owns nothing; and one saved under an
+	// object id that is nobody's.
 	const collarID = 0x10000003
 	const petItemID = 0x10000004
 	const strayItemID = 0x10000005
+	const collarItemID = 0x10000007
 	seedRow(t, db,
 		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 2375, 1, 'INVENTORY')", charID, collarID)
 	seedRow(t, db,
 		"INSERT INTO pets (item_obj_id, name, level, curHp, curMp, exp, sp, fed) VALUES (?, '', 15, 0, 10, 0, 0, 100)", collarID)
 	seedRow(t, db,
-		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 40, 'PET')", collarID, petItemID)
+		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 40, 'PET')", charID, petItemID)
+	seedRow(t, db,
+		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 40, 'PET')", collarID, collarItemID)
 	seedRow(t, db,
 		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 40, 'PET')", 0x10000006, strayItemID)
 
@@ -140,12 +144,18 @@ func TestBootCleanupRestoresDatabaseIntegrity(t *testing.T) {
 		t.Fatalf("expired reuse timestamps survived boot: %d", expired)
 	}
 
-	var petItems, strayItems int
+	var petItems, strayItems, collarItems int
 	if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE object_id = ?", petItemID).Scan(&petItems); err != nil {
 		t.Fatalf("count pet item: %v", err)
 	}
 	if petItems != 1 {
-		t.Fatal("boot deleted a pet's item saved under its collar")
+		t.Fatal("boot deleted a pet's item saved under its owner")
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE object_id = ?", collarItemID).Scan(&collarItems); err != nil {
+		t.Fatalf("count collar item: %v", err)
+	}
+	if collarItems != 0 {
+		t.Fatal("an item row owned by a collar survived boot")
 	}
 	if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE object_id = ?", strayItemID).Scan(&strayItems); err != nil {
 		t.Fatalf("count stray item: %v", err)

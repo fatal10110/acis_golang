@@ -1,7 +1,6 @@
 package pets
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -56,7 +55,7 @@ func (h *petWorld) requireOwnerUseRefused(t *testing.T, templateID int32, messag
 	if got := h.ownerItemCount(t, templateID); got != 1 {
 		t.Fatalf("owner holds %d of item %d after the refusal, want 1", got, templateID)
 	}
-	if got := h.collarItemCount(t, templateID); got != 0 {
+	if got := h.petRowCount(t, templateID); got != 0 {
 		t.Fatalf("pet holds %d of item %d after the refusal, want 0", got, templateID)
 	}
 }
@@ -85,7 +84,7 @@ func TestOwnerUsePetWeaponPutsItOnThePet(t *testing.T) {
 	if held := wolf.PetInventory().ItemAt(itemcontainer.RHand); held == nil || held.ObjectID != weaponID {
 		t.Fatalf("wolf right hand = %+v, want weapon %d", held, weaponID)
 	}
-	row := mustPersistedItem(t, h.srv, h.collarID, weaponID)
+	row := mustPersistedItem(t, h.srv, h.ownerID, weaponID)
 	if row.Location != item.LocationPetEquip || row.LocationData != itemcontainer.RHand {
 		t.Fatalf("weapon row = %+v, want pet equipment in the right hand", row)
 	}
@@ -129,13 +128,10 @@ func TestOwnerUsePetWeaponDeadPet(t *testing.T) {
 func TestOwnerUsePetWeaponPetSlotsFull(t *testing.T) {
 	t.Parallel()
 	h := bootGearOwner(t, armedWolfNPCID, seedItem{TemplateID: fixturePetWeaponID, Count: 1})
-	for range 12 {
-		sword := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: 30, OwnerID: h.collarID, Count: 1, Location: item.LocationPet}
-		if err := h.srv.Items.Create(context.Background(), h.collarID, sword); err != nil {
-			t.Fatalf("seed pet sword: %v", err)
-		}
-	}
 	h.spawnWolf(t)
+	for range 12 {
+		h.srv.GivePetItem(t, h.ownerID, 30, 1)
+	}
 	drainUntilQuiet(t, h.client)
 	h.settleInventoryUpdates(t)
 	h.requireOwnerUseRefused(t, fixturePetWeaponID, serverpackets.SystemMessagePetCannotCarryMoreItems)

@@ -1,7 +1,6 @@
 package pets
 
 import (
-	"context"
 	"slices"
 	"strconv"
 	"testing"
@@ -94,11 +93,8 @@ func bootConditionedWolfWeapon(t *testing.T, uc item.UseCondition) (*petWorld, *
 		gameservertest.WithSummonItems(summonItems),
 		gameservertest.WithItemTemplates(item.NewTable(append(gameservertest.ItemTemplates().All(), weaponTmpl))),
 	})
-	weapon := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: fixturePetWeaponID, OwnerID: h.collarID, Count: 1, Location: item.LocationPet}
-	if err := h.srv.Items.Create(context.Background(), h.collarID, weapon); err != nil {
-		t.Fatalf("seed pet weapon: %v", err)
-	}
 	actor, _ := h.spawnWolf(t)
+	weaponID := h.srv.GivePetItem(t, h.ownerID, fixturePetWeaponID, 1)
 	h.settleInventoryUpdates(t)
-	return h, actor, weapon.ObjectID
+	return h, actor, weaponID
 }
