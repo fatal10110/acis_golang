@@ -253,6 +253,10 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 // ObjectID returns the world object id assigned to this door.
 func (o *Object) ObjectID() int32 { return o.objectID }
 
+// CollisionRadius is the door's body radius, the same for every door: a
+// radius scan around a creature widens by it as by any creature's.
+func (*Object) CollisionRadius() float64 { return CollisionRadius }
+
 // Dead reports whether the door has been broken down.
 func (o *Object) Dead() bool { return o.dead.Load() }
 

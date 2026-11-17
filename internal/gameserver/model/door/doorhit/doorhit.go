@@ -62,9 +62,6 @@ func ForEachKnownInRadius(w *world.State, self world.Tracked, radius int, fn fun
 // closed: a sight query to the hit target leaves the door out.
 func (t Target) StoredObject() dynamic.Object { return t.Object }
 
-// CollisionRadius is the body radius every door has.
-func (Target) CollisionRadius() float64 { return door.CollisionRadius }
-
 func (Target) Karma() int             { return 0 }
 func (t Target) AlikeDead() bool      { return t.Dead() }
 func (Target) FakeDeath() bool        { return false }
