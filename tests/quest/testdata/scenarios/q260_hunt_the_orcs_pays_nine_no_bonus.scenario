@@ -1,0 +1,29 @@
+# Q260: nine items pay no bonus (5 amulets and 4 necklaces).
+character Hunter 6
+class 18
+script quest.Q260_HuntTheOrcs
+item 1114 1115 5789
+page guard/30221.htm
+page script/quest/Q260_HuntTheOrcs/
+npc rayen 30221 Guard 10 0 0
+quest Q260_HuntTheOrcs <cond>=1 <state>=STARTED
+hold 1114 5
+hold 1115 4
+
+action rayen
+action rayen
+  S ActionFailed
+  S NpcHtmlMessage obj=rayen item=0 page=guard/30221.htm
+  S ActionFailed
+bypass npc_{rayen}_Quest
+  S SystemMessage id=301 3:1114 6:5
+  S SystemMessage id=301 3:1115 6:4
+  S SystemMessage id=52 6:180
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:6000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-05.htm
+  S ActionFailed
+  S ActionFailed
+  M set Q260_HuntTheOrcs_OneTimeQuestFlag | true
+  items 57=180 1114=0 1115=0

@@ -1,0 +1,29 @@
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=3 <state>=STARTED
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3869 3870 3871
+page default/30760.htm
+page default/30645.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc gustav 30760 Folk 10 0 0
+npc martien 30645 Folk 20 0 0
+
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-11.htm
+  S ActionFailed
+  S ActionFailed
+action martien
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q503_PursuitOfClanAmbition/30645-07.htm
+  S ActionFailed
+  S ActionFailed

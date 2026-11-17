@@ -1,0 +1,20 @@
+# Q265: Kristin sends a dark elf below level 6 away (30357-01).
+character Liberator 5
+class 31
+script quest.Q265_ChainsOfSlavery
+item 1368 5790
+page guard/30357.htm
+page script/quest/Q265_ChainsOfSlavery/
+npc kristin 30357 Guard 10 0 0
+
+action kristin
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q265_ChainsOfSlavery CREATED
+  rows Q265_ChainsOfSlavery -

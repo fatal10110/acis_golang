@@ -1,0 +1,28 @@
+# Q265: a shackle drops with 50% from an imp (20004) and 60% from an elder (20005).
+character Liberator 6
+class 31
+script quest.Q265_ChainsOfSlavery
+item 1368 5790
+page guard/30357.htm
+page script/quest/Q265_ChainsOfSlavery/
+npc kristin 30357 Guard 10 0 0
+npc imp 20004 Monster 40 0 0
+npc elder 20005 Monster 0 40 0
+quest Q265_ChainsOfSlavery <cond>=1 <state>=STARTED
+
+kill imp
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 499999
+kill imp
+  S SystemMessage id=95 1:0 1:0
+  random 500000
+kill elder
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 599999
+kill elder
+  S SystemMessage id=95 1:0 1:0
+  random 600000

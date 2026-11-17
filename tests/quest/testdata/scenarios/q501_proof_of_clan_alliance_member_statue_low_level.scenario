@@ -1,0 +1,24 @@
+# Q501: the statue sends a clan member below level 40 away while the leader is at cond 2 (30757-02).
+character Leader 40
+clan 3
+mate Member 39 online
+quest Q501_ProofOfClanAlliance <cond>=2 <state>=STARTED
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+
+as Member action statue
+as Member action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/30757.htm
+  S ActionFailed
+as Member bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q501_ProofOfClanAlliance/30757-02.htm
+  S ActionFailed
+  S ActionFailed

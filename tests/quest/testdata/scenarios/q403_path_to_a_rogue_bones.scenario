@@ -71,9 +71,6 @@ bypass npc_{bezique}_Quest
   Q upsert Q403_PathToARogue | <cond> | 5
   items 1184=0 1185=1
   rows Q403_PathToARogue <cond>=5 <state>=STARTED
-# A link the page on screen does not offer: the server drops it.
-bypass Quest Q403_PathToARogue 30379-08.htm
-  rejected
 action bezique
   S ActionFailed
   S NpcHtmlMessage obj=bezique item=0 page=guard/30379.htm

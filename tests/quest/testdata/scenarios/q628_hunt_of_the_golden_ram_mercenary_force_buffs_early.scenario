@@ -1,4 +1,4 @@
-# Hunt of the Golden Ram Mercenary Force (Q628): before the badge is of a soldier the page offers no blessing link, and a blessing event sent anyway is dropped.
+# Hunt of the Golden Ram Mercenary Force (Q628): before the badge is of a soldier Selina's page offers no blessing link: a later talk shows what a recruit sees, and the badges stay.
 # Expectations replay the reference trace of this scenario.
 trace internal/gameserver/script/testdata/oracle/scenarios/q628_hunt_of_the_golden_ram_mercenary_force_buffs_early.golden
 character Recruit 66
@@ -16,8 +16,8 @@ action selina
   S ActionFailed
   S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31556-09.htm
   S ActionFailed
-# A link the page on screen does not offer: the server drops it.
-bypass Quest Q628_HuntOfTheGoldenRamMercenaryForce 4404
-  rejected
+bypass npc_{selina}_Quest
+  S NpcHtmlMessage obj=selina item=0 page=script/quest/Q628_HuntOfTheGoldenRamMercenaryForce/31554-04b.htm
+  S ActionFailed
+  S ActionFailed
   items 7251=6
-tick x3

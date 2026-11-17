@@ -1,0 +1,20 @@
+# Q263: Kayleen sends a dark elf below level 8 away (30346-01).
+character Subjugator 7
+class 31
+script quest.Q263_OrcSubjugation
+item 1116
+page guard/30346.htm
+page script/quest/Q263_OrcSubjugation/
+npc kayleen 30346 Guard 10 0 0
+
+action kayleen
+action kayleen
+  S ActionFailed
+  S NpcHtmlMessage obj=kayleen item=0 page=guard/30346.htm
+  S ActionFailed
+bypass npc_{kayleen}_Quest
+  S NpcHtmlMessage obj=kayleen item=0 page=script/quest/Q263_OrcSubjugation/30346-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q263_OrcSubjugation CREATED
+  rows Q263_OrcSubjugation -

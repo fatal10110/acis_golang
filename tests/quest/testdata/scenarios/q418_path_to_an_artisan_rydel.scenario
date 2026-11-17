@@ -2,7 +2,7 @@
 trace internal/gameserver/script/testdata/oracle/scenarios/q418_path_to_an_artisan_rydel.golden
 character Fighter 19
 class 53
-quest Q418_PathToAnArtisan <cond>=11 <state>=STARTED
+quest Q418_PathToAnArtisan <cond>=9 <state>=STARTED
 hold 1633 1
 hold 1634 1
 hold 1641 1
@@ -33,21 +33,44 @@ action hitchi
   S NpcHtmlMessage obj=hitchi item=0 page=merchant/31963.htm
   S ActionFailed
 bypass npc_{hitchi}_Quest
-  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-06a.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-01.htm
   S ActionFailed
   S ActionFailed
-# The page on screen does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+bypass Quest Q418_PathToAnArtisan 31963-06.htm
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-06.htm
+  S ActionFailed
 bypass Quest Q418_PathToAnArtisan 31963-07.htm
-  rejected
+  S QuestList 418:0x800009ff
+  S ExShowQuestMark quest=418
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hitchi item=0 page=script/quest/Q418_PathToAnArtisan/31963-07.htm
+  S ActionFailed
+  Q upsert Q418_PathToAnArtisan | <flags> | -2147481089
+  Q upsert Q418_PathToAnArtisan | <cond> | 12
 action rydel
 action rydel
   S ActionFailed
   S NpcHtmlMessage obj=rydel item=0 page=warehouse/31956.htm
   S ActionFailed
 bypass npc_{rydel}_Quest
-  S NpcHtmlMessage obj=rydel item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S NpcHtmlMessage obj=rydel item=0 page=script/quest/Q418_PathToAnArtisan/31956-01.htm
   S ActionFailed
   S ActionFailed
-# The page on screen does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
+bypass Quest Q418_PathToAnArtisan 31956-02.htm
+  S NpcHtmlMessage obj=rydel item=0 page=script/quest/Q418_PathToAnArtisan/31956-02.htm
+  S ActionFailed
+bypass Quest Q418_PathToAnArtisan 31956-03.htm
+  S NpcHtmlMessage obj=rydel item=0 page=script/quest/Q418_PathToAnArtisan/31956-03.htm
+  S ActionFailed
 bypass Quest Q418_PathToAnArtisan 31956-04.htm
-  rejected
+  S SystemMessage id=302 3:1633
+  S SystemMessage id=302 3:1634
+  S SystemMessage id=302 3:1641
+  S SystemMessage id=54 3:1635
+  S SystemMessage id=95 1:3200 1:3490
+  S SocialAction obj=player action=3
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rydel item=0 page=script/quest/Q418_PathToAnArtisan/31956-04.htm
+  S ActionFailed
+  Q delete-quest Q418_PathToAnArtisan

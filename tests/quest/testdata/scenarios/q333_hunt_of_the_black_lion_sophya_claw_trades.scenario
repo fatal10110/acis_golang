@@ -1,0 +1,177 @@
+# Q333: ten claws for an eye and a prize: with 5 to 8 eyes the page is 30735-18b (one eye more, prize by roll of 100: healing 25,
+# soulshots 200, escape 20, swift attack 3), with 9 eyes 19b (no eye, healing 50, soulshots 400, escape 30, swift 4).
+character Mercenary 25
+quest Q333_HuntOfTheBlackLion <cond>=1 <state>=STARTED state=0
+hold 1369 1
+hold 3671 1
+hold 3675 80
+hold 3676 5
+script quest.Q333_HuntOfTheBlackLion
+item 57 735 736 1061 1369 1463 2510 3440 3441 3442 3443 3444 3445 3446 3447 3448 3449 3450 3451 3452 3453 3454 3455 3456 3457 3458 3459 3460 3461 3462 3463 3464 3465 3466 3671 3672 3673 3674 3675 3676 3677 3848 3849 3850 3851
+page default/30735.htm
+page default/30736.htm
+page trainer/30471.htm
+page default/30130.htm
+page default/30531.htm
+page default/30737.htm
+page script/quest/Q333_HuntOfTheBlackLion/
+npc sophya 30735 Folk 10 0 0
+npc redfoot 30736 Folk 20 0 0
+npc rupio 30471 Trainer 30 0 0
+npc undrias 30130 Folk -10 0 0
+npc lockirin 30531 Folk -20 0 0
+npc morgan 30737 Folk -30 0 0
+
+action sophya
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=54 3:3676
+  S SystemMessage id=53 3:1061 6:25
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-18b.htm
+  S ActionFailed
+  random 0
+  items 1061=25
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=54 3:3676
+  S SystemMessage id=53 3:1463 6:200
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-18b.htm
+  S ActionFailed
+  random 25
+  items 1463=200
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=54 3:3676
+  S SystemMessage id=53 3:736 6:20
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-18b.htm
+  S ActionFailed
+  random 50
+  items 736=20
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=54 3:3676
+  S SystemMessage id=53 3:735 6:3
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-18b.htm
+  S ActionFailed
+  random 75
+  items 735=3
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=53 3:1061 6:50
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-19b.htm
+  S ActionFailed
+  random 0
+  items 1061=75
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=53 3:1463 6:400
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-19b.htm
+  S ActionFailed
+  random 25
+  items 1463=600
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=53 3:736 6:30
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-19b.htm
+  S ActionFailed
+  random 50
+  items 736=50
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+action sophya
+  S ActionFailed
+  S NpcHtmlMessage obj=sophya item=0 page=default/30735.htm
+  S ActionFailed
+bypass npc_{sophya}_Quest
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q333_HuntOfTheBlackLion 30735-16.htm
+  S SystemMessage id=301 3:3675 6:10
+  S SystemMessage id=53 3:735 6:4
+  S NpcHtmlMessage obj=sophya item=0 page=script/quest/Q333_HuntOfTheBlackLion/30735-19b.htm
+  S ActionFailed
+  random 75
+  items 735=7

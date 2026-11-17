@@ -1,0 +1,20 @@
+# Q260: Rayen sends an elf below level 6 away (30221-01).
+character Hunter 5
+class 18
+script quest.Q260_HuntTheOrcs
+item 1114 1115 5789
+page guard/30221.htm
+page script/quest/Q260_HuntTheOrcs/
+npc rayen 30221 Guard 10 0 0
+
+action rayen
+action rayen
+  S ActionFailed
+  S NpcHtmlMessage obj=rayen item=0 page=guard/30221.htm
+  S ActionFailed
+bypass npc_{rayen}_Quest
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q260_HuntTheOrcs CREATED
+  rows Q260_HuntTheOrcs -

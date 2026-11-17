@@ -1,0 +1,38 @@
+# Q257: a werewolf's fang drops with 20% (20342), 40% (20343) and 50% (20132); the draw just under the
+# chance drops it, the draw at the chance does not.
+character Guardsman 6
+script quest.Q257_TheGuardIsBusy
+item 1084 752 1085 1086 5789
+page guard/30039.htm
+page script/quest/Q257_TheGuardIsBusy/
+npc gilbert 30039 Guard 10 0 0
+npc w1 20342 Monster 40 0 0
+npc w2 20343 Monster 0 40 0
+npc w3 20132 Monster -40 0 0
+quest Q257_TheGuardIsBusy <cond>=1 <state>=STARTED
+hold 1084 1
+
+kill w1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1086
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 199999
+kill w1
+  S SystemMessage id=95 1:0 1:0
+  random 200000
+kill w2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1086
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 399999
+kill w2
+  S SystemMessage id=95 1:0 1:0
+  random 400000
+kill w3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1086
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  random 499999
+kill w3
+  S SystemMessage id=95 1:0 1:0
+  random 500000

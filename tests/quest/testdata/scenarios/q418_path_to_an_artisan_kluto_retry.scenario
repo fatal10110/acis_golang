@@ -50,6 +50,3 @@ bypass Quest Q418_PathToAnArtisan 30317-07.htm
   S NpcHtmlMessage obj=kluto item=0 page=script/quest/Q418_PathToAnArtisan/30317-07.htm
   S ActionFailed
   Q upsert Q418_PathToAnArtisan | <cond> | 4
-# The page on screen does not offer this link, so the server drops it; the full chain that reaches it is tracked by #5081.
-bypass Quest Q418_PathToAnArtisan 30317-12.htm
-  rejected

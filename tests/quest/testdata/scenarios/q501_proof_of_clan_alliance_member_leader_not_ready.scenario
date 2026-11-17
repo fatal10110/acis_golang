@@ -1,0 +1,33 @@
+# Q501: a member at the statue while the leader is not at cond 2 gets 30757-06, and at Kalis, with the leader at cond 1 to 3, 30759-12.
+character Leader 40
+clan 3
+mate Member 40 online
+quest Q501_ProofOfClanAlliance <cond>=1 <state>=STARTED
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page default/30757.htm
+page default/30759.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+npc statue 30757 Folk 20 0 0
+npc kalis 30759 Folk 30 0 0
+
+as Member action statue
+as Member action statue
+  S ActionFailed
+  S NpcHtmlMessage obj=statue item=0 page=default/30757.htm
+  S ActionFailed
+as Member bypass npc_{statue}_Quest
+  S NpcHtmlMessage obj=statue item=0 page=script/quest/Q501_ProofOfClanAlliance/30757-06.htm
+  S ActionFailed
+  S ActionFailed
+as Member action kalis
+as Member action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+as Member bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q501_ProofOfClanAlliance/30759-12.htm
+  S ActionFailed
+  S ActionFailed
