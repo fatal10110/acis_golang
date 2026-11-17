@@ -152,8 +152,8 @@ func (s *Service) ClanOf(c *player.Character) (*Clan, bool) {
 
 // RestoreMembership settles c's clan state as its row is loaded at
 // selection: a clan that no longer exists, or no longer lists c, leaves it
-// clanless; a penalty already over is cleared; the pledge class follows
-// the clan.
+// clanless, in its row too; a penalty already over is cleared; the pledge class
+// follows the clan.
 func (s *Service) RestoreMembership(c *player.Character, now time.Time) {
 	nowMs := now.UnixMilli()
 	if c.ClanJoinExpiryTime() < nowMs {
@@ -163,14 +163,26 @@ func (s *Service) RestoreMembership(c *player.Character, now time.Time) {
 		c.SetClanCreateExpiryTime(0)
 	}
 	cl, ok := s.table.Get(c.ClanID())
-	if !ok {
-		c.SetClanID(0)
+	if !ok || !cl.IsMember(c.ID) {
+		s.leaveStaleClan(c)
+	}
+	if ok {
+		c.SetPledgeClass(s.pledgeClass(c))
+	}
+}
+
+// leaveStaleClan leaves c, found out of the clan its row names, clanless.
+// The row is cleared on c's lane, ahead of every save of the session: the
+// saves store the title and clan penalties only while the row names the
+// clan the character is in.
+func (s *Service) leaveStaleClan(c *player.Character) {
+	stale := c.ClanID()
+	c.SetClanID(0)
+	if stale == 0 {
 		return
 	}
-	if !cl.IsMember(c.ID) {
-		c.SetClanID(0)
-	}
-	c.SetPledgeClass(s.pledgeClass(c))
+	id := c.ID
+	s.write(id, "clear stale clan id", func(ctx context.Context, st Store) error { return st.ClearClanID(ctx, id, stale) })
 }
 
 // pledgeClass computes c's clan rank from its current clan membership,
