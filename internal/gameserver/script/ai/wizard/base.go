@@ -165,7 +165,7 @@ func BaseHooks() script.Hooks {
 // the hook returns before it.
 func attacked(s *script.Script, e script.Attacked) bool {
 	n, attacker := e.NPC, e.Attacker
-	if n.IntParam("CreviceOfDiminsion") != 0 && !n.InSpawnTerritory(attacker) {
+	if n.SpawnIntParam("CreviceOfDiminsion") != 0 && !n.InSpawnTerritory(attacker) {
 		n.StopHate(attacker)
 		return false
 	}

@@ -1060,16 +1060,17 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 		t.Fatal("IsSpoiler(42) = false after a losing Mark, want true")
 	}
 
-	pool.Add(100, 3)
-	pool.Add(100, 2)
-	pool.Add(200, 1)
+	pool.Put(100, 3)
+	pool.Put(200, 1)
+	pool.Put(100, 2)
 
 	if !pool.Sweepable() {
-		t.Fatal("Sweepable() = false after Add, want true")
+		t.Fatal("Sweepable() = false after Put, want true")
 	}
 
 	got := pool.Sweep()
-	want := []SpoilItem{{ItemID: 100, Count: 5}, {ItemID: 200, Count: 1}}
+	// A second put of 100 replaces its amount and keeps its place.
+	want := []SpoilItem{{ItemID: 100, Count: 2}, {ItemID: 200, Count: 1}}
 	if !slices.Equal(got, want) {
 		t.Fatalf("Sweep() = %v, want %v", got, want)
 	}
@@ -1122,7 +1123,7 @@ func TestSpoilPoolSweepOrder(t *testing.T) {
 		var pool SpoilPool
 		pool.Mark(1)
 		for _, id := range tc.added {
-			pool.Add(id, 1)
+			pool.Put(id, 1)
 		}
 		var got []int32
 		for _, swept := range pool.Sweep() {

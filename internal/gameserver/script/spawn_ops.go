@@ -58,16 +58,17 @@ func (s *Spawner) SetRespawnDelay(n *NPC, seconds int32) {
 // are 0 or unset, and always for a private or a standalone spawn, whose
 // spawn sets none. A value that is not an int panics.
 func (n *NPC) FleeLocation() (Loc, bool) {
-	x, y, z := n.spawnInt("flee_x"), n.spawnInt("flee_y"), n.spawnInt("flee_z")
+	x, y, z := n.SpawnIntParam("flee_x"), n.SpawnIntParam("flee_y"), n.SpawnIntParam("flee_z")
 	if x == 0 && y == 0 && z == 0 {
 		return Loc{}, false
 	}
 	return Loc{X: x, Y: y, Z: z}, true
 }
 
-// spawnInt returns the int AI parameter name the NPC's spawn sets, 0 when
-// unset. A value that is not an int panics.
-func (n *NPC) spawnInt(name string) int {
+// SpawnIntParam returns the int AI parameter name the NPC's spawn sets, 0
+// when unset; unlike IntParam, its template's never consulted. A value that
+// is not an int panics.
+func (n *NPC) SpawnIntParam(name string) int {
 	var (
 		v  string
 		ok bool

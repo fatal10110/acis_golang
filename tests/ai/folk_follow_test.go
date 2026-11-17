@@ -11,10 +11,10 @@ import (
 )
 
 // TestFolkFollowStepGatesItsTarget pins the civilian NPC's follow step
-// (NpcAI.thinkFollow), run from the periodic AI cycle: a follower more than
-// 150 from its target takes up the run stance and, on a roll over 50 of
-// every second cycle, walks toward a point near it; one within 150 holds
-// still; a follow whose target plays dead (alike dead) is dropped by desire
+// (NpcAI.thinkFollow), run from the periodic AI cycle: a follower 150 or
+// more from its target takes up the run stance and, on a roll over 50 of
+// every second cycle, walks toward a point near it; one nearer than 150
+// holds still; a follow whose target plays dead (alike dead) is dropped by desire
 // selection before it steps, whatever the distance.
 func TestFolkFollowStepGatesItsTarget(t *testing.T) {
 	t.Parallel()
@@ -26,6 +26,7 @@ func TestFolkFollowStepGatesItsTarget(t *testing.T) {
 		wantMoves bool
 	}{
 		{"far target is followed", 400, false, true},
+		{"target exactly at the radius is followed", 150, false, true},
 		{"target within the radius holds the follower", 149, false, false},
 		{"far target playing dead is dropped", 400, true, false},
 	} {
