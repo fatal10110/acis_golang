@@ -176,6 +176,23 @@ type Spelled struct {
 type Start struct {
 	Ctx    context.Context
 	Server Server
+
+	// offload hands work to the schedule's offload goroutine; nil for a
+	// Start no schedule made.
+	offload func(func(ctx context.Context))
+}
+
+// Offload hands fn, the start's database work, to the schedule's own
+// goroutine and returns at once: the schedule's queue runs every task and
+// must not wait on the database. fn runs after the work earlier starts
+// offloaded, with Ctx; once the schedule stops, work not yet started is
+// dropped. A Start no schedule made runs fn at once.
+func (e Start) Offload(fn func(ctx context.Context)) {
+	if e.offload == nil {
+		fn(e.Ctx)
+		return
+	}
+	e.offload(fn)
 }
 
 // StaticObjectClanAttacked: a door, attacked by Attacker, called the NPC

@@ -3,7 +3,10 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+
+	"github.com/go-sql-driver/mysql"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 )
@@ -46,7 +49,8 @@ func (s *QuestStore) ListByOwner(ctx context.Context, ownerID int32) ([]questlog
 }
 
 // ApplyJournal runs ownerID's journal writes, in order, in one transaction:
-// either every write lands or none does.
+// either every write lands or none does. A write the database refuses for
+// its data, and a write of no known kind, fail with questlog.ErrRejected.
 func (s *QuestStore) ApplyJournal(ctx context.Context, ownerID int32, writes []questlog.Write) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -67,7 +71,10 @@ func (s *QuestStore) ApplyJournal(ctx context.Context, ownerID int32, writes []q
 		case questlog.OpComplete:
 			_, err = tx.ExecContext(ctx, `DELETE FROM character_quests WHERE charId=? AND name=? AND var<>'<state>'`, ownerID, w.Quest)
 		default:
-			err = fmt.Errorf("unknown journal write %d", w.Op)
+			err = fmt.Errorf("unknown journal write %d: %w", w.Op, questlog.ErrRejected)
+		}
+		if refusedData(err) {
+			err = fmt.Errorf("%w: %w", questlog.ErrRejected, err)
 		}
 		if err != nil {
 			return fmt.Errorf("write quest %s for owner %d: %w", w.Quest, ownerID, err)
@@ -77,4 +84,24 @@ func (s *QuestStore) ApplyJournal(ctx context.Context, ownerID int32, writes []q
 		return fmt.Errorf("write quests for owner %d: %w", ownerID, err)
 	}
 	return nil
+}
+
+// refusedData reports whether err is the database refusing a statement for
+// the data it carries (a value too long or of the wrong kind for its
+// column), which the same statement meets again on every retry.
+func refusedData(err error) bool {
+	var me *mysql.MySQLError
+	if !errors.As(err, &me) {
+		return false
+	}
+	switch me.Number {
+	case 1048, // column cannot be null
+		1264, // value out of range
+		1265, // data truncated
+		1292, // incorrect value
+		1366, // incorrect string value
+		1406: // data too long
+		return true
+	}
+	return false
 }

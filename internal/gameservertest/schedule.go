@@ -18,15 +18,15 @@ func WithScheduledTasks(start time.Time) Option {
 }
 
 // startSchedule starts the runner WithScheduledTasks asks for against gcl,
-// returning its clock; nil without it.
-func startSchedule(t *testing.T, o *options, scripts *script.Registry, gcl *network.GameClientLink) *sim.Inline {
+// returning its clock and itself; nil without it.
+func startSchedule(t *testing.T, o *options, scripts *script.Registry, gcl *network.GameClientLink) (*sim.Inline, *script.Schedule) {
 	t.Helper()
 	if o.scheduleStart.IsZero() {
-		return nil
+		return nil, nil
 	}
 	clock := sim.NewInline(o.scheduleStart)
 	sch := script.StartSchedule(scripts, clock.NewQueue("script-schedule"), gcl)
 	cleanup(t, sch.Stop)
 	clock.Run()
-	return clock
+	return clock, sch
 }

@@ -16,14 +16,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
-// JournalWriteTimeout bounds one drain of a player's journal writes.
+// JournalWriteTimeout bounds one store call of a drain of a player's journal
+// writes.
 const JournalWriteTimeout = 2 * time.Second
 
 // errJournalUnwritten reports a sealed journal whose writes did not all land.
 var errJournalUnwritten = errors.New("quest journal writes not applied")
 
 // JournalStore applies a player's journal writes to character_quests, in
-// order, in one transaction.
+// order, in one transaction. A write the database refuses for its data
+// fails the call with questlog.ErrRejected.
 type JournalStore interface {
 	ApplyJournal(ctx context.Context, ownerID int32, writes []questlog.Write) error
 }
@@ -228,17 +230,50 @@ func (q *Quests) schedule(ownerID int32, j *questlog.Journal) {
 // with nothing owed is forgotten.
 func (q *Quests) drain(ownerID int32, j *questlog.Journal) error {
 	if writes := j.TakePending(); len(writes) > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), JournalWriteTimeout)
-		err := q.store.ApplyJournal(ctx, ownerID, writes)
-		cancel()
-		j.Applied(writes, err == nil)
+		left, err := q.apply(ownerID, writes)
+		j.Applied(left, err == nil)
 		if err != nil {
-			q.log.Error().Err(err).Int32("object_id", ownerID).Int("writes", len(writes)).Msg("write quest journal")
+			q.log.Error().Err(err).Int32("object_id", ownerID).Int("writes", len(left)).Msg("write quest journal")
 			return err
 		}
 	}
 	q.forget(ownerID, j)
 	return nil
+}
+
+// apply applies writes and returns those still owed: none once they have
+// landed, and from the first write a failure the database may recover from
+// stopped. A batch the database refused for its data is applied again one
+// write at a time, so only the refused write is dropped, with a log, and
+// the writes around it land in order.
+func (q *Quests) apply(ownerID int32, writes []questlog.Write) ([]questlog.Write, error) {
+	err := q.applyBatch(ownerID, writes)
+	if !errors.Is(err, questlog.ErrRejected) {
+		if err != nil {
+			return writes, err
+		}
+		return nil, nil
+	}
+	for i := range writes {
+		err := q.applyBatch(ownerID, writes[i:i+1])
+		switch {
+		case err == nil:
+		case errors.Is(err, questlog.ErrRejected):
+			q.log.Error().Err(err).Int32("object_id", ownerID).Str("quest", writes[i].Quest).
+				Str("var", writes[i].Var).Msg("quest journal write rejected, dropped")
+		default:
+			return writes[i:], err
+		}
+	}
+	return nil, nil
+}
+
+// applyBatch applies writes in one store call bounded by
+// JournalWriteTimeout.
+func (q *Quests) applyBatch(ownerID int32, writes []questlog.Write) error {
+	ctx, cancel := context.WithTimeout(context.Background(), JournalWriteTimeout)
+	defer cancel()
+	return q.store.ApplyJournal(ctx, ownerID, writes)
 }
 
 // forget drops j from the sealed journals once it owes nothing.
