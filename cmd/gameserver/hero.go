@@ -11,24 +11,22 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
 
-// defaultHeroMinMatches is the number of Olympiad matches a noble needs to
-// be elected hero when events.properties does not set one.
-const defaultHeroMinMatches = 5
-
 // loadHeroMinMatches reads OlyMinMatchesToBeClassed from events.properties:
-// the matches a noble needs to be elected hero.
+// the matches a noble needs to be elected hero, by default the Olympiad's
+// own default.
 func loadHeroMinMatches(paths gameServerPaths) (int, error) {
 	props, err := config.LoadFile(paths.EventsConfigPath)
 	if err != nil {
 		return 0, err
 	}
 	f := config.NewFields(props, "events")
-	n := f.Int("OlyMinMatchesToBeClassed", defaultHeroMinMatches)
+	n := f.Int("OlyMinMatchesToBeClassed", olympiad.DefaultConfig().MinMatches)
 	return n, f.Err()
 }
 

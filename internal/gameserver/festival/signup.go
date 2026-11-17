@@ -14,10 +14,6 @@ var maxLevels = [Count]int{31, 42, 53, 64, 80}
 // The seal stones a signup is paid in, and what each adds to the
 // festival's bonus.
 const (
-	blueStoneID  = 6360
-	greenStoneID = 6361
-	redStoneID   = 6362
-
 	blueStoneBonus  = 3
 	greenStoneBonus = 5
 	redStoneBonus   = 10
@@ -76,12 +72,12 @@ func (m *Manager) signUp(g Guide, t GuideTalker, command string) GuideReply {
 	var stoneID int32
 	var needed, bonus int
 	switch stone {
-	case blueStoneID:
-		stoneID, needed, bonus = blueStoneID, g.Blue, blueStoneBonus
-	case greenStoneID:
-		stoneID, needed, bonus = greenStoneID, g.Green, greenStoneBonus
-	case redStoneID:
-		stoneID, needed, bonus = redStoneID, g.Red, redStoneBonus
+	case int(sevensigns.BlueStoneID):
+		stoneID, needed, bonus = sevensigns.BlueStoneID, g.Blue, blueStoneBonus
+	case int(sevensigns.GreenStoneID):
+		stoneID, needed, bonus = sevensigns.GreenStoneID, g.Green, greenStoneBonus
+	case int(sevensigns.RedStoneID):
+		stoneID, needed, bonus = sevensigns.RedStoneID, g.Red, redStoneBonus
 	default:
 		return GuideReply{NotEnoughItems: true}
 	}

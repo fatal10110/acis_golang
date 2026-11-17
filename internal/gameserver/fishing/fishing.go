@@ -70,6 +70,12 @@ func LureGroup(lureID int32) int {
 	return GroupNormal
 }
 
+// PrizeLure reports whether lureID is a prize-winning lure, which can make
+// a fishing championship catch up to 3 longer.
+func PrizeLure(lureID int32) bool {
+	return lureID >= 8484 && lureID <= 8486
+}
+
 // NightLure reports whether lureID only gets bites at night.
 func NightLure(lureID int32) bool {
 	return (lureID >= 8505 && lureID <= 8513) || lureID == 8485
@@ -184,7 +190,7 @@ func CheckDelay(lureID int32, gutsCheckTime int) time.Duration {
 	case lureID == 6519 || lureID == 6522 || lureID == 6525 || lureID == 8505 || lureID == 8508 || lureID == 8511:
 		scale = 1.33
 	case lureID == 6520 || lureID == 6523 || lureID == 6526 || (lureID >= 8505 && lureID <= 8513) ||
-		(lureID >= 7610 && lureID <= 7613) || (lureID >= 7807 && lureID <= 7809) || (lureID >= 8484 && lureID <= 8486):
+		(lureID >= 7610 && lureID <= 7613) || (lureID >= 7807 && lureID <= 7809) || PrizeLure(lureID):
 		scale = 1.00
 	case lureID == 6521 || lureID == 6524 || lureID == 6527:
 		scale = 0.66

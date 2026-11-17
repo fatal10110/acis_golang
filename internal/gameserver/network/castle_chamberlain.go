@@ -21,11 +21,10 @@ import (
 // hand over.
 const (
 	chamberlainPages = "data/html/chamberlain/"
-	// certificateBundle certificates of certificateItemID sell together,
+	// certificateBundle certificates of approval sell together,
 	// at certificatePrice adena each.
 	certificateBundle = 10
 	certificatePrice  = 1000
-	certificateItemID = 6388
 	lordCrownItemID   = 6841
 	// castleBanishOffset is the random offset of a player thrown out of a
 	// castle's grounds.
@@ -456,7 +455,7 @@ func (d chamberlainDialog) certificates(buy bool) {
 		case !buy:
 			file = "sell-dawn-ticket.htm"
 		case reduceAdena(d.live, certificateBundle*certificatePrice):
-			d.live.AddCreatedItem(certificateItemID, certificateBundle, d.l.nextObjectID)
+			d.live.AddCreatedItem(sevensigns.CertificateOfApprovalID, certificateBundle, d.l.nextObjectID)
 			file, left = "sell-dawn-ticket.htm", d.c.TakeCertificates(certificateBundle)
 		default:
 			file = "not-enough-adena.htm"
