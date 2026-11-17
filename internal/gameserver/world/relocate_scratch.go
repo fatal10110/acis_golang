@@ -11,6 +11,14 @@ type RelocateScratch struct {
 	notifications []visibilityNotification
 }
 
+// A crossing keeps its notification buffer for the next one unless the
+// buffer holds more than relocateScratchKeep entries and more than
+// relocateScratchSlack times what the crossing used.
+const (
+	relocateScratchKeep  = 256
+	relocateScratchSlack = 4
+)
+
 // relocateScratch exposes the embedded buffer to relocate, mirroring how
 // Presence.presence() exposes Presence to State.
 func (s *RelocateScratch) relocateScratch() *RelocateScratch { return s }
