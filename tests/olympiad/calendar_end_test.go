@@ -81,7 +81,7 @@ func TestOlympiadEndRunsAtTheMonthEnd(t *testing.T) {
 	if got := o.Period(); got != olympiad.Validation {
 		t.Fatalf("period after the end = %v, want Validation", got)
 	}
-	if err := worker.Flush(ctx, 0); err != nil {
+	if err := worker.Flush(ctx, persist.ServiceOwner); err != nil {
 		t.Fatal(err)
 	}
 	var points int
@@ -130,7 +130,7 @@ func TestOlympiadEndRunsAtTheMonthEnd(t *testing.T) {
 	if _, ok := o.Noble(1002); ok {
 		t.Fatal("the new cycle kept a held record")
 	}
-	if err := worker.Flush(ctx, 0); err != nil {
+	if err := worker.Flush(ctx, persist.ServiceOwner); err != nil {
 		t.Fatal(err)
 	}
 	if got := countRows(t, db, "olympiad_nobles"); got != 0 {

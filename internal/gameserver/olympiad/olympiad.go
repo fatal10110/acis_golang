@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
@@ -35,9 +36,9 @@ const TaskTimeout = 10 * time.Second
 
 // writeLane is the persistence owner every Olympiad write is queued under:
 // one lane keeps the writes in the order the calendar made them, so a
-// truncate never lands after the records saved behind it. No character,
-// item or clan has object id 0.
-const writeLane int32 = 0
+// truncate never lands after the records saved behind it, and no player's
+// saves wait behind them.
+const writeLane = persist.ServiceOwner
 
 // Period is the part of the calendar the Olympiad is in.
 type Period int

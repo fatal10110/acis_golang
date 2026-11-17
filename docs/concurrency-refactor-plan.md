@@ -231,8 +231,12 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
   `ItemInstanceTaskManager` on a 60 s tick and once at shutdown, so a crash loses up to a minute of
   item changes there; the Go container flush at logout lands sooner than that.
 - **Operator knobs** and how they add up (constants, not config today):
-  - `persist.Lanes` = 4: lanes shared by every owner; one slow job holds the owners hashed to its
-    lane.
+  - `persist.Lanes` = 5: four lanes shared by the owners (characters, items, clans, pets, lists,
+    by id modulo 4), where one slow job holds the owners hashed to its lane, plus one lane for the
+    game-wide services alone (`persist.ServiceOwner`: Olympiad, heroes, raid points, lottery,
+    fishing championship, cursed weapons, castle manor, spawn state). The services share that one
+    lane so their writes land in the order they were made (a hero election after the nobles save
+    queued before it), and a slow service write holds no player's saves or selection.
   - Per-job budgets on the same lanes (each started when the job runs, not when it was queued):
     - `livePlayerDetachSaveTimeout` = 2 s (`network/lifecycle.go`): detach save, container
       flush, pets row on unsummon/logout/rename, shortcut rows, and single-item writes
