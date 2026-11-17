@@ -111,11 +111,15 @@ func (r *l2offReader) multilayer(region *block.RegionBuilder, blockIndex int) er
 	var counts [block.CellCount]uint8
 	cells := make([]uint16, 0, block.CellCount)
 	for cell := range counts {
-		count, ok := r.u16()
+		raw, ok := r.u16()
 		if !ok {
 			return shortL2OFF(blockIndex, "layer count", r.pos)
 		}
-		if count == 0 || count > block.MaxLayers {
+		// The count is stored in two bytes but only the low byte counts, as
+		// a signed byte: 0x0105 is five layers, 0x0080-0x00ff are negative
+		// and rejected.
+		count := int(int8(raw))
+		if count <= 0 || count > block.MaxLayers {
 			return fmt.Errorf("geo/reader: block %d cell %d: invalid layer count %d", blockIndex, cell, count)
 		}
 
@@ -125,7 +129,7 @@ func (r *l2offReader) multilayer(region *block.RegionBuilder, blockIndex int) er
 		// them ordered lowest to highest, so reverse them into place as
 		// they're read.
 		start := len(cells)
-		for layer := 0; layer < int(count); layer++ {
+		for layer := 0; layer < count; layer++ {
 			code, ok := r.u16()
 			if !ok {
 				return shortL2OFF(blockIndex, "layer data", r.pos)
