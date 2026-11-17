@@ -44,7 +44,7 @@ func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.
 		return nil, err
 	}
 	objs.SetStrife(sevenSigns)
-	doorHooks.SetHook(objs.ToggleDoor)
+	doorHooks.SetHook(objs.SetDoorOpen)
 	return objs, nil
 }
 

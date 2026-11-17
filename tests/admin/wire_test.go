@@ -59,7 +59,9 @@ func shippedAdminPages(t *testing.T, names ...string) map[string]string {
 
 // bootAdmin boots one character, "Admin", at the given access level with
 // the shipped admin tables and panel pages, and returns the server and the
-// character's object id. The character is not in the world yet.
+// character's object id. The character is not in the world yet. Characters
+// opts seed come after "Admin" on the account; "Admin" stays in the slot
+// enterWorld selects.
 func bootAdmin(t *testing.T, level int, opts ...gameservertest.Option) (*gameservertest.Server, int32) {
 	t.Helper()
 	opts = append([]gameservertest.Option{
@@ -72,7 +74,14 @@ func bootAdmin(t *testing.T, level int, opts ...gameservertest.Option) (*gameser
 		gameservertest.WithReuseDelays(3*time.Second, 0),
 	}, opts...)
 	srv := gameservertest.Boot(t, opts...)
-	objID := srv.SoleObjectID(t)
+	chars, err := srv.Chars.ListByAccount(context.Background(), srv.Account())
+	if err != nil {
+		t.Fatalf("list characters: %v", err)
+	}
+	if len(chars) == 0 || chars[0].CharacterName() != "Admin" {
+		t.Fatalf("account characters %v, want Admin in the first slot", chars)
+	}
+	objID := chars[0].ID
 	setAccessLevel(t, srv, objID, level)
 	return srv, objID
 }

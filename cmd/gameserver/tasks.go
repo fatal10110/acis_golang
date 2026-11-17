@@ -351,28 +351,26 @@ func provideRespawnTask() (*task.Respawn, *npcRespawnEffects, error) {
 	return r, effects, err
 }
 
-// doorTimerEffects flips one door's open state once its scheduled auto
-// open/close deadline elapses. Like npcRespawnEffects, its real resolution
-// (manager.WorldObjects.ToggleDoor) is wired in after construction, since
+// doorTimerEffects applies one door's scheduled auto open/close change once
+// its deadline elapses. Like npcRespawnEffects, its real resolution
+// (manager.WorldObjects.SetDoorOpen) is wired in after construction, since
 // WorldObjects itself needs *task.Door to schedule door timers in the first
 // place.
 type doorTimerEffects struct {
 	mu   sync.RWMutex
-	hook func(id int)
+	hook func(id int, open bool) bool
 }
 
-func (e *doorTimerEffects) ToggleDoor(id int) {
+func (e *doorTimerEffects) SetDoorOpen(id int, open bool) bool {
 	e.mu.RLock()
 	hook := e.hook
 	e.mu.RUnlock()
-	if hook != nil {
-		hook(id)
-	}
+	return hook != nil && hook(id, open)
 }
 
-// SetHook records the callback that flips a due door's open state. Call it
+// SetHook records the callback that applies a due door change. Call it
 // once, before fx starts the door-timer ticker.
-func (e *doorTimerEffects) SetHook(f func(id int)) {
+func (e *doorTimerEffects) SetHook(f func(id int, open bool) bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.hook = f

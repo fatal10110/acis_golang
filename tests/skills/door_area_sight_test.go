@@ -217,7 +217,7 @@ func spawnDoorOn(t *testing.T, eng *engine.Engine, tmpl *door.Template) *door.Ob
 
 type idleDoorToggle struct{}
 
-func (idleDoorToggle) ToggleDoor(int) {}
+func (idleDoorToggle) SetDoorOpen(int, bool) bool { return false }
 
 type doorIDs struct{ next int32 }
 

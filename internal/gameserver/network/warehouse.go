@@ -448,10 +448,11 @@ func storeMoves(rows []clientpackets.ItemRequest) []invops.Move {
 }
 
 // restoreStorage builds c's warehouse and freight from rows, its restored
-// item rows, and reads the account's other characters with the freight of
-// each. A character whose saves cannot be waited for, or whose rows cannot
-// be read, gets no freight: a package to it is refused this session.
-func (l *GameClientLink) restoreStorage(ctx context.Context, account string, c *player.Character, rows []*item.Instance) playerStorage {
+// item rows, and takes the account's other characters from chars, the list
+// the selection picked c from, with the freight of each. A character whose
+// saves cannot be waited for, or whose rows cannot be read, gets no freight:
+// a package to it is refused this session.
+func (l *GameClientLink) restoreStorage(ctx context.Context, chars []*player.Character, c *player.Character, rows []*item.Instance) playerStorage {
 	st := playerStorage{
 		warehouse: itemcontainer.NewContainerWithPersister(c.ID, item.LocationWarehouse, l.itemTemplates, l.itemPersister(c.ID)),
 		freight:   itemcontainer.NewFreightWithPersister(c.ID, l.itemTemplates, l.itemPersister(c.ID)),
@@ -460,14 +461,6 @@ func (l *GameClientLink) restoreStorage(ctx context.Context, account string, c *
 	st.warehouse.Restore(rows)
 	st.freight.Restore(rows)
 	c.AttachWarehouse(st.warehouse)
-	if l.roster == nil || account == "" {
-		return st
-	}
-	chars, err := l.roster.List(ctx, account)
-	if err != nil {
-		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: list account characters")
-		return st
-	}
 	for _, other := range chars {
 		if other.ID == c.ID {
 			continue
@@ -511,7 +504,7 @@ func (l *GameClientLink) restoreDepositedFreight(ctx context.Context, id int32) 
 		l.log.Error().Err(err).Int32("object_id", id).Msg("enter world: wait for account character saves")
 		return nil
 	}
-	rows, err := l.belongings.items.ListByOwner(ctx, id)
+	rows, err := l.belongings.items.ListByOwnerAndLocations(ctx, id, item.LocationFreight)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", id).Msg("enter world: read account character freight")
 		return nil

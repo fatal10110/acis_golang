@@ -36,7 +36,7 @@ func TestReloadDoorsWhileTogglingKeepsGeodataInStep(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			objects.ToggleDoor(tmpl.ID)
+			objects.SetDoorOpen(tmpl.ID, false)
 		}()
 		go func() {
 			defer wg.Done()
