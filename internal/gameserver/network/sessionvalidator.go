@@ -182,6 +182,13 @@ func (v *SessionValidator) abandon(req *authRequest) {
 // definitive rejection. A transport error or a canceled ctx reports
 // (false, err) without notifying client, since no definitive answer came
 // back.
+//
+// Deliberate divergence: a login link that fails the send, drops while
+// the request waits, or stays silent past the validation timeout ends in a
+// silent close of the client. The original server instead logs the failed
+// send and leaves the client connected with no answer until the client
+// gives up; closing frees the connection slot and the account claim, and
+// the client sees the same "no answer" either way.
 func (v *SessionValidator) Validate(ctx context.Context, client *Client, req clientpackets.AuthLogin, loginLink *LoginLink) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err

@@ -53,8 +53,9 @@ func (l *GameClientLink) handleAuthLogin(ctx context.Context, cs *connState, req
 	ok, err := l.authenticate(ctx, client, req)
 	if err != nil || !ok {
 		// A rejection already answered AuthLoginFail; it also closes
-		// with ServerClose. A canceled wait or a lost login link
-		// closes silently.
+		// with ServerClose. A canceled wait, a lost login link or a
+		// login server silent past the validation timeout closes
+		// silently, a deliberate divergence documented at Validate.
 		if err == nil {
 			client.closeNow()
 		}
