@@ -15,6 +15,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 )
 
@@ -26,9 +27,9 @@ const winnerCount = 100
 
 // writeLane is the persistence owner every raid point write is queued
 // under: one lane keeps the writes in the order the points changed, so a
-// later total never lands before an earlier one. No character has object
-// id 0.
-const writeLane int32 = 0
+// later total never lands before an earlier one, and no player's saves wait
+// behind them.
+const writeLane = persist.ServiceOwner
 
 // Row is one stored character_raid_points row.
 type Row struct {

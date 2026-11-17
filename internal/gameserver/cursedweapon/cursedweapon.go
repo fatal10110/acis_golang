@@ -24,6 +24,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 )
 
@@ -43,9 +44,9 @@ const HolderKarma = 9999999
 const taskTimeout = 10 * time.Second
 
 // writeLane is the persistence lane every cursed_weapons write is queued
-// on, so they land in the order the weapons changed. No character has
-// object id 0.
-const writeLane int32 = 0
+// on, so they land in the order the weapons changed, and no player's saves
+// wait behind them.
+const writeLane = persist.ServiceOwner
 
 // Row is one stored cursed_weapons row: a held weapon's state.
 type Row struct {

@@ -18,6 +18,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 )
 
@@ -27,8 +28,8 @@ const taskTimeout = 10 * time.Second
 // writeLane is the persistence owner every hero write is queued under. It
 // is the Olympiad's lane too, so an election reads the nobles' records the
 // Olympiad saved just before it, and a later activation lands after the
-// election's own writes. No character, item or clan has object id 0.
-const writeLane int32 = 0
+// election's own writes.
+const writeLane = persist.ServiceOwner
 
 // The heroes_diary actions.
 const (

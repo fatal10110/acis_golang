@@ -188,8 +188,8 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// Enqueue reports without running it once the worker is closed.
 	//
 	// It also has a ceiling. petRestoreTimeout bounds the query, but the
-	// job first waits its turn on one of persist.Lanes lanes shared by
-	// every owner (persist.LaneIndex), and nothing bounds that wait —
+	// job first waits its turn on one of the lanes the owners share
+	// (persist.LaneIndex), and nothing bounds that wait —
 	// a burst of logout saves landing on the same lane would otherwise keep
 	// the caster in a cast long after the client's own cast bar ended,
 	// which the specified flow never does: its read has nothing queued ahead

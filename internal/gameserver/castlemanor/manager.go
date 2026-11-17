@@ -27,15 +27,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // TaskTimeout bounds one database read or write.
 const TaskTimeout = 10 * time.Second
 
-// writeLane is the persistence owner every manor save is queued under. No
-// character, item or clan has object id 0.
-const writeLane int32 = 0
+// writeLane is the persistence owner every manor save is queued under, the
+// game-wide services' own lane.
+const writeLane = persist.ServiceOwner
 
 // Status is the manor's mode.
 type Status uint8

@@ -20,6 +20,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
@@ -28,9 +29,9 @@ import (
 const TaskTimeout = 10 * time.Second
 
 // writeLane is the persistence owner every lottery write is queued under:
-// one lane keeps them in the order they were made. No character, item or
-// clan has object id 0.
-const writeLane int32 = 0
+// one lane keeps them in the order they were made, and no player's saves
+// wait behind them.
+const writeLane = persist.ServiceOwner
 
 const (
 	minuteMillis = int64(time.Minute / time.Millisecond)

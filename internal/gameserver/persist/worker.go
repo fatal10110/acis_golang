@@ -6,13 +6,26 @@ package persist
 
 import (
 	"context"
+	"math"
 	"sync"
 
 	"github.com/rs/zerolog"
 )
 
-// Lanes is how many goroutines run jobs. Every owner id maps to one lane.
-const Lanes = 4
+// Lanes is how many goroutines run jobs. Every owner id maps to one lane:
+// ServiceOwner to a lane of its own, every other id to one of the rest by
+// its value.
+const Lanes = ownerLanes + 1
+
+// ownerLanes is how many lanes the owners other than ServiceOwner share.
+const ownerLanes = 4
+
+// ServiceOwner is the owner id of the game-wide services' writes (Olympiad,
+// heroes, raid points, lottery, ...). It is the only id on its lane, so a
+// slow service write never holds a player's saves, and every service queued
+// under it lands in the order it was queued, one after another. No
+// character, item, clan or list has this id.
+const ServiceOwner int32 = math.MinInt32
 
 // Worker runs persistence jobs on a fixed set of lanes. Each lane is one
 // goroutine draining an unbounded FIFO, so Enqueue never blocks the caller.
@@ -197,7 +210,10 @@ func (w *Worker) lane(ownerID int32) *lane {
 
 // LaneIndex is the lane ownerID's jobs run on.
 func LaneIndex(ownerID int32) uint32 {
-	return uint32(ownerID) % Lanes
+	if ownerID == ServiceOwner {
+		return ownerLanes
+	}
+	return uint32(ownerID) % ownerLanes
 }
 
 func (l *lane) push(job func()) bool {

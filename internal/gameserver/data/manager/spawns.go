@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 )
 
@@ -30,8 +31,9 @@ type spawnRowQueue interface {
 }
 
 // spawnWriteLane is the persistence owner every row write is queued under,
-// so the writes of one row land in the order they were made.
-const spawnWriteLane int32 = 0
+// so the writes of one row land in the order they were made, and no
+// player's saves wait behind them.
+const spawnWriteLane = persist.ServiceOwner
 
 // SpawnRowWriteTimeout bounds one row write.
 const SpawnRowWriteTimeout = 10 * time.Second

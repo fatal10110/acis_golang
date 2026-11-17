@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -24,7 +25,7 @@ func TestHeroClaimBeforeElectionRuns(t *testing.T) {
 		`INSERT INTO olympiad_nobles VALUES (9101, 88, 50, 10, 3, 7, 0, 0)`,
 	)))
 
-	release := w.srv.HoldPersistenceLane(t, 0)
+	release := w.srv.HoldPersistenceLane(t, persist.ServiceOwner)
 	w.srv.Olympiad.SelectHeroes()
 	w.srv.Settle(t)
 	if !w.srv.Heroes.IsInactive(w.player) {

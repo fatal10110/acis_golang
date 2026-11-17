@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
@@ -26,8 +27,8 @@ import (
 const TaskTimeout = 10 * time.Second
 
 // writeLane is the persistence owner every championship save is queued
-// under. No character, item or clan has object id 0.
-const writeLane int32 = 0
+// under, the game-wide services' own lane.
+const writeLane = persist.ServiceOwner
 
 const (
 	// Places is how many fishers stand in a ranking and win a prize.
