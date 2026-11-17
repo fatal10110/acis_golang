@@ -44,7 +44,9 @@ const duelistClass = 88
 // (OlympiadManager.registerNoble and unRegisterNoble, OlympiadManager.java
 // isInCompetition): either registration is refused with
 // ALREADY_REGISTERED_ON_THE_EVENT_WAITING_LIST, the unregistration is
-// answered with nothing, and the noble stays drafted.
+// answered with YOU_HAVE_NOT_BEEN_REGISTERED_IN_A_WAITING_LIST_OF_A_GAME
+// (the draw already took the noble off the queue, and the registered check
+// precedes the in-competition one), and the noble stays drafted.
 func TestOlympiadManagerWhileDraftedIntoMatch(t *testing.T) {
 	t.Parallel()
 	duelist := gameservertest.ClassTemplate()
@@ -83,7 +85,9 @@ func TestOlympiadManagerWhileDraftedIntoMatch(t *testing.T) {
 		route  []string
 		choice string
 	}{
-		{[]string{"Chat 10", "Chat 11"}, "4"}, {[]string{"Chat 10", "Chat 12"}, "5"}, {nil, "1"},
+		// The unregistration comes first: the manager's main page, open
+		// after the two selections, is the one offering its link.
+		{nil, "1"}, {[]string{"Chat 10", "Chat 11"}, "4"}, {[]string{"Chat 10", "Chat 12"}, "5"},
 	} {
 		choice := tc.choice
 		for _, link := range tc.route {
@@ -103,7 +107,7 @@ func TestOlympiadManagerWhileDraftedIntoMatch(t *testing.T) {
 		}
 		want := []int{serverpackets.SystemMessageAlreadyRegisteredInEventWaitingList}
 		if choice == "1" {
-			want = nil
+			want = []int{serverpackets.SystemMessageNotRegisteredInGameWaitingList}
 		}
 		if !slices.Equal(ids, want) {
 			t.Fatalf("OlympiadNoble %s answered %d frames (messages %v), want messages %v", choice, len(frames), ids, want)

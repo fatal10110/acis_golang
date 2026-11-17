@@ -17,10 +17,11 @@ import (
 // an allied target or a dissolving target (RequestStartPledgeWar.java), and
 // a member without SP_CLAN_WAR starting, stopping or surrendering a war.
 //
-// Not covered here, each owned by an open issue that rewrites the
-// assertion: a full personal surrender of a mutual war
-// (TestPersonalSurrenderEndsWar asserts the target-side outcome) and the
-// alliance dissolution refreshing clans that have no alliance.
+// Not covered here: a full personal surrender of a mutual war, fixed by
+// #5324 (closing #5006), whose TestPersonalSurrenderEndsWar now asserts the
+// surrenderer's side only, as the reference does; and the alliance
+// dissolution refreshing clans that have no alliance, which only differs by
+// redundant packets and is tracked on #5007.
 
 // TestCreateAllyRefusedWhileDissolving has the leader of a clan under
 // dissolution ask for an alliance: CANNOT_CREATE_ALLY_WHILE_DISSOLVING

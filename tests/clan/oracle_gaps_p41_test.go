@@ -20,9 +20,11 @@ import (
 // Clan.java:1746-1754) and an academy sponsor request without master rights
 // (RequestPledgeSetAcademyMaster.java:36-40).
 //
-// Not covered here, each owned by an open issue that rewrites the
-// assertion: the title on join and on a noble's leave, and the timing of a
-// re-requested dissolution.
+// Not covered here, each fixed by #5201 (closing #5002, #5003, #5004) with
+// its own tests: the title on founding, joining and leaving
+// (tests/clan/found_title_test.go, title_test.go TestJoiningClanClearsTitle
+// and TestLeavingClanClearsTitle) and the timing of a re-requested
+// dissolution (internal/gameserver/clan/dissolution_timer_test.go).
 
 const fullClanID int32 = 0x7f000002
 
