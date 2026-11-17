@@ -1,10 +1,15 @@
 package questlog
 
 import (
+	"errors"
 	"maps"
 	"math"
 	"strconv"
 )
+
+// ErrRejected marks a journal write the database refused for its data: no
+// retry of the same write can land it.
+var ErrRejected = errors.New("quest journal write rejected")
 
 // Op is what one journal write does to the owner's character_quests rows.
 type Op uint8

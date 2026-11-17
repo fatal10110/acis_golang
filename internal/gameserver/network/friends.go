@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
@@ -28,13 +29,13 @@ const characterLookupTimeout = 5 * time.Second
 // code units.
 const friendSayMaxLength = 300
 
-// findCharacter looks a character up by name; a failed lookup is logged
-// and finds none.
-func (l *GameClientLink) findCharacter(name string) (relation.Named, bool) {
+// findCharacter looks a character up by name, under ctx; a failed lookup is
+// logged and finds none.
+func (l *GameClientLink) findCharacter(ctx context.Context, name string) (relation.Named, bool) {
 	if l.characters == nil {
 		return relation.Named{}, false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), characterLookupTimeout)
+	ctx, cancel := context.WithTimeout(ctx, characterLookupTimeout)
 	defer cancel()
 	ref, ok, err := l.characters.FindByName(ctx, name)
 	if err != nil {
@@ -42,6 +43,44 @@ func (l *GameClientLink) findCharacter(name string) (relation.Named, bool) {
 		return relation.Named{}, false
 	}
 	return ref, ok
+}
+
+// whenLiveNamed is whenLive for a request that may name a stored character:
+// named returns the name when the request needs that character. The lookup
+// reads the database, so it runs here, on the connection goroutine and
+// under the connection's context, and not on the player's queue, where it
+// would hold a pool worker; handle then runs on the queue with what the
+// lookup found. The loop reads no next frame until handle has run, so the
+// replies keep their order.
+func whenLiveNamed[T any](
+	named func(T) (string, bool),
+	handle func(*GameClientLink, *livePlayer, T, relation.Named, bool),
+) func(*GameClientLink, context.Context, *connState, T) error {
+	return func(l *GameClientLink, ctx context.Context, cs *connState, req T) error {
+		live := cs.live
+		if live == nil {
+			return nil
+		}
+		var ref relation.Named
+		var found bool
+		if name, ok := named(req); ok {
+			ref, found = l.findCharacter(ctx, name)
+		}
+		onLive(live, func() {
+			sim.Attribute(live.Queue(), handle)
+			handle(l, live, req, ref, found)
+		})
+		return nil
+	}
+}
+
+// friendDelName names the character every RequestFriendDel looks up.
+func friendDelName(req clientpackets.RequestFriendDel) (string, bool) { return req.Name, true }
+
+// blockName names the character a block or unblock looks up; the other
+// block commands name none.
+func blockName(req clientpackets.RequestBlock) (string, bool) {
+	return req.Name, req.Type == clientpackets.BlockAdd || req.Type == clientpackets.BlockRemove
 }
 
 // characterNames returns the stored names of ids; a failed lookup is logged
@@ -212,9 +251,8 @@ func (l *GameClientLink) handleRequestFriendList(live *livePlayer) {
 
 // handleRequestFriendDel removes the named character from live's friend
 // list, and live from its. A name that is no friend of live answers with
-// USER_NOT_IN_FRIENDS_LIST.
-func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpackets.RequestFriendDel) {
-	ref, found := l.findCharacter(req.Name)
+// USER_NOT_IN_FRIENDS_LIST. ref is the character the name finds, when found.
+func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpackets.RequestFriendDel, ref relation.Named, found bool) {
 	if !found || !l.relations.RemoveFriend(live.ObjectID(), ref.ID) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageUserNotInFriendsList))
 		return
@@ -233,10 +271,11 @@ func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpack
 // Two branches answer nothing on purpose: an unblock of a name not on the
 // block list, and a command type no command sends. Neither registers
 // a pending client action; the chat-line commands expect no reply.
-func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.RequestBlock) {
+//
+// ref is the character a block or unblock names, when found.
+func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.RequestBlock, ref relation.Named, found bool) {
 	switch req.Type {
 	case clientpackets.BlockAdd, clientpackets.BlockRemove:
-		ref, found := l.findCharacter(req.Name)
 		switch relation.CheckBlockTarget(live.ObjectID(), ref, found) {
 		case relation.BlockInvalidTarget:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToRegisterToIgnoreList))

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -207,7 +208,7 @@ func (l *GameClientLink) sendMail(live *livePlayer, list, subject, message strin
 // mailRecipient looks name up as a recipient of a mail from live.
 func (l *GameClientLink) mailRecipient(live *livePlayer, name string) bbs.Recipient {
 	r := bbs.Recipient{Name: name}
-	ref, found := l.findCharacter(name)
+	ref, found := l.findCharacter(context.Background(), name)
 	if !found {
 		return r
 	}
