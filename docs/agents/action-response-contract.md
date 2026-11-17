@@ -44,14 +44,14 @@ Two traps:
 
 ## Verifying it
 
-- Rejection branches: `silent_action_test.go` is the guardrail. Every case there sends a request built
+- Rejection branches: `internal/gameserver/network/silent_action_test.go` is the guardrail. Every case there sends a request built
   to be rejected and asserts at least one frame comes back. Extend it when adding an action-shaped
   opcode or rejection branch.
 - Success paths: `silent_action_test.go` cannot help — it only probes rejections. Assert the release in
-  the flow's own success-path test, in packet order. See
-  `internal/gameserver/network/pickup_test.go` (`TestGameClientLinkPickupGroundItemFullClientFlow`,
-  `TestGameClientLinkPickupAdenaMergeFullClientFlow`) and the owned-summon case in `pet_test.go`
-  (`TestHandleTargetActionShowsPetStatusForOwnerPet`).
+  the flow's own success-path test, in packet order. See `tests/items/pickup_drop_test.go`
+  (`TestDropGroundItemRoundTrip`: the in-range pickup answers `ActionFailed`, then `GetItem`, then the
+  adena merge message) and the owned-summon case in `tests/pets/summon_damage_test.go`
+  (`TestOwnerSecondClickOnItsPetOpensTheStatusWindow`).
 
 A handler that answers rejections correctly can still freeze a live client on success, and every gate in
 the repository can be green while it does. Tests that only read opcodes will not notice; the symptom

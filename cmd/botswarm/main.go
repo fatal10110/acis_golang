@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
 	"strings"
@@ -52,6 +53,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	if *serverID > 255 {
 		fmt.Fprintln(stderr, "botswarm: -server must be 0-255")
+		return 2
+	}
+	if *revision < math.MinInt32 || *revision > math.MaxInt32 {
+		fmt.Fprintln(stderr, "botswarm: -revision must fit in 32 bits")
+		return 2
+	}
+	if *moveRadius < 0 || *moveRadius > math.MaxInt32 {
+		fmt.Fprintf(stderr, "botswarm: -move-radius must be 0-%d\n", math.MaxInt32)
 		return 2
 	}
 	cfg.ServerID, cfg.Revision, cfg.MoveRadius = byte(*serverID), int32(*revision), int32(*moveRadius)

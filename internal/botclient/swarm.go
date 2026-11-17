@@ -89,6 +89,10 @@ func (c *Config) Validate() error {
 		return errors.New("bots must be positive")
 	case c.Rate < 0:
 		return errors.New("rate must not be negative")
+	case c.Duration < 0:
+		return errors.New("duration must not be negative")
+	case c.Actions < 0:
+		return errors.New("actions must not be negative")
 	case c.Duration == 0 && c.Actions == 0:
 		return errors.New("set a duration or an action budget")
 	case len(c.Behaviors) == 0:

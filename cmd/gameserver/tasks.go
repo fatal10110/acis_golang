@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
@@ -261,12 +261,11 @@ func startAutosave(lc fx.Lifecycle, a *task.Autosave, log zerolog.Logger) {
 //
 // The respawn hook is set after construction (manager.Npcs needs *task.Decay
 // itself to register newly spawned actors, so it can't be built first), so
-// it's guarded by its own lock separate from anything task.Decay holds.
+// it's published atomically: the decay ticker reads it without a lock.
 type worldDecayEffects struct {
 	state *world.State
 
-	mu          sync.RWMutex
-	respawnHook func(id int32) func()
+	respawnHook atomic.Pointer[func(id int32) func()]
 }
 
 type decayableActor interface {
@@ -285,9 +284,10 @@ func (w *worldDecayEffects) Decay(actor task.DecayActor) {
 		return
 	}
 
-	w.mu.RLock()
-	hook := w.respawnHook
-	w.mu.RUnlock()
+	var hook func(id int32) func()
+	if p := w.respawnHook.Load(); p != nil {
+		hook = *p
+	}
 
 	switch d := obj.(type) {
 	case spawnDecayer:
@@ -304,9 +304,11 @@ func (w *worldDecayEffects) Decay(actor task.DecayActor) {
 // SetRespawnHook records the callback used to arm a decayed actor's next
 // respawn. Call it once, before fx starts the decay ticker.
 func (w *worldDecayEffects) SetRespawnHook(f func(id int32) func()) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.respawnHook = f
+	if f == nil {
+		w.respawnHook.Store(nil)
+		return
+	}
+	w.respawnHook.Store(&f)
 }
 
 func provideDecay(state *world.State) (*task.Decay, *worldDecayEffects, error) {
@@ -324,25 +326,23 @@ func startDecay(lc fx.Lifecycle, d *task.Decay, log zerolog.Logger) {
 // (manager.Npcs.Respawn) is wired in after construction, since Npcs itself
 // needs *task.Respawn to schedule respawns in the first place.
 type npcRespawnEffects struct {
-	mu   sync.RWMutex
-	hook func(slot task.SlotID)
+	hook atomic.Pointer[func(slot task.SlotID)]
 }
 
 func (e *npcRespawnEffects) Respawn(slot task.SlotID) {
-	e.mu.RLock()
-	hook := e.hook
-	e.mu.RUnlock()
-	if hook != nil {
-		hook(slot)
+	if hook := e.hook.Load(); hook != nil {
+		(*hook)(slot)
 	}
 }
 
 // SetHook records the callback that re-instantiates a due spawn slot. Call
 // it once, before fx starts the respawn ticker.
 func (e *npcRespawnEffects) SetHook(f func(slot task.SlotID)) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.hook = f
+	if f == nil {
+		e.hook.Store(nil)
+		return
+	}
+	e.hook.Store(&f)
 }
 
 func provideRespawnTask() (*task.Respawn, *npcRespawnEffects, error) {
@@ -357,23 +357,22 @@ func provideRespawnTask() (*task.Respawn, *npcRespawnEffects, error) {
 // WorldObjects itself needs *task.Door to schedule door timers in the first
 // place.
 type doorTimerEffects struct {
-	mu   sync.RWMutex
-	hook func(id int, open bool) bool
+	hook atomic.Pointer[func(id int, open bool) bool]
 }
 
 func (e *doorTimerEffects) SetDoorOpen(id int, open bool) bool {
-	e.mu.RLock()
-	hook := e.hook
-	e.mu.RUnlock()
-	return hook != nil && hook(id, open)
+	hook := e.hook.Load()
+	return hook != nil && (*hook)(id, open)
 }
 
 // SetHook records the callback that applies a due door change. Call it
 // once, before fx starts the door-timer ticker.
 func (e *doorTimerEffects) SetHook(f func(id int, open bool) bool) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.hook = f
+	if f == nil {
+		e.hook.Store(nil)
+		return
+	}
+	e.hook.Store(&f)
 }
 
 func provideDoorTask() (*task.Door, *doorTimerEffects, error) {
