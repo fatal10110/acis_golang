@@ -97,13 +97,13 @@ func TestAugmentationActiveSkillRedisabledOnEquip(t *testing.T) {
 		if !c.SkillDisabled(key) {
 			t.Fatal("skill usable after equip with its reuse running")
 		}
-		clock.Advance(40*time.Second - time.Millisecond)
+		clock.Advance(40 * time.Second)
 		if !c.SkillDisabled(key) {
-			t.Fatal("skill usable before its original expiry")
+			t.Fatal("skill usable at its original expiry instant")
 		}
 		clock.Advance(time.Millisecond)
 		if c.SkillDisabled(key) {
-			t.Fatal("skill still disabled at its original expiry")
+			t.Fatal("skill still disabled past its original expiry")
 		}
 	})
 	t.Run("reuse ended", func(t *testing.T) {
