@@ -149,7 +149,7 @@ revisited later), and `ACIS_REQUIRE_REFERENCE=0` stays in CI. The local run is t
 - **geodata** (`datapack.Geodata`): the region files are too large for the repository. They are
   found in a full datapack checkout above the module (the outer `acis_public/aCis_datapack/`) or
   `ACIS_GEODATA_DIR`, and always skip without one, even under `ACIS_REQUIRE_DATAPACK`. The tests:
-  - `internal/gameserver/geo/probe`: `TestCacheMatchesLegacyDecoderOnRealGeodata`;
+  - `internal/gameserver/geo/geodata`: `TestCacheMatchesLegacyDecoderOnRealGeodata`;
   - `internal/gameserver/geo/pathfind`: `TestFindGeodataResultsMatchCapturedFingerprint` and the
     benchmarks `BenchmarkGeodataQueries` and `BenchmarkFinderSearch` (both load `loadGeodataSample`).
 - **reference** (`datapack.Reference`): they read `aCis_gameserver/`, which is not in the repository.
