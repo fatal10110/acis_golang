@@ -82,7 +82,7 @@ jobs:
       # The tests/ packages the real pool does not run, each with its reason.
       # A tests/ package on no `pool` list and not named here fails `rest`.
       POOL_EXCLUDED: |
-        ai: its boss and hall scenarios wait out minutes of timers per test; a pool pass of main measured 22 failures on wall-clock boundary assertions, 83 cuts at long waits, and a run that was still going after 15 minutes with 1255 tests unfinished; tracked in #5301
+        ai: its boss and hall scenarios wait out minutes of timers per test; a pool pass of main measured 22 failures on wall-clock boundary assertions, 83 cuts at long waits, and a run that stalled with every parallel slot held and no test running (goroutine dump: about 90 tests in t.Parallel's wait, none executing) after about 800 of 1058 tests; tracked in #5301
       STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:
