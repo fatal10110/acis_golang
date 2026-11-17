@@ -541,16 +541,7 @@ func splitInts(raw string) ([]int, error) {
 	if raw == "" {
 		return nil, nil
 	}
-	parts := strings.Split(raw, ";")
-	out := make([]int, len(parts))
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = n
-	}
-	return out, nil
+	return parseInts(raw)
 }
 
 // cleanStrings trims whitespace from each element of in and drops any that

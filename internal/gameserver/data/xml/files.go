@@ -150,8 +150,14 @@ func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 type boolAttr bool
 
 func (b *boolAttr) UnmarshalXMLAttr(attr xml.Attr) error {
-	*b = boolAttr(strings.EqualFold(attr.Value, "true"))
+	*b = boolAttr(permissiveBool(attr.Value))
 	return nil
+}
+
+// permissiveBool reads raw as true when it is a case-insensitive "true" and
+// as false otherwise, never failing.
+func permissiveBool(raw string) bool {
+	return strings.EqualFold(raw, "true")
 }
 
 // dashPairAttr is a "left-right" attribute (an item requirement or a
@@ -184,17 +190,28 @@ func (d *dashPairAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 type intListAttr []int
 
 func (l *intListAttr) UnmarshalXMLAttr(attr xml.Attr) error {
-	parts := strings.Split(attr.Value, ";")
-	out := make(intListAttr, len(parts))
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil {
-			return fmt.Errorf("%s: %w", attr.Name.Local, err)
-		}
-		out[i] = n
+	out, err := parseInts(attr.Value)
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}
 	*l = out
 	return nil
+}
+
+// parseInts splits raw on ";" and reads each part, untrimmed, as a base-10
+// int; an empty part, so an empty raw too, is an error. Callers that accept
+// an empty list check for it first.
+func parseInts(raw string) ([]int, error) {
+	parts := strings.Split(raw, ";")
+	out := make([]int, len(parts))
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = n
+	}
+	return out, nil
 }
 
 // pointElement is an element whose x/y attributes are a 2D world point, and

@@ -134,7 +134,9 @@ func (c *Countdown) Abort(issuer string) {
 // tick runs one second of n. An aborted countdown notices it on its next
 // tick: it gives the login server its listing back if it had closed it, and
 // ends. A countdown aborted during its last second neither restores the
-// listing nor stops the server.
+// listing nor stops the server. A countdown replaced by a later Start
+// leaves the listing closed when its replacement closes logins on its own
+// next tick, so the server is never listed open in between.
 func (c *Countdown) tick(n *counter) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -152,7 +154,8 @@ func (c *Countdown) tick(n *counter) {
 	if n.aborted {
 		n.done = true
 		n.ticker.Stop()
-		if c.status.Type() == link.ServerTypeDown {
+		replacementCloses := c.current != n && c.current.seconds <= closeLoginsAt
+		if !replacementCloses && c.status.Type() == link.ServerTypeDown {
 			if c.status.GMOnly() {
 				c.status.SetType(link.ServerTypeGMOnly)
 			} else {

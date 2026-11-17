@@ -365,7 +365,7 @@ func (s *CharacterStore) SetOnline(ctx context.Context, objectID int32, lastAcce
 // owns - its items, the items its pets carry, shortcuts, macros, memos,
 // quest journal, hennas, recipe book, subclasses, skills, skill-save state,
 // pets, item augmentations, the friend and block relations naming it on
-// either side, and its Olympiad record - as one transaction, so a failure or
+// either side, its Olympiad and hero records - as one transaction, so a failure or
 // cancellation partway through leaves all of them in place instead of
 // orphaning owned rows behind a deleted character.
 //
@@ -434,6 +434,9 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM olympiad_nobles WHERE char_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d olympiad record: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM heroes WHERE char_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d hero record: %w", objectID, err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_raid_points WHERE char_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d raid points: %w", objectID, err)

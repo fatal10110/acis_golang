@@ -223,6 +223,9 @@ func TestCharacterStore_Purge(t *testing.T) {
 		t.Fatalf("Create() unexpected error: %v", err)
 	}
 	seedOwnedRows(t, db, c.ID)
+	if _, err := db.ExecContext(ctx, "INSERT INTO heroes (char_id, class_id, count, played, active, message) VALUES (?, 88, 1, 1, 1, '')", c.ID); err != nil {
+		t.Fatalf("seed hero: %v", err)
+	}
 
 	deleted, err := store.Purge(ctx, c.ID)
 	if err != nil {
@@ -254,6 +257,9 @@ func TestCharacterStore_Purge(t *testing.T) {
 	}
 	if n := countRows(t, db, "SELECT COUNT(*) FROM character_recipebook WHERE charId = ?", c.ID); n != 0 {
 		t.Errorf("recipe book rows after purge = %d, want 0", n)
+	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM heroes WHERE char_id = ?", c.ID); n != 0 {
+		t.Errorf("hero rows after purge = %d, want 0", n)
 	}
 
 	deleted, err = store.Purge(ctx, c.ID)

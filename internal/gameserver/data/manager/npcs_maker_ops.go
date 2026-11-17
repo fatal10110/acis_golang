@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -148,7 +149,7 @@ type standaloneSpawn struct {
 func (s standaloneSpawn) DrawSpawnLocation() (spawn.Position, bool) {
 	at := s.at
 	if at.Heading < 0 {
-		at.Heading = rnd.Get(65536)
+		at.Heading = location.RandomHeading()
 	}
 	return at, true
 }

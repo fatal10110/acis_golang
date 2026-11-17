@@ -3,7 +3,6 @@ package manager
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -50,7 +49,7 @@ func (n *Npcs) DrawSpawnPoint(m npc.PartyMember) (at location.Location, heading 
 	case slot.fixed, slot.placed:
 		heading = slot.heading
 		if heading < 0 {
-			heading = rnd.Get(65536)
+			heading = location.RandomHeading()
 		}
 		return slot.at, heading, true
 	case slot.master != nil:

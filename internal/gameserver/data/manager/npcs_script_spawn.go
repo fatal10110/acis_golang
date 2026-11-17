@@ -72,7 +72,7 @@ func (n *Npcs) SpawnSummoned(tmpl *npc.Template, x, y, z, heading int, summoner 
 // faces a random way.
 func (n *Npcs) placeStandalone(tmpl *npc.Template, x, y, z, heading int, summoner attackable.Combatant) (attackable.Combatant, error) {
 	if heading < 0 {
-		heading = rnd.Get(65536)
+		heading = location.RandomHeading()
 	}
 	return n.spawnStandalone(tmpl, x, y, z, heading, 0, summoner, 0, 0)
 }
@@ -87,7 +87,7 @@ func (n *Npcs) SpawnForClan(npcID int32, x, y, z, heading int, clanID int32) (at
 		return nil, fmt.Errorf("%w: %d", npc.ErrNoTemplate, npcID)
 	}
 	if heading < 0 {
-		heading = rnd.Get(65536)
+		heading = location.RandomHeading()
 	}
 	return n.spawnStandalone(tmpl, x, y, z, heading, 0, nil, 0, clanID)
 }

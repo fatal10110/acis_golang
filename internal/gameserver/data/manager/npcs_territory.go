@@ -3,6 +3,7 @@ package manager
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
 
@@ -15,7 +16,7 @@ func pickPosition(positions []spawn.Position) (spawn.Position, bool) {
 	for _, pos := range positions {
 		chance -= pos.Chance
 		if chance < 0 {
-			pos.Heading = rnd.Get(65536)
+			pos.Heading = location.RandomHeading()
 			return pos, true
 		}
 	}
@@ -37,7 +38,7 @@ func randomTerritoryPosition(maker *spawn.Maker, geo move.Geo) (spawn.Position, 
 	if !ok {
 		return spawn.Position{}, false
 	}
-	return spawn.Position{Location: loc, Heading: rnd.Get(65536)}, true
+	return spawn.Position{Location: loc, Heading: location.RandomHeading()}, true
 }
 
 // locatedRef and creatureActorRef are forward references that break the

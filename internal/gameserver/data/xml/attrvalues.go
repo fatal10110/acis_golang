@@ -114,7 +114,7 @@ func (a *attrValues) boolDefault(key string, def bool) bool {
 	if !ok {
 		return def
 	}
-	return strings.EqualFold(raw, "true")
+	return permissiveBool(raw)
 }
 
 // boolean returns the value at key as a bool, recording an error if key is
@@ -202,15 +202,10 @@ func (a *attrValues) intArray(key string) []int {
 		a.fail(fmt.Errorf("attribute %q is required", key))
 		return nil
 	}
-	parts := strings.Split(raw, ";")
-	out := make([]int, len(parts))
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil {
-			a.fail(fmt.Errorf("attribute %q: %w", key, err))
-			return nil
-		}
-		out[i] = n
+	out, err := parseInts(raw)
+	if err != nil {
+		a.fail(fmt.Errorf("attribute %q: %w", key, err))
+		return nil
 	}
 	return out
 }
