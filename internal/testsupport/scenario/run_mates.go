@@ -155,6 +155,7 @@ func (r *run) enterMate(t *testing.T, i int) {
 		t.Fatalf("%s: mate %s entered the world twice", r.sc.Name, m.Name)
 	}
 	c := r.srv.DialClient(t, mateAccount(m), 1)
+	r.track(c)
 	c.Send(gameStart())
 	for n := 0; ; n++ {
 		if n == 100 {

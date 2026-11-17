@@ -137,6 +137,8 @@ type run struct {
 	// mates are the mate lines' characters; a client is set once the mate
 	// entered the world.
 	mates []mateClient
+	// links are the bypass links each client was last offered.
+	links map[*testsupport.ScriptedClient]*links
 	// summon is the summon line's summon once called.
 	summon *summon.Actor
 	// stance is the clock of the attack stances when the scenario ends the
@@ -328,6 +330,7 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 		}
 	}
 	r.boot(t, cfg)
+	r.track(r.srv.Client)
 	for i, st := range sc.Steps {
 		r.step(t, i, st)
 	}
@@ -946,10 +949,14 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		w.WriteUint8(0)
 		c.Send(w.Bytes())
 	case "bypass":
+		command := expandRoles(st.Args[0], r.objs)
 		w := wire.NewPacketWriter(clientpackets.OpcodeRequestBypassToServer)
-		w.WriteString(expandRoles(st.Args[0], r.objs))
+		w.WriteString(command)
 		for range st.Repeat - 1 {
 			// An xN bypass: the sends before the last are not compared.
+			if msg := r.offeredDiff(c, command, st.Rejected); msg != "" {
+				fail("%s", msg)
+			}
 			c.Send(w.Bytes())
 			r.srv.ReadQueued(t, c)
 			if st.As == "" && r.character(t).Teleporting() {
@@ -957,6 +964,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 				c.Send(wire.NewPacketWriter(clientpackets.OpcodeAppearing).Bytes())
 				r.srv.ReadQueued(t, c)
 			}
+		}
+		if msg := r.offeredDiff(c, command, st.Rejected); msg != "" {
+			fail("%s", msg)
 		}
 		c.Send(w.Bytes())
 	case "appear":
@@ -1271,41 +1281,55 @@ func (r *run) onPlayer(t *testing.T, fn func(p attackable.Combatant)) {
 
 // check runs one items, rows or state line, describing the first
 // difference.
+// checkEvaluators evaluate each family of check kinds: the failure text, ""
+// when the check holds.
+var checkEvaluators = map[checkFamily]func(r *run, t *testing.T, ck Check) string{
+	checkItems: (*run).itemsCheck, checkRows: (*run).rowsCheck, checkQuest: (*run).questCheck,
+	checkSeed: (*run).seedCheck, checkFight: (*run).fightCheck, checkState: (*run).stateCheck,
+}
+
+// check runs one check line, describing the first difference.
 func (r *run) check(t *testing.T, ck Check) string {
 	t.Helper()
-	switch ck.Kind {
-	case "items":
-		var got, want []string
-		owner, args := r.player, ck.Args
-		if !strings.Contains(args[0], "=") {
-			owner, args = r.otherCharacter(t, args[0]), args[1:]
-		}
-		for _, a := range args {
-			id, count, _ := strings.Cut(a, "=")
-			n, _ := strconv.ParseInt(id, 10, 32)
-			got = append(got, fmt.Sprintf("%s=%d", id, r.srv.PlayerItemCount(t, owner, int32(n))))
-			want = append(want, id+"="+count)
-		}
-		return FirstDiff("item", got, want)
-	case "rows":
-		return rowsDiff(ck.Args[0], r.rows(t, ck.Args[0]), ck.Args[1:])
-	case "state":
-		quest, want := ck.Args[0], ck.Args[1]
-		got := "-"
-		r.srv.RunQuest(t, r.player, quest, func(_ *script.Quests, c *player.Character, _ *script.Script) {
-			if st := c.Quests().State(quest); st != nil {
-				got = st.Status().String()
-			}
-		})
-		return FirstDiff(quest+" state", []string{got}, []string{want})
-	case "open", "dungeon", "standing":
-		return r.seedCheck(t, ck)
-	case "hate", "desires", "at":
-		return r.fightCheck(t, ck)
-	case "mem", "hp", "privates", "master", "top", "effect", "dead", "inworld", "stance":
-		return r.stateCheck(t, ck)
+	eval, ok := checkEvaluators[checkKinds[ck.Kind]]
+	if !ok {
+		// A check the parser accepts that nothing evaluates would pass silently.
+		return fmt.Sprintf("no evaluator for the %s check", ck.Kind)
 	}
-	return ""
+	return eval(r, t, ck)
+}
+
+func (r *run) itemsCheck(t *testing.T, ck Check) string {
+	t.Helper()
+	var got, want []string
+	owner, args := r.player, ck.Args
+	if !strings.Contains(args[0], "=") {
+		owner, args = r.otherCharacter(t, args[0]), args[1:]
+	}
+	for _, a := range args {
+		id, count, _ := strings.Cut(a, "=")
+		n, _ := strconv.ParseInt(id, 10, 32)
+		got = append(got, fmt.Sprintf("%s=%d", id, r.srv.PlayerItemCount(t, owner, int32(n))))
+		want = append(want, id+"="+count)
+	}
+	return FirstDiff("item", got, want)
+}
+
+func (r *run) rowsCheck(t *testing.T, ck Check) string {
+	t.Helper()
+	return rowsDiff(ck.Args[0], r.rows(t, ck.Args[0]), ck.Args[1:])
+}
+
+func (r *run) questCheck(t *testing.T, ck Check) string {
+	t.Helper()
+	quest, want := ck.Args[0], ck.Args[1]
+	got := "-"
+	r.srv.RunQuest(t, r.player, quest, func(_ *script.Quests, c *player.Character, _ *script.Script) {
+		if st := c.Quests().State(quest); st != nil {
+			got = st.Status().String()
+		}
+	})
+	return FirstDiff(quest+" state", []string{got}, []string{want})
 }
 
 // rowsDiff compares the var=value rows of quest the database holds with
