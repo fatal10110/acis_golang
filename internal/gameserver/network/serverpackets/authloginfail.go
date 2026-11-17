@@ -13,13 +13,6 @@ type LoginFailReason int32
 // client's presented session keys as invalid.
 const LoginFailSystemErrorTryLater LoginFailReason = 0x01
 
-// EncodeAuthLoginFail builds the AuthLoginFail packet for reason.
-func EncodeAuthLoginFail(reason LoginFailReason) []byte {
-	w := newWriter(OpcodeAuthLoginFail)
-	writeAuthLoginFail(w, reason)
-	return w.Bytes()
-}
-
 // FrameAuthLoginFail builds the AuthLoginFail packet as an owned frame.
 func FrameAuthLoginFail(reason LoginFailReason) wire.Frame {
 	w := newFrameWriter(OpcodeAuthLoginFail)

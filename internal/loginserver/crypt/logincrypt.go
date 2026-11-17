@@ -16,7 +16,9 @@ const sessionKeySize = 16
 
 // NewSessionKey returns a fresh random Blowfish key for one client
 // connection's dynamic (post-Init) encryption. Every byte is uniform in
-// 1..255: the client expects a key with no zero byte.
+// 1..255: the client expects a key with no zero byte. Each connection draws
+// its own key rather than one from a small reused set; the client cannot
+// tell the two apart.
 func NewSessionKey() ([]byte, error) {
 	key := make([]byte, sessionKeySize)
 	if _, err := cryptorand.Read(key); err != nil {

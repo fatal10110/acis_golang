@@ -198,10 +198,14 @@ var loginServerKeys = map[string]keySet{
 			"AcceptFilterAllowlist", "AcceptFilterBanTime", "AcceptFilterBurstLimit",
 			"AcceptFilterBurstTime", "AcceptNewGameServer", "AutoCreateAccounts",
 			"EnableAcceptFilter", "EnableFloodProtection",
-			"FastConnectionLimit", "FastConnectionTime", "Hostname", "Login", "LoginBlockAfterBan",
+			"FastConnectionLimit", "FastConnectionTime", "Login", "LoginBlockAfterBan",
 			"LoginHostname", "LoginPort", "LoginTryBeforeBan", "LoginserverHostname",
 			"LoginserverPort", "MaxConnectionPerIP", "MaxConnections", "NormalConnectionTime", "Password",
 			"ShowLicence", "URL",
 		},
+		// Hostname is the game server's advertised address; the login
+		// server's file carries it too, but binds by LoginHostname and
+		// LoginserverHostname.
+		Ignored: []string{"Hostname"},
 	},
 }

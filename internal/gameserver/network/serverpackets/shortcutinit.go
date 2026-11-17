@@ -37,16 +37,6 @@ type Shortcut struct {
 	AugmentationID   int32
 }
 
-// StarterShortcuts are the basic action shortcuts a new character starts
-// with until shortcut persistence is ported.
-func StarterShortcuts() []Shortcut {
-	return []Shortcut{
-		{Slot: 0, Page: 0, Type: ShortcutAction, ID: 2, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
-		{Slot: 3, Page: 0, Type: ShortcutAction, ID: 5, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
-		{Slot: 10, Page: 0, Type: ShortcutAction, ID: 0, Level: -1, CharacterType: 1, SharedReuseGroup: -1},
-	}
-}
-
 // FrameShortCutInit builds the shortcut initialization packet.
 func FrameShortCutInit(shortcuts []Shortcut) wire.Frame {
 	w := newFrameWriter(OpcodeShortCutInit)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -42,43 +41,11 @@ var defaultWarnLog = zerolog.New(os.Stderr).With().Timestamp().Logger()
 // leaves out.
 const DefaultDelimiters = `[\s\x0B,;]+`
 
-// ShippedFiles is the config/*.properties set expected by the current server.
-var ShippedFiles = []string{
-	"banned_ips.properties",
-	"clans.properties",
-	"events.properties",
-	"geoengine.properties",
-	"logging.properties",
-	"loginserver.properties",
-	"npcs.properties",
-	"players.properties",
-	"server.properties",
-	"siege.properties",
-}
-
 var defaultDelimitersRE = regexp.MustCompile(DefaultDelimiters)
 
 // Properties holds one parsed .properties file.
 type Properties struct {
 	values map[string]string
-}
-
-// FileSet holds the shipped config files keyed by basename.
-type FileSet struct {
-	Files map[string]*Properties
-}
-
-// KeyRef identifies a key in a config file.
-type KeyRef struct {
-	File string
-	Key  string
-}
-
-// CountMismatch reports a loaded key count that differs from an expected count.
-type CountMismatch struct {
-	File string
-	Got  int
-	Want int
 }
 
 // IntPair is a pair parsed from values shaped like "57-100;6651-3". Both
@@ -129,73 +96,6 @@ func LoadFile(name string) (*Properties, error) {
 		return nil, fmt.Errorf("load config %s: %w", name, err)
 	}
 	return p, nil
-}
-
-// LoadDirectory reads the ten shipped config files from dir and rejects unknown .properties files.
-func LoadDirectory(dir string) (*FileSet, error) {
-	known := make(map[string]bool, len(ShippedFiles))
-	for _, name := range ShippedFiles {
-		known[name] = true
-	}
-
-	matches, err := filepath.Glob(filepath.Join(dir, "*.properties"))
-	if err != nil {
-		return nil, err
-	}
-	for _, match := range matches {
-		if name := filepath.Base(match); !known[name] {
-			return nil, fmt.Errorf("unsupported config file %s", name)
-		}
-	}
-
-	set := &FileSet{Files: make(map[string]*Properties, len(ShippedFiles))}
-	for _, name := range ShippedFiles {
-		p, err := LoadFile(filepath.Join(dir, name))
-		if err != nil {
-			return nil, err
-		}
-		set.Files[name] = p
-	}
-	return set, nil
-}
-
-// CountMismatches compares loaded key counts with expected counts.
-func (s *FileSet) CountMismatches(expected map[string]int) []CountMismatch {
-	var out []CountMismatch
-	for file, want := range expected {
-		got := 0
-		if p := s.Files[file]; p != nil {
-			got = p.Len()
-		}
-		if got != want {
-			out = append(out, CountMismatch{File: file, Got: got, Want: want})
-		}
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].File < out[j].File })
-	return out
-}
-
-// UnknownKeys returns loaded keys not present in the provided supported-key list.
-func (s *FileSet) UnknownKeys(supported map[string][]string) []KeyRef {
-	var out []KeyRef
-	for file, p := range s.Files {
-		allowed := make(map[string]bool, len(supported[file]))
-		for _, key := range supported[file] {
-			allowed[key] = true
-		}
-		for _, key := range p.Keys() {
-			if !allowed[key] {
-				out = append(out, KeyRef{File: file, Key: key})
-			}
-		}
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].File == out[j].File {
-			return out[i].Key < out[j].Key
-		}
-		return out[i].File < out[j].File
-	})
-	return out
 }
 
 // Len returns the number of loaded properties.
@@ -388,30 +288,30 @@ func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 // logged. Entries and numbers are taken as written, untrimmed. A malformed
 // entry — not exactly two '-'-separated parts, or a number that is not an
 // int32 — logs and returns an empty list.
-func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
+func (p *Properties) IntPairs(key, def string) []IntPair {
 	value, ok := p.Lookup(key)
 	if !ok {
 		value = def
 	}
 	entries := splitLiteralTrimTrailingEmpty(value, ";")
 	if len(entries) == 0 {
-		return nil, nil
+		return nil
 	}
 	out := make([]IntPair, len(entries))
 	for i, entry := range entries {
 		bounds := splitLiteralTrimTrailingEmpty(entry, "-")
 		if len(bounds) != 2 {
 			logger().Warn().Str("key", key).Str("entry", entry).Msg("config item pair malformed, want first-second; using empty list")
-			return nil, nil
+			return nil
 		}
 		pair, err := parseIntPair(bounds)
 		if err != nil {
 			logger().Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
-			return nil, nil
+			return nil
 		}
 		out[i] = pair
 	}
-	return out, nil
+	return out
 }
 
 // IntPairsComma returns pairs parsed from a comma-separated list of

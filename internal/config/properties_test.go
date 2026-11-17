@@ -14,9 +14,8 @@ func TestIntPairsMalformedValueReturnsEmptyList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := p.IntPairs("items", "")
-	if err != nil || got != nil {
-		t.Fatalf("IntPairs() = (%v, %v), want (nil, nil)", got, err)
+	if got := p.IntPairs("items", ""); got != nil {
+		t.Fatalf("IntPairs() = %v, want nil", got)
 	}
 }
 
@@ -26,9 +25,8 @@ func TestIntPairsNonNumericValueReturnsEmptyList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := p.IntPairs("items", "")
-	if err != nil || got != nil {
-		t.Fatalf("IntPairs() = (%v, %v), want (nil, nil)", got, err)
+	if got := p.IntPairs("items", ""); got != nil {
+		t.Fatalf("IntPairs() = %v, want nil", got)
 	}
 }
 
@@ -41,8 +39,8 @@ func TestIntPairsOutOfInt32ReturnsEmptyList(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got, err := p.IntPairs("items", ""); err != nil || got != nil {
-			t.Errorf("IntPairs(%q) = (%v, %v), want (nil, nil)", value, got, err)
+		if got := p.IntPairs("items", ""); got != nil {
+			t.Errorf("IntPairs(%q) = %v, want nil", value, got)
 		}
 	}
 	p, err := ParseString("items=4294973947-0\n")
@@ -56,8 +54,8 @@ func TestIntPairsOutOfInt32ReturnsEmptyList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := p.IntPairs("items", ""); err != nil || len(got) != 1 || got[0] != (IntPair{First: 2147483647, Second: 2147483647}) {
-		t.Errorf("IntPairs(int32 bounds) = (%v, %v), want the one pair", got, err)
+	if got := p.IntPairs("items", ""); len(got) != 1 || got[0] != (IntPair{First: 2147483647, Second: 2147483647}) {
+		t.Errorf("IntPairs(int32 bounds) = %v, want the one pair", got)
 	}
 }
 

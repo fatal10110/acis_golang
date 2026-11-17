@@ -878,7 +878,7 @@ func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) bool {
 	}
 	entries := l.serverEntries(c.accessLevel, c.remoteIP)
 	for _, e := range entries {
-		l.log.Info().
+		l.log.Debug().
 			Uint8("id", e.ID).
 			Str("ip", net.IP(e.IP[:]).String()).
 			Int32("port", e.Port).
@@ -900,6 +900,10 @@ func (l *ClientLink) serverEntries(accessLevel int, clientIP net.IP) []serverpac
 	for _, e := range all {
 		online := e.Status != link.ServerTypeDown && !(e.Status == link.ServerTypeGMOnly && accessLevel <= 0) && accessLevel >= 0
 		host := e.Host
+		// ConnIP outlives the link: a server that went offline keeps its
+		// last link address, so a local client still sees that address on
+		// the entry. The entry is listed down then, so the address is never
+		// used to connect.
 		if localClient && e.ConnIP != nil {
 			host = e.ConnIP.String()
 		}

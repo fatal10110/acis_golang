@@ -41,9 +41,9 @@ func (s State) String() string {
 }
 
 // allowedOpcodes lists, for each state, the first-byte opcodes a client may
-// send. It starts out covering only the connect-to-in-world handshake
-// sequence; every additional packet registers its opcode here as it gets
-// ported, the same way the full dispatch table grows one packet at a time.
+// send; any other opcode is refused before decode. It is held in step with
+// the handler registry: every accepted opcode has a handler, and every
+// handler's opcode is accepted in its state.
 var allowedOpcodes = map[State]map[byte]bool{
 	StateConnected: {
 		0x00: true, // protocol version negotiation

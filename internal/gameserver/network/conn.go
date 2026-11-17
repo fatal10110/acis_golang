@@ -28,6 +28,11 @@ const queuedFrameBytes = int(unsafe.Sizeof(wire.Frame{}))
 // its peak backlog's slots for life.
 const retainedQueueCap = 1024
 
+// connWriteTimeout bounds one vectored write to the client: the writer
+// goroutine is the only one blocked on a peer that stops reading, and this
+// deadline is what frees it.
+const connWriteTimeout = time.Minute
+
 // frameCost is what frame counts against outboundHighWater.
 func frameCost(frame wire.Frame) int {
 	return frame.Footprint() + queuedFrameBytes
@@ -57,6 +62,9 @@ type Conn struct {
 	stopOnce sync.Once
 	stopped  chan struct{}
 	closeErr error
+	// wbufs is the slice header the writer hands to net.Buffers.WriteTo;
+	// only writeLoop touches it.
+	wbufs net.Buffers
 
 	// observeSend, when set, sees each outbound payload on the goroutine
 	// that queues it; see ObserveSends.
@@ -159,11 +167,14 @@ func (c *Conn) writeBatch(batch []wire.Frame, bufs net.Buffers) (_ net.Buffers, 
 		bufs = append(bufs, frame.Bytes())
 		cost += frameCost(frame)
 	}
-	if err := c.Conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
+	if err := c.Conn.SetWriteDeadline(time.Now().Add(connWriteTimeout)); err != nil {
 		return bufs, cost, err
 	}
-	send := bufs
-	_, err := send.WriteTo(c.Conn)
+	// WriteTo consumes the header it is called on; calling it on a field
+	// rather than a local keeps that header off the heap.
+	c.wbufs = bufs
+	_, err := c.wbufs.WriteTo(c.Conn)
+	c.wbufs = nil
 	return bufs, cost, err
 }
 
