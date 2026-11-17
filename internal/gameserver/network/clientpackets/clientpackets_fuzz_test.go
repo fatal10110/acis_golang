@@ -1,6 +1,13 @@
 package clientpackets
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
+	"maps"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -28,6 +35,11 @@ type gameDecoder struct {
 	// with fields in the order the client writes them.
 	seed []byte
 }
+
+// refusedSeeds names the decoders whose seed is a packet they refuse by
+// design, with why. RequestBuyProcure checks eight bytes per row where each
+// row reads twelve, so no non-empty list decodes.
+var refusedSeeds = map[string]string{"RequestBuyProcure": "row check of 8 bytes against 12 read"}
 
 func decodes[T any](decode func([]byte) (T, error)) func([]byte) error {
 	return func(payload []byte) error {
@@ -104,7 +116,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestMakeMacro", decodes(DecodeRequestMakeMacro), seedPacket(OpcodeRequestMakeMacro, int32(0), "Heal", "self heal", "H", byte(1), byte(1), byte(1), byte(1), int32(1011), byte(0), "")},
 	{"RequestDeleteMacro", decodes(DecodeRequestDeleteMacro), seedPacket(OpcodeRequestDeleteMacro, int32(1000))},
 	{"RequestEvaluate", decodes(DecodeRequestEvaluate), seedPacket(OpcodeRequestEvaluate, seedObjectID)},
-	{"CannotMoveAnymore", decodes(DecodeCannotMoveAnymore), seedPacket(OpcodeCannotMoveAnymore, seedX, seedY, seedZ, int32(32768))},
+	{"CannotMoveAnymore", decodes(DecodeCannotMoveAnymore), seedPacket(OpcodeCannotMoveInVehicle, seedX, seedY, seedZ, int32(32768))},
 	{"RequestTargetCancel", decodes(DecodeRequestTargetCancel), seedPacket(OpcodeRequestTargetCancel, uint16(0))},
 	{"AnswerTradeRequest", decodes(DecodeAnswerTradeRequest), seedPacket(OpcodeAnswerTradeRequest, int32(1))},
 	{"RequestActionUse", decodes(DecodeRequestActionUse), seedPacket(OpcodeRequestActionUse, int32(0), int32(0), byte(0))},
@@ -179,6 +191,67 @@ var gameDecoders = []gameDecoder{
 	{"RequestWriteHeroWords", decodes(DecodeRequestWriteHeroWords), seedExtended(OpcodeRequestWriteHeroWords, "Glory to the heroes")},
 	{"RequestDuelStart", decodes(DecodeRequestDuelStart), seedExtended(OpcodeRequestDuelStart, "Rival", int32(1))},
 	{"RequestDuelAnswerStart", decodes(DecodeRequestDuelAnswerStart), seedExtended(OpcodeRequestDuelAnswerStart, int32(0), int32(0), int32(1))},
+	{"AllyDismiss", decodes(DecodeAllyDismiss), seedPacket(OpcodeAllyDismiss, "Allies")},
+	{"AnswerJoinPartyRoom", decodes(DecodeAnswerJoinPartyRoom), seedExtended(OpcodeAnswerJoinPartyRoom, int32(1))},
+	{"CannotMoveAnymoreInVehicle", decodes(DecodeCannotMoveAnymoreInVehicle), seedPacket(OpcodeCannotMoveInVehicle, int32(1), seedX, seedY, seedZ, int32(100))},
+	{"PetitionVote", decodes(DecodePetitionVote), seedPacket(OpcodePetitionVote, int32(0), int32(5), "Well helped")},
+	{"RequestAnswerJoinAlly", decodes(DecodeRequestAnswerJoinAlly), seedPacket(OpcodeRequestAnswerJoinAlly, int32(1))},
+	{"RequestAnswerJoinParty", decodes(DecodeRequestAnswerJoinParty), seedPacket(OpcodeRequestAnswerJoinParty, int32(1))},
+	{"RequestAnswerJoinPledge", decodes(DecodeRequestAnswerJoinPledge), seedPacket(OpcodeRequestAnswerJoinPledge, int32(1))},
+	{"RequestAskJoinPartyRoom", decodes(DecodeRequestAskJoinPartyRoom), seedExtended(OpcodeRequestAskJoinPartyRoom, "Friend")},
+	{"RequestBuyProcure", decodesList(DecodeRequestBuyProcure), seedPacket(OpcodeRequestBuyProcure, int32(1), int32(1), int32(0), int32(5073))},
+	{"RequestChangePartyLeader", decodes(DecodeRequestChangePartyLeader), seedExtended(OpcodeRequestChangePartyLeader, "Friend")},
+	{"RequestDismissPartyRoom", decodes(DecodeRequestDismissPartyRoom), seedExtended(OpcodeRequestDismissPartyRoom, int32(1), int32(0))},
+	{"RequestExAcceptJoinMPCC", decodes(DecodeRequestExAcceptJoinMPCC), seedExtended(OpcodeRequestExAcceptJoinMPCC, int32(1))},
+	{"RequestExAskJoinMPCC", decodes(DecodeRequestExAskJoinMPCC), seedExtended(OpcodeRequestExAskJoinMPCC, "Friend")},
+	{"RequestExMPCCShowPartyMembersInfo", decodes(DecodeRequestExMPCCShowPartyMembersInfo), seedExtended(OpcodeRequestExMPCCShowPartyMembersInfo, seedObjectID)},
+	{"RequestExOustFromMPCC", decodes(DecodeRequestExOustFromMPCC), seedExtended(OpcodeRequestExOustFromMPCC, "Friend")},
+	{"RequestExSetPledgeCrestLarge", decodes(DecodeRequestExSetPledgeCrestLarge), append(seedExtended(OpcodeRequestExSetPledgeCrestLarge, int32(4)), 1, 2, 3, 4)},
+	{"RequestGetBossRecord", decodes(DecodeRequestGetBossRecord), seedExtended(OpcodeRequestGetBossRecord, int32(1))},
+	{"RequestGetOffVehicle", decodes(DecodeRequestGetOffVehicle), seedPacket(OpcodeRequestGetOffVehicle, int32(1), seedX, seedY, seedZ)},
+	{"RequestGetOnVehicle", decodes(DecodeRequestGetOnVehicle), seedPacket(OpcodeRequestGetOnVehicle, int32(1), seedX, seedY, seedZ)},
+	{"RequestJoinAlly", decodes(DecodeRequestJoinAlly), seedPacket(OpcodeRequestJoinAlly, seedObjectID)},
+	{"RequestJoinParty", decodes(DecodeRequestJoinParty), seedPacket(OpcodeRequestJoinParty, "Friend", int32(0))},
+	{"RequestJoinPartyRoom", decodes(DecodeRequestJoinPartyRoom), seedPacket(OpcodeRequestJoinPartyRoom, int32(1), int32(-1), int32(0))},
+	{"RequestJoinPledge", decodes(DecodeRequestJoinPledge), seedPacket(OpcodeRequestJoinPledge, seedObjectID, int32(0))},
+	{"RequestListPartyMatchingWaitingRoom", decodes(DecodeRequestListPartyMatchingWaitingRoom), seedExtended(OpcodeRequestListPartyMatchingWaitingRoom, int32(1), int32(1), int32(80), int32(1))},
+	{"RequestListPartyWaiting", decodes(DecodeRequestListPartyWaiting), seedPacket(OpcodeRequestListPartyWaiting, int32(1), int32(-1), int32(0))},
+	{"RequestManagePartyRoom", decodes(DecodeRequestManagePartyRoom), seedPacket(OpcodeRequestManagePartyRoom, int32(1), int32(9), int32(1), int32(80), int32(0), "Hunting")},
+	{"RequestMoveToLocationInVehicle", decodes(DecodeRequestMoveToLocationInVehicle), seedPacket(OpcodeRequestMoveInVehicle, int32(1), seedX, seedY, seedZ, seedX+10, seedY+10, seedZ)},
+	{"RequestOustFromPartyRoom", decodes(DecodeRequestOustFromPartyRoom), seedExtended(OpcodeRequestOustFromPartyRoom, seedObjectID)},
+	{"RequestOustPartyMember", decodes(DecodeRequestOustPartyMember), seedPacket(OpcodeRequestOustPartyMember, "Friend")},
+	{"RequestOustPledgeMember", decodes(DecodeRequestOustPledgeMember), seedPacket(OpcodeRequestOustPledgeMember, "Friend")},
+	{"RequestPCCafeCouponUse", decodes(DecodeRequestPCCafeCouponUse), seedExtended(OpcodeRequestPCCafeCouponUse, "COUPON")},
+	{"RequestPetition", decodes(DecodeRequestPetition), seedPacket(OpcodeRequestPetition, "I am stuck", int32(0))},
+	{"RequestPledgeInfo", decodes(DecodeRequestPledgeInfo), seedPacket(OpcodeRequestPledgeInfo, seedObjectID)},
+	{"RequestPledgeMemberPower", func(payload []byte) error {
+		_, err := DecodeRequestPledgeMemberName(payload, OpcodeRequestPledgeMemberPower)
+		return err
+	}, seedExtended(OpcodeRequestPledgeMemberPower, int32(0), "Friend")},
+	{"RequestPledgeMemberDetail", func(payload []byte) error {
+		_, err := DecodeRequestPledgeMemberName(payload, OpcodeRequestPledgeMemberDetail)
+		return err
+	}, seedExtended(OpcodeRequestPledgeMemberDetail, int32(0), "Friend")},
+	{"RequestPledgePower", decodes(DecodeRequestPledgePower), seedPacket(OpcodeRequestPledgePower, int32(1), int32(2), int32(0xff))},
+	{"RequestPledgeReorganizeMember", decodes(DecodeRequestPledgeReorganizeMember), seedExtended(OpcodeRequestPledgeReorganizeMember, int32(1), "Friend", int32(100), "Mate")},
+	{"RequestPledgeSetAcademyMaster", decodes(DecodeRequestPledgeSetAcademyMaster), seedExtended(OpcodeRequestPledgeSetAcademyMaster, int32(1), "Master", "Pupil")},
+	{"RequestPledgeSetMemberPowerGrade", decodes(DecodeRequestPledgeSetMemberPowerGrade), seedExtended(OpcodeRequestPledgeSetGrade, "Friend", int32(3))},
+	{"RequestPledgeWarList", decodes(DecodeRequestPledgeWarList), seedExtended(OpcodeRequestPledgeWarList, int32(0), int32(0))},
+	{"RequestPledgeWarName", decodes(DecodeRequestPledgeWarName), seedPacket(OpcodeRequestStartPledgeWar, "Rivals")},
+	{"RequestPledgeWarReply", decodes(DecodeRequestPledgeWarReply), seedPacket(OpcodeRequestReplyStartPledgeWar, int32(1))},
+	{"RequestPreviewItem", decodes(DecodeRequestPreviewItem), seedPacket(OpcodeRequestPreviewItem, int32(0), int32(1), int32(2), int32(1060), int32(1835))},
+	{"RequestQuestAbort", decodes(DecodeRequestQuestAbort), seedPacket(OpcodeRequestQuestAbort, int32(255))},
+	{"RequestSSQStatus", decodes(DecodeRequestSSQStatus), seedPacket(OpcodeRequestSSQStatus, byte(1))},
+	{"RequestSetAllyCrest", decodes(DecodeRequestSetAllyCrest), append(seedPacket(OpcodeRequestSetAllyCrest, int32(4)), 1, 2, 3, 4)},
+	{"RequestSetPledgeCrest", decodes(DecodeRequestSetPledgeCrest), append(seedPacket(OpcodeRequestSetPledgeCrest, int32(4)), 1, 2, 3, 4)},
+	{"RequestTutorialClientEvent", decodes(DecodeRequestTutorialClientEvent), seedPacket(OpcodeRequestTutorialClientEvent, int32(1))},
+	{"RequestTutorialLinkHTML", decodes(DecodeRequestTutorialLinkHTML), seedPacket(OpcodeRequestTutorialLinkHTML, "tutorial_01.htm")},
+	{"RequestTutorialPassCmdToServer", decodes(DecodeRequestTutorialPassCmdToServer), seedPacket(OpcodeRequestTutorialPassCmdToServer, "close")},
+	{"RequestTutorialQuestionMark", decodes(DecodeRequestTutorialQuestionMark), seedPacket(OpcodeRequestTutorialQuestionMark, int32(1))},
+	{"RequestUserCommand", decodes(DecodeRequestUserCommand), seedPacket(OpcodeRequestUserCommand, int32(0))},
+	{"RequestWithdrawPartyRoom", decodes(DecodeRequestWithdrawPartyRoom), seedExtended(OpcodeRequestWithdrawPartyRoom, int32(1), int32(0))},
+	{"SendBypassBuildCmd", decodes(DecodeSendBypassBuildCmd), seedPacket(OpcodeSendBypassBuildCmd, "admin")},
+	{"SnoopQuit", decodes(DecodeSnoopQuit), seedPacket(OpcodeSnoopQuit, int32(1))},
 }
 
 // TestGameDecoderFuzzSeedsDecode keeps the fuzz seeds honest: each one must
@@ -186,8 +259,64 @@ var gameDecoders = []gameDecoder{
 // decoder's success path.
 func TestGameDecoderFuzzSeedsDecode(t *testing.T) {
 	for _, d := range gameDecoders {
-		if err := d.decode(d.seed); err != nil {
+		err := d.decode(d.seed)
+		_, refused := refusedSeeds[d.name]
+		switch {
+		case refused && err == nil:
+			t.Errorf("%s seed % x decoded, but the decoder refuses every list", d.name, d.seed)
+		case !refused && err != nil:
 			t.Errorf("%s seed % x: %v", d.name, d.seed, err)
+		}
+	}
+}
+
+// TestEveryGameDecoderIsFuzzed fails when an exported Decode function of this
+// package is missing from gameDecoders, so a new client packet cannot ship
+// outside FuzzGameClientPackets. A decoder that is not a game packet's
+// (none today) would be listed in notFuzzed with the reason.
+func TestEveryGameDecoderIsFuzzed(t *testing.T) {
+	notFuzzed := map[string]string{}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool { return strings.HasSuffix(fi.Name(), ".go") }, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declared := map[string]bool{}
+	fuzzed := map[string]bool{}
+	for _, pkg := range pkgs {
+		for file, f := range pkg.Files {
+			if file == "clientpackets_fuzz_test.go" {
+				ast.Inspect(f, func(n ast.Node) bool {
+					if id, ok := n.(*ast.Ident); ok && strings.HasPrefix(id.Name, "Decode") {
+						fuzzed[id.Name] = true
+					}
+					return true
+				})
+				continue
+			}
+			if strings.HasSuffix(file, "_test.go") {
+				continue
+			}
+			for _, decl := range f.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.IsExported() && strings.HasPrefix(fn.Name.Name, "Decode") {
+					declared[fn.Name.Name] = true
+				}
+			}
+		}
+	}
+	if len(declared) < 100 {
+		t.Fatalf("found %d exported Decode functions, the scan is broken", len(declared))
+	}
+	for _, name := range slices.Sorted(maps.Keys(declared)) {
+		if reason, skip := notFuzzed[name]; skip {
+			if fuzzed[name] {
+				t.Errorf("%s is fuzzed; drop its notFuzzed entry (%s)", name, reason)
+			}
+			continue
+		}
+		if !fuzzed[name] {
+			t.Errorf("%s is not in gameDecoders: add it with a seed packet so FuzzGameClientPackets feeds it", name)
 		}
 	}
 }
