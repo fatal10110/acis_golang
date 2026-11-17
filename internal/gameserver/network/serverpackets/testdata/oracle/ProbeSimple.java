@@ -1,3 +1,5 @@
+import net.sf.l2j.gameserver.model.actor.Npc;
+import net.sf.l2j.gameserver.model.actor.Player;
 import net.sf.l2j.gameserver.model.location.Location;
 import net.sf.l2j.gameserver.network.serverpackets.*;
 
@@ -118,6 +120,14 @@ final class ProbeSimple
 			PacketProbe.emit("PlaySound/typed" + n, new PlaySound(v[0], "sound"));
 			PacketProbe.emit("PlaySound/full" + n, new PlaySound(v[0], "sound", true, v[1], new Location(v[2], v[3], v[4]), v[5]));
 
+			// RelationChanged reads the object id, karma and pvp flag off the playable.
+			final Player relPlayer = new Player();
+			relPlayer.objectId = v[0];
+			relPlayer.karma = v[2];
+			relPlayer.pvpFlag = v[3];
+			PacketProbe.emit("RelationChanged/auto" + n, new RelationChanged(relPlayer, v[1], true));
+			PacketProbe.emit("RelationChanged/peaceful" + n, new RelationChanged(relPlayer, v[1], false));
+
 			for (final boolean flag : new boolean[] { true, false })
 			{
 				final String f = n + (flag ? "/true" : "/false");
@@ -160,6 +170,7 @@ final class ProbeSimple
 			PacketProbe.emit("ShowBoard" + n, new ShowBoard(s, "101"));
 			PacketProbe.emit("ExShowScreenMessage/text-" + STR_NAMES[i], new ExShowScreenMessage(s, 5000));
 			PacketProbe.emit("PlaySound/file-" + STR_NAMES[i], new PlaySound(s));
+			PacketProbe.emit("TutorialShowHtml" + n, new TutorialShowHtml(s));
 		}
 		PacketProbe.emit("ShowBoard/no-page", ShowBoard.STATIC_SHOWBOARD_102);
 		PacketProbe.emit("ShowBoard/fields", new ShowBoard(java.util.List.of("a", "", "日")));
@@ -204,6 +215,29 @@ final class ProbeSimple
 		PacketProbe.emit("CharDeleteOk", CharDeleteOk.STATIC_PACKET);
 		PacketProbe.emit("ExOlympiadMatchEnd", ExOlympiadMatchEnd.STATIC_PACKET);
 		PacketProbe.emit("ExPlayScene", ExPlayScene.STATIC_PACKET);
+		PacketProbe.emit("ServerClose", ServerClose.STATIC_PACKET);
+		PacketProbe.emit("TutorialCloseHtml", TutorialCloseHtml.STATIC_PACKET);
+		PacketProbe.emit("PetitionVote", PetitionVote.STATIC_PACKET);
+
+		// The monster race track: eight runners, a speed per segment (sent only for a race
+		// whose first code is 0), and the phase codes of the init, start, middle and end.
+		final java.util.List<Npc> runners = new java.util.ArrayList<>();
+		final int[][] speeds = new int[8][20];
+		for (int lane = 0; lane < 8; lane++)
+		{
+			final Npc runner = new Npc();
+			runner.objectId = 0x10000000 + lane * 3;
+			runner.template.npcId = 31003 + lane * 7;
+			runner.collisionHeight = 10.5 + lane;
+			runner.collisionRadius = 5.25 + lane * 0.25;
+			runners.add(runner);
+			for (int segment = 0; segment < 20; segment++)
+				speeds[lane][segment] = (lane * 37 + segment * 13 + 128) % 256;
+		}
+		PacketProbe.emit("MonRaceInfo/init", new MonRaceInfo(-1, 0, runners, speeds));
+		PacketProbe.emit("MonRaceInfo/start", new MonRaceInfo(0, 15322, runners, speeds));
+		PacketProbe.emit("MonRaceInfo/middle", new MonRaceInfo(13765, -1, runners, speeds));
+		PacketProbe.emit("MonRaceInfo/end", new MonRaceInfo(-1, 0, runners, speeds));
 
 		// Ride: the ride type follows the NPC id (striders 12526-12528, wyvern 12621) and the
 		// class id is sent offset by 1000000.

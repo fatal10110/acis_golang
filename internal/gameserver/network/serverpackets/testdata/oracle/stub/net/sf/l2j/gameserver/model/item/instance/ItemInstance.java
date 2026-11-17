@@ -1,6 +1,7 @@
 package net.sf.l2j.gameserver.model.item.instance;
 
 import net.sf.l2j.gameserver.model.Augmentation;
+import net.sf.l2j.gameserver.model.actor.Player;
 import net.sf.l2j.gameserver.model.item.kind.EtcItem;
 import net.sf.l2j.gameserver.model.item.kind.Item;
 import net.sf.l2j.gameserver.model.item.kind.Weapon;
@@ -84,6 +85,25 @@ public final class ItemInstance
 	public boolean isEquipped()
 	{
 		return equipped;
+	}
+
+	public boolean isTradable()
+	{
+		return !isAugmented() && item.isTradable();
+	}
+
+	// The reference rule: not worn (unless a store buy), no quest item, no shield-armor money,
+	// not the control item of the summoned pet, not the enchant scroll in use, no adena
+	// unless allowed, not what the current cast consumes, tradable unless allowed.
+	public boolean isAvailable(Player player, boolean allowAdena, boolean allowNonTradable, boolean allowStoreBuy)
+	{
+		return ((!isEquipped() || allowStoreBuy)
+			&& (getItem().getType2() != 3)
+			&& (getItem().getType2() != 4 || getItem().getType1() != 1)
+			&& (player.getSummon() == null || getObjectId() != player.getSummon().getControlItemId())
+			&& (player.getActiveEnchantItem() != this)
+			&& (allowAdena || getItemId() != 57)
+			&& (player.getCast().getCurrentSkill() == null || player.getCast().getCurrentSkill().getItemConsumeId() != getItemId()) && (allowNonTradable || isTradable()));
 	}
 
 	public boolean isAugmented()

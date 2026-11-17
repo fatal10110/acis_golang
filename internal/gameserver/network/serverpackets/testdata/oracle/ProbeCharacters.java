@@ -9,7 +9,11 @@ import net.sf.l2j.gameserver.enums.actors.ClassRace;
 import net.sf.l2j.gameserver.enums.actors.MoveType;
 import net.sf.l2j.gameserver.enums.actors.OperateType;
 import net.sf.l2j.gameserver.enums.actors.Sex;
+import net.sf.l2j.gameserver.data.xml.NpcData;
+import net.sf.l2j.gameserver.data.xml.PlayerData;
 import net.sf.l2j.gameserver.model.actor.Boat;
+import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
+import net.sf.l2j.gameserver.model.actor.template.PlayerTemplate;
 import net.sf.l2j.gameserver.model.actor.container.player.BoatInfo;
 import net.sf.l2j.gameserver.model.actor.instance.Cubic;
 import net.sf.l2j.gameserver.model.location.Location;
@@ -99,6 +103,29 @@ final class ProbeCharacters
 		st.maxCp = 86;
 	}
 
+	// The bodies the player of row r reads: the template of its base class (collision by sex) and
+	// the two mounts a variant rides. The Go twin is newOraclePlayer and oracleMounts.
+	static void bodies(int r)
+	{
+		final PlayerTemplate t = new PlayerTemplate();
+		t.collisionRadius = dbl(r, 2);
+		t.collisionHeight = dbl(r, 3);
+		t.collisionRadiusFemale = dbl(r, 4);
+		t.collisionHeightFemale = dbl(r, 5);
+		PlayerData.getInstance().templates.put(ClassId.values()[CLASS_INDEX[r]].getId(), t);
+		mount(12526, dbl(0, 6), dbl(0, 7));
+		mount(12621, dbl(0, 8), dbl(0, 9));
+	}
+
+	private static void mount(int npcId, double radius, double height)
+	{
+		final NpcTemplate t = new NpcTemplate();
+		t.npcId = npcId;
+		t.collisionRadius = radius;
+		t.collisionHeight = height;
+		NpcData.getInstance().templates.put(npcId, t);
+	}
+
 	// A player of row r with the shared input; the derived stats are the values the Go
 	// calculators answer for a character with no template (all attributes 1, level 40).
 	static Player player(int r, int[] v)
@@ -133,8 +160,8 @@ final class ProbeCharacters
 		p.appearance.hairColor = f(v, 8);
 		p.appearance.nameColor = f(v, 9);
 		p.appearance.titleColor = f(v, 0) ^ f(v, 1);
-		p.collisionRadius = (f(v, 2) & 1) == 0 ? dbl(r, 2) : dbl(r, 4);
-		p.collisionHeight = (f(v, 2) & 1) == 0 ? dbl(r, 3) : dbl(r, 5);
+		p.baseClass = p.classId.getId();
+		bodies(r);
 
 		final var st = p.playerStatus;
 		st.level = 40;
@@ -171,8 +198,6 @@ final class ProbeCharacters
 		}
 		p.inventory.augmentationIds[Paperdoll.RHAND.getId()] = f(v, 8);
 		p.inventory.augmentationIds[Paperdoll.LHAND.getId()] = f(v, 9);
-		if (p.inventory.objectIds[Paperdoll.RHAND.getId()] != 0)
-			p.activeWeaponItem = new Object();
 		p.enchantEffect = Math.min(127, (f(v, 9) & 0x7fffffff) % 256);
 		return p;
 	}
@@ -182,6 +207,44 @@ final class ProbeCharacters
 		final Player p = player(r, v);
 		PacketProbe.emit("UserInfo" + n, new UserInfo(p));
 		PacketProbe.emit("CharInfo" + n, new CharInfo(p), new GameClient());
+	}
+
+	static void strider(Player p)
+	{
+		p.mounted = true;
+		p.mountType = 1;
+		p.mountNpcId = 12526;
+	}
+
+	static void wyvern(Player p)
+	{
+		p.mounted = true;
+		p.mountType = 2;
+		p.mountNpcId = 12621;
+		p.flying = true;
+	}
+
+	// Another class of another race is active; the body stays the base class's.
+	static void subclass(Player p)
+	{
+		final ClassId active = ClassId.values()[CLASS_INDEX[1]];
+		final PlayerTemplate decoy = new PlayerTemplate();
+		decoy.collisionRadius = dbl(0, 6);
+		decoy.collisionHeight = dbl(0, 7);
+		decoy.collisionRadiusFemale = dbl(0, 8);
+		decoy.collisionHeightFemale = dbl(0, 9);
+		PlayerData.getInstance().templates.put(active.getId(), decoy);
+		p.classId = active;
+	}
+
+	// Nothing in the right hand: the class's fists are the weapon.
+	static void unarmed(Player p)
+	{
+		p.inventory.objectIds[Paperdoll.RHAND.getId()] = 0;
+		p.inventory.itemIds[Paperdoll.RHAND.getId()] = 0;
+		p.inventory.augmentationIds[Paperdoll.RHAND.getId()] = 0;
+		// The enchant effect is the weapon's: none without one.
+		p.enchantEffect = 0;
 	}
 
 	private static final class Variant
@@ -223,19 +286,14 @@ final class ProbeCharacters
 			}),
 			new Variant("hero", p -> p.hero = true),
 			new Variant("noble", p -> p.noble = true),
-			new Variant("strider", p ->
+			new Variant("strider", ProbeCharacters::strider),
+			new Variant("wyvern", ProbeCharacters::wyvern),
+			new Variant("subclass", p ->
 			{
-				p.mounted = true;
-				p.mountType = 1;
-				p.mountNpcId = 12526;
+				live(p);
+				subclass(p);
 			}),
-			new Variant("wyvern", p ->
-			{
-				p.mounted = true;
-				p.mountType = 2;
-				p.mountNpcId = 12621;
-				p.flying = true;
-			}),
+			new Variant("unarmed", ProbeCharacters::unarmed),
 			new Variant("fishing", p ->
 			{
 				p.fishing = true;
@@ -330,7 +388,6 @@ final class ProbeCharacters
 		s.inCombat = (f(v, 1) & 1) != 0;
 		s.alikeDead = (f(v, 2) & 1) != 0;
 		s.name = ProbeSimple.STRS[r];
-		s.title = ProbeSimple.STRS[(r + 1) % ProbeSimple.STRS.length];
 		s.pvpFlag = (byte) (Math.abs(f(v, 4) % 3));
 		s.karma = f(v, 5);
 		s.getStatus().hp = f(v, 6);
@@ -362,6 +419,8 @@ final class ProbeCharacters
 		s.owner = new Player();
 		s.owner.name = "Master";
 		s.owner.online = true;
+		// A summon is titled with its owner's name when it is created.
+		s.title = s.owner.name;
 	}
 
 	private static void summons(int r, int[] v, String n) throws Exception

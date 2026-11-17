@@ -24,6 +24,10 @@ public final class PcInventory
 	public final List<ItemInfo> updateList = new ArrayList<>();
 	public int totalWeight;
 
+	// The player this inventory belongs to; the availability rule reads its pet, enchant
+	// scroll and cast.
+	public net.sf.l2j.gameserver.model.actor.Player owner;
+
 	// The adena a warehouse holds.
 	public int adena;
 
@@ -88,9 +92,12 @@ public final class PcInventory
 		final List<ItemInstance> out = new ArrayList<>();
 		for (ItemInstance it : items)
 		{
-			if ((!it.isEquipped() || allowStoreBuy) && it.getItem().getType2() != 3 && (it.getItem().getType2() != 4 || it.getItem().getType1() != 1) && (allowAdena || it.getItemId() != 57) && (allowNonTradable || !it.isAugmented()))
+			if (it != null && it.isAvailable(owner, allowAdena, allowNonTradable, allowStoreBuy))
 				out.add(it);
 		}
+		// The reference container is an ordered set: newest first, then the highest object id
+		// first. Every probed item has the same age.
+		out.sort((a, b) -> Integer.compare(b.getObjectId(), a.getObjectId()));
 		return out.toArray(new ItemInstance[0]);
 	}
 

@@ -11,6 +11,7 @@ public final class L2Skill
 	public boolean clanSkill;
 	public int reuseDelay;
 	public int reuseHashCode;
+	public int itemConsumeId;
 
 	public int getId()
 	{
@@ -40,6 +41,11 @@ public final class L2Skill
 	public int getReuseDelay()
 	{
 		return reuseDelay;
+	}
+
+	public int getItemConsumeId()
+	{
+		return itemConsumeId;
 	}
 
 	public int getReuseHashCode()

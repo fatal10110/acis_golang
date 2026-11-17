@@ -13,6 +13,13 @@ public final class Pet extends Summon
 	public int weapon;
 	public int armor;
 	public int inventoryLimit;
+	public int controlItemId;
+
+	@Override
+	public int getControlItemId()
+	{
+		return controlItemId;
+	}
 
 	public final class PetData
 	{

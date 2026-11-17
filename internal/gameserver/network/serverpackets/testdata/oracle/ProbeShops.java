@@ -128,6 +128,47 @@ final class ProbeShops
 
 	// ---- direct trade ----
 
+	// The items a trade window offers when the player has the pet's collar, the enchant scroll
+	// or the last cast's consumed item among free items: each of them is left out. The Go twin
+	// is oracleTradeStartHeld.
+	private static void tradeStartHeld(int[] v, String n) throws Exception
+	{
+		final String[] names = { "/plain", "/pet-collar", "/enchant-scroll", "/cast-consume", "/all-held" };
+		for (int k = 0; k < names.length; k++)
+		{
+			final Player player = new Player();
+			final ItemInstance weapon = distinct(ProbeItems.item(v, ProbeItems.WEAPON, false, false), ProbeItems.WEAPON);
+			final ItemInstance armor = distinct(ProbeItems.item(v, ProbeItems.ARMOR, false, false), ProbeItems.ARMOR);
+			final ItemInstance jewel = distinct(ProbeItems.item(v, ProbeItems.JEWEL, false, false), ProbeItems.JEWEL);
+			final ItemInstance adena = distinct(ProbeItems.item(v, ProbeItems.ADENA, false, false), ProbeItems.ADENA);
+			ProbeItems.load(player, new ItemInstance[] { weapon, armor, jewel, adena });
+			if (k == 1 || k == 4)
+			{
+				final net.sf.l2j.gameserver.model.actor.instance.Pet pet = new net.sf.l2j.gameserver.model.actor.instance.Pet();
+				pet.controlItemId = armor.getObjectId();
+				player.summon = pet;
+			}
+			if (k == 2 || k == 4)
+				player.activeEnchantItem = jewel;
+			if (k == 3 || k == 4)
+			{
+				player.cast.currentSkill = new net.sf.l2j.gameserver.skills.L2Skill();
+				player.cast.currentSkill.itemConsumeId = weapon.getItemId();
+			}
+			player.activeTradeList = new net.sf.l2j.gameserver.model.trade.TradeList();
+			player.activeTradeList.partner = new Player();
+			player.activeTradeList.partner.objectId = f(v, 3);
+			PacketProbe.emit("TradeStart" + names[k] + n, new TradeStart(player));
+		}
+	}
+
+	// Object ids are unique in the world: a row whose fields repeat still gets four distinct ones.
+	private static ItemInstance distinct(ItemInstance it, int kind)
+	{
+		it.objectId += (kind + 1) * 0x101;
+		return it;
+	}
+
 	private static void trade(int[] v, String n) throws Exception
 	{
 		final Player player = new Player();
@@ -136,6 +177,7 @@ final class ProbeShops
 		player.activeTradeList.partner = new Player();
 		player.activeTradeList.partner.objectId = f(v, 3);
 		PacketProbe.emit("TradeStart" + n, new TradeStart(player));
+		tradeStartHeld(v, n);
 
 		final int qty = f(v, 3);
 		for (int kind : new int[] { ProbeItems.WEAPON, ProbeItems.ADENA })

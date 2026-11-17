@@ -63,6 +63,14 @@ final class ProbeGMView
 		all.put("gm", p -> p.gm = true);
 		all.put("hero", p -> p.hero = true);
 		all.put("noble", p -> p.noble = true);
+		all.put("strider", ProbeCharacters::strider);
+		all.put("wyvern", ProbeCharacters::wyvern);
+		all.put("subclass", p ->
+		{
+			ProbeCharacters.live(p);
+			ProbeCharacters.subclass(p);
+		});
+		all.put("unarmed", ProbeCharacters::unarmed);
 		for (Map.Entry<String, Consumer<Player>> e : all.entrySet())
 		{
 			final Player p = ProbeCharacters.player(0, v);
