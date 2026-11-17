@@ -301,6 +301,7 @@ type journalStore struct {
 
 	mu       sync.Mutex
 	writeErr error
+	passes   int // store calls still let through before writeErr applies
 	applied  []questlog.Write
 }
 
@@ -314,6 +315,10 @@ func (s *journalStore) ListByOwner(ctx context.Context, ownerID int32) ([]questl
 func (s *journalStore) ApplyJournal(ctx context.Context, ownerID int32, writes []questlog.Write) error {
 	s.mu.Lock()
 	err := s.writeErr
+	if err != nil && s.passes > 0 {
+		s.passes--
+		err = nil
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return err
@@ -330,8 +335,17 @@ func (s *journalStore) ApplyJournal(ctx context.Context, ownerID int32, writes [
 // FailJournalWrites makes every quest journal drain fail with err from now
 // on, applying nothing; nil lets drains through again.
 func (s *Server) FailJournalWrites(err error) {
+	s.FailJournalWritesAfter(0, err)
+}
+
+// FailJournalWritesAfter lets the next n quest journal store calls through
+// to the database and makes every later one fail with err, applying
+// nothing, so a suite can fail a drain part way through; a nil err lets
+// every call through again.
+func (s *Server) FailJournalWritesAfter(n int, err error) {
 	s.quests.store.mu.Lock()
 	s.quests.store.writeErr = err
+	s.quests.store.passes = n
 	s.quests.store.mu.Unlock()
 }
 

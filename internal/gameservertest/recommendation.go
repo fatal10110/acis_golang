@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"context"
+	"sync"
 	"testing"
 )
 
@@ -23,18 +24,11 @@ func (s *Server) RefreshDailyRecommendations(tb testing.TB) {
 // RefreshDailyRecommendations.
 func (s *Server) StartDailyRecommendationRefresh(tb testing.TB) (wait func()) {
 	tb.Helper()
-	// The refresh pauses every lane until the held one reaches the pause,
-	// so until it returns no lane is free for a catch-up to flush: count
-	// them all as held, or every client read waits out catchUpTimeout.
-	for i := range s.heldLanes {
-		s.heldLanes[i].Add(1)
-	}
+	resume := s.holdEveryLane()
 	done := make(chan error, 1)
 	go func() {
 		err := s.refreshRecommendations(context.Background())
-		for i := range s.heldLanes {
-			s.heldLanes[i].Add(-1)
-		}
+		resume()
 		done <- err
 	}()
 	return func() {
@@ -43,5 +37,36 @@ func (s *Server) StartDailyRecommendationRefresh(tb testing.TB) (wait func()) {
 			tb.Fatalf("refresh daily recommendations: %v", err)
 		}
 		s.Settle(tb)
+	}
+}
+
+// ExpectEveryLanePaused is for a suite that holds a persistence lane while
+// a scheduled start's offloaded work pauses every lane behind it (the daily
+// recommendation refresh): until resume is called (also on cleanup), the
+// catch-up before a client read flushes no lane, since none can drain, and
+// the read does not wait out catchUpTimeout. Call resume once that work has
+// returned, which Settle waits for.
+func (s *Server) ExpectEveryLanePaused(tb testing.TB) (resume func()) {
+	tb.Helper()
+	resume = s.holdEveryLane()
+	cleanup(tb, resume)
+	return resume
+}
+
+// holdEveryLane counts every persistence lane as held until the returned
+// release is called: a refresh pausing every lane until a held one reaches
+// the pause leaves no lane free for a catch-up to flush, and without this
+// every client read would wait out catchUpTimeout.
+func (s *Server) holdEveryLane() (release func()) {
+	for i := range s.heldLanes {
+		s.heldLanes[i].Add(1)
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			for i := range s.heldLanes {
+				s.heldLanes[i].Add(-1)
+			}
+		})
 	}
 }

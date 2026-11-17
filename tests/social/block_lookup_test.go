@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -57,10 +58,14 @@ func TestBlockLookupHoldsNoQueue(t *testing.T) {
 }
 
 // awaitLookupOnLock returns once the server's name lookup is waiting on the
-// characters table lock.
+// characters table lock, failing the test if it never gets there.
 func awaitLookupOnLock(t *testing.T, p *pair) {
 	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
 	for {
+		if time.Now().After(deadline) {
+			t.Fatal("the name lookup never waited on the characters table lock")
+		}
 		var n int
 		if err := p.srv.DB.QueryRowContext(context.Background(),
 			`SELECT COUNT(*) FROM information_schema.PROCESSLIST
