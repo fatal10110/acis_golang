@@ -152,7 +152,7 @@ func TestSweepEarnsPooledItemsAndClearsPool(t *testing.T) {
 	caster := &spoilFakeCaster{id: 1}
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 	target.pool.Mark(1)
-	target.pool.Add(57, 10)
+	target.pool.Put(57, 10)
 
 	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 
@@ -171,7 +171,7 @@ func TestSweepEarnsInPoolOrder(t *testing.T) {
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 	target.pool.Mark(1)
 	for _, id := range []int32{1869, 1876, 1864, 116, 1872} {
-		target.pool.Add(id, 1)
+		target.pool.Put(id, 1)
 	}
 
 	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
@@ -197,7 +197,7 @@ func TestSweepByNonPlayerLeavesPool(t *testing.T) {
 	caster := &manorFakeCaster{id: 1}
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 	target.pool.Mark(1)
-	target.pool.Add(57, 10)
+	target.pool.Put(57, 10)
 
 	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 	if !target.pool.IsSpoiler(1) || !target.pool.Sweepable() {

@@ -214,14 +214,14 @@ func TestFolkFollowRollsToMove(t *testing.T) {
 }
 
 // TestFolkFollowHoldsWithinItsLooseRadius follows NpcAI.thinkFollow 210: a
-// target within 150 draws no step.
+// target nearer than 150 draws no step.
 func TestFolkFollowHoldsWithinItsLooseRadius(t *testing.T) {
 	r := newFolkFollowRig(t)
 	nearby := &hostileTarget{id: 3, playable: true}
-	r.f.world.Spawn(nearby, 100+folkFollowLooseRadius, 0, 0, 0)
+	r.f.world.Spawn(nearby, 100+folkFollowLooseRadius-1, 0, 0, 0)
 	r.follow(nearby, 1)
 	if r.f.IsMoving() {
-		t.Fatal("the follower moved toward a target 150 away, want it to hold")
+		t.Fatal("the follower moved toward a target 149 away, want it to hold")
 	}
 }
 

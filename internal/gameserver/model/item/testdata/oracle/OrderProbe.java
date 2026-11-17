@@ -111,5 +111,10 @@ public final class OrderProbe
 		sweep("high-bits", rows(65536, 1, 131073, 196609, 2, 65538));
 		sweep("two-categories", rows(1868, 57, 1458), rows(1869, 1460, 65537));
 		sweep("two-categories-fill-past-twelve", rows(range(1458, 1465)), rows(range(1865, 1871)));
+		sweep("repeated-item-replaces-in-its-slot", rows(48, 16, 57), new int[][]
+		{
+			row(48, 5),
+			row(1868, 7)
+		});
 	}
 }
