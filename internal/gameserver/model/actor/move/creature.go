@@ -627,7 +627,7 @@ func (m *CreatureMove) flagTypeLocked() MoveType {
 // the ground plane for a ground mover, through space otherwise.
 func span(t MoveType, dx, dy, dz float64) float64 {
 	if t == MoveGround {
-		return math.Hypot(dx, dy)
+		return math.Sqrt(dx*dx + dy*dy)
 	}
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
