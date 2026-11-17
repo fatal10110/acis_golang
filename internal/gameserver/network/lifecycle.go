@@ -64,6 +64,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.scripts != nil {
 		l.scripts.PlayerDetached(live.Character)
 	}
+	// The scroll selection belongs to this session's enchant window: the
+	// next login starts with none, so nothing it does is gated or answered
+	// as if the window were still open.
+	l.enchanting.scrolls.Clear(live.ObjectID())
 	// Out of party matching while still in sight, so its observers see it
 	// leave its room; marked as departing first, so no room or waiting
 	// list takes it back in.
