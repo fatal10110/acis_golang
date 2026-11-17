@@ -176,8 +176,18 @@ func TestNPCDeathStripsEffectsWithoutPerEffectStatus(t *testing.T) {
 	if su := speedStatusUpdates(seen); len(su) != 0 {
 		t.Fatalf("Watcher got speed StatusUpdates %+v after the monster's death strip, want none", su)
 	}
-	if got := framesWithOpcode(seen, serverpackets.OpcodeNPCInfo); len(got) != 0 {
-		t.Fatalf("Watcher got %d NpcInfo frames after the monster's death strip, want none (opcodes % x)", len(got), opcodeList(seen))
+	// The only NpcInfo is the one following the dead monster's switch to
+	// its walk stance; the death strip itself sends none.
+	if got := framesWithOpcode(seen, serverpackets.OpcodeNPCInfo); len(got) != 1 {
+		t.Fatalf("Watcher got %d NpcInfo frames after the monster's death strip, want 1 after the walk stance (opcodes % x)", len(got), opcodeList(seen))
+	}
+	info := opcodeIndex(seen, serverpackets.OpcodeNPCInfo)
+	if info < 1 || seen[info-1][0] != serverpackets.OpcodeChangeMoveType {
+		t.Fatalf("NpcInfo after the death does not follow a ChangeMoveType (opcodes % x)", opcodeList(seen))
+	}
+	stance := wireReader(seen[info-1][1:])
+	if id, running := stance.ReadInt32(), stance.ReadInt32(); id != mob.ObjectID() || running != 0 {
+		t.Fatalf("ChangeMoveType before the death NpcInfo = {id %d, running %d}, want {%d, 0}", id, running, mob.ObjectID())
 	}
 	if opcodeIndex(seen, serverpackets.OpcodeDie) < 0 {
 		t.Fatalf("Watcher got no Die of the monster (opcodes % x)", opcodeList(seen))
