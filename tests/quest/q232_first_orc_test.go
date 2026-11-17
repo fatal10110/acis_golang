@@ -111,6 +111,9 @@ func TestQ232MartankusCallsOneFirstOrc(t *testing.T) {
 	if rows := questRows(t, w.srv, w.player, q232Name); rows["<cond>"] != "7" {
 		t.Fatalf("rows %v, want cond 7", rows)
 	}
+	if !w.srv.DrivesClock() {
+		t.Skip("the next wait is pinned to the last 100 ms before a deadline, which the wall clock does not meet")
+	}
 	w.advance(t, 9999*time.Millisecond)
 	if n := len(npcsOf(w.srv, q232FirstOrc)); n != 1 {
 		t.Fatalf("%d First Orcs 9999 ms after its page, want 1", n)

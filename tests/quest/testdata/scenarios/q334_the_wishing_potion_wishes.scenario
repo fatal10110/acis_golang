@@ -7,6 +7,7 @@
 # The wishes that call something out (a fairy, demons, a chest) are in tests/quest/q334_spawns_test.go:
 # a scenario cannot see or talk to an NPC a script spawns (#4020 item 5). Expectations replay the
 # reference trace of this scenario.
+driven
 trace internal/gameserver/script/testdata/oracle/scenarios/q334_the_wishing_potion_wishes.golden
 character Seeker 30
 quest Q334_TheWishingPotion <state>=STARTED <cond>=5

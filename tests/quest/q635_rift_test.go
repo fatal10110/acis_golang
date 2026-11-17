@@ -127,7 +127,9 @@ func (w *q635World) now() time.Time { return w.start.Add(time.Duration(w.elapsed
 // step moves the world's clock d on.
 func (w *q635World) step(t *testing.T, d time.Duration) {
 	t.Helper()
-	w.elapsed.Add(int64(d))
+	if passed := time.Duration(w.elapsed.Add(int64(d))); !w.srv.DrivesClock() && passed > 30*time.Second {
+		t.Skipf("waiting %v on the wall clock in all; the driven clock covers the rest", passed)
+	}
 	w.srv.Advance(t, d)
 }
 

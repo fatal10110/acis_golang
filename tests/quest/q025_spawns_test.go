@@ -219,6 +219,9 @@ func TestQ025CoffinHoldsTheDress(t *testing.T) {
 	t.Run("sinks", func(t *testing.T) {
 		t.Parallel()
 		w, _ := coffinWorld(t)
+		if !w.srv.DrivesClock() {
+			t.Skip("the next wait is pinned to the last 100 ms before a deadline, which the wall clock does not meet")
+		}
 		w.advance(t, 19900*time.Millisecond)
 		if n := len(npcsOf(w.srv, q025Coffin)); n != 1 {
 			t.Fatalf("%d coffins 19.9 s after the raise, want 1", n)

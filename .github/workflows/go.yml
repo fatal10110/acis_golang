@@ -62,6 +62,9 @@ jobs:
           - name: pool-admin-npcs
             cache: rest
             pool: ./tests/admin ./tests/npcs
+          - name: pool-quest
+            cache: rest
+            pool: ./tests/quest ./tests/olympiad
           - name: pool-small
             cache: rest
             pool: ./tests/bbs ./tests/boat ./tests/botswarm ./tests/clan ./tests/duel ./tests/fishchamp ./tests/idfactory ./tests/lottery ./tests/party ./tests/perf ./tests/petition ./tests/wedding
@@ -79,9 +82,7 @@ jobs:
       # The tests/ packages the real pool does not run, each with its reason.
       # A tests/ package on no `pool` list and not named here fails `rest`.
       POOL_EXCLUDED: |
-        ai: its boss and hall scenarios wait out minutes of timers per test, so a pool pass cuts about 80 tests at long waits and still runs past 17 minutes; the wall-clock boundary assertions are tracked in #5301
-        olympiad: its match tests wait out wall-clock countdowns of 65-88 s each and a pool pass hit a 15 minute timeout; tracked in #5301
-        quest: a pool pass takes about 13 minutes and fails 19 tests on wall-clock boundary and timing assumptions; tracked in #5301
+        ai: its boss and hall scenarios wait out minutes of timers per test; a pool pass of main measured 22 failures on wall-clock boundary assertions, 83 cuts at long waits, and a run that was still going after 15 minutes with 1255 tests unfinished; tracked in #5301
       STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:
