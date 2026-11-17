@@ -145,9 +145,14 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	if err != nil {
 		return loginServerConfig{}, err
 	}
-	maxConnections, _, err := props.OptionalInt("MaxConnections")
+	maxConnections, set, err := props.OptionalInt("MaxConnections")
 	if err != nil {
 		return loginServerConfig{}, err
+	}
+	// An absent key keeps the default pool size; a present one must name a
+	// usable pool.
+	if set && maxConnections < 1 {
+		return loginServerConfig{}, fmt.Errorf("MaxConnections %d must be at least 1", maxConnections)
 	}
 	acceptFilter, err := config.AcceptFilter(props)
 	if err != nil {

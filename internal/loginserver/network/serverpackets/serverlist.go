@@ -6,11 +6,9 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 // servers a client may choose from.
 const OpcodeServerList = 0x04
 
-// ServerEntry is one game server row encoded into a ServerList packet.
-// Callers assemble these from registered-gameserver and account state once
-// that layer is ported (account/ban persistence and the gameserver
-// registry, milestone M1) - this encoder only reproduces the wire bytes for
-// already-resolved fields.
+// ServerEntry is one game server row encoded into a ServerList packet. The
+// caller resolves every field from the game server registry and the
+// requesting account; this encoder only writes them.
 type ServerEntry struct {
 	ID             byte
 	IP             [4]byte

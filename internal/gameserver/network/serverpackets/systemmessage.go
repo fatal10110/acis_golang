@@ -328,6 +328,8 @@ type SystemMessageParam struct {
 	Type  int32
 	Text  string
 	Value int32
+	// Level is a skill-name parameter's skill level; Value is its skill id.
+	Level int32
 	// X, Y and Z are a zone-name parameter's point.
 	X, Y, Z int32
 }
@@ -358,6 +360,12 @@ func ItemNumberParam(n int32) SystemMessageParam {
 	return SystemMessageParam{Type: SystemMessageParamItemNumber, Value: n}
 }
 
+// SkillNameParam is a skill-name parameter: the client names the skill at
+// that level.
+func SkillNameParam(skillID, level int32) SystemMessageParam {
+	return SystemMessageParam{Type: SystemMessageParamSkillName, Value: skillID, Level: level}
+}
+
 // FrameSystemMessageParams builds a SystemMessage packet with params in
 // order.
 func FrameSystemMessageParams(id int, params ...SystemMessageParam) wire.Frame {
@@ -373,6 +381,9 @@ func FrameSystemMessageParams(id int, params ...SystemMessageParam) wire.Frame {
 			w.WriteInt32(p.X)
 			w.WriteInt32(p.Y)
 			w.WriteInt32(p.Z)
+		case SystemMessageParamSkillName:
+			w.WriteInt32(p.Value)
+			w.WriteInt32(p.Level)
 		default:
 			w.WriteInt32(p.Value)
 		}

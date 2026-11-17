@@ -806,8 +806,8 @@ type GameClientLinkConfig struct {
 	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
-	// Boats is the scheduled boat fleet //reload boat rebuilds; nil leaves
-	// that reload not ported.
+	// Boats is the scheduled boat fleet //reload boat rebuilds; nil makes
+	// that reload log the gap and answer ActionFailed.
 	Boats *boat.Fleet
 	// Reloads re-read the data tables //reload and //respawnall name; a
 	// nil hook leaves its table as booted.

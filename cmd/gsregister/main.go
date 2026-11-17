@@ -198,6 +198,10 @@ func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.Server
 			}
 
 			filename := fmt.Sprintf("hexid(server %d).txt", id)
+			// A hexid file that could not be written is reported in place of
+			// the registered lines, never alongside them: telling the
+			// operator to install a file that does not exist would only
+			// surface later as a refused game server.
 			if err := model.WriteHexIDFile(filepath.Join(dir, filename), id, key, time.Now()); err != nil {
 				fmt.Fprintf(out, "Failed to save hex ID to '%s' file: %v\n", filename, err)
 				continue

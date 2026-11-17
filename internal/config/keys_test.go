@@ -116,14 +116,23 @@ func TestKeyTablesCoverTheReferenceKeys(t *testing.T) {
 }
 
 // TestReadKeysHaveAReader holds the key tables to the code: every Read key
-// is spelled as a string literal somewhere in the servers' non-test code,
+// is spelled as a string literal somewhere in that server's non-test code,
 // and no ignored or pending key is, so wiring one fails here until it moves
-// into Read.
+// into Read. Each server is checked without the other server's packages, so
+// a key one server reads cannot vouch for the same key in the other's file.
 func TestReadKeysHaveAReader(t *testing.T) {
 	t.Parallel()
-	literals := sourceLiterals(t, filepath.Join("..", "..", "cmd"), filepath.Join("..", "..", "internal"))
-	for _, tables := range []map[string]keySet{gameServerKeys, loginServerKeys} {
-		for file, set := range tables {
+	cmd, internal := filepath.Join("..", "..", "cmd"), filepath.Join("..", "..", "internal")
+	servers := []struct {
+		tables map[string]keySet
+		skip   []string
+	}{
+		{gameServerKeys, []string{filepath.Join(cmd, "loginserver"), filepath.Join(internal, "loginserver")}},
+		{loginServerKeys, []string{filepath.Join(cmd, "gameserver"), filepath.Join(internal, "gameserver")}},
+	}
+	for _, server := range servers {
+		literals := sourceLiterals(t, server.skip, cmd, internal)
+		for file, set := range server.tables {
 			for _, key := range set.Read {
 				if !literals[key] {
 					t.Errorf("%s %s: listed as read, but no code spells the key", file, key)
@@ -139,13 +148,16 @@ func TestReadKeysHaveAReader(t *testing.T) {
 }
 
 // sourceLiterals returns every string literal of the non-test Go files
-// under roots, keys.go itself left out.
-func sourceLiterals(t *testing.T, roots ...string) map[string]bool {
+// under roots, keys.go itself and the directories in skip left out.
+func sourceLiterals(t *testing.T, skip []string, roots ...string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
 	fset := token.NewFileSet()
 	for _, root := range roots {
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err == nil && d.IsDir() && slices.Contains(skip, filepath.Clean(path)) {
+				return filepath.SkipDir
+			}
 			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return err
 			}

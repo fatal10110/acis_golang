@@ -13,6 +13,11 @@ func Get(n int) int {
 
 // GetRange returns a pseudo-random int in [min, max], inclusive of both
 // ends. It panics if max < min.
+//
+// max stays reachable even at math.MaxInt32. A generator whose exclusive
+// bound is an int32 cannot express max+1 there and caps the range at
+// [min, MaxInt32) instead; no caller passes MaxInt32 as max, so the two
+// never differ in practice.
 func GetRange(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }

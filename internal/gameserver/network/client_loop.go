@@ -227,7 +227,15 @@ func (l *GameClientLink) logReadFrameError(client *Client, err error) {
 // answering ActionFailed at most once per second of ongoing flood. After
 // counting (so dropped frames never reach a handler), an excess of detected
 // floods per minute disconnects, as does a hard cap on packets processed
-// pre-auth. The queue-size accounting and burst cap of a queued packet
+// pre-auth.
+//
+// Both disconnect checks run on every received frame, including an empty or
+// unaccepted one about to be refused below. Counting only frames that
+// decode would let a flood of junk frames dodge the flood disconnect; the
+// cost is that, in game, a junk frame can be the one that trips it, one
+// frame earlier than a count of decoded packets would. Pre-auth the two
+// orders disconnect on the same frame, since any refused opcode there
+// disconnects anyway. The queue-size accounting and burst cap of a queued packet
 // reader have no counterpart here: the read loop processes each frame
 // inline with its read, so there is no inbound queue to overflow or drain
 // in batches.
