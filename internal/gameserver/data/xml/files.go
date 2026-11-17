@@ -161,7 +161,8 @@ func permissiveBool(raw string) bool {
 }
 
 // dashPairAttr is a "left-right" attribute (an item requirement or a
-// shared-reuse skill reference): a 32-bit id and a plain count/level.
+// shared-reuse skill reference): a 32-bit id and a plain count/level. A
+// third part is an error rather than ignored (issue #4779).
 type dashPairAttr struct {
 	ID    int32
 	Count int

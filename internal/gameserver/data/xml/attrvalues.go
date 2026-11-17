@@ -316,7 +316,9 @@ func (a *attrValues) float32Default(key string, def float32) float32 {
 }
 
 // float64 returns the value at key as a float64, recording an error if key
-// is absent.
+// is absent. Deliberately strict (issue #4779): surrounding white space or
+// a "d"/"f" suffix is a parse error rather than read as the number, so a
+// hand-edited value fails its skill instead of loading silently.
 func (a *attrValues) float64(key string) float64 {
 	if a.err != nil {
 		return 0

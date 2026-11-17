@@ -617,7 +617,12 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		Stat:         attrEnumDefault(a, "stat", parseStatConstant, ""),
 		IgnoreShield: a.boolDefault("ignoreShld", false),
 
-		SkillType:  attrSkillType(a),
+		SkillType: attrSkillType(a),
+		// effectType, chanceType and negateStats are kept as written, not
+		// checked against their name sets at load (issue #4779): an unknown
+		// name loads and simply matches nothing. effectId defaults to 0 for
+		// every type, signets included; no consumer reads the default and
+		// every shipped signet sets it.
 		EffectType: a.strDefault("effectType", ""),
 
 		EffectID:    a.intDefault("effectId", 0),

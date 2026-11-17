@@ -52,7 +52,7 @@ type towerStatsElement struct {
 type castleTicketElement struct {
 	ItemID     *coord   `xml:"itemId,attr"`
 	Type       string   `xml:"type,attr"`
-	Stationary boolAttr `xml:"stationary,attr"`
+	Stationary boolAttr `xml:"stationary,attr"` // defaults to false, not required (issue #4781)
 	NPCID      *coord   `xml:"npcId,attr"`
 	MaxAmount  *coord   `xml:"maxAmount,attr"`
 	SSQ        string   `xml:"ssq,attr"`
@@ -431,10 +431,12 @@ func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
 	}
 
 	return clanhall.NewHall(clanhall.HallAttrs{
-		ID:             id,
-		ParentID:       parentID,
-		Alias:          attrs["alias"],
-		Name:           attrs["name"],
+		ID:       id,
+		ParentID: parentID,
+		Alias:    attrs["alias"],
+		Name:     attrs["name"],
+		// desc and loc default to "" instead of being required (issue
+		// #4781; every shipped hall sets both).
 		Description:    attrs["desc"],
 		Town:           attrs["loc"],
 		AuctionMin:     fees[0],
@@ -469,6 +471,10 @@ func buildResidenceTax(attrs residenceAttrs) (residence.Tax, error) {
 	return residence.Tax{Rate: rate, SysgetRate: sysgetRate, TributeRate: tributeRate}, nil
 }
 
+// buildResidenceZones reads a residence's <zones> block. Deliberately
+// strict (issue #4781): no server logic reads these zones, yet an unknown
+// type or a missing minZ/maxZ fails the castle or clan hall load rather
+// than being skipped unread.
 func buildResidenceZones(elems []residenceZoneElement) ([]residence.Zone, error) {
 	zones := make([]residence.Zone, 0, len(elems))
 	for _, el := range elems {
