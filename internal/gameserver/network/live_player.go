@@ -560,6 +560,10 @@ func (p *livePlayer) clientDetached() bool {
 	return p.sessionEnded.Load() || p.detached()
 }
 
+// ClientDetached is clientDetached, for consumers outside this package that
+// hold p as a world player.
+func (p *livePlayer) ClientDetached() bool { return p.clientDetached() }
+
 // saveState copies p's character row for an in-game save, marking a copy
 // taken while p lingers after its connection dropped.
 func (p *livePlayer) saveState() player.SaveState {

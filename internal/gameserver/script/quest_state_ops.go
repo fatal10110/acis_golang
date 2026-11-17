@@ -121,21 +121,25 @@ func (p *Player) Apprentice() int32 { return p.character().Apprentice() }
 // mentorRange is how near an academy sponsor or apprentice must stand.
 const mentorRange = 1500
 
-// SponsorInRange reports whether the player's academy sponsor is a member of
-// its clan in the world, strictly within 1500 of it.
+// SponsorInRange reports whether the player's academy sponsor is an online
+// member of its clan, strictly within 1500 of it.
 func (s *Script) SponsorInRange(p *Player) bool {
 	return s.clanMateInRange(p, p.Sponsor()) != nil
 }
 
-// ApprenticeInRange returns the player's academy apprentice when it is a
-// member of its clan in the world, strictly within 1500 of it; nil
-// otherwise.
+// ApprenticeInRange returns the player's academy apprentice when it is an
+// online member of its clan, strictly within 1500 of it; nil otherwise.
 func (s *Script) ApprenticeInRange(p *Player) *Player {
 	return s.clanMateInRange(p, p.Apprentice())
 }
 
-// clanMateInRange returns the player objectID when it is in the world, in
-// p's clan and strictly within mentorRange of p; nil otherwise.
+// clientHolder is a world player that knows whether its client is gone.
+type clientHolder interface{ ClientDetached() bool }
+
+// clanMateInRange returns the player objectID when it is online, in p's
+// clan and strictly within mentorRange of p; nil otherwise. A player whose
+// client is gone is offline, though it lingers in the world until it
+// leaves.
 func (s *Script) clanMateInRange(p *Player, objectID int32) *Player {
 	clanID := p.ClanID()
 	if objectID == 0 || clanID == 0 {
@@ -143,6 +147,9 @@ func (s *Script) clanMateInRange(p *Player, objectID int32) *Player {
 	}
 	mate := s.WorldPlayer(objectID)
 	if mate == nil || mate.ClanID() != clanID || !InRadius3D(p, mate, mentorRange) {
+		return nil
+	}
+	if c, ok := mate.self.(clientHolder); ok && c.ClientDetached() {
 		return nil
 	}
 	return mate
