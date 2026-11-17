@@ -127,6 +127,25 @@ func tutorialFrames(frames [][]byte) [][]byte {
 	return out
 }
 
+// tutorialFramesWant returns what is queued to the client. On the wall clock
+// it lets time pass in small steps until n tutorial frames have arrived. A step due exactly
+// where the span before ended can fire a few milliseconds late on the wall
+// clock, and a hook that armed its timer after the burst was read puts the
+// deadline that much later. A driven clock has fired it by then, so the read
+// there is exact, unfiltered, and a step that fires late is caught.
+func tutorialFramesWant(t *testing.T, srv *gameservertest.Server, n int) [][]byte {
+	t.Helper()
+	if srv.DrivesClock() {
+		return srv.ReadQueued(t, srv.Client)
+	}
+	var got [][]byte
+	srv.AdvanceUntil(t, "the tutorial frames", func() bool {
+		got = append(got, tutorialFrames(srv.ReadQueued(t, srv.Client))...)
+		return len(got) >= n
+	})
+	return got
+}
+
 // voiceFrame is the tutorial voice file played to the player objID at at.
 func voiceFrame(objID int32, at location.Location, file string) wire.Frame {
 	return serverpackets.FramePlaySoundAt(serverpackets.Sound{Type: 2, File: file, BindToObject: true, ObjectID: objID, Location: at})
@@ -172,13 +191,13 @@ func TestNewCharacterTutorialFirstSteps(t *testing.T) {
 		t.Fatalf("before 10 s sent %x, want nothing", got)
 	}
 	srv.Advance(t, time.Second)
-	expectFrames(t, "first step", srv.ReadQueued(t, srv.Client),
+	expectFrames(t, "first step", tutorialFramesWant(t, srv, 2),
 		voiceFrame(objID, at, "tutorial_voice_001a"), tutorialPageFrame(t, "tutorial_human_fighter001.htm"))
 	if n := srv.PlayerItemCount(t, objID, tutorialGuideID); n != 1 {
 		t.Fatalf("guides = %d, want the one the class grants", n)
 	}
 	srv.Advance(t, 30*time.Second)
-	expectFrames(t, "second step", srv.ReadQueued(t, srv.Client), voiceFrame(objID, at, "tutorial_voice_002"))
+	expectFrames(t, "second step", tutorialFramesWant(t, srv, 1), voiceFrame(objID, at, "tutorial_voice_002"))
 
 	restart(t, srv)
 	srv.FlushPersistence(t)

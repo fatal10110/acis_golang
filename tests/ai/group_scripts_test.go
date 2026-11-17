@@ -146,6 +146,7 @@ func TestFollowerComesWithItsMasterAndWalksBesideIt(t *testing.T) {
 	srv, at := bootGroupScript(t, "script.ai.group.FollowerMovingAroundMaster", follower.New,
 		map[int32]script.NPCKind{telsonID: script.KindFolk, dorothyID: script.KindFolk},
 		[]*npc.Template{golem}, draws)
+	needsDrivenClock(t, srv)
 
 	masterAt := location.Location{X: at.X + 100, Y: at.Y, Z: at.Z}
 	master := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", int(telsonID)), masterAt)

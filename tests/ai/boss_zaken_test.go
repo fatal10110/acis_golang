@@ -244,6 +244,7 @@ func (w *zakenWorld) wantCounts(t *testing.T, when string, want map[int32]int) {
 func TestZakenAppearsAndPlacesItsWaves(t *testing.T) {
 	t.Parallel()
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	h := w.zaken(t)
 	if got := zakenDest(h); got != zakenHome {
 		t.Errorf("Instant Move point = %v, want where Zaken appeared, %v", got, zakenHome)
@@ -475,6 +476,7 @@ func TestZakenScattersItsTargets(t *testing.T) {
 	room3 := location.Location{X: 54950, Y: 218790, Z: -3488}
 	room6 := location.Location{X: 55970, Y: 217770, Z: -3216}
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	h := w.zaken(t)
 	w.settle(t)
 	w.draws.set(1<<30, 9)
@@ -551,6 +553,7 @@ func TestZakenMassTeleportSendsAMarkOnce(t *testing.T) {
 func TestZakenBringsBackADeadPrivate(t *testing.T) {
 	t.Parallel()
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	w.settle(t)
 	alive := func() int {
 		n := 0
@@ -610,6 +613,7 @@ func TestZakenBringsBackADeadPrivate(t *testing.T) {
 func TestZakenSeesAndMarks(t *testing.T) {
 	t.Parallel()
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	h := w.zaken(t)
 	w.settle(t)
 	if _, ok := attackOn(h, w.player); ok {
