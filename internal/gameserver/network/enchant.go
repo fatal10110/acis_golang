@@ -441,7 +441,7 @@ const itemWriteRowWait = 20 * time.Millisecond
 // (persist.Write.Run). The write is owed on laneOwner's lane and on the lane
 // of every owner in alsoOwed, so waiting on any of them waits for it.
 //
-// A lane serves every owner that maps to it (persist.Lanes of them for the
+// A lane serves every owner that maps to it (a handful of lanes for the
 // whole world), so a write that simply waited for its rows would stall the
 // character, shortcut, skill and pet writes queued behind it — and a row can
 // be held by the persistence tick's chunk for its whole transaction.

@@ -309,18 +309,25 @@ func (s *Server) parkedOnHeldLane(ct *connTraffic) bool {
 
 func (s *Server) flushUnheldLanes() error {
 	// One owner id per unheld lane: Flush takes owners, not lanes.
+	// The game-wide services' lane serves persist.ServiceOwner alone, so it
+	// is named; the other lanes are found by probing ids from 0.
 	var owners []int32
 	var seen [persist.Lanes]bool
-	for id, found := int32(0), 0; found < persist.Lanes; id++ {
+	found := 0
+	visit := func(id int32) {
 		lane := persist.LaneIndex(id)
 		if seen[lane] {
-			continue
+			return
 		}
 		seen[lane] = true
 		found++
 		if s.heldLanes[lane].Load() == 0 {
 			owners = append(owners, id)
 		}
+	}
+	visit(persist.ServiceOwner)
+	for id := int32(0); found < persist.Lanes; id++ {
+		visit(id)
 	}
 	if len(owners) == 0 {
 		return nil

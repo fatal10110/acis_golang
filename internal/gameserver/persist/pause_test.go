@@ -26,12 +26,12 @@ func TestPauseRunsBetweenEarlierAndLaterJobsOnEveryLane(t *testing.T) {
 	}
 	busy := make(chan struct{})
 	w.Enqueue(1, func() { <-busy })
-	for owner := range int32(Lanes) {
+	for _, owner := range laneOwners {
 		w.Enqueue(owner, func() { record("before") })
 	}
 
 	p := w.Pause()
-	for owner := range int32(Lanes) {
+	for _, owner := range laneOwners {
 		w.Enqueue(owner, func() { record("after") })
 	}
 	done := make(chan error, 1)
