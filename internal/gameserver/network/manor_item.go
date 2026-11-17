@@ -28,8 +28,8 @@ func (c ManorConfig) rules() itemhandler.ManorRules {
 // useManorItem answers UseItem on a seed or a harvester. A seed is sown on
 // the targeted monster with the seed itself carrying the cast; a harvester
 // casts the harvest skill on the targeted corpse. Each refusal is answered
-// by its system message alone, or by nothing where the specified handler is
-// silent: a use-item request leaves no client action pending. It reports
+// by its system message alone, or by nothing where the refusal is
+// silent by design: a use-item request leaves no client action pending. It reports
 // whether inst is a manor item.
 func (l *GameClientLink) useManorItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) bool {
 	decision := itemhandler.ResolveManorItem(tmpl, live.Character, l.manor.rules(), l.skills)
@@ -53,7 +53,7 @@ func (l *GameClientLink) useManorItem(live *livePlayer, inv *itemcontainer.Inven
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSeedHasBeenSown))
 	case itemhandler.ManorSilent:
 		// A disabled manor, an item no seed row names and a missing skill
-		// are refused with no packet, as specified.
+		// are refused with no packet by design.
 	}
 	return true
 }

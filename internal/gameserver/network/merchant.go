@@ -78,12 +78,12 @@ func (l *GameClientLink) showWearWindow(live *livePlayer, f *npc.Folk, listID in
 // completed purchase shows the merchant's -bought page when it has one,
 // then the full item list.
 //
-// Every refusal specified with a system message answers so here; a row
+// Every refusal that carries a system message answers with it; a row
 // whose price or weight leaves the int32 range answers as too little adena
 // or too much weight, then ActionFailed. The others (an unknown list, a
 // game master's list sent by anyone else, an untargeted or unreachable
 // seller, an item off the list, an unpriced item, a count over the stock,
-// a total price overflowing the adena range) answer nothing, as specified. The
+// a total price overflowing the adena range) answer nothing by design. The
 // buy window's submit leaves no client action pending, so that silence
 // cannot hang the client.
 func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.RequestBuyItem) {
@@ -174,7 +174,7 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 // An empty request or an out-of-range list id answers ActionFailed, and
 // two items for one slot or too little adena a system message. The other
 // refusals (an untargeted or unreachable merchant, an unknown list, an
-// item off the list) answer nothing, as specified; the try-on
+// item off the list) answer nothing by design; the try-on
 // window's submit leaves no client action pending.
 func (l *GameClientLink) requestPreviewItem(live *livePlayer, req clientpackets.RequestPreviewItem) {
 	if len(req.Items) < 1 || req.ListID >= maxPreviewListID {

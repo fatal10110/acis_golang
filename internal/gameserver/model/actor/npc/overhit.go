@@ -45,12 +45,16 @@ func (o *overhitState) test(attacker attackable.Combatant, currentHP, damage flo
 	o.attacker = attacker
 }
 
+// overhitBonusCapPercent caps the overhit bonus, as a percentage of the
+// kill's normal experience.
+const overhitBonusCapPercent = 25
+
 func (o *overhitState) bonusExp(normalExp int64, maxHP float64) int64 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	percentage := (o.damage * 100) / maxHP
-	if percentage > 25 {
-		percentage = 25
+	if percentage > overhitBonusCapPercent {
+		percentage = overhitBonusCapPercent
 	}
 	return int64(math.Round((percentage / 100) * float64(normalExp)))
 }

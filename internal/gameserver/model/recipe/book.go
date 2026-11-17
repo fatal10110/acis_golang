@@ -17,7 +17,7 @@ type Book struct {
 // bookPage is one page of a Book. It lists its recipes in the order the
 // client receives them: grouped by recipe id modulo the page's table size,
 // in insertion order within a group. That is the iteration order of the
-// hash table the book is specified against, which starts at 16 buckets,
+// hash table that defines the page order, which starts at 16 buckets,
 // doubles once it holds more than three quarters of its size, and also
 // doubles, while under 64 buckets, when a ninth recipe lands in one
 // bucket. The table never shrinks, not even on removal. Once the table has

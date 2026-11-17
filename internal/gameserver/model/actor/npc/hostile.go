@@ -1297,9 +1297,13 @@ func (h *Hostile) RestoreSpawnHeadingIfAtHome() {
 // IsMoving reports whether this NPC has an in-flight movement request.
 func (h *Hostile) IsMoving() bool { return h.Move().Moving() }
 
+// guardDriftRange is how far a guard or siege guard may stray from its
+// spawn point, in place of the configured drift range.
+const guardDriftRange = 20
+
 func (h *Hostile) driftRange() int {
 	if kind := hostileKind(h.Instance); kind == "Guard" || kind == "SiegeGuard" {
-		return 20
+		return guardDriftRange
 	}
 	return h.Instance.MaxDriftRange()
 }
