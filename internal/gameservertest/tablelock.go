@@ -10,7 +10,9 @@ import (
 // LockTable write-locks table from a database connection of its own, so
 // every other statement on the table waits until release runs; cleanup
 // releases it too. A suite holds a read the server makes open with it and
-// pins what runs meanwhile.
+// pins what runs meanwhile. While a lock is held, a sent EnterWorld does not
+// wait for the server to handle it (see awaitEnterWorld): the login may read
+// the locked table.
 func (s *Server) LockTable(tb testing.TB, table string) (release func()) {
 	tb.Helper()
 	ctx := context.Background()
@@ -22,9 +24,11 @@ func (s *Server) LockTable(tb testing.TB, table string) (release func()) {
 		_ = conn.Close()
 		tb.Fatal(err)
 	}
+	s.lockedTables.Add(1)
 	var once sync.Once
 	release = func() {
 		once.Do(func() {
+			defer s.lockedTables.Add(-1)
 			if _, err := conn.ExecContext(ctx, `UNLOCK TABLES`); err != nil {
 				tb.Errorf("unlock %s: %v", table, err)
 			}

@@ -229,13 +229,15 @@ const enterWorldTimeout = 30 * time.Second
 // late. On a driven clock every read already waits for the server to catch
 // up, and the login runs on an actor queue only the clock moves, so this wait
 // is for the wall clock alone. It also returns once the connection closed or
-// the login waits on a persistence lane the test holds, and gives up quietly
+// the login waits on a persistence lane the test holds, at once while the test
+// locks a table (LockTable) the login may read, and gives up quietly
 // after enterWorldTimeout, leaving the reads to report.
 func (s *Server) awaitEnterWorld(c *testsupport.ScriptedClient) {
 	deadline := time.Now().Add(enterWorldTimeout)
 	for time.Now().Before(deadline) {
 		ct := s.traffic.conn(c.LocalAddr())
-		if ct != nil && (ct.done.Load() || ct.waits.Load()-1 >= c.Sent() || s.parkedOnHeldLane(ct)) {
+		if ct != nil && (ct.done.Load() || ct.waits.Load()-1 >= c.Sent() || s.parkedOnHeldLane(ct)) ||
+			s.lockedTables.Load() > 0 {
 			return
 		}
 		time.Sleep(50 * time.Microsecond)

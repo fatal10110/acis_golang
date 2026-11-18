@@ -1230,6 +1230,7 @@ type Server struct {
 	schedule     *script.Schedule // the WithScheduledTasks runner; nil without it
 	traffic      *traffic
 	heldLanes    [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
+	lockedTables atomic.Int32                // LockTable locks not yet released
 	log          zerolog.Logger
 	sendObserver *atomic.Pointer[func(payload []byte)]
 	// writeStalls is the write gates WithWriteStalls installed; nil without.
