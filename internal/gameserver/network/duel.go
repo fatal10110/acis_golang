@@ -425,38 +425,73 @@ func duelUserInfo(live *livePlayer) serverpackets.DuelUserInfo {
 // online and defeated. Both sides are then told the result, and every
 // player gets its condition back and leaves the duel. A cancelled
 // one-on-one duel puts nothing back.
+//
+// Those steps run one after another, each on its player's queue, and only
+// the last posts the rest of the end: every player stops fighting before
+// any bow, sees each bow before the result, and is not sent back to its
+// spot, out of sight of a loser, before that loser has bowed.
 func (l *GameClientLink) endDuel(v duel.View[*livePlayer], res duel.Result, partyEdit bool) {
 	all := v.All()
-	if !partyEdit {
+	finish := func() {
+		msgs := duelEndMessages(v, res)
 		for _, m := range all {
-			postLive(m, func() { l.stopToFight(m) })
+			postLive(m, func() {
+				for _, msg := range msgs {
+					m.SendFrame(msg())
+				}
+				m.SendFrame(serverpackets.FrameExDuelEnd(v.Party))
+			})
 		}
-		if leader, losers := duelLosers(v, res); leader != nil && !leader.Departed() && leader.DuelState() == duel.Dead {
-			for _, m := range losers {
-				postLive(m, func() {
-					l.broadcastLiveFrame(m, func() wire.Frame { return serverpackets.FrameSocialAction(m.ObjectID(), duelBowAction) })
-				})
+		abnormal := !v.Party && res == duel.Canceled
+		for _, m := range all {
+			if !postLive(m, func() {
+				l.restoreDuelCondition(m, abnormal)
+				l.leaveDuel(m)
+				l.duels.Leave(v.ID)
+			}) {
+				l.duels.Leave(v.ID)
 			}
 		}
 	}
-	msgs := duelEndMessages(v, res)
-	for _, m := range all {
-		postLive(m, func() {
-			for _, msg := range msgs {
-				m.SendFrame(msg())
-			}
-			m.SendFrame(serverpackets.FrameExDuelEnd(v.Party))
-		})
+	if partyEdit {
+		finish()
+		return
 	}
-	abnormal := !v.Party && res == duel.Canceled
+	steps := make([]liveStep, 0, len(all)*2)
 	for _, m := range all {
-		if !postLive(m, func() {
-			l.restoreDuelCondition(m, abnormal)
-			l.leaveDuel(m)
-			l.duels.Leave(v.ID)
-		}) {
-			l.duels.Leave(v.ID)
+		steps = append(steps, liveStep{m, func() { l.stopToFight(m) }})
+	}
+	if leader, losers := duelLosers(v, res); leader != nil && !leader.Departed() && leader.DuelState() == duel.Dead {
+		for _, m := range losers {
+			steps = append(steps, liveStep{m, func() {
+				l.broadcastLiveFrame(m, func() wire.Frame { return serverpackets.FrameSocialAction(m.ObjectID(), duelBowAction) })
+			}})
 		}
+	}
+	inTurn(steps, finish)
+}
+
+// liveStep is work to run on one player's queue.
+type liveStep struct {
+	live *livePlayer
+	fn   func()
+}
+
+// inTurn runs steps one after another, each on its player's queue, then
+// runs next on the queue of the last step, or on the caller's when there
+// is none. A step whose player's queue is closed is skipped, so next
+// always runs.
+func inTurn(steps []liveStep, next func()) {
+	if len(steps) == 0 {
+		next()
+		return
+	}
+	step, rest := steps[0], steps[1:]
+	if !postLive(step.live, func() {
+		step.fn()
+		inTurn(rest, next)
+	}) {
+		inTurn(rest, next)
 	}
 }
 
