@@ -169,7 +169,8 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 			}
 		}
 	}
-	live.SendFrame(serverpackets.FrameActionFailed())
+	// The closing ActionFailed follows whatever a deferred lookup sends.
+	live.afterLookups(func() { live.SendFrame(serverpackets.FrameActionFailed()) })
 }
 
 // folkBypass runs command on f for live. It reports false when the command

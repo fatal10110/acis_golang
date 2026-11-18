@@ -222,7 +222,7 @@ func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connSta
 
 // handleEnterWorld spawns the selected character and moves the client in
 // game.
-func (l *GameClientLink) handleEnterWorld(_ context.Context, cs *connState, _ struct{}) error {
+func (l *GameClientLink) handleEnterWorld(ctx context.Context, cs *connState, _ struct{}) error {
 	client := cs.client
 	// Unreachable while the state gate admits EnterWorld only in
 	// StateEntering, which character selection enters together with
@@ -234,7 +234,7 @@ func (l *GameClientLink) handleEnterWorld(_ context.Context, cs *connState, _ st
 	// A failed entry leaves live attached and registered; Handle's
 	// deferred detachLivePlayer is what releases it.
 	cs.live, cs.entering = cs.entering, nil
-	if !l.enterWorld(client, cs.live) {
+	if !l.enterWorld(ctx, client, cs.live) {
 		client.closeNow()
 		return errDisconnect
 	}

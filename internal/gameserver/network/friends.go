@@ -52,9 +52,12 @@ func (l *GameClientLink) findCharacter(ctx context.Context, name string) (relati
 // would hold a pool worker; handle then runs on the queue with what the
 // lookup found. The loop reads no next frame until handle has run, so the
 // replies keep their order.
+//
+// handle may return a further read to make off the queue, as whenLiveStaged's
+// begin does; nil when the request is answered.
 func whenLiveNamed[T any](
 	named func(T) (string, bool),
-	handle func(*GameClientLink, *livePlayer, T, relation.Named, bool),
+	handle func(*GameClientLink, *livePlayer, T, relation.Named, bool) func(context.Context),
 ) func(*GameClientLink, context.Context, *connState, T) error {
 	return func(l *GameClientLink, ctx context.Context, cs *connState, req T) error {
 		live := cs.live
@@ -66,10 +69,14 @@ func whenLiveNamed[T any](
 		if name, ok := named(req); ok {
 			ref, found = l.findCharacter(ctx, name)
 		}
+		var lookup func(context.Context)
 		onLive(live, func() {
 			sim.Attribute(live.Queue(), handle)
-			handle(l, live, req, ref, found)
+			lookup = handle(l, live, req, ref, found)
 		})
+		if lookup != nil {
+			lookup(ctx)
+		}
 		return nil
 	}
 }
@@ -83,13 +90,13 @@ func blockName(req clientpackets.RequestBlock) (string, bool) {
 	return req.Name, req.Type == clientpackets.BlockAdd || req.Type == clientpackets.BlockRemove
 }
 
-// characterNames returns the stored names of ids; a failed lookup is logged
-// and names none.
-func (l *GameClientLink) characterNames(ids []int32) map[int32]string {
+// characterNames returns the stored names of ids, read under ctx; a failed
+// lookup is logged and names none.
+func (l *GameClientLink) characterNames(ctx context.Context, ids []int32) map[int32]string {
 	if l.characters == nil || len(ids) == 0 {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), characterLookupTimeout)
+	ctx, cancel := context.WithTimeout(ctx, characterLookupTimeout)
 	defer cancel()
 	names, err := l.characters.Names(ctx, ids)
 	if err != nil {
@@ -99,20 +106,30 @@ func (l *GameClientLink) characterNames(ids []int32) map[int32]string {
 	return names
 }
 
-// friendListEntries is id's friend list as FriendList sends it: a friend
-// whose character no longer exists keeps its row with an empty name.
+// friendIDs is id's friend list.
 //
 // The relation state is nil only on a link built without NewGameClientLink;
 // such a link has no friends to list or notify.
-func (l *GameClientLink) friendListEntries(id int32) []serverpackets.FriendListEntry {
+func (l *GameClientLink) friendIDs(id int32) []int32 {
 	if l.relations == nil {
 		return nil
 	}
-	ids := l.relations.FriendIDs(id)
+	return l.relations.FriendIDs(id)
+}
+
+// friendListEntries is id's friend list as FriendList sends it, its names
+// read under ctx; see friendEntries.
+func (l *GameClientLink) friendListEntries(ctx context.Context, id int32) []serverpackets.FriendListEntry {
+	ids := l.friendIDs(id)
+	return l.friendEntries(ids, l.characterNames(ctx, ids))
+}
+
+// friendEntries is the FriendList rows of the friends ids, named from names:
+// a friend whose character no longer exists keeps its row with an empty name.
+func (l *GameClientLink) friendEntries(ids []int32, names map[int32]string) []serverpackets.FriendListEntry {
 	if len(ids) == 0 {
 		return nil
 	}
-	names := l.characterNames(ids)
 	entries := make([]serverpackets.FriendListEntry, len(ids))
 	for i, friendID := range ids {
 		_, online := l.livePlayerByID(friendID)
@@ -186,16 +203,20 @@ func friendInviteRefusalMessage(refusal relation.InviteRefusal, name string) wir
 	}
 }
 
-// handleRequestAnswerFriendInvite answers the friend invitation live holds.
+// beginAnswerFriendInvite answers the friend invitation live holds.
 //
 // With no answerable invitation the answer goes unanswered on purpose:
 // the invitation dialog closed when the client answered, so no
 // click waits on a reply. A request of another kind in live's slot is no
 // friend invitation: it stays pending for its own answer.
-func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req clientpackets.RequestAnswerFriendInvite) {
+//
+// An accept whose requester's login left names the requester as its
+// character is stored: the returned lookup reads that name off the queue
+// and sends live's notices; see whenLiveStaged.
+func (l *GameClientLink) beginAnswerFriendInvite(live *livePlayer, req clientpackets.RequestAnswerFriendInvite) func(context.Context) {
 	inv, ok := l.tradeBook().TakeRequest(tradebook.KindFriend, live.ObjectID())
 	if !ok {
-		return
+		return nil
 	}
 	// The login that invited hears the outcome only while it is still the
 	// one in the world.
@@ -207,7 +228,7 @@ func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req c
 		if requester != nil {
 			requester.SendFrame(serverpackets.FrameFriendAddRequestResult(false))
 		}
-		return
+		return nil
 	}
 
 	l.relations.AddFriend(inv.RequesterID, live.ObjectID())
@@ -216,25 +237,40 @@ func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req c
 		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AddedToFriends, live.CharacterName()))
 		requester.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, live.CharacterName(), true, live.ObjectID()))
 	}
-	// A login that left is named as its character is stored.
-	var requesterName string
 	if requester != nil {
-		requesterName = requester.CharacterName()
-	} else {
-		requesterName = l.characterNames([]int32{inv.RequesterID})[inv.RequesterID]
+		sendFriendJoined(live, requester.CharacterName(), true, inv.RequesterID)
+		return nil
 	}
-	live.SendFrame(serverpackets.FrameFriendAddRequestResult(true))
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1JoinedAsFriend, requesterName))
-	live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, requesterName, requester != nil, inv.RequesterID))
+	id := inv.RequesterID
+	return func(ctx context.Context) {
+		name := l.characterNames(ctx, []int32{id})[id]
+		onLive(live, func() { sendFriendJoined(live, name, false, id) })
+	}
 }
 
-// handleRequestFriendList lists live's friends as system messages, each
-// marked online or offline, between the list's header and footer. A friend
-// whose character no longer exists is left out.
-func (l *GameClientLink) handleRequestFriendList(live *livePlayer) {
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFriendListHeader))
+// sendFriendJoined tells live that the character id, named name, joined its
+// friend list.
+func sendFriendJoined(live *livePlayer, name string, online bool, id int32) {
+	live.SendFrame(serverpackets.FrameFriendAddRequestResult(true))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1JoinedAsFriend, name))
+	live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, name, online, id))
+}
+
+// beginFriendList lists live's friends as system messages, each marked
+// online or offline, between the list's header and footer. A friend whose
+// character no longer exists is left out. The names are read off the queue;
+// see whenLiveStaged.
+func (l *GameClientLink) beginFriendList(live *livePlayer) func(context.Context) {
 	ids := l.relations.FriendIDs(live.ObjectID())
-	names := l.characterNames(ids)
+	return func(ctx context.Context) {
+		names := l.characterNames(ctx, ids)
+		onLive(live, func() { l.sendFriendList(live, ids, names) })
+	}
+}
+
+// sendFriendList sends live the friend list of ids, named from names.
+func (l *GameClientLink) sendFriendList(live *livePlayer, ids []int32, names map[int32]string) {
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFriendListHeader))
 	for _, id := range ids {
 		name, ok := names[id]
 		if !ok {
@@ -252,18 +288,19 @@ func (l *GameClientLink) handleRequestFriendList(live *livePlayer) {
 // handleRequestFriendDel removes the named character from live's friend
 // list, and live from its. A name that is no friend of live answers with
 // USER_NOT_IN_FRIENDS_LIST. ref is the character the name finds, when found.
-func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpackets.RequestFriendDel, ref relation.Named, found bool) {
+func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpackets.RequestFriendDel, ref relation.Named, found bool) func(context.Context) {
 	if !found || !l.relations.RemoveFriend(live.ObjectID(), ref.ID) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageUserNotInFriendsList))
-		return
+		return nil
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, ref.Name))
 	if target, online := l.livePlayerByName(req.Name); online {
 		live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, target.CharacterName(), true, target.ObjectID()))
 		target.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, live.CharacterName(), true, live.ObjectID()))
-		return
+		return nil
 	}
 	live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, req.Name, false, 0))
+	return nil
 }
 
 // handleRequestBlock runs one block-list command.
@@ -272,23 +309,24 @@ func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpack
 // block list, and a command type no command sends. Neither registers
 // a pending client action; the chat-line commands expect no reply.
 //
-// ref is the character a block or unblock names, when found.
-func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.RequestBlock, ref relation.Named, found bool) {
+// ref is the character a block or unblock names, when found. The block list
+// names its characters off the queue: it returns that read.
+func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.RequestBlock, ref relation.Named, found bool) func(context.Context) {
 	switch req.Type {
 	case clientpackets.BlockAdd, clientpackets.BlockRemove:
 		switch relation.CheckBlockTarget(live.ObjectID(), ref, found) {
 		case relation.BlockInvalidTarget:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToRegisterToIgnoreList))
-			return
+			return nil
 		case relation.BlockTargetGM:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouMayNotImposeBlockOnGM))
-			return
+			return nil
 		}
 		if req.Type == clientpackets.BlockRemove {
 			if l.relations.Unblock(live.ObjectID(), ref.ID) {
 				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1RemovedFromYourIgnoreList, ref.Name))
 			}
-			return
+			return nil
 		}
 		// The block is recorded before either notice goes out: the blocked
 		// player's connection runs on its own goroutine, so a request it
@@ -300,7 +338,7 @@ func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.
 		}
 
 	case clientpackets.BlockList:
-		l.sendBlockList(live)
+		return l.beginBlockList(live)
 
 	case clientpackets.BlockAll, clientpackets.BlockAllRelease:
 		on := req.Type == clientpackets.BlockAll
@@ -315,15 +353,24 @@ func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.
 	default:
 		l.log.Warn().Int32("type", req.Type).Int32("object_id", live.ObjectID()).Msg("unknown block type")
 	}
+	return nil
 }
 
-// sendBlockList lists live's block list, one numbered line per character,
+// beginBlockList lists live's block list, one numbered line per character,
 // between the block list's header and the list footer. A blocked character
-// that no longer exists is listed as "null".
-func (l *GameClientLink) sendBlockList(live *livePlayer) {
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageBlockListHeader))
+// that no longer exists is listed as "null". The names are read off the
+// queue, by the lookup it returns.
+func (l *GameClientLink) beginBlockList(live *livePlayer) func(context.Context) {
 	ids := l.relations.BlockedIDs(live.ObjectID())
-	names := l.characterNames(ids)
+	return func(ctx context.Context) {
+		names := l.characterNames(ctx, ids)
+		onLive(live, func() { sendBlockList(live, ids, names) })
+	}
+}
+
+// sendBlockList sends live its block list of ids, named from names.
+func sendBlockList(live *livePlayer, ids []int32, names map[int32]string) {
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageBlockListHeader))
 	for i, id := range ids {
 		name, ok := names[id]
 		if !ok {

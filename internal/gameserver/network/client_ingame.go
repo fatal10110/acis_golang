@@ -386,9 +386,10 @@ func (l *GameClientLink) handleRequestLinkHTML(_ context.Context, cs *connState,
 }
 
 // handleRequestBypassToServer runs a bypass command.
-func (l *GameClientLink) handleRequestBypassToServer(_ context.Context, cs *connState, req clientpackets.RequestBypassToServer) error {
+func (l *GameClientLink) handleRequestBypassToServer(ctx context.Context, cs *connState, req clientpackets.RequestBypassToServer) error {
 	client, live := cs.client, cs.live
 	refused := false
+	var lookups []func(context.Context)
 	// An empty command returns before the bypass reuse gate is
 	// consulted, so it never consumes the cooldown; a refused
 	// command is dropped silently. The gate belongs to this read loop,
@@ -404,9 +405,17 @@ func (l *GameClientLink) handleRequestBypassToServer(_ context.Context, cs *conn
 			return
 		}
 		l.requestBypassToServer(live, req)
+		if live != nil {
+			lookups = live.takeLookups()
+		}
 	})
 	if refused {
 		return nil
+	}
+	// The lookups the command deferred run here, off the queue; see
+	// deferLookup.
+	for _, lookup := range lookups {
+		lookup(ctx)
 	}
 	l.finishPendingClassChange(live)
 	return nil
