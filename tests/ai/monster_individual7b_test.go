@@ -282,6 +282,7 @@ func TestLV3PartyPrivateHatesASpellOnItsFight(t *testing.T) {
 	tmpl := ind7bTemplate(ind7bPartyPrivateID)
 	tmpl.AIParams = npc.AIParams{"SetHateRace": "@race_human", "SetHateRaceRatio": "20"}
 	w := bootIndividual7(t, ind1AggroSpellBoot(t), tmpl)
+	needsDrivenClock(t, w.srv)
 	private := w.spawn(t, ind7bPartyPrivateID, 60, 0)
 	me := w.charOf(t)
 	w.onQueue(t, private, func() { script.NPCOf(private).AddAttackDesire(me, 100) })

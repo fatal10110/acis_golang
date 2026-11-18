@@ -65,9 +65,11 @@ Rules:
   long timers); `WithRealPool()` pins one test there (pool task-panic recovery, the slow-task
   watchdog, perf), and its waits are never cut.
 - CI runs every `tests/` package on the real pool except the ones `POOL_EXCLUDED` names in
-  `.github/workflows/go.yml`, each with its reason (ai, olympiad and quest: wall-clock timers
-  the pool cannot skip, tracked in #5301); `.github/scripts/test-shards.sh check` fails when a
-  package is on no `pool` list and not excluded. Measured on the main run for `d3fc17dc0`
+  `.github/workflows/go.yml`, each with its reason (none now); `.github/scripts/test-shards.sh
+  check` fails when a package is on no `pool` list and not excluded. `tests/ai` has its own
+  shard (`pool-ai`): its boss and hall scenarios wait out minutes of timers on the wall clock, so
+  the package takes about nine minutes alone. A test that pins a state a millisecond before a
+  timer's deadline, or on it, calls `needsDrivenClock` and runs only on the inline pass. Measured on the main run for `d3fc17dc0`
   (2026-11-17; job wall time includes checkout and setup, the pool step is `go test` alone;
   `gotest.sh` ends every log with the slowest packages):
 

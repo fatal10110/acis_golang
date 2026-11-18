@@ -305,6 +305,7 @@ func TestCast3SkillsCurseDebuffsWhenLeftAlone(t *testing.T) {
 		t.Run(fmt.Sprintf("%d hits", hits), func(t *testing.T) {
 			t.Parallel()
 			w := bootIndividual1e(t, raidBoot{}, ind1eTemplate(curseID, nil))
+			needsDrivenClock(t, w.srv)
 			n := w.spawn(t, curseID, 1500, 0)
 			me := w.player.ObjectID()
 			if ind1Slot(n, script.SlotIntAI3) != 0 || ind1Slot(n, script.SlotIntAI4) != 0 {
