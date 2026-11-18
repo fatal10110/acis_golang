@@ -178,6 +178,9 @@ public class LotteryProbe
 		_isStarted = true;
 		p("ANN Lottery tickets are now available for Lucky Lottery #" + getId() + ".");
 		Calendar finishTime = Calendar.getInstance();
+		// Monday-first (ISO) weeks, the server's week rule (#5345).
+		finishTime.setFirstDayOfWeek(Calendar.MONDAY);
+		finishTime.setMinimalDaysInFirstWeek(4);
 		finishTime.setTimeInMillis(_endDate);
 		finishTime.set(Calendar.MINUTE, 0);
 		finishTime.set(Calendar.SECOND, 0);

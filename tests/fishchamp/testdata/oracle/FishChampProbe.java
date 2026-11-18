@@ -119,6 +119,9 @@ public class FishChampProbe
 	private void setEndOfChamp()
 	{
 		final Calendar cal = Calendar.getInstance();
+		// Monday-first (ISO) weeks, the server's week rule (#5345).
+		cal.setFirstDayOfWeek(Calendar.MONDAY);
+		cal.setMinimalDaysInFirstWeek(4);
 		cal.setTimeInMillis(_endDate);
 		cal.set(Calendar.MINUTE, 0);
 		cal.set(Calendar.SECOND, 0);

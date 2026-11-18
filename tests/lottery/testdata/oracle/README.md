@@ -17,6 +17,9 @@ this directory, a probe of the reference lottery.
 except:
 
 - `System.currentTimeMillis()` reads a virtual clock.
+- The drawing calendar is pinned to Monday-first (ISO) weeks, the server's
+  week rule (#5345), so `set(DAY_OF_WEEK, SATURDAY)` on a Sunday picks the
+  Saturday before; the `en_US` locale alone would start the week on Sunday.
 - `ThreadPool.schedule` records a task at `now + max(0, delay)`; the driver
   steps the clock to the soonest task, runs every task due by then (ties in
   scheduling order) and prints the state.

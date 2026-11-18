@@ -105,10 +105,12 @@ SM 783
 @2026-10-17T18:50:00.999Z round=1 prize=50000 started=true selling=false end=2026-10-17T19:00:00.999Z enddate=Oct 17, 2026
 # empty table, Sunday midnight
 ANN Lottery tickets are now available for Lucky Lottery #1.
-DB insert idnr=1 enddate=2026-10-17T19:00:00Z prize=50000 newprize=50000
-@2026-10-11T00:00:00Z round=1 prize=50000 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+DB insert idnr=1 enddate=2026-10-10T19:00:00Z prize=50000 newprize=50000
+@2026-10-11T00:00:00Z round=1 prize=50000 started=true selling=true end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
 SM 783
-@2026-10-17T18:50:00Z round=1 prize=50000 started=true selling=false end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+SM 1113 1 50000
+DB finish idnr=1 prize=50000 newprize=100000 number1=68 number2=11 prize1=0 prize2=0 prize3=0
+@2026-10-11T00:00:00Z round=2 prize=50000 started=false selling=false end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
 # empty table, week across the year
 ANN Lottery tickets are now available for Lucky Lottery #1.
 DB insert idnr=1 enddate=2027-01-02T19:00:00.500Z prize=50000 newprize=50000
