@@ -1,6 +1,7 @@
 package festival
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
@@ -20,10 +21,10 @@ func newMovesWorld() *movesWorld {
 	return &movesWorld{fakeWorld: &fakeWorld{unspawns: map[NPC]int{}}}
 }
 
-func (w *movesWorld) Locate(int32) (Spot, bool)   { return Spot{}, true }
-func (w *movesWorld) Admit(id int32, _, _, _ int) { w.admitted = append(w.admitted, id) }
-func (w *movesWorld) Settle([]int32)              { w.settles++ }
-func (w *movesWorld) Relocate(id int32, _ *Spot)  { w.relocated = append(w.relocated, id) }
+func (w *movesWorld) Locate(int32) (Spot, bool)     { return Spot{}, true }
+func (w *movesWorld) Admit(id int32, _, _, _ int)   { w.admitted = append(w.admitted, id) }
+func (w *movesWorld) Settle(_ []int32, then func()) { w.settles++; then() }
+func (w *movesWorld) Relocate(id int32, _ *Spot)    { w.relocated = append(w.relocated, id) }
 
 // beginFestival starts the schedule with party signed up for Dawn's first
 // festival and runs it until that festival begins. It returns the index in
@@ -100,7 +101,7 @@ func TestStopCallsOffTheFestivalUnderWay(t *testing.T) {
 	w := newMovesWorld()
 	h.m.SetWorld(w)
 	h.beginFestival(t)
-	h.m.Stop()
+	h.m.Stop(context.Background())
 	armed, admitted := len(h.pending), len(w.admitted)
 	h.fire(t) // the stale first stage
 	if len(w.spawned) != 0 || len(w.admitted) != admitted || len(w.relocated) != 0 || len(h.pending) != armed {

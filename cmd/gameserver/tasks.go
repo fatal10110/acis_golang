@@ -147,11 +147,41 @@ func provideGameClock() *task.GameClock {
 	return task.NewGameClock(time.Now)
 }
 
+// sevenSignsQueue is the service queue the Seven Signs period changes and
+// the festival's timers share, so the period changes driving the festival
+// stay in order with its own steps.
+type sevenSignsQueue struct{ *sim.Queue }
+
+func provideSevenSignsQueue(pool *sim.Pool) sevenSignsQueue {
+	return sevenSignsQueue{pool.NewQueue("sevensigns")}
+}
+
 // provideSevenSignsState returns the Seven Signs state persisting through
-// the gameserver database and announcing period changes to every player in
-// state.
-func provideSevenSignsState(db *sql.DB, state *world.State, log zerolog.Logger) *sevensigns.State {
-	return sevensigns.NewState(gamesql.NewSevenSignsStore(db), network.NewSevenSignsBroadcaster(state), log, time.Now, nil)
+// the gameserver database on worker, announcing period changes to every
+// player in state and running them on queue.
+func provideSevenSignsState(db *sql.DB, queue sevenSignsQueue, worker *persist.Worker, state *world.State, log zerolog.Logger) *sevensigns.State {
+	return sevensigns.NewState(gamesql.NewSevenSignsStore(db), network.NewSevenSignsBroadcaster(state), log, time.Now, queue.Queue, worker, nil)
+}
+
+// stopSevenSigns stops the period-change timer and the festival's, each
+// waiting for a step still under way, then closes their queue. It is
+// invoked after startSimPool so it stops first, while the pool still runs
+// the steps it waits for; startSevenSigns' final save follows the pool's
+// stop. A period change under way waits for its saves on the persistence
+// lane; past shutdownSaveTimeout the shutdown goes on, the persistence
+// worker lands the saves still queued and startSevenSigns' final save
+// writes the same state.
+func stopSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, queue sevenSignsQueue) {
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			ctx, cancel := context.WithTimeout(ctx, shutdownSaveTimeout)
+			defer cancel()
+			state.Stop(ctx)
+			fest.Stop(ctx)
+			queue.Close()
+			return nil
+		},
+	})
 }
 
 // startSevenSigns restores the persisted status and sign-ups, then the
@@ -160,9 +190,10 @@ func provideSevenSignsState(db *sql.DB, state *world.State, log zerolog.Logger) 
 // through link; spawns the Seven Signs NPC groups of the restored period
 // and hands the period changes' swap of them to npcs; starts
 // the festival's schedule and arms the period-change timer —
-// firing an overdue period change immediately. On shutdown it stops both
-// timers, saves the festival scores unless seal validation is under way,
-// and saves the sign-ups and the status with the festival's columns.
+// firing an overdue period change immediately. On shutdown, once
+// stopSevenSigns has stopped both timers, it saves the festival scores
+// unless seal validation is under way, and saves the sign-ups and the
+// status with the festival's columns.
 func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, castles *castle.Manager, link *network.GameClientLink, npcs *manager.Npcs, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -183,8 +214,6 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Ma
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			state.Stop()
-			fest.Stop()
 			saveOnStop(ctx, shutdownSaveTimeout, log, "save seven signs", func(ctx context.Context) error {
 				if state.CurrentPeriod() != sevensigns.SealValidation {
 					if err := fest.SaveScores(ctx); err != nil {

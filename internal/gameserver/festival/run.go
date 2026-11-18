@@ -2,7 +2,6 @@ package festival
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -40,7 +39,7 @@ type festivalRun struct {
 	// its cycle was due.
 	generation uint64
 	due        int64
-	timer      *time.Timer
+	timer      Timer
 }
 
 func newRun() run {
@@ -207,7 +206,9 @@ func (m *Manager) festivalStep(fest *festivalRun, fn func() func(World)) {
 	m.stepIf(func() bool { return m.current == fest }, fn)
 }
 
-// stepIf runs fn, holding the lock, if live reports true under it.
+// stepIf runs fn, holding the lock, if live reports true under it, then
+// what fn returns on the world without the lock, counted in steps so Stop
+// waits for it.
 func (m *Manager) stepIf(live func() bool, fn func() func(World)) {
 	m.mu.Lock()
 	if !live() {
@@ -216,9 +217,35 @@ func (m *Manager) stepIf(live func() bool, fn func() func(World)) {
 	}
 	after := fn()
 	world := m.world
+	if world == nil || after == nil {
+		m.mu.Unlock()
+		return
+	}
+	m.steps++
 	m.mu.Unlock()
-	if world != nil && after != nil {
-		after(world)
+	after(world)
+	m.stepDone()
+}
+
+// settleThen has world settle objectIDs, then shouts text as sender on the
+// queue. The step stays counted until the shout is out.
+func (m *Manager) settleThen(world World, objectIDs []int32, sender, text string) {
+	m.mu.Lock()
+	m.steps++
+	m.mu.Unlock()
+	world.Settle(objectIDs, m.onQueue(func() {
+		world.Shout(sender, text)
+		m.stepDone()
+	}))
+}
+
+// stepDone ends one counted step.
+func (m *Manager) stepDone() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.steps--
+	if m.steps == 0 {
+		m.idle.Broadcast()
 	}
 }
 
@@ -345,8 +372,7 @@ func (m *Manager) festivalEnded(fest *festivalRun) {
 					world.Unspawn(n)
 				}
 			}
-			world.Settle(memberIDs(arenas))
-			world.Shout(witchName, outsideSoonShout)
+			m.settleThen(world, memberIDs(arenas), witchName, outsideSoonShout)
 		}
 	})
 }

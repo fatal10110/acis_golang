@@ -108,7 +108,7 @@ docker compose --profile servers run --rm loginserver accountmgr -config config/
 
 On `stop`, `restart` and `down`, Docker sends SIGTERM. The game server then closes every client
 with `ServerClose`, saves players and world state, and exits. Its `stop_grace_period` (240s) is set
-above the server's own worst-case shutdown (`gameServerStopTimeout`, currently 3m45s).
+above the server's own worst-case shutdown (`gameServerStopTimeout`, currently 3m55s).
 `TestComposeStopGraceCoversGameServerStop` fails if the two drift apart. The `servers` profile
 uses `restart: unless-stopped`, so a crashed server comes back up, and so does one stopped
 in game: `//server restart` (exit code 2) and `//server shutdown` (exit code 0) both end in a

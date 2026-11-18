@@ -12,7 +12,7 @@ import (
 
 func restoredSevenSigns(t *testing.T, db *sql.DB) *sevensigns.State {
 	t.Helper()
-	state := sevensigns.NewState(NewSevenSignsStore(db), nil, zerolog.Nop(), nil, nil)
+	state := sevensigns.NewState(NewSevenSignsStore(db), nil, zerolog.Nop(), nil, nil, nil, nil)
 	if err := state.Restore(context.Background()); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}

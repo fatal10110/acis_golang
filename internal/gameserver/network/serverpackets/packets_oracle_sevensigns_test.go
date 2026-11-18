@@ -83,7 +83,7 @@ func (s oracleSevenSignsState) state() *sevensigns.State {
 		store.players = append(store.players, p)
 	}
 	now := func() time.Time { return time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC) }
-	st := sevensigns.NewState(store, nil, zerolog.Nop(), now, nil)
+	st := sevensigns.NewState(store, nil, zerolog.Nop(), now, nil, nil, nil)
 	if err := st.Restore(context.Background()); err != nil {
 		panic(err)
 	}
