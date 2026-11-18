@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -25,7 +26,7 @@ func (l *GameClientLink) boardContacts(ids ...[]int32) boardContacts {
 	for _, list := range ids {
 		all = append(all, list...)
 	}
-	return boardContacts{link: l, names: l.characterNames(all)}
+	return boardContacts{link: l, names: l.characterNames(context.Background(), all)}
 }
 
 func (c boardContacts) Name(id int32) (string, bool) {
@@ -98,7 +99,7 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 		l.showFriendList(live, false)
 	case "delall":
 		friends := l.relations.FriendIDs(live.ObjectID())
-		names := l.characterNames(friends)
+		names := l.characterNames(context.Background(), friends)
 		for _, friendID := range friends {
 			if l.relations.RemoveFriend(live.ObjectID(), friendID) {
 				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, names[friendID]))
@@ -107,12 +108,12 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 		session.friends.Clear()
 		l.showFriendList(live, false)
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, friendsCleared))
-		live.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(live.ObjectID())))
+		live.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(context.Background(), live.ObjectID())))
 	case "delconfirm":
 		l.showFriendList(live, true)
 	case "del":
 		picked := session.friends.IDs()
-		names := l.characterNames(picked)
+		names := l.characterNames(context.Background(), picked)
 		for _, friendID := range picked {
 			// An online friend is the one told: by the time live's own
 			// removal runs the two are no longer friends.
@@ -120,7 +121,7 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 				if l.relations.RemoveFriend(friendID, live.ObjectID()) {
 					friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.CharacterName()))
 				}
-				friend.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(friendID)))
+				friend.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(context.Background(), friendID)))
 			}
 			if l.relations.RemoveFriend(live.ObjectID(), friendID) {
 				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, names[friendID]))
@@ -128,7 +129,7 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 		}
 		session.friends.Clear()
 		l.showFriendList(live, false)
-		live.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(live.ObjectID())))
+		live.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(context.Background(), live.ObjectID())))
 	case "mail":
 		if !session.friends.Empty() {
 			l.showFriendMail(live)
@@ -160,7 +161,7 @@ func (l *GameClientLink) boardBlockAction(live *livePlayer, action string, id in
 // unblockAll takes ids off live's block list, telling live of each one
 // that was on it.
 func (l *GameClientLink) unblockAll(live *livePlayer, ids []int32) {
-	names := l.characterNames(ids)
+	names := l.characterNames(context.Background(), ids)
 	for _, id := range ids {
 		if l.relations.Unblock(live.ObjectID(), id) {
 			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1RemovedFromYourIgnoreList, names[id]))

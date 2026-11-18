@@ -217,6 +217,11 @@ type livePlayer struct {
 	// on p's queue while the connection goroutine waits in onLive and taken
 	// by that goroutine once the wait returns; see finishPendingClassChange.
 	pendingClassChange *classChange
+	// pendingLookups are the steps the running bypass left for its
+	// connection goroutine to make off p's queue, in order; set on p's
+	// queue and taken there before the queued part returns. See
+	// deferLookup.
+	pendingLookups []func(context.Context)
 	// performFloodProtected consults one of the reuse gates of p's
 	// connection (Client.performFloodProtected), set once at attach. Those
 	// gates are the connection read loop's: call it only from a task that
@@ -447,6 +452,39 @@ func onLive(live *livePlayer, fn func()) bool {
 	}
 	live.handlerPanicked = true
 	return false
+}
+
+// deferLookup leaves lookup to the connection goroutine of the bypass
+// request running on p's queue: it runs once the request's queued part
+// returns, under the connection's context and off the queue, where a slow
+// database would hold a pool worker. lookup posts what it read back to p's
+// queue itself (onLive). The loop reads no next frame until it has run.
+//
+// Only work a bypass request runs may defer a lookup: that request takes
+// them (takeLookups).
+func (p *livePlayer) deferLookup(lookup func(context.Context)) {
+	sim.AssertOwner(p.Queue())
+	p.pendingLookups = append(p.pendingLookups, lookup)
+}
+
+// afterLookups runs fn on p's queue after the lookups the running bypass
+// deferred, so that what fn sends follows what they send; with none
+// deferred it runs fn now.
+func (p *livePlayer) afterLookups(fn func()) {
+	sim.AssertOwner(p.Queue())
+	if len(p.pendingLookups) == 0 {
+		fn()
+		return
+	}
+	p.pendingLookups = append(p.pendingLookups, func(context.Context) { onLive(p, fn) })
+}
+
+// takeLookups takes the lookups the running bypass deferred, in order.
+func (p *livePlayer) takeLookups() []func(context.Context) {
+	sim.AssertOwner(p.Queue())
+	lookups := p.pendingLookups
+	p.pendingLookups = nil
+	return lookups
 }
 
 // Stop aborts everything p is doing, as abortAll does, then drops its

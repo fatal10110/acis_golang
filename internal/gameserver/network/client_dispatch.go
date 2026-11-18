@@ -172,8 +172,8 @@ func newGameInbound() inboundRegistry[byte] {
 	registerCapped(reg, clientpackets.OpcodeSendWarehouseWithdraw, clientpackets.DecodeSendWarehouseWithdrawList, whenLive((*GameClientLink).requestWarehouseWithdraw))
 	registerCapped(reg, clientpackets.OpcodeRequestPackageSend, clientpackets.DecodeRequestPackageSend, whenLive((*GameClientLink).requestPackageSend))
 	register(reg, clientpackets.OpcodeRequestFriendInvite, clientpackets.DecodeRequestFriendInvite, whenLive((*GameClientLink).handleRequestFriendInvite))
-	register(reg, clientpackets.OpcodeRequestAnswerFriendInvite, clientpackets.DecodeRequestAnswerFriendInvite, whenLive((*GameClientLink).handleRequestAnswerFriendInvite))
-	register(reg, clientpackets.OpcodeRequestFriendList, noPayload, whenLiveNoBody((*GameClientLink).handleRequestFriendList))
+	register(reg, clientpackets.OpcodeRequestAnswerFriendInvite, clientpackets.DecodeRequestAnswerFriendInvite, whenLiveStaged((*GameClientLink).beginAnswerFriendInvite))
+	register(reg, clientpackets.OpcodeRequestFriendList, noPayload, whenLiveStagedNoBody((*GameClientLink).beginFriendList))
 	register(reg, clientpackets.OpcodeRequestFriendDel, clientpackets.DecodeRequestFriendDel, whenLiveNamed(friendDelName, (*GameClientLink).handleRequestFriendDel))
 	register(reg, clientpackets.OpcodeRequestBlock, clientpackets.DecodeRequestBlock, whenLiveNamed(blockName, (*GameClientLink).handleRequestBlock))
 	register(reg, clientpackets.OpcodeRequestSendL2FriendSay, clientpackets.DecodeRequestSendL2FriendSay, whenLive((*GameClientLink).handleRequestSendL2FriendSay))
@@ -413,6 +413,41 @@ func whenLive[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameCli
 		}
 		return nil
 	}
+}
+
+// whenLiveStaged is whenLive for a request that reads the database. begin
+// runs on the player's queue and returns the read to make off it, or nil when
+// the request is already answered. The read runs here, on the connection
+// goroutine under the connection's context, where a slow database holds no
+// pool worker, and posts what it found back to the queue itself (onLive).
+// The loop reads no next frame until it returns, so the replies keep their
+// order.
+func whenLiveStaged[T any](begin func(*GameClientLink, *livePlayer, T) func(context.Context)) func(*GameClientLink, context.Context, *connState, T) error {
+	return func(l *GameClientLink, ctx context.Context, cs *connState, req T) error {
+		live := cs.live
+		if live == nil {
+			return nil
+		}
+		var lookup func(context.Context)
+		if !onLive(live, func() {
+			sim.Attribute(live.Queue(), begin)
+			lookup = begin(l, live, req)
+		}) {
+			return nil
+		}
+		if lookup != nil {
+			lookup(ctx)
+		}
+		return nil
+	}
+}
+
+// whenLiveStagedNoBody is whenLiveStaged for a request that carries no
+// fields.
+func whenLiveStagedNoBody(begin func(*GameClientLink, *livePlayer) func(context.Context)) func(*GameClientLink, context.Context, *connState, struct{}) error {
+	return whenLiveStaged(func(l *GameClientLink, live *livePlayer, _ struct{}) func(context.Context) {
+		return begin(l, live)
+	})
 }
 
 // whenLiveNoBody is whenLive for a request that carries no fields.

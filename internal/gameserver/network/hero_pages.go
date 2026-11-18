@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -34,7 +35,8 @@ func (l *GameClientLink) bypassHeroFights(live *livePlayer, command string) {
 // sendHeroPage sends live the hero page file filled by fill, without
 // taking its links as the ones live may send back. Nothing is sent when
 // command's two parameters do not parse, no hero of the running era has
-// the class, the hero's character is gone, or fill sends no page.
+// the class, the hero's character is gone, or fill sends no page. The
+// hero's name is read off the queue; see deferLookup.
 func (l *GameClientLink) sendHeroPage(live *livePlayer, command, file string,
 	fill func(m *hero.Manager, template, heroName string, heroClass, objectID, page int32) (string, bool),
 ) {
@@ -49,15 +51,19 @@ func (l *GameClientLink) sendHeroPage(live *livePlayer, command, file string,
 	if !ok {
 		return
 	}
-	name, ok := l.characterNames([]int32{id})[id]
-	if !ok {
-		return
-	}
-	html, ok := fill(l.heroes, l.setPage(file), name, heroClass, id, page)
-	if !ok {
-		return
-	}
-	live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, html, 0))
+	live.deferLookup(func(ctx context.Context) {
+		name, ok := l.characterNames(ctx, []int32{id})[id]
+		if !ok {
+			return
+		}
+		onLive(live, func() {
+			html, ok := fill(l.heroes, l.setPage(file), name, heroClass, id, page)
+			if !ok {
+				return
+			}
+			live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, html, 0))
+		})
+	})
 }
 
 // heroPageParams reads a hero page command's class and page: the values of
