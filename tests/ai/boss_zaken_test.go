@@ -642,6 +642,7 @@ func TestZakenSeesAndMarks(t *testing.T) {
 func TestZakenPicksASkillWhenHit(t *testing.T) {
 	t.Parallel()
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	h := w.zaken(t)
 	w.settle(t)
 	w.draws.set(1<<30, 0, 4)
@@ -723,6 +724,7 @@ func TestZakenLeavesAFarFightAtNight(t *testing.T) {
 		t.Run(fmt.Sprintf("night=%v", night), func(t *testing.T) {
 			t.Parallel()
 			w := bootZaken(t, zakenBoot{night: night})
+			needsDrivenClock(t, w.srv)
 			h := w.zaken(t)
 			w.settle(t)
 			w.draws.set(1<<30, 9)

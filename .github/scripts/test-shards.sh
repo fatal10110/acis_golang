@@ -21,10 +21,11 @@ shard_lists() {
 # one per line: the block's lines read `name: reason`.
 pool_excluded() {
   awk '
-    $1 == "POOL_EXCLUDED:" { inblock = 1; next }
+    $1 == "POOL_EXCLUDED:" { inblock = 1; match($0, /^ */); keyindent = RLENGTH; next }
     inblock && NF == 0 { next }
     inblock {
       match($0, /^ */)
+      if (RLENGTH <= keyindent) exit
       if (indent == 0) indent = RLENGTH
       if (RLENGTH < indent) exit
       name = $1

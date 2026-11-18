@@ -264,6 +264,7 @@ func frLiveRow(value int) *spawn.State {
 func TestFollowerOfFrintezzaSleepsThenRises(t *testing.T) {
 	t.Parallel()
 	w := bootFollower(t, nil, "GrandBoss")
+	needsDrivenClock(t, w.srv)
 	f := w.follower(t)
 	n := script.NPCOf(f)
 	id := f.ObjectID()

@@ -209,6 +209,7 @@ func TestFrintezzaTransformRisesAndFallsAsleep(t *testing.T) {
 	t.Run("low HP", func(t *testing.T) {
 		t.Parallel()
 		w := bootTransform(t, trLiveRow(7, 1), "GrandBoss", raidBoot{})
+		needsDrivenClock(t, w.srv)
 		f := w.transform(t)
 		if got, want := w.heard.take(), []string{fmt.Sprintf("29993 event=%d arg1=30021 arg2=0", f.ObjectID())}; !slices.Equal(got, want) {
 			t.Fatalf("heard as it was restored at 1 HP = %q, want %q", got, want)
@@ -217,6 +218,7 @@ func TestFrintezzaTransformRisesAndFallsAsleep(t *testing.T) {
 	t.Run("full HP", func(t *testing.T) {
 		t.Parallel()
 		w := bootTransform(t, trLiveRow(7, 1<<20), "GrandBoss", raidBoot{})
+		needsDrivenClock(t, w.srv)
 		f := w.transform(t)
 		n := script.NPCOf(f)
 		id := f.ObjectID()

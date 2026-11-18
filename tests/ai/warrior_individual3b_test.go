@@ -832,6 +832,7 @@ func TestPartyLeaderCastCurseAggressiveTickDrawsOnlyWithDebuff(t *testing.T) {
 				delete(tmpl.SkillsByType, npc.SkillTypeDebuff)
 			}
 			w := bootIndividual3b(t, raidBoot{}, tmpl)
+			needsDrivenClock(t, w.srv)
 			n := w.spawn(t, ind3bCurseID, 300, 0)
 			w.hit(t, n, 10)
 			w.ticks(t, 1)
