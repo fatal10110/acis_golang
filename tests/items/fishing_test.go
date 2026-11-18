@@ -28,11 +28,14 @@ import (
 // D-grade Fishing Shot and Small Green Nimble Fish, and the Fishing,
 // Pumping, Reeling and Fishing Expertise skills.
 const (
-	fishRodD     int32 = 6530
-	fishLure     int32 = 6520 // normal group, medium grade
-	fishShotD    int32 = 6536
-	fishShotC    int32 = 6537
-	fishCaughtID int32 = 6411
+	fishRodD int32 = 6530
+	fishLure int32 = 6520 // normal group, medium grade
+	// fishNightLure is a normal group lure of the 8505 to 8513 range, which
+	// only gets bites at night.
+	fishNightLure int32 = 8505
+	fishShotD     int32 = 6536
+	fishShotC     int32 = 6537
+	fishCaughtID  int32 = 6411
 
 	fishingSkill  = 1312
 	pumpingSkill  = 1313
@@ -59,6 +62,11 @@ func fishingCatalog() *item.Table {
 		},
 		&item.Template{
 			ID: fishLure, Name: "Green Colored Lure", Kind: item.KindEtcItem, Slot: item.SlotLHand, Duration: -1,
+			Stackable: true, Destroyable: true, DefaultAction: item.ActionEquip,
+			EtcItem: &item.EtcItemDetail{Type: item.EtcItemLure},
+		},
+		&item.Template{
+			ID: fishNightLure, Name: "Night Lure", Kind: item.KindEtcItem, Slot: item.SlotLHand, Duration: -1,
 			Stackable: true, Destroyable: true, DefaultAction: item.ActionEquip,
 			EtcItem: &item.EtcItemDetail{Type: item.EtcItemLure},
 		},
@@ -127,7 +135,9 @@ type fishingRig struct {
 	srv                            *gameservertest.Server
 	c                              *testsupport.ScriptedClient
 	objID, rod, lure, shotD, shotC int32
-	dice                           *fishingDice
+	// nightLure is the night lure carried beside the lures.
+	nightLure int32
+	dice      *fishingDice
 	// castAt is the client clock when the last cast was requested.
 	castAt time.Time
 }
@@ -184,6 +194,7 @@ func bootFishingSpec(t *testing.T, spec fishingSpec, opts ...gameservertest.Opti
 	}
 	r.rod = srv.GiveItem(t, r.objID, fishRodD, 1)
 	r.lure = srv.GiveItem(t, r.objID, fishLure, 5)
+	r.nightLure = srv.GiveItem(t, r.objID, fishNightLure, 5)
 	r.shotD = srv.GiveItem(t, r.objID, fishShotD, 3)
 	r.shotC = srv.GiveItem(t, r.objID, fishShotC, 1)
 	startInWorld(t, r.c)
