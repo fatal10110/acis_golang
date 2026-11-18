@@ -193,6 +193,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGroundItems,
 			provideGameClock,
 			provideServerSession,
+			provideSevenSignsQueue,
 			provideSevenSignsState,
 			provideFestival,
 			loadSignsPriestConfig,
@@ -254,6 +255,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 		fx.Invoke(reportConfigKeys),
 		fx.Invoke(buildScripts),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, markServerSession, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, stopSevenSigns, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, markServerSession, startGameServer),
 	}
 }

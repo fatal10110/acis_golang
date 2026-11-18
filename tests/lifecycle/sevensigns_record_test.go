@@ -183,13 +183,14 @@ func TestPeriodChangeBroadcastsToPlayersOnline(t *testing.T) {
 	// A second state over the same database fires its period change on
 	// demand through the production broadcaster.
 	var fire func()
-	changer := sevensigns.NewState(gamesql.NewSevenSignsStore(srv.DB), network.NewSevenSignsBroadcaster(srv.State), zerolog.Nop(), time.Now,
-		func(_ time.Duration, fn func()) *time.Timer { fire = fn; return nil })
+	changer := sevensigns.NewState(gamesql.NewSevenSignsStore(srv.DB), network.NewSevenSignsBroadcaster(srv.State), zerolog.Nop(), time.Now, nil, nil,
+		func(_ time.Duration, fn func()) sevensigns.Timer { fire = fn; return nil })
 	if err := changer.Restore(context.Background()); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
 	changer.Start()
 	fire()
+	changer.WaitIdle()
 
 	sound := c.Read()
 	assertFrameOpcode(t, sound, serverpackets.OpcodePlaySound, "period sound")

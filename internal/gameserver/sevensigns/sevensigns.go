@@ -25,6 +25,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // Period is one of the four phases a Seven Signs cycle passes through. The
@@ -186,23 +189,39 @@ const (
 const saveTimeout = 10 * time.Second
 
 // Festival is the Festival of Darkness as the period changes drive it.
-// Its methods are called without the state's lock held.
+// Its methods are called without the state's lock held. A method taking
+// then calls it once, from any goroutine, when what it started is done.
 type Festival interface {
 	// CompetitionBegun starts the festival schedule as recruiting ends.
 	CompetitionBegun()
 	// CompetitionEnded stops it as the competition ends, once the end is
 	// announced and before the seals' new owners are.
-	CompetitionEnded()
+	CompetitionEnded(then func())
 	// CycleBegun resets the festival for cycle as seal validation ends,
 	// once the end is announced.
-	CycleBegun(cycle int)
+	CycleBegun(cycle int, then func())
 	// SaveStatus writes the festival's columns of the status row; every
 	// status save calls it right after writing the row.
 	SaveStatus(ctx context.Context) error
 }
 
+// Timer is an armed period-change timer.
+type Timer interface {
+	Stop() bool
+}
+
+// Writer runs the period changes' saves off the queue, in the order they
+// were handed to it per owner.
+type Writer interface {
+	Enqueue(ownerID int32, job func()) bool
+}
+
 // State tracks the active period and the competition's scores and drives
 // the period transitions. All methods are safe for concurrent use.
+//
+// A period change runs as a chain of steps on queue, the service queue it
+// shares with the festival: each step that waits on the players' queues or
+// the database hands the next step to them and returns.
 type State struct {
 	store     Store
 	out       Broadcaster
@@ -211,7 +230,9 @@ type State struct {
 	castles   Castles
 	spawns    Spawns
 	now       func() time.Time
-	afterFunc func(time.Duration, func()) *time.Timer
+	queue     *sim.Queue
+	writes    Writer
+	afterFunc func(time.Duration, func()) Timer
 	log       zerolog.Logger
 
 	// saveMu serializes every write to the store, so the write that lands
@@ -223,24 +244,32 @@ type State struct {
 	row        StatusRow
 	players    map[int32]*PlayerRow
 	nextChange time.Time
-	timer      *time.Timer
+	timer      Timer
 	// stopped latches Stop: a transition already running when Stop arrives
-	// must not re-arm the timer once its save completes.
+	// ends once its save completes, without re-arming the timer.
 	stopped bool
+	// transitioning is set from the start of a period change to its last
+	// step; idle, on mu, is signalled when it clears.
+	transitioning bool
+	idle          sync.Cond
 }
 
 // NewState returns a state persisting through store and announcing period
-// changes through out (nil announces nothing). now supplies wall time;
-// afterFunc schedules the next transition timer (both overridden in tests;
-// nil falls back to time.Now and time.AfterFunc).
-func NewState(store Store, out Broadcaster, log zerolog.Logger, now func() time.Time, afterFunc func(time.Duration, func()) *time.Timer) *State {
+// changes through out (nil announces nothing). Its period changes run on
+// queue and save through writes. now supplies wall time; afterFunc
+// schedules the next transition timer (both overridden in tests; nil falls
+// back to time.Now and queue's timers). A nil queue runs every step on the
+// goroutine finishing the one before, a nil writes saves there too.
+func NewState(store Store, out Broadcaster, log zerolog.Logger, now func() time.Time, queue *sim.Queue, writes Writer, afterFunc func(time.Duration, func()) Timer) *State {
 	if now == nil {
 		now = time.Now
 	}
 	if afterFunc == nil {
-		afterFunc = time.AfterFunc
+		afterFunc = func(d time.Duration, fn func()) Timer { return queue.After(d, fn) }
 	}
-	return &State{store: store, out: out, now: now, afterFunc: afterFunc, log: log, players: map[int32]*PlayerRow{}}
+	s := &State{store: store, out: out, now: now, queue: queue, writes: writes, afterFunc: afterFunc, log: log, players: map[int32]*PlayerRow{}}
+	s.idle.L = &s.mu
+	return s
 }
 
 // SetFestival hands the period changes and status saves to festival. It
@@ -295,8 +324,11 @@ func (s *State) Start() {
 	s.scheduleLocked()
 }
 
-// Stop cancels the pending transition timer and latches, so a transition
-// already in flight cannot re-arm once it finishes persisting.
+// Stop cancels the pending transition timer and latches, then waits for a
+// period change already under way: it still saves the new period, but
+// neither expels, shows the sky, swaps the NPC groups nor re-arms. Once Stop
+// returns, the period changes neither post to a queue nor write. It must
+// not run on the state's queue.
 func (s *State) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -304,6 +336,19 @@ func (s *State) Stop() {
 	if s.timer != nil {
 		s.timer.Stop()
 		s.timer = nil
+	}
+	for s.transitioning {
+		s.idle.Wait()
+	}
+}
+
+// WaitIdle returns once no period change is under way. It must not run on
+// the state's queue.
+func (s *State) WaitIdle() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for s.transitioning {
+		s.idle.Wait()
 	}
 }
 
@@ -369,78 +414,172 @@ func (s *State) NextChange() time.Time {
 	return s.nextChange
 }
 
+// transition is one period change as its steps carry it out.
+type transition struct {
+	ended, period Period
+	cycle         int
+	notices       []Notice
+	online        Online
+	castles       Castles
+	spawns        Spawns
+	strifeOwner   Cabal
+}
+
 // advance moves the state into the following period — settling the
-// competition, or starting the next cycle after validation ends — announces
-// it, drives the festival, the castles and the Seal of Strife skills,
-// persists it, sends the players no longer allowed in a Seven Signs dungeon
-// out, shows the new sky, and re-arms the timer.
+// competition, or starting the next cycle after validation ends — then
+// runs the change's steps in order: it announces it, driving the festival
+// and the Seal of Strife skills, settles the castles, saves it, sends the
+// players no longer allowed in a Seven Signs dungeon out, shows the new
+// sky, swaps the Seven Signs NPC groups, and re-arms the timer. Each step
+// waiting on the players or the database continues on the queue.
 func (s *State) advance() {
 	s.mu.Lock()
-	ended := s.row.Period
-	notices := s.changePeriodLocked()
+	if s.stopped || s.transitioning {
+		s.mu.Unlock()
+		return
+	}
+	s.transitioning = true
+	t := &transition{ended: s.row.Period}
+	t.notices = s.changePeriodLocked()
 	s.nextChange = nextPeriodChange(s.row.Period, s.now())
-	cycle, period := s.row.Cycle, s.row.Period
-	online, castles, spawns := s.online, s.castles, s.spawns
-	strifeOwner := s.strifeOwnerLocked()
+	t.cycle, t.period = s.row.Cycle, s.row.Period
+	t.online, t.castles, t.spawns = s.online, s.castles, s.spawns
+	t.strifeOwner = s.strifeOwnerLocked()
 	s.mu.Unlock()
 
-	s.announce(ended, cycle, notices, online)
-	s.settleCastles(ended, castles, strifeOwner)
+	s.announce(t, s.onQueue(func() { s.save(t) }))
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
-	defer cancel()
-	if err := s.Save(ctx); err != nil {
-		s.log.Error().Err(err).Int("cycle", cycle).Str("period", period.String()).Msg("save seven signs")
+// save settles the castles and saves the period change on the writer;
+// once written, the change continues on the queue. The save runs even
+// when Stop arrived meanwhile, so the stored period matches the one in
+// memory.
+func (s *State) save(t *transition) {
+	s.settleCastles(t.ended, t.castles, t.strifeOwner)
+	job := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+		defer cancel()
+		if err := s.Save(ctx); err != nil {
+			s.log.Error().Err(err).Int("cycle", t.cycle).Str("period", t.period.String()).Msg("save seven signs")
+		}
+		s.post(func() { s.expel(t) })
 	}
+	if s.writes == nil || !s.writes.Enqueue(persist.ServiceOwner, job) {
+		job()
+	}
+}
 
-	if online != nil {
-		online.ExpelFromDungeons()
+// expel sends the players no longer allowed in a Seven Signs dungeon out.
+func (s *State) expel(t *transition) {
+	if s.endIfStopped() {
+		return
+	}
+	if t.online == nil {
+		s.reveal(t)
+		return
+	}
+	t.online.ExpelFromDungeons(s.onQueue(func() { s.reveal(t) }))
+}
+
+// reveal shows the new sky, swaps the Seven Signs NPC groups and re-arms
+// the timer, ending the period change.
+func (s *State) reveal(t *transition) {
+	if s.endIfStopped() {
+		return
 	}
 	s.broadcast([]Notice{{Kind: NoticeSky, Cabal: s.Sky()}})
-	if spawns != nil {
-		spawns.SevenSignsChanged()
+	if t.spawns != nil {
+		t.spawns.SevenSignsChanged()
 	}
-	s.log.Info().Int("cycle", cycle).Str("period", period.String()).Msg("seven signs period begun")
+	s.log.Info().Int("cycle", t.cycle).Str("period", t.period.String()).Msg("seven signs period begun")
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.endLocked()
 	s.scheduleLocked()
+}
+
+// endIfStopped ends the period change under way when Stop has arrived.
+func (s *State) endIfStopped() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.stopped {
+		return false
+	}
+	s.endLocked()
+	return true
+}
+
+func (s *State) endLocked() {
+	s.transitioning = false
+	s.idle.Broadcast()
+}
+
+// onQueue returns a continuation that runs fn on the queue.
+func (s *State) onQueue(fn func()) func() {
+	return func() { s.post(fn) }
+}
+
+// post runs fn on the queue; on the caller when there is none or it no
+// longer takes tasks, so a period change under way at shutdown still ends.
+func (s *State) post(fn func()) {
+	if s.queue == nil || !s.queue.Post(fn) {
+		fn()
+	}
 }
 
 // announce announces the notices of the period that ended, with the
 // festival's change and the Seal of Strife skills at their place among
-// them. Recruiting's end starts the festival before anything is announced;
-// the competition's end stops it once its sound and end are announced;
-// results' end gives the Seal of Strife skills before anything is
-// announced; seal validation's end takes them away once everything is
-// announced, then resets the festival for the new cycle.
-func (s *State) announce(ended Period, cycle int, notices []Notice, online Online) {
-	switch ended {
+// them, then runs then. Recruiting's end starts the festival before
+// anything is announced; the competition's end stops it once its sound
+// and end are announced; results' end gives the Seal of Strife skills
+// before anything is announced; seal validation's end takes them away once
+// everything is announced, then resets the festival for the new cycle.
+func (s *State) announce(t *transition, then func()) {
+	notices := t.notices
+	switch t.ended {
 	case Recruiting:
 		if s.festival != nil {
 			s.festival.CompetitionBegun()
 		}
 		s.broadcast(notices)
+		then()
 	case Competition:
 		split := min(2, len(notices))
 		s.broadcast(notices[:split])
-		if s.festival != nil {
-			s.festival.CompetitionEnded()
+		rest := func() {
+			s.broadcast(notices[split:])
+			then()
 		}
-		s.broadcast(notices[split:])
+		if s.festival == nil {
+			rest()
+			return
+		}
+		s.festival.CompetitionEnded(s.onQueue(rest))
 	case Results:
-		if online != nil {
-			online.GiveStrifeSkills()
+		announce := func() {
+			s.broadcast(notices)
+			then()
 		}
-		s.broadcast(notices)
+		if t.online == nil {
+			announce()
+			return
+		}
+		t.online.GiveStrifeSkills(s.onQueue(announce))
 	case SealValidation:
 		s.broadcast(notices)
-		if online != nil {
-			online.RemoveStrifeSkills()
+		reset := func() {
+			if s.festival == nil {
+				then()
+				return
+			}
+			s.festival.CycleBegun(t.cycle, s.onQueue(then))
 		}
-		if s.festival != nil {
-			s.festival.CycleBegun(cycle)
+		if t.online == nil {
+			reset()
+			return
 		}
+		t.online.RemoveStrifeSkills(s.onQueue(reset))
 	}
 }
 

@@ -42,7 +42,9 @@ func TestCycleBegunTakesBloodOfferings(t *testing.T) {
 	c := srv.Client
 	startInWorld(t, c)
 
-	srv.Festival.CycleBegun(2)
+	reset := make(chan struct{})
+	srv.Festival.CycleBegun(2, func() { close(reset) })
+	<-reset
 	srv.InventoryUpdates.Tick()
 	frames := srv.ReadQueued(t, c)
 	if len(frames) != 1 {
@@ -127,7 +129,9 @@ func TestCompetitionEndRewardsBestPartyClans(t *testing.T) {
 	c.Send(encodeEnterWorld())
 	srv.ReadQueued(t, c)
 
-	srv.Festival.CompetitionEnded()
+	rewarded := make(chan struct{})
+	srv.Festival.CompetitionEnded(func() { close(rewarded) })
+	<-rewarded
 	frames := srv.ReadQueued(t, c)
 	want := []byte{serverpackets.OpcodePledgeShowInfoUpdate, serverpackets.OpcodeSystemMessage, serverpackets.OpcodePledgeShowInfoUpdate, serverpackets.OpcodeSystemMessage}
 	got := make([]byte, len(frames))

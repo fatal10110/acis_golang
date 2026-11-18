@@ -51,8 +51,8 @@ func bootSevenSigns(t *testing.T, setup sevenSignsSetup, opts ...gameservertest.
 				t.Fatalf("seed status row: %v", err)
 			}
 		}),
-		// Boot and every period change run on this goroutine, so the
-		// pending change needs no lock.
+		// Boot arms on this goroutine; a period change re-arms under the
+		// state's lock, which the fired call waits on before returning.
 		gameservertest.WithSevenSignsTimer(func(_ time.Duration, fn func()) *time.Timer {
 			w.change = fn
 			return nil

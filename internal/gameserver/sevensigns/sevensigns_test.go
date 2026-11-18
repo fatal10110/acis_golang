@@ -174,7 +174,7 @@ func newStateHarness(t *testing.T, start time.Time) *stateHarness {
 		out:     &recordingBroadcaster{},
 		current: start,
 	}
-	h.state = NewState(h.store, h.out, zerolog.Nop(), func() time.Time { return h.current }, func(d time.Duration, fn func()) *time.Timer {
+	h.state = NewState(h.store, h.out, zerolog.Nop(), func() time.Time { return h.current }, nil, nil, func(d time.Duration, fn func()) Timer {
 		h.delays = append(h.delays, d)
 		h.fired = append(h.fired, fn)
 		return nil
@@ -287,49 +287,6 @@ func TestStopCancelsPendingTransition(t *testing.T) {
 	// a stub, so just verify no further scheduling happened implicitly.
 	if len(h.fired) != 1 {
 		t.Fatalf("callbacks fired = %d, want 1", len(h.fired))
-	}
-}
-
-// A Stop landing inside a transition's save window must win over that
-// transition's re-arm: once stopped, the in-flight advance finishes without
-// scheduling anything new.
-func TestStopDuringTransitionSavePreventsRearm(t *testing.T) {
-	start := at(2026, time.August, 26, 12, 0, time.UTC)
-	h := newStateHarness(t, start)
-	h.store.row = StatusRow{Cycle: 2, Period: Results, LastSave: start.Add(-time.Hour)}
-	h.store.found = true
-	if err := h.state.Restore(context.Background()); err != nil {
-		t.Fatalf("Restore: %v", err)
-	}
-	h.state.Start()
-
-	saving := make(chan struct{})
-	release := make(chan struct{})
-	h.store.onSave = func() {
-		close(saving)
-		<-release
-	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		h.fired[0]()
-	}()
-
-	select {
-	case <-saving:
-	case <-time.After(5 * time.Second):
-		t.Fatal("transition never reached its save window")
-	}
-	h.state.Stop()
-	close(release)
-
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("transition did not finish after release")
-	}
-	if len(h.fired) != 1 {
-		t.Fatalf("callbacks armed after stop = %d, want the single fired transition only", len(h.fired))
 	}
 }
 

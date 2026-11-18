@@ -33,8 +33,10 @@ const (
 // arena's center when sent there.
 const swarmWeight = 1000000
 
-func (w festivalWorld) RewardClanOf(name string, points int) { w.l.RewardClanOf(name, points) }
-func (w festivalWorld) RemoveBloodOfferings()                { w.l.RemoveBloodOfferings() }
+func (w festivalWorld) RewardClanOf(name string, points int, then func()) {
+	w.l.RewardClanOf(name, points, then)
+}
+func (w festivalWorld) RemoveBloodOfferings(then func()) { w.l.RemoveBloodOfferings(then) }
 
 // Shout sends text as a shout by sender to the players inside each peace
 // zone holding a festival guide: the Dawn oracle's zones, then the Dusk
@@ -139,13 +141,15 @@ func (w festivalWorld) Tell(objectID int32, text string) {
 	w.postOnline(objectID, func(live *livePlayer) { sendText(live, text) })
 }
 
-// Settle waits for each player's queue to run what was posted to it.
-func (w festivalWorld) Settle(objectIDs []int32) {
+// Settle runs then once each player's queue has run what was posted to it.
+func (w festivalWorld) Settle(objectIDs []int32, then func()) {
+	var lives []*livePlayer
 	for _, id := range objectIDs {
 		if live, ok := w.l.onlineLive(id); ok {
-			awaitLiveQueue(live)
+			lives = append(lives, live)
 		}
 	}
+	awaitLiveQueues(lives, then)
 }
 
 // festivalDeparture is where live, a participant leaving the world during

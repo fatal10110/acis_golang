@@ -16,7 +16,7 @@ func TestNoticeKeepsCountingFromCompetitionEndToNextCompetition(t *testing.T) {
 	h.m.Start()
 	h.fire(t) // the first cycle runs
 	h.fire(t) // an empty signup ends: the next festival is awaited 19 minutes on
-	h.m.CompetitionEnded()
+	h.m.CompetitionEnded(func() {})
 
 	h.calendar.period = sevensigns.Results
 	if got := h.m.NextFestivalNotice(); got != notice("20") {
@@ -36,7 +36,7 @@ func TestNoticeKeepsCountingFromCompetitionEndToNextCompetition(t *testing.T) {
 	for range 7 * 24 * 60 / 19 {
 		h.fire(t)
 	}
-	h.m.CycleBegun(2)
+	h.m.CycleBegun(2, func() {})
 	h.calendar.period = sevensigns.Recruiting
 	h.fire(t)
 	if got := h.m.NextFestivalNotice(); got != notice("20") {
@@ -63,7 +63,7 @@ func TestCompetitionEndCallsOffCyclesNotBegun(t *testing.T) {
 	h.calendar.period = sevensigns.SealValidation
 	h.fire(t) // skipped: the next is due a cycle later
 	h.calendar.period = sevensigns.Competition
-	h.m.CompetitionEnded()
+	h.m.CompetitionEnded(func() {})
 	before := len(h.pending)
 	h.fire(t)
 	if len(h.pending) != before {

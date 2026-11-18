@@ -69,20 +69,23 @@ func changerOver(t *testing.T, srv *gameservertest.Server) (state *sevensigns.St
 	t.Helper()
 	ctx := context.Background()
 	var change func()
-	state = sevensigns.NewState(gamesql.NewSevenSignsStore(srv.DB), network.NewSevenSignsBroadcaster(srv.State), zerolog.Nop(), time.Now,
-		func(_ time.Duration, fn func()) *time.Timer { change = fn; return nil })
+	state = sevensigns.NewState(gamesql.NewSevenSignsStore(srv.DB), network.NewSevenSignsBroadcaster(srv.State), zerolog.Nop(), time.Now, nil, nil,
+		func(_ time.Duration, fn func()) sevensigns.Timer { change = fn; return nil })
 	if err := state.Restore(ctx); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
-	fest = festival.New(festival.DefaultConfig(), gamesql.NewFestivalStore(srv.DB), state, zerolog.Nop(), time.Now,
-		func(time.Duration, func()) *time.Timer { return nil })
+	fest = festival.New(festival.DefaultConfig(), gamesql.NewFestivalStore(srv.DB), state, zerolog.Nop(), time.Now, nil, nil,
+		func(time.Duration, func()) festival.Timer { return nil })
 	if err := fest.Restore(ctx, state.CurrentCycle()); err != nil {
 		t.Fatalf("festival Restore: %v", err)
 	}
 	state.SetFestival(fest)
 	fest.Start()
 	state.Start()
-	return state, fest, func() { change() }
+	return state, fest, func() {
+		change()
+		state.WaitIdle()
+	}
 }
 
 // Recruiting's end starts a festival schedule, counting a festival cycle,

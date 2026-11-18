@@ -20,6 +20,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -76,7 +77,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	ids := &sequentialIDs{next: 100}
 	inventoryUpdates := task.NewInventoryUpdates()
 	sevenSignsStore := gamesql.NewSevenSignsStore(db)
-	sevenSigns := sevensigns.NewState(sevenSignsStore, nil, zerolog.Nop(), time.Now, nil)
+	sevenSigns := sevensigns.NewState(sevenSignsStore, nil, zerolog.Nop(), time.Now, sim.NewInline(time.Now()).NewQueue("sevensigns"), nil, nil)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}

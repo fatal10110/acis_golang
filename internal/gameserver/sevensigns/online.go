@@ -1,20 +1,21 @@
 package sevensigns
 
 // Online is the players online as a period change acts on them beyond its
-// notices. Its methods are called without the state's lock held, and each
-// returns once every player it acts on has been dealt with.
+// notices. Its methods are called without the state's lock held; each
+// calls then once, from any goroutine, when every player it acts on has
+// been dealt with, so what follows goes out after it.
 type Online interface {
 	// GiveStrifeSkills gives every player online the Seal of Strife skill
 	// StrifeSkill names, as seal validation begins.
-	GiveStrifeSkills()
+	GiveStrifeSkills(then func())
 	// RemoveStrifeSkills takes both Seal of Strife skills from every
 	// player online, as seal validation ends.
-	RemoveStrifeSkills()
+	RemoveStrifeSkills(then func())
 	// ExpelFromDungeons sends every player online standing in a Seven
 	// Signs dungeon, game masters aside, whom ExpelledAtPeriodChange names
 	// to the nearest town and out of the dungeon. It runs after every
 	// period change's save.
-	ExpelFromDungeons()
+	ExpelFromDungeons(then func())
 }
 
 // SetOnline hands the period changes' effects on the players online to

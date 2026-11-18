@@ -51,6 +51,8 @@ type scheduleHarness struct {
 	m        *Manager
 	delays   []time.Duration
 	pending  []func()
+	// timer, when set, is what every arming returns.
+	timer Timer
 }
 
 func newScheduleHarness(t *testing.T) *scheduleHarness {
@@ -61,10 +63,10 @@ func newScheduleHarness(t *testing.T) *scheduleHarness {
 		calendar: &fakeCalendar{period: sevensigns.Competition, nextChange: start.Add(5 * 24 * time.Hour)},
 		store:    &memStore{status: Status{FestivalCycle: 4}},
 	}
-	h.m = New(DefaultConfig(), h.store, h.calendar, zerolog.Nop(), func() time.Time { return h.now }, func(d time.Duration, fn func()) *time.Timer {
+	h.m = New(DefaultConfig(), h.store, h.calendar, zerolog.Nop(), func() time.Time { return h.now }, nil, nil, func(d time.Duration, fn func()) Timer {
 		h.delays = append(h.delays, d)
 		h.pending = append(h.pending, fn)
-		return nil
+		return h.timer
 	})
 	if err := h.m.Restore(context.Background(), 1); err != nil {
 		t.Fatal(err)
@@ -182,7 +184,7 @@ func TestScheduleStopsWithTheCompetition(t *testing.T) {
 	h := newScheduleHarness(t)
 	h.m.Start()
 	stale := h.pending[0]
-	h.m.CompetitionEnded()
+	h.m.CompetitionEnded(func() {})
 	before := len(h.pending)
 	stale()
 	if len(h.pending) != before {

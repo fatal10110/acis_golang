@@ -23,7 +23,7 @@ type schedule struct {
 	// milliseconds: a cycle length after the schedule started or the last
 	// signup period opened; zero until a schedule first sets it.
 	nextCycleStart int64
-	timer          *time.Timer
+	timer          Timer
 	// generation tells a timer of a cancelled schedule from the running
 	// one's: each start and cancel moves it on.
 	generation uint64
@@ -45,7 +45,9 @@ func (m *Manager) Start() {
 	m.CompetitionBegun()
 }
 
-// Stop cancels the schedule for good.
+// Stop cancels the schedule for good, then waits for the steps still
+// acting on the world; once it returns the festival's timers neither post
+// to a queue nor write. It must not run on the festival's queue.
 func (m *Manager) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -56,6 +58,21 @@ func (m *Manager) Stop() {
 			m.current.timer.Stop()
 		}
 		m.current = nil
+	}
+	m.waitIdleLocked()
+}
+
+// WaitIdle returns once no timer step is acting on the world. It must not
+// run on the festival's queue.
+func (m *Manager) WaitIdle() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.waitIdleLocked()
+}
+
+func (m *Manager) waitIdleLocked() {
+	for m.steps > 0 {
+		m.idle.Wait()
 	}
 }
 
@@ -84,7 +101,8 @@ func (m *Manager) CompetitionBegun() {
 // CompetitionEnded stops the festival schedule, then rewards the clans of
 // the party that set each festival's best score ever: for each festival in
 // turn, each member named, online or not, earns its clan 100 reputation
-// points, once per festival it holds the record of.
+// points, once per festival it holds the record of. then runs once every
+// reward has been told.
 //
 // Only a cycle not yet begun is called off. A cycle under way is the last:
 // while nobody signs up it keeps opening a new signup period whenever one
@@ -93,7 +111,7 @@ func (m *Manager) CompetitionBegun() {
 // festival a party signs up for runs to its end, its parties taken back
 // out of their arenas, and no cycle follows it. CompetitionBegun replaces
 // the cycle still opening signup periods with a new schedule.
-func (m *Manager) CompetitionEnded() {
+func (m *Manager) CompetitionEnded(then func()) {
 	m.mu.Lock()
 	if m.running {
 		m.lastRun = true
@@ -109,11 +127,20 @@ func (m *Manager) CompetitionEnded() {
 	world := m.world
 	m.mu.Unlock()
 	if world == nil {
+		then()
 		return
 	}
-	for _, name := range names {
-		world.RewardClanOf(name, highestRankedReward)
+	m.rewardClans(world, names, then)
+}
+
+// rewardClans rewards the clan of each of names in turn, each once the one
+// before has been told, then runs then.
+func (m *Manager) rewardClans(world World, names []string, then func()) {
+	if len(names) == 0 {
+		then()
+		return
 	}
+	world.RewardClanOf(names[0], highestRankedReward, m.onQueue(func() { m.rewardClans(world, names[1:], then) }))
 }
 
 // runCycle runs the festival cycle that was due at due. During seal
@@ -166,8 +193,7 @@ func (m *Manager) signupEnded(generation uint64, due int64) {
 			for _, a := range opened {
 				m.openArena(world, a)
 			}
-			world.Settle(memberIDs(opened))
-			world.Shout(guideName, startingText)
+			m.settleThen(world, memberIDs(opened), guideName, startingText)
 		}
 	})
 }
