@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	xmldata "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -253,15 +254,21 @@ func TestPrimevalSummonerBringsTheDeadPartyMembers(t *testing.T) {
 	}
 
 	// The page comes with the three-second timer the summon's end armed. On
-	// the wall clock that timer starts a few milliseconds after the body
-	// moved, so a fixed three-second wait can end just before it fires: wait
-	// for the page itself.
+	// the driven clock the page must arrive exactly three seconds on. On the
+	// wall clock that timer starts a few milliseconds after the body moved, so
+	// a fixed three-second wait can end just before it fires: wait for the
+	// page itself.
 	done := []string{pageLine(t, "vervato004.htm"), "S ActionFailed"}
 	var got []string
-	v.srv.AdvanceUntil(t, "vervato004.htm", func() bool {
-		got = append(got, v.summonLines(t, v.srv.ReadQueued(t, v.srv.Client))...)
-		return slices.Contains(got, done[0])
-	})
+	if v.srv.DrivesClock() {
+		v.srv.Advance(t, 3*time.Second)
+		got = v.summonLines(t, v.srv.ReadQueued(t, v.srv.Client))
+	} else {
+		v.srv.AdvanceUntil(t, "vervato004.htm", func() bool {
+			got = append(got, v.summonLines(t, v.srv.ReadQueued(t, v.srv.Client))...)
+			return slices.Contains(got, done[0])
+		})
+	}
 	if !slices.Equal(got, done) {
 		t.Fatalf("Payer three seconds after the summon = %q, want %q", got, done)
 	}

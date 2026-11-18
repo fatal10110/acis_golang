@@ -112,9 +112,10 @@ func TestBaiumRanksSpellDamageByHPBracket(t *testing.T) {
 		w.srv.Settle(t)
 	}
 	w.srv.ReadQueued(t, w.srv.Client)
-	// The bracket is read off the damage dealt, which doubles up on a magic
-	// critical roll; pin the roll to one that never crits so every spell
-	// does the same damage and each rank beats the one before.
+	// The bracket is read off the damage dealt, which is quadrupled on a magic
+	// critical roll; pin the roll to n-1 (999 of 1000), which never crits for
+	// a rate under 1000 and holds the random spread at its top value, so every
+	// spell does the same damage and each rank beats the one before.
 	done := make(chan struct{})
 	if !w.srv.PlayerQueue(t, w.player.ObjectID()).Post(func() {
 		defer close(done)
