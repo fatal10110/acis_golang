@@ -106,6 +106,11 @@ func TestFishingNightLureByDay(t *testing.T) {
 			t.Parallel()
 			r := bootFishingWith(t, false)
 			id := r.objID
+			// The in-game hour follows the wall clock: start every run by day.
+			if r.srv.CrossDayNight(t) {
+				r.srv.CrossDayNight(t)
+			}
+			drainUntilQuiet(t, r.c)
 			r.c.Send(encodeUseItem(r.nightLure, false))
 			fishingEvents(t, r.c)
 			fishType := -1
