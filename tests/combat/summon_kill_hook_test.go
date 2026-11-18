@@ -150,13 +150,19 @@ func TestWarriorBehaviorAttackFinishedTurnsOnTheOwnerOfAKilledSummon(t *testing.
 		aggro    int
 		want     float64
 		wantHeld bool
+		// topOwner makes the owner the top desire target instead, and seed is
+		// an attack desire the monster holds on the owner beforehand.
+		topOwner bool
+		seed     float64
 	}{
-		{"moving attack", nil, false, true, 30, 1000, 5000, false},
-		{"moving attack, rooted and 41 from the top target", nil, true, true, 41, 1000, 10000, false},
-		{"moving attack, rooted and 40 from the top target", nil, true, true, 40, 1000, 5000, false},
-		{"moving attack, rooted with no top target", nil, true, false, 100, 1000, 5000, false},
-		{"held attack, the owner in aggro range", npc.AIParams{"MovingAttack": "0"}, false, true, 30, 1000, 5000, true},
-		{"held attack, the owner out of aggro range", npc.AIParams{"MovingAttack": "0"}, false, true, 30, 10, 0, false},
+		{"moving attack", nil, false, true, 30, 1000, 5000, false, false, 0},
+		{"moving attack, rooted and 41 from the top target", nil, true, true, 41, 1000, 10000, false, false, 0},
+		{"moving attack, rooted and 40 from the top target", nil, true, true, 40, 1000, 5000, false, false, 0},
+		{"moving attack, rooted with no top target", nil, true, false, 100, 1000, 5000, false, false, 0},
+		{"held attack, the owner in aggro range", npc.AIParams{"MovingAttack": "0"}, false, true, 30, 1000, 5000, true, false, 0},
+		{"held attack, the owner out of aggro range", npc.AIParams{"MovingAttack": "0"}, false, true, 30, 10, 0, false, false, 0},
+		{"moving attack, rooted, the owner on top and not attackable", nil, true, false, 100, 10, 5000, false, true, 0},
+		{"held attack, the owner on top and not attackable", npc.AIParams{"MovingAttack": "0"}, false, false, 30, 10, 0, false, true, 300},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
@@ -166,6 +172,12 @@ func TestWarriorBehaviorAttackFinishedTurnsOnTheOwnerOfAKilledSummon(t *testing.
 			}
 			if row.top {
 				s.killer.AI().SetTopDesireTarget(s.servitor)
+			}
+			if row.topOwner {
+				s.killer.AI().SetTopDesireTarget(s.owner)
+			}
+			if row.seed > 0 {
+				s.killer.AI().AddAttackDesireHold(s.owner, row.seed)
 			}
 			s.kill(t)
 			if !s.servitor.Dead() {
