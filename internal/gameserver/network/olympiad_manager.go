@@ -174,19 +174,28 @@ func (l *GameClientLink) dropOlympiadCompetitor(live *livePlayer) {
 }
 
 // showClassRanking opens Olympiad manager f's ranking of classID for live:
-// the month's ten best of the class, read from the database. A failed read
-// is logged and shows the ranking empty.
+// the month's ten best of the class, read from the database off the queue
+// (see deferLookup). A failed read is logged and shows the ranking empty.
 func (l *GameClientLink) showClassRanking(live *livePlayer, f *npc.Folk, classID int) {
-	var names []string
-	if l.olympiad != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), classRankingTimeout)
+	if l.olympiad == nil {
+		l.sendClassRanking(live, f, nil)
+		return
+	}
+	o := l.olympiad
+	live.deferLookup(func(ctx context.Context) {
+		ctx, cancel := context.WithTimeout(ctx, classRankingTimeout)
 		defer cancel()
-		var err error
-		if names, err = l.olympiad.ClassLeaders(ctx, classID); err != nil {
+		names, err := o.ClassLeaders(ctx, classID)
+		if err != nil {
 			l.log.Error().Err(err).Int("class_id", classID).Msg("olympiad class ranking")
 			names = nil
 		}
-	}
+		onLive(live, func() { l.sendClassRanking(live, f, names) })
+	})
+}
+
+// sendClassRanking sends live Olympiad manager f's ranking page naming names.
+func (l *GameClientLink) sendClassRanking(live *livePlayer, f *npc.Folk, names []string) {
 	pages := l.pages()
 	page := f.OlympiadRankingPage(pages, names)
 	l.sendFilePage(live, f.ObjectID(), pages.file, page, 0)

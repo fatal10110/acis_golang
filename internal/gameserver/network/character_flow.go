@@ -342,18 +342,23 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, ch
 // and sends the EnterWorld packet burst. It reports false when the login
 // cannot complete; live, attached at selection, stays the caller's to
 // detach either way.
-func (l *GameClientLink) enterWorld(client *Client, live *livePlayer) bool {
+func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, live *livePlayer) bool {
+	// The friend list's names are read here, under ctx and off the queue,
+	// where a slow database would hold a pool worker; the burst names the
+	// friends it lists from them.
+	friendNames := l.characterNames(ctx, l.friendIDs(live.ObjectID()))
 	// The player has a queue: the login runs on it, and this goroutine
 	// waits, so the burst keeps its order.
 	entered := false
-	onLive(live, func() { entered = l.finishEnterWorld(client, live.Character, live) })
+	onLive(live, func() { entered = l.finishEnterWorld(client, live.Character, live, friendNames) })
 	return entered
 }
 
 // finishEnterWorld spawns the attached player live into the world and sends
 // the EnterWorld burst, on live's queue. It reports false when the login
-// cannot complete.
-func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer) bool {
+// cannot complete. friendNames names the characters on the friend list it
+// sends.
+func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer, friendNames map[int32]string) bool {
 	sim.AssertOwner(live.Queue())
 	// Same constructor RequestItemList uses, so the login snapshot comes from
 	// the live inventory instead of the raw restored rows. Built before the
@@ -443,7 +448,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	}
 	client.Session.SendFrame(questListFrame(c))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
-	client.Session.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(c.ID)))
+	client.Session.SendFrame(serverpackets.FrameFriendList(l.friendEntries(l.friendIDs(c.ID), friendNames)))
 	// From the UserInfo on, the client knows the maxima, and a change
 	// to one is reported.
 	c.AdoptMaxima()

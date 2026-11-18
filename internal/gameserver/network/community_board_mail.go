@@ -119,7 +119,7 @@ func (l *GameClientLink) mailWriters(box []bbs.Mail) func(int32) string {
 	for _, mail := range box {
 		ids = append(ids, mail.SenderID)
 	}
-	names := l.characterNames(ids)
+	names := l.characterNames(context.Background(), ids)
 	return func(id int32) string {
 		if name, ok := names[id]; ok {
 			return name
