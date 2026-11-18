@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -70,17 +71,21 @@ func TestEffectTemplateLandingBranches(t *testing.T) {
 	}
 }
 
-// TestPhysicalSkillEvadedByArmedPlayer casts a physical skill with a melee
-// weapon equipped. A monster that evades every physical skill
-// (P_SKILL_EVASION 100) keeps its HP; the same cast at a monster without the
-// evasion drains it, which shows the wait was long enough for the hit.
-func TestPhysicalSkillEvadedByArmedPlayer(t *testing.T) {
+// TestPhysicalSkillEvasionNeedsWeapon casts a physical skill at a monster that
+// evades every physical skill (P_SKILL_EVASION 100). Evasion is only rolled for
+// a caster with a weapon equipped: the armed cast keeps the monster's HP and
+// tells the caster the target dodged, the unarmed cast and the cast at a
+// monster without the evasion drain it, which shows the wait was long enough
+// for the hit.
+func TestPhysicalSkillEvasionNeedsWeapon(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
+		armed   bool
 		evasion bool
 	}{
-		{name: "evading target", evasion: true},
-		{name: "plain target", evasion: false},
+		{name: "armed caster, evading target", armed: true, evasion: true},
+		{name: "armed caster, plain target", armed: true, evasion: false},
+		{name: "unarmed caster, evading target", armed: false, evasion: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -95,15 +100,20 @@ func TestPhysicalSkillEvadedByArmedPlayer(t *testing.T) {
 				}})),
 			)
 			c, objID := srv.Client, srv.SoleObjectID(t)
-			weapon := srv.GiveItem(t, objID, 30, 1)
 			seedKnownSkill(t, srv, objID, skillID, 1)
+			var weapon int32
+			if tc.armed {
+				weapon = srv.GiveItem(t, objID, 30, 1)
+			}
 			startInWorld(t, c)
-			w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
-			w.WriteInt32(weapon)
-			w.WriteInt32(0)
-			c.Send(w.Bytes())
-			srv.InventoryUpdates.Tick()
-			drainUntilQuiet(t, c)
+			if tc.armed {
+				w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
+				w.WriteInt32(weapon)
+				w.WriteInt32(0)
+				c.Send(w.Bytes())
+				srv.InventoryUpdates.Tick()
+				drainUntilQuiet(t, c)
+			}
 
 			hostile := srv.SpawnHostileNPC(t)
 			if tc.evasion {
@@ -117,8 +127,15 @@ func TestPhysicalSkillEvadedByArmedPlayer(t *testing.T) {
 			readCastStartFrames(t, c, objID, skillID, 1, 500, 0, hostile.ObjectID())
 			srv.Advance(t, 2*time.Second)
 			srv.Settle(t)
-			if hp := hostile.CurrentHP(); (hp < maxHP) == tc.evasion {
-				t.Fatalf("monster HP after the skill = %d of %d, evasion %v", hp, maxHP, tc.evasion)
+			evaded := tc.armed && tc.evasion
+			if hp := hostile.CurrentHP(); (hp < maxHP) == evaded {
+				t.Fatalf("monster HP after the skill = %d of %d, want evaded %v", hp, maxHP, evaded)
+			}
+			frames := c.ReadQueued()
+			if evaded {
+				assertOneSystemMessage(t, frames, serverpackets.SystemMessageS1DodgesAttack)
+			} else {
+				assertNoSystemMessage(t, frames, serverpackets.SystemMessageS1DodgesAttack)
 			}
 		})
 	}
