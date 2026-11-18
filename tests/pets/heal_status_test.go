@@ -17,6 +17,7 @@ import (
 const (
 	ownerHealSkill     = 1011
 	ownerManaHealSkill = 1013
+	ownerRechargeSkill = 1014
 	ownerHealPower     = 30
 	ownerManaHealPower = 12
 )
@@ -42,11 +43,16 @@ func bootOwnerHealer(t *testing.T) (*petWorld, *summon.Actor) {
 			SkillType: "MANAHEAL", Power: ownerManaHealPower, CastRange: 600,
 			StaticHitTime: true, HitTime: 500, StaticReuse: true, ReuseDelay: 0,
 		},
+		{
+			ID: ownerRechargeSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			SkillType: "MANARECHARGE", Power: ownerManaHealPower, CastRange: 600,
+			StaticHitTime: true, HitTime: 500, StaticReuse: true, ReuseDelay: 0,
+		},
 	}), gamesql.NewCharacterSkillStore(db))
 	srv := bootPets(t, gameservertest.WithSkills(skills))
 	ownerID := srv.SoleObjectID(t)
 	collarID := srv.GiveItem(t, ownerID, wolfCollarID, 1)
-	for _, id := range []int{ownerHealSkill, ownerManaHealSkill} {
+	for _, id := range []int{ownerHealSkill, ownerManaHealSkill, ownerRechargeSkill} {
 		if err := srv.KnownSkills.SetKnownSkill(context.Background(), ownerID, 0, id, 1); err != nil {
 			t.Fatalf("seed known skill %d: %v", id, err)
 		}
@@ -81,6 +87,7 @@ func TestOwnerHealOnPetRefreshesPetWindow(t *testing.T) {
 	}{
 		{name: "heal", skill: ownerHealSkill, step: petVitals{hp: ownerHealPower}},
 		{name: "mana heal", skill: ownerManaHealSkill, step: petVitals{mp: ownerManaHealPower}, message: serverpackets.SystemMessageS2MPRestoredByS1},
+		{name: "mana recharge", skill: ownerRechargeSkill, step: petVitals{mp: ownerManaHealPower}, message: serverpackets.SystemMessageS2MPRestoredByS1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
