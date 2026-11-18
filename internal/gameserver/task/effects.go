@@ -9,7 +9,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// EffectTick is the fixed live-effect sweep interval.
+// EffectTick is the fixed live-effect sweep interval. It bounds how late
+// an effect tick or expiry may land after its due instant: a parity
+// exception (owner decision, #4932), documented in package effect.
 const EffectTick = time.Second
 
 // Effects runs periodic actions for effect lists that currently hold at

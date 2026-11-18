@@ -359,6 +359,12 @@ func (e *Effect) dueAt() time.Time {
 	return e.nextAction
 }
 
+// claimAction claims at most one tick of e that has come due by now. It
+// reports whether the tick action should run and whether e has ended. The
+// next due instant advances from the claimed one by exactly one period, never
+// from now, so a sweep that claims late (parity exception, #4932) neither
+// drifts the schedule nor changes the tick count; a claim more than one period
+// late leaves the next tick already due for the following sweep.
 func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
 	e.scheduleMu.Lock()
 	defer e.scheduleMu.Unlock()
