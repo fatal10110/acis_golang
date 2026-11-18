@@ -1,6 +1,7 @@
 package festival
 
 import (
+	"context"
 	"slices"
 	"sync"
 	"testing"
@@ -50,7 +51,7 @@ func TestStopJoinsTheStepUnderWay(t *testing.T) {
 
 	returned := make(chan struct{})
 	go func() {
-		h.m.Stop()
+		h.m.Stop(context.Background())
 		close(returned)
 	}()
 	<-timer.stopped
@@ -64,5 +65,40 @@ func TestStopJoinsTheStepUnderWay(t *testing.T) {
 
 	if !slices.Equal(w.shouts, []string{startingText}) {
 		t.Fatalf("shouts = %q, want the opening's only", w.shouts)
+	}
+}
+
+// A Stop whose context ends while a festival's opening still waits on its
+// parties' queues returns without the step.
+func TestStopGivesUpOnTheStepWhenItsContextEnds(t *testing.T) {
+	h := newScheduleHarness(t)
+	w := &heldSettleWorld{movesWorld: newMovesWorld()}
+	h.m.SetWorld(w)
+	timer := &observedTimer{stopped: make(chan struct{})}
+	h.timer = timer
+	h.m.Start()
+	h.signUp(sevensigns.Dawn, 0, party)
+	h.fire(t) // the first cycle
+	h.fire(t) // the signup ends: the festival opens
+	if w.settled == nil {
+		t.Fatal("the opening did not wait on its parties")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	returned := make(chan struct{})
+	go func() {
+		h.m.Stop(ctx)
+		close(returned)
+	}()
+	<-timer.stopped
+	select {
+	case <-returned:
+		t.Fatal("Stop returned with the opening still under way")
+	default:
+	}
+	cancel()
+	<-returned
+	if len(w.shouts) != 0 {
+		t.Fatalf("shouts = %q, want none before the step ends", w.shouts)
 	}
 }

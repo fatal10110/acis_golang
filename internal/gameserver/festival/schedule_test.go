@@ -195,7 +195,7 @@ func TestScheduleStopsWithTheCompetition(t *testing.T) {
 	if h.festivalCycle(t) != 6 || len(h.pending) != before+1 {
 		t.Fatalf("restart: cycle %d, %d timers", h.festivalCycle(t), len(h.pending))
 	}
-	h.m.Stop()
+	h.m.Stop(context.Background())
 	h.m.CompetitionBegun()
 	if h.festivalCycle(t) != 6 || len(h.pending) != before+1 {
 		t.Fatal("a stopped festival started a schedule")

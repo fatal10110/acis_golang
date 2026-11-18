@@ -1,6 +1,7 @@
 package festival
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
@@ -100,7 +101,7 @@ func TestStopCallsOffTheFestivalUnderWay(t *testing.T) {
 	w := newMovesWorld()
 	h.m.SetWorld(w)
 	h.beginFestival(t)
-	h.m.Stop()
+	h.m.Stop(context.Background())
 	armed, admitted := len(h.pending), len(w.admitted)
 	h.fire(t) // the stale first stage
 	if len(w.spawned) != 0 || len(w.admitted) != admitted || len(w.relocated) != 0 || len(h.pending) != armed {

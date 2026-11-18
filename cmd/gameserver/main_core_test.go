@@ -64,6 +64,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startRelationPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "character_relations save"},
 		"startPetitionPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "petition and petition_message save"},
 		"startSimPool":             {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
+		"stopSevenSigns":           {shutdownSaveTimeout, "shutdownSaveTimeout", "waits for a period change or festival step under way, whose seven_signs_festival and seven_signs_status saves run on the persistence lane, then closes their queue"},
 		"startTicker": {
 			task.ItemInstanceSaveTimeout, "",
 			"StopAndWait waits for one in-flight tick; the rest are in-memory, and the item and race track ticks, the only ones with database I/O, run under a context the stop cancels (TestItemInstancesStopCutsALongTickShort), so their wait is the cancellation's, kept at ItemInstanceSaveTimeout as headroom rather than its ItemInstanceTickBudget",
@@ -71,7 +72,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startItemInstances":         {3 * task.ItemInstanceSaveTimeout, "ItemInstanceSaveTimeout", "drainItemInstances: save, persistence-worker drain, save"},
 		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
 		"startGroundItemPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "items_on_ground save"},
-		"startSevenSigns":            {shutdownSaveTimeout, "shutdownSaveTimeout", "stops the period and festival timers, then saves seven_signs_festival (outside seal validation), seven_signs and seven_signs_status in one budget"},
+		"startSevenSigns":            {shutdownSaveTimeout, "shutdownSaveTimeout", "once stopSevenSigns stopped the period and festival timers, saves seven_signs_festival (outside seal validation), seven_signs and seven_signs_status in one budget"},
 		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, which does no I/O, then for its queued olympiad_nobles and server_memo writes and the final save on the persistence lane, each bounded by olympiad.TaskTimeout"},
 		"startBossZones":             {shutdownSaveTimeout, "shutdownSaveTimeout", "grandboss_list save"},
 		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save"},

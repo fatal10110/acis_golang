@@ -2324,9 +2324,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	sevenSigns.SetFestival(fest)
 	fest.Start()
-	cleanup(t, fest.Stop)
+	cleanup(t, func() { fest.Stop(context.Background()) })
 	sevenSigns.Start()
-	cleanup(t, sevenSigns.Stop)
+	cleanup(t, func() { sevenSigns.Stop(context.Background()) })
 
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear

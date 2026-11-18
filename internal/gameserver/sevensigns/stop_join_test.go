@@ -90,7 +90,7 @@ func (h *stopHarness) stop(t *testing.T) <-chan struct{} {
 	t.Helper()
 	returned := make(chan struct{})
 	go func() {
-		h.state.Stop()
+		h.state.Stop(context.Background())
 		close(returned)
 	}()
 	<-h.timer.stopped
@@ -191,5 +191,34 @@ func TestPeriodChangeStepsRunThroughOnItsQueue(t *testing.T) {
 	want := []string{"notice 0", "notice 1", "dungeons swept", fmt.Sprintf("notice %d", NoticeSky)}
 	if !slices.Equal(h.online.entries, want) || h.armed != 2 {
 		t.Fatalf("entries = %q, timers armed %d; want %q and the next change armed", h.online.entries, h.armed, want)
+	}
+}
+
+// A Stop whose context ends while the period change still waits on its
+// save returns without it; the save, run later, still writes the new
+// period.
+func TestStopGivesUpOnPeriodChangeWhenItsContextEnds(t *testing.T) {
+	h := newStopHarness(t)
+	h.fire()
+	h.queue.Run()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	returned := make(chan struct{})
+	go func() {
+		h.state.Stop(ctx)
+		close(returned)
+	}()
+	<-h.timer.stopped
+	select {
+	case <-returned:
+		t.Fatal("Stop returned with the period change still under way")
+	default:
+	}
+	cancel()
+	<-returned
+
+	h.runSave(t)
+	if len(h.store.saves) != 1 || h.store.saves[0].Period != Competition {
+		t.Fatalf("status saves = %+v, want the new period's", h.store.saves)
 	}
 }

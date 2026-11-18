@@ -167,12 +167,17 @@ func provideSevenSignsState(db *sql.DB, queue sevenSignsQueue, worker *persist.W
 // waiting for a step still under way, then closes their queue. It is
 // invoked after startSimPool so it stops first, while the pool still runs
 // the steps it waits for; startSevenSigns' final save follows the pool's
-// stop.
+// stop. A period change under way waits for its saves on the persistence
+// lane; past shutdownSaveTimeout the shutdown goes on, the persistence
+// worker lands the saves still queued and startSevenSigns' final save
+// writes the same state.
 func stopSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, queue sevenSignsQueue) {
 	lc.Append(fx.Hook{
-		OnStop: func(context.Context) error {
-			state.Stop()
-			fest.Stop()
+		OnStop: func(ctx context.Context) error {
+			ctx, cancel := context.WithTimeout(ctx, shutdownSaveTimeout)
+			defer cancel()
+			state.Stop(ctx)
+			fest.Stop(ctx)
 			queue.Close()
 			return nil
 		},

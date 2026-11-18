@@ -324,12 +324,13 @@ func (s *State) Start() {
 	s.scheduleLocked()
 }
 
-// Stop cancels the pending transition timer and latches, then waits for a
-// period change already under way: it still saves the new period, but
-// neither expels, shows the sky, swaps the NPC groups nor re-arms. Once Stop
-// returns, the period changes neither post to a queue nor write. It must
-// not run on the state's queue.
-func (s *State) Stop() {
+// Stop cancels the pending transition timer and latches, then waits, until
+// ctx ends, for a period change already under way: it still saves the new
+// period, but neither expels, shows the sky, swaps the NPC groups nor
+// re-arms. Once Stop returns before ctx ends, the period changes neither
+// post to a queue nor write; past it, the change under way may still save.
+// It must not run on the state's queue.
+func (s *State) Stop(ctx context.Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopped = true
@@ -337,9 +338,7 @@ func (s *State) Stop() {
 		s.timer.Stop()
 		s.timer = nil
 	}
-	for s.transitioning {
-		s.idle.Wait()
-	}
+	s.waitIdleLocked(ctx)
 }
 
 // WaitIdle returns once no period change is under way. It must not run on
@@ -347,7 +346,22 @@ func (s *State) Stop() {
 func (s *State) WaitIdle() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for s.transitioning {
+	s.waitIdleLocked(context.Background())
+}
+
+// waitIdleLocked waits on s.mu until no period change is under way or ctx
+// ends.
+func (s *State) waitIdleLocked(ctx context.Context) {
+	if !s.transitioning {
+		return
+	}
+	stop := context.AfterFunc(ctx, func() {
+		s.mu.Lock()
+		s.idle.Broadcast()
+		s.mu.Unlock()
+	})
+	defer stop()
+	for s.transitioning && ctx.Err() == nil {
 		s.idle.Wait()
 	}
 }

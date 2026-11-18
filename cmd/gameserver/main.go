@@ -52,6 +52,7 @@ const (
 		shutdownSaveTimeout + // spawn_data
 		shutdownSaveTimeout + // character_relations
 		shutdownSaveTimeout + // petition, petition_message
+		shutdownSaveTimeout + // seven signs stop: a period change under way waiting on its saves
 		shutdownSaveTimeout + // seven_signs, seven_signs_status
 		simPoolStopTimeout +
 		task.ItemInstanceSaveTimeout + // item ticker: its stop cancels an in-flight save, so this is headroom, not task.ItemInstanceTickBudget

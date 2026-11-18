@@ -282,7 +282,7 @@ func TestStopCancelsPendingTransition(t *testing.T) {
 		t.Fatalf("Restore: %v", err)
 	}
 	h.state.Start()
-	h.state.Stop()
+	h.state.Stop(context.Background())
 	// Nothing observable besides no panic; the timer handle was replaced by
 	// a stub, so just verify no further scheduling happened implicitly.
 	if len(h.fired) != 1 {

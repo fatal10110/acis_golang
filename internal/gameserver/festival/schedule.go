@@ -1,6 +1,7 @@
 package festival
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -45,10 +46,11 @@ func (m *Manager) Start() {
 	m.CompetitionBegun()
 }
 
-// Stop cancels the schedule for good, then waits for the steps still
-// acting on the world; once it returns the festival's timers neither post
-// to a queue nor write. It must not run on the festival's queue.
-func (m *Manager) Stop() {
+// Stop cancels the schedule for good, then waits, until ctx ends, for the
+// steps still acting on the world; once it returns before ctx ends the
+// festival's timers neither post to a queue nor write. It must not run on
+// the festival's queue.
+func (m *Manager) Stop(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.stopped = true
@@ -59,7 +61,7 @@ func (m *Manager) Stop() {
 		}
 		m.current = nil
 	}
-	m.waitIdleLocked()
+	m.waitIdleLocked(ctx)
 }
 
 // WaitIdle returns once no timer step is acting on the world. It must not
@@ -67,11 +69,22 @@ func (m *Manager) Stop() {
 func (m *Manager) WaitIdle() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.waitIdleLocked()
+	m.waitIdleLocked(context.Background())
 }
 
-func (m *Manager) waitIdleLocked() {
-	for m.steps > 0 {
+// waitIdleLocked waits on m.mu until no step is acting on the world or ctx
+// ends.
+func (m *Manager) waitIdleLocked(ctx context.Context) {
+	if m.steps == 0 {
+		return
+	}
+	stop := context.AfterFunc(ctx, func() {
+		m.mu.Lock()
+		m.idle.Broadcast()
+		m.mu.Unlock()
+	})
+	defer stop()
+	for m.steps > 0 && ctx.Err() == nil {
 		m.idle.Wait()
 	}
 }
