@@ -27,7 +27,7 @@ func TestCompetitionEndLetsTheFestivalUnderWayFinish(t *testing.T) {
 	if !h.m.Initialized() || h.lastDelay() != 2*time.Minute {
 		t.Fatalf("after the signup: initialized %v, next step in %v", h.m.Initialized(), h.lastDelay())
 	}
-	h.m.CompetitionEnded()
+	h.m.CompetitionEnded(func() {})
 	for _, want := range []time.Duration{3 * time.Minute, 4 * time.Minute, 3 * time.Minute, 3 * time.Minute, 3 * time.Minute} {
 		h.fire(t)
 		if h.lastDelay() != want {
@@ -121,18 +121,18 @@ func (w *fakeWorld) place() NPC {
 	return fakeNPC(w.next)
 }
 
-func (w *fakeWorld) RewardClanOf(string, int)         {}
-func (w *fakeWorld) RemoveBloodOfferings()            {}
-func (w *fakeWorld) Shout(string, string)             {}
-func (w *fakeWorld) Locate(int32) (Spot, bool)        { return Spot{}, false }
-func (w *fakeWorld) Admit(int32, int, int, int)       {}
-func (w *fakeWorld) Relocate(int32, *Spot)            {}
-func (w *fakeWorld) Tell(int32, string)               {}
-func (w *fakeWorld) Settle([]int32)                   {}
-func (w *fakeWorld) SpawnWitch(int, Spot) (NPC, bool) { return w.place(), true }
-func (w *fakeWorld) Say(NPC, string)                  {}
-func (w *fakeWorld) Swarm(NPC, int, int, int)         {}
-func (w *fakeWorld) Unspawn(n NPC)                    { w.unspawns[n]++ }
+func (w *fakeWorld) RewardClanOf(_ string, _ int, then func()) { then() }
+func (w *fakeWorld) RemoveBloodOfferings(then func())          { then() }
+func (w *fakeWorld) Shout(string, string)                      {}
+func (w *fakeWorld) Locate(int32) (Spot, bool)                 { return Spot{}, false }
+func (w *fakeWorld) Admit(int32, int, int, int)                {}
+func (w *fakeWorld) Relocate(int32, *Spot)                     {}
+func (w *fakeWorld) Tell(int32, string)                        {}
+func (w *fakeWorld) Settle(_ []int32, then func())             { then() }
+func (w *fakeWorld) SpawnWitch(int, Spot) (NPC, bool)          { return w.place(), true }
+func (w *fakeWorld) Say(NPC, string)                           {}
+func (w *fakeWorld) Swarm(NPC, int, int, int)                  {}
+func (w *fakeWorld) Unspawn(n NPC)                             { w.unspawns[n]++ }
 func (w *fakeWorld) SpawnMonster(int, int, int, int, int) (NPC, bool) {
 	if fn := w.onSpawn; fn != nil {
 		w.onSpawn = nil

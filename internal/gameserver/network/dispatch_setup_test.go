@@ -207,7 +207,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	}
 	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, CharacterSelectDelay: 3 * time.Second, ServerBypassDelay: 100 * time.Millisecond, MaxBuffsAmount: 20}
 	inventoryUpdates := task.NewInventoryUpdates()
-	sevenSigns := sevensigns.NewState(staticSevenSignsStore{}, nil, log, nil, nil)
+	sevenSigns := sevensigns.NewState(staticSevenSignsStore{}, nil, log, nil, nil, nil, nil)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}

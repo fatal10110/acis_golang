@@ -2,6 +2,7 @@ package network
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -15,12 +16,12 @@ import (
 // festival. A character online answers for its own clan; any other name is
 // looked up, in any case, in the clans' rosters. The message goes out even
 // to a clan too low in level to earn reputation. Each member gets it on its
-// own queue, and the call returns once every member's queue has sent it, so
-// the period change's announcements that follow come after it. It must not
-// run on a player's queue.
-func (l *GameClientLink) RewardClanOf(name string, points int) {
+// own queue, and then runs once every member's queue has sent it, so the
+// period change's announcements that follow come after it.
+func (l *GameClientLink) RewardClanOf(name string, points int, then func()) {
 	cl, ok := l.clanNamed(name)
 	if !ok {
+		then()
 		return
 	}
 	if change, changed := l.clanService().AddReputation(cl, points); changed {
@@ -29,19 +30,26 @@ func (l *GameClientLink) RewardClanOf(name string, points int) {
 	l.broadcastToClanQueued(cl, nil, func() wire.Frame {
 		return serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageFestivalHighestRankedParty, name, int32(points))
 	})
-	for _, member := range l.onlineClanMembers(cl, 0) {
-		awaitLiveQueue(member)
-	}
+	awaitLiveQueues(l.onlineClanMembers(cl, 0), then)
 }
 
-// awaitLiveQueue returns once live's queue has run everything posted to it
-// so far; at once when the queue has closed. It must not run on a player's
-// queue.
-func awaitLiveQueue(live *livePlayer) {
-	done := make(chan struct{})
-	if postLive(live, func() { close(done) }) {
-		<-done
+// awaitLiveQueues posts a mark behind everything already posted to each of
+// lives and runs then on the queue of the last to reach its mark; at once
+// on the caller when none takes it.
+func awaitLiveQueues(lives []*livePlayer, then func()) {
+	var pending atomic.Int32
+	pending.Store(int32(len(lives)) + 1)
+	reached := func() {
+		if pending.Add(-1) == 0 {
+			then()
+		}
 	}
+	for _, live := range lives {
+		if !postLive(live, reached) {
+			reached()
+		}
+	}
+	reached()
 }
 
 // clanNamed returns the clan of the character named name: an online
@@ -66,11 +74,11 @@ func (l *GameClientLink) clanNamed(name string) (*clan.Clan, bool) {
 
 // RemoveBloodOfferings is the festival world's RemoveBloodOfferings:
 // every player online, on its own queue, loses the blood offerings it
-// carries, told only by its inventory update.
-func (l *GameClientLink) RemoveBloodOfferings() {
-	l.onEachLivePlayer(func(live *livePlayer) {
+// carries, told only by its inventory update; then runs after the last.
+func (l *GameClientLink) RemoveBloodOfferings(then func()) {
+	l.onEachLivePlayerThen(func(live *livePlayer) {
 		if inv := live.Inventory(); inv != nil {
 			inv.DestroyAll(inv.ItemByTemplateID(festival.BloodOfferingID))
 		}
-	})
+	}, then)
 }

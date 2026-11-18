@@ -12,9 +12,20 @@ import (
 // festival calls.
 type onlineJournal struct{ *journal }
 
-func (j onlineJournal) GiveStrifeSkills()   { j.entries = append(j.entries, "strife given") }
-func (j onlineJournal) RemoveStrifeSkills() { j.entries = append(j.entries, "strife removed") }
-func (j onlineJournal) ExpelFromDungeons()  { j.entries = append(j.entries, "dungeons swept") }
+func (j onlineJournal) GiveStrifeSkills(then func()) {
+	j.entries = append(j.entries, "strife given")
+	then()
+}
+
+func (j onlineJournal) RemoveStrifeSkills(then func()) {
+	j.entries = append(j.entries, "strife removed")
+	then()
+}
+
+func (j onlineJournal) ExpelFromDungeons(then func()) {
+	j.entries = append(j.entries, "dungeons swept")
+	then()
+}
 
 // Each period change acts on the players online at the reference's point
 // (SevenSignsPeriodChange.run): results' end gives the Seal of Strife skills
@@ -25,7 +36,7 @@ func TestPeriodChangesActOnPlayersOnline(t *testing.T) {
 	start := at(2026, time.August, 24, 17, 0, time.UTC)
 	h := newStateHarness(t, start)
 	j := onlineJournal{&journal{store: h.store}}
-	h.state = NewState(h.store, j, h.state.log, func() time.Time { return h.current }, func(d time.Duration, fn func()) *time.Timer {
+	h.state = NewState(h.store, j, h.state.log, func() time.Time { return h.current }, nil, nil, func(d time.Duration, fn func()) Timer {
 		h.fired = append(h.fired, fn)
 		return nil
 	})

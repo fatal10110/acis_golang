@@ -12,60 +12,70 @@ var _ sevensigns.Online = (*GameClientLink)(nil)
 // GiveStrifeSkills implements sevensigns.Online: every player online gets the
 // Seal of Strife skill its cabal earns, on its own queue, unstored and without
 // a skill list; its changed maximum CP shows as any stat change does.
-func (l *GameClientLink) GiveStrifeSkills() {
+func (l *GameClientLink) GiveStrifeSkills(then func()) {
 	if l.sevenSigns == nil {
+		then()
 		return
 	}
-	l.onEachLivePlayer(func(live *livePlayer) {
+	l.onEachLivePlayerThen(func(live *livePlayer) {
 		l.giveStrifeSkill(live, l.sevenSigns.StrifeSkill(live.ObjectID()))
-	})
+	}, then)
 }
 
 // RemoveStrifeSkills implements sevensigns.Online: every player online
 // loses both Seal of Strife skills, unstored and without a skill list.
-func (l *GameClientLink) RemoveStrifeSkills() {
-	l.onEachLivePlayer(l.removeStrifeSkills)
+func (l *GameClientLink) RemoveStrifeSkills(then func()) {
+	l.onEachLivePlayerThen(l.removeStrifeSkills, then)
 }
 
 // ExpelFromDungeons implements sevensigns.Online: every player in the world
 // standing in a Seven Signs dungeon, game masters aside, whom the period change
 // no longer allows there is sent to the nearest town and out of the dungeon. A
 // player still logging in is left to its login check.
-func (l *GameClientLink) ExpelFromDungeons() {
+func (l *GameClientLink) ExpelFromDungeons(then func()) {
 	if l.sevenSigns == nil {
+		then()
 		return
 	}
-	l.onEachLivePlayer(func(live *livePlayer) {
+	l.onEachLivePlayerThen(func(live *livePlayer) {
 		if !l.liveInWorld(live) || !live.In7sDungeon() || live.accessLevel().IsGM {
 			return
 		}
 		if l.sevenSigns.ExpelledAtPeriodChange(live.ObjectID()) {
 			l.expelFromDungeon(live)
 		}
-	})
+	}, then)
 }
 
-// onEachLivePlayer runs fn on the queue of every player online, one player
-// after the other, each before the next starts, so what fn sends goes out
-// ahead of whatever the caller sends next. A player whose queue has closed
-// is skipped. It must not run on a player's queue.
-func (l *GameClientLink) onEachLivePlayer(fn func(*livePlayer)) {
-	if l.world == nil {
-		return
-	}
-	for _, obj := range l.world.Players() {
-		live, ok := obj.(*livePlayer)
-		if !ok {
-			continue
+// onEachLivePlayerThen runs fn on the queue of every player online, one
+// player after the other: the task running fn for one posts the next, and
+// the last runs then on its queue, so what fn sends goes out ahead of
+// whatever then sends. A player whose queue has closed is skipped; with
+// nobody left, then runs at once on the caller.
+func (l *GameClientLink) onEachLivePlayerThen(fn func(*livePlayer), then func()) {
+	var lives []*livePlayer
+	if l.world != nil {
+		for _, obj := range l.world.Players() {
+			if live, ok := obj.(*livePlayer); ok {
+				lives = append(lives, live)
+			}
 		}
-		done := make(chan struct{})
+	}
+	eachLiveThen(lives, fn, then)
+}
+
+// eachLiveThen runs fn on the queue of each of lives in turn, then then.
+func eachLiveThen(lives []*livePlayer, fn func(*livePlayer), then func()) {
+	for i, live := range lives {
+		rest := lives[i+1:]
 		if postLive(live, func() {
-			defer close(done)
 			fn(live)
+			eachLiveThen(rest, fn, then)
 		}) {
-			<-done
+			return
 		}
 	}
+	then()
 }
 
 // giveStrifeSkill gives live the Seal of Strife skill skill names, unstored.

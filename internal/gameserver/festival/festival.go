@@ -27,7 +27,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
 
@@ -73,17 +75,18 @@ type Store interface {
 }
 
 // World is how the festival reaches the players, clans and arenas. Its
-// methods are called without the festival's lock held.
+// methods are called without the festival's lock held. A method taking
+// then calls it once, from any goroutine, when what it started is done.
 type World interface {
 	// RewardClanOf adds points to the reputation of the clan of the
 	// character named name, online or not, and tells the clan's members
 	// online that name earned them for the clan in the festival. A
-	// character in no clan earns nothing. It returns once the members
-	// have been sent all of it, so what the caller sends next follows.
-	RewardClanOf(name string, points int)
+	// character in no clan earns nothing. then runs once the members have
+	// been sent all of it, so what follows it goes out after.
+	RewardClanOf(name string, points int, then func())
 	// RemoveBloodOfferings destroys every blood offering the players
-	// online carry, without a word, and returns once it is done.
-	RemoveBloodOfferings()
+	// online carry, without a word, then runs then.
+	RemoveBloodOfferings(then func())
 	// Shout shouts text, spoken by sender, to every player inside the
 	// oracles' peace zones.
 	Shout(sender, text string)
@@ -102,10 +105,9 @@ type World interface {
 	Relocate(objectID int32, at *Spot)
 	// Tell sends the player objectID text as a plain message.
 	Tell(objectID int32, text string)
-	// Settle returns once everything Admit, Relocate and Tell did so far
-	// to each player of objectIDs in the world has been carried out. It
-	// must not be called on a player's queue.
-	Settle(objectIDs []int32)
+	// Settle runs then once everything Admit, Relocate and Tell did so far
+	// to each player of objectIDs in the world has been carried out.
+	Settle(objectIDs []int32, then func())
 	// SpawnWitch places the witch npcID at s and shows its arrival, two
 	// casts on itself; false when it could not be placed.
 	SpawnWitch(npcID int, s Spot) (NPC, bool)
@@ -187,15 +189,30 @@ func (c Config) signup() time.Duration {
 // saveTimeout bounds a save the festival makes on its own.
 const saveTimeout = 10 * time.Second
 
+// Timer is an armed festival timer.
+type Timer interface {
+	Stop() bool
+}
+
+// Writer runs the festival's saves off the queue, in the order they were
+// handed to it per owner.
+type Writer interface {
+	Enqueue(ownerID int32, job func()) bool
+}
+
 // Manager is the Festival of Darkness. All methods are safe for concurrent
 // use; the Seven Signs period changes drive it through CompetitionBegun,
-// CompetitionEnded and CycleBegun.
+// CompetitionEnded and CycleBegun. Its timers fire on queue, the service
+// queue it shares with the Seven Signs, and each step that waits on the
+// players' queues continues there.
 type Manager struct {
 	cfg       Config
 	store     Store
 	calendar  Calendar
 	now       func() time.Time
-	afterFunc func(time.Duration, func()) *time.Timer
+	queue     *sim.Queue
+	writes    Writer
+	afterFunc func(time.Duration, func()) Timer
 	log       zerolog.Logger
 
 	// saveMu serializes the writes to the store, so the write that lands
@@ -213,23 +230,41 @@ type Manager struct {
 	// scores holds each Seven Signs cycle's scores keyed by festival id,
 	// plus Count for Dawn's.
 	scores map[int]map[int]Score
+	// steps counts the timer steps still acting on the world; idle, on mu,
+	// is signalled when it drops to zero.
+	steps int
+	idle  sync.Cond
 	schedule
 	run
 }
 
-// New returns a festival persisting through store and following calendar.
-// now supplies wall time and afterFunc schedules its timers (both
-// overridden in tests; nil falls back to time.Now and time.AfterFunc).
-func New(cfg Config, store Store, calendar Calendar, log zerolog.Logger, now func() time.Time, afterFunc func(time.Duration, func()) *time.Timer) *Manager {
+// New returns a festival persisting through store and following calendar,
+// its steps running on queue and its saves on writes. now supplies wall
+// time and afterFunc schedules its timers (both overridden in tests; nil
+// falls back to time.Now and queue's timers). A nil queue runs every
+// continuation on the goroutine finishing what it waited for, a nil writes
+// saves there too.
+func New(cfg Config, store Store, calendar Calendar, log zerolog.Logger, now func() time.Time, queue *sim.Queue, writes Writer, afterFunc func(time.Duration, func()) Timer) *Manager {
 	if now == nil {
 		now = time.Now
 	}
 	if afterFunc == nil {
-		afterFunc = time.AfterFunc
+		afterFunc = func(d time.Duration, fn func()) Timer { return queue.After(d, fn) }
 	}
-	m := &Manager{cfg: cfg, store: store, calendar: calendar, now: now, afterFunc: afterFunc, log: log, scores: map[int]map[int]Score{}}
+	m := &Manager{cfg: cfg, store: store, calendar: calendar, now: now, queue: queue, writes: writes, afterFunc: afterFunc, log: log, scores: map[int]map[int]Score{}}
+	m.idle.L = &m.mu
 	m.run = newRun()
 	return m
+}
+
+// onQueue returns a continuation that runs fn on the queue; on the caller
+// when there is none or it no longer takes tasks.
+func (m *Manager) onQueue(fn func()) func() {
+	return func() {
+		if m.queue == nil || !m.queue.Post(fn) {
+			fn()
+		}
+	}
 }
 
 // SetWorld hands the festival the players and clans its period changes
@@ -310,9 +345,9 @@ func (m *Manager) overallHighestLocked(festivalID int) (Score, bool) {
 // CycleBegun resets the festival for the Seven Signs cycle that began: no
 // festival cycle run, no bonus accumulated, no party signed up or waiting
 // to register its score, and a blank score for each festival and cabal,
-// saved with every stored score. Then every blood offering left on the
-// players online is destroyed.
-func (m *Manager) CycleBegun(cycle int) {
+// saved with every stored score on the writer. Then every blood offering
+// left on the players online is destroyed, and then runs.
+func (m *Manager) CycleBegun(cycle int, then func()) {
 	m.mu.Lock()
 	m.status = Status{}
 	m.signsCycle = cycle
@@ -327,15 +362,22 @@ func (m *Manager) CycleBegun(cycle int) {
 	world := m.world
 	m.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
-	defer cancel()
-	if err := m.SaveScores(ctx); err != nil {
-		m.log.Error().Err(err).Int("cycle", cycle).Msg("festival: save the new cycle's scores")
+	save := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+		defer cancel()
+		if err := m.SaveScores(ctx); err != nil {
+			m.log.Error().Err(err).Int("cycle", cycle).Msg("festival: save the new cycle's scores")
+		}
 	}
-	if world != nil {
-		world.RemoveBloodOfferings()
+	if m.writes == nil || !m.writes.Enqueue(persist.ServiceOwner, save) {
+		save()
 	}
 	m.log.Info().Int("cycle", cycle).Msg("festival: reinitialized for the next competition period")
+	if world == nil {
+		then()
+		return
+	}
+	world.RemoveBloodOfferings(then)
 }
 
 // SaveScores writes every kept score.

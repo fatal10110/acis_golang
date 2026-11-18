@@ -818,7 +818,9 @@ func WithFestivalClock(now func() time.Time) Option {
 }
 
 // WithFestivalTimer schedules the Festival of Darkness's timers through
-// afterFunc instead of real timers, so a test can fire each at will.
+// afterFunc instead of real timers, so a test can fire each at will. The
+// call fired runs the step on the festival's queue and returns once all of
+// it is done.
 func WithFestivalTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
 	return func(o *options) { o.festivalTimer = afterFunc }
 }
@@ -836,7 +838,9 @@ func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
 }
 
 // WithSevenSignsTimer schedules the Seven Signs period changes through
-// afterFunc instead of a real timer, so a test can fire one at will.
+// afterFunc instead of a real timer, so a test can fire one at will. The
+// call fired runs the period change on its queue and returns once all of
+// it is done.
 func WithSevenSignsTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
 	return func(o *options) { o.sevenSignsTimer = afterFunc }
 }
@@ -2288,7 +2292,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.sevenSignsClock != nil {
 		sevenSignsClock = o.sevenSignsClock
 	}
-	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, sevenSignsClock, o.sevenSignsTimer)
+	// The Seven Signs and the festival share one service queue, as in
+	// production.
+	sevenSignsQueue := queues.NewQueue("sevensigns")
+	var (
+		sevenSigns *sevensigns.State
+		fest       *festival.Manager
+	)
+	sevenSigns = sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, sevenSignsClock, sevenSignsQueue, persistWorker,
+		serviceTimer[sevensigns.Timer](sevenSignsQueue, o.sevenSignsTimer, func() { sevenSigns.WaitIdle() }))
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
@@ -2305,15 +2317,16 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.festivalConfig != nil {
 		festivalConfig = *o.festivalConfig
 	}
-	fest := festival.New(festivalConfig, festivalStore, sevenSigns, o.log, festivalClock, o.festivalTimer)
+	fest = festival.New(festivalConfig, festivalStore, sevenSigns, o.log, festivalClock, sevenSignsQueue, persistWorker,
+		serviceTimer[festival.Timer](sevenSignsQueue, o.festivalTimer, func() { fest.WaitIdle() }))
 	if err := fest.Restore(context.Background(), sevenSigns.CurrentCycle()); err != nil {
 		t.Fatalf("restore festival: %v", err)
 	}
 	sevenSigns.SetFestival(fest)
 	fest.Start()
-	cleanup(t, fest.Stop)
+	cleanup(t, func() { fest.Stop(context.Background()) })
 	sevenSigns.Start()
-	cleanup(t, sevenSigns.Stop)
+	cleanup(t, func() { sevenSigns.Stop(context.Background()) })
 
 	// Restore the ground items the previous session saved at shutdown,
 	// mirroring the production boot: hydrate into world state, then clear
@@ -3020,5 +3033,33 @@ func (s *Server) SaveRelations(tb testing.TB) {
 	tb.Helper()
 	if err := s.relationRows.Save(context.Background(), s.Relations.Changes()); err != nil {
 		tb.Fatalf("save character relations: %v", err)
+	}
+}
+
+// serviceTimer schedules the timers of a service running on queue. With a
+// test's hook, the call the hook captures runs the timer's step on queue
+// and returns once idle reports the step and its continuations done.
+// Without one, each timer runs on the wall clock and posts its step to
+// queue: the inline executor's virtual clock would fire a week-long period
+// timer whenever a test advances it for something else.
+func serviceTimer[T interface{ Stop() bool }](queue *sim.Queue, hook func(time.Duration, func()) *time.Timer, idle func()) func(time.Duration, func()) T {
+	return func(d time.Duration, fn func()) T {
+		var zero T
+		if hook == nil {
+			return any(time.AfterFunc(d, func() { queue.Post(fn) })).(T)
+		}
+		t := hook(d, func() {
+			done := make(chan struct{})
+			if !queue.Post(func() { fn(); close(done) }) {
+				fn()
+				close(done)
+			}
+			<-done
+			idle()
+		})
+		if t == nil {
+			return zero
+		}
+		return any(t).(T)
 	}
 }

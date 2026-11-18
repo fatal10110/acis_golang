@@ -56,7 +56,7 @@ func TestPeriodChangesActOnCastles(t *testing.T) {
 			start := at(2026, time.August, 24, 17, 0, time.UTC)
 			h := newStateHarness(t, start)
 			j := castlesJournal{&journal{store: h.store}}
-			h.state = NewState(h.store, j, h.state.log, func() time.Time { return h.current }, func(d time.Duration, fn func()) *time.Timer {
+			h.state = NewState(h.store, j, h.state.log, func() time.Time { return h.current }, nil, nil, func(d time.Duration, fn func()) Timer {
 				h.fired = append(h.fired, fn)
 				return nil
 			})
