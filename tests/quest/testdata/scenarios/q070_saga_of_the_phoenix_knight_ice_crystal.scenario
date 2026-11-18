@@ -1,0 +1,39 @@
+# Saga of the Phoenix Knight (Q070) at cond 3: Donath, the second NPC, offers the trade (1-03) only
+# with the Ice Crystal and the Paladin's optional item in the bag; 1-4 takes both, gives the reward item
+# and moves to cond 4. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q070_saga_of_the_phoenix_knight_ice_crystal.golden
+character Paladin 76
+class 5
+quest Q070_SagaOfThePhoenixKnight <state>=STARTED <cond>=3
+hold 7080 1
+hold 6482 1
+script quest.Q070_SagaOfThePhoenixKnight
+item 7093 7080 6482 7534
+page villagemaster/30849.htm
+page trainer/31277.htm
+page default/31624.htm
+page script/quest/Q070_SagaOfThePhoenixKnight/
+npc sedrick 30849 VillageMasterFighter 10 0 0
+npc felix 31277 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+
+action donath
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/1-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 1-4
+  S QuestList 70:0x8000000f
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7080
+  S SystemMessage id=302 3:6482
+  S SystemMessage id=54 3:7534
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/1-06.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 4
+  items 7080=0 6482=0 7534=1

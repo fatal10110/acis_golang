@@ -1,0 +1,39 @@
+# Saga of the Phoenix Knight (Q070) at cond 20, level 76: Sedrick ends the saga by talk alone (0-09):
+# adena, the Book of Giants and experience, the quest completed, the Paladin made a Phoenix Knight.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q070_saga_of_the_phoenix_knight_finish_by_talk.golden
+character Paladin 76
+class 5
+quest Q070_SagaOfThePhoenixKnight <state>=STARTED <cond>=20
+script quest.Q070_SagaOfThePhoenixKnight
+item 6622
+page villagemaster/30849.htm
+page trainer/31277.htm
+page default/31624.htm
+page script/quest/Q070_SagaOfThePhoenixKnight/
+npc sedrick 30849 VillageMasterFighter 10 0 0
+npc felix 31277 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+
+action sedrick
+action sedrick
+  S ActionFailed
+  S NpcHtmlMessage obj=sedrick item=0 page=villagemaster/30849.htm
+  S ActionFailed
+bypass npc_{sedrick}_Quest
+  S SystemMessage id=52 6:5000000
+  S SystemMessage id=54 3:6622
+  S SystemMessage id=45 1:2299404
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 70:0x00000000
+  S MagicSkillUse caster=player target=player skill=5103-1 hit=1000 reuse=0 success=0
+  S SystemMessage id=1606
+  S MagicSkillUse caster=player target=player skill=4339-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=sedrick target=sedrick skill=4339-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/0-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <state> | COMPLETED
+  Q delete-except-state Q070_SagaOfThePhoenixKnight
+  items 6622=1
+  state Q070_SagaOfThePhoenixKnight COMPLETED
