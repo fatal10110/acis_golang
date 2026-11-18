@@ -470,6 +470,16 @@ func (a *Actor) MAtkSpd() float64 {
 // AttackType returns this summon's current physical attack style.
 func (a *Actor) AttackType() item.WeaponType { return item.WeaponFist }
 
+// HeldWeaponType reports the type of the weapon a pet holds in its right
+// hand; ok is false for a servitor and for a pet holding none.
+func (a *Actor) HeldWeaponType() (item.WeaponType, bool) {
+	weapon := a.heldWeapon()
+	if weapon == nil {
+		return item.WeaponNone, false
+	}
+	return weapon.Type, true
+}
+
 // SoulshotCharged reports whether a soulshot charge is currently active.
 func (a *Actor) SoulshotCharged() bool { return a.ChargedShot(item.ShotSoul) }
 

@@ -339,6 +339,16 @@ func (c *Character) AttackType() item.WeaponType {
 	return c.activeWeapon().attackType()
 }
 
+// HeldWeaponType reports the type of the weapon equipped in the right hand;
+// ok is false when the hand is empty, where AttackType reports the fist.
+func (c *Character) HeldWeaponType() (item.WeaponType, bool) {
+	w := c.activeWeapon()
+	if w.inst == nil {
+		return item.WeaponNone, false
+	}
+	return w.attackType(), true
+}
+
 // AttackSpeed resolves the equipped weapon's pAtkSpd stat-set value. A
 // wyvern rider attacks at a flat 300, 150 while the wyvern is hungry; a
 // strider rider from the strider's P.Atk. speed, halved while it is hungry.

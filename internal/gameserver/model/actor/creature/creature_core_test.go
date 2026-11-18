@@ -27,26 +27,31 @@ type randomDamageTestActor struct {
 	spread        int
 	roll          int
 	attackType    item.WeaponType
+	held          item.WeaponType
+	armed         bool
 	pSkillEvasion float64
 }
 
-func (a *randomDamageTestActor) Position() (int, int, int)      { return 0, 0, 0 }
-func (a *randomDamageTestActor) ObjectID() int32                { return 1 }
-func (a *randomDamageTestActor) Heading() int                   { return 0 }
-func (a *randomDamageTestActor) Level() int                     { return a.level }
-func (a *randomDamageTestActor) STR() int                       { return 0 }
-func (a *randomDamageTestActor) CON() int                       { return 0 }
-func (a *randomDamageTestActor) DEX() int                       { return 0 }
-func (a *randomDamageTestActor) INT() int                       { return 0 }
-func (a *randomDamageTestActor) WIT() int                       { return 0 }
-func (a *randomDamageTestActor) MEN() int                       { return 0 }
-func (a *randomDamageTestActor) PAtk() float64                  { return 0 }
-func (a *randomDamageTestActor) PDef() float64                  { return 0 }
-func (a *randomDamageTestActor) MAtk() float64                  { return 0 }
-func (a *randomDamageTestActor) MDef() float64                  { return 0 }
-func (a *randomDamageTestActor) MagicCriticalRate() float64     { return 0 }
-func (a *randomDamageTestActor) CriticalRate() float64          { return 0 }
-func (a *randomDamageTestActor) AttackType() item.WeaponType    { return a.attackType }
+func (a *randomDamageTestActor) Position() (int, int, int)   { return 0, 0, 0 }
+func (a *randomDamageTestActor) ObjectID() int32             { return 1 }
+func (a *randomDamageTestActor) Heading() int                { return 0 }
+func (a *randomDamageTestActor) Level() int                  { return a.level }
+func (a *randomDamageTestActor) STR() int                    { return 0 }
+func (a *randomDamageTestActor) CON() int                    { return 0 }
+func (a *randomDamageTestActor) DEX() int                    { return 0 }
+func (a *randomDamageTestActor) INT() int                    { return 0 }
+func (a *randomDamageTestActor) WIT() int                    { return 0 }
+func (a *randomDamageTestActor) MEN() int                    { return 0 }
+func (a *randomDamageTestActor) PAtk() float64               { return 0 }
+func (a *randomDamageTestActor) PDef() float64               { return 0 }
+func (a *randomDamageTestActor) MAtk() float64               { return 0 }
+func (a *randomDamageTestActor) MDef() float64               { return 0 }
+func (a *randomDamageTestActor) MagicCriticalRate() float64  { return 0 }
+func (a *randomDamageTestActor) CriticalRate() float64       { return 0 }
+func (a *randomDamageTestActor) AttackType() item.WeaponType { return a.attackType }
+func (a *randomDamageTestActor) HeldWeaponType() (item.WeaponType, bool) {
+	return a.held, a.armed
+}
 func (a *randomDamageTestActor) SoulshotCharged() bool          { return false }
 func (a *randomDamageTestActor) SpiritshotCharged() bool        { return false }
 func (a *randomDamageTestActor) BlessedSpiritshotCharged() bool { return false }
@@ -63,18 +68,27 @@ var _ FormulaActor = (*randomDamageTestActor)(nil)
 
 func (a *randomDamageTestActor) Against(conditions.Actor, conditions.Skill) SkillStats { return a }
 
-func TestResolvePhysicalSkillInputSkipsEvasionForUnarmedAndBow(t *testing.T) {
+// TestResolvePhysicalSkillInputEvasionNeedsHeldWeapon pins that the target
+// rolls physical-skill evasion only against a caster holding a weapon item
+// other than a bow: an unarmed caster, a bow, and an NPC whose template
+// right-hand weapon sets its attack type without being an item never let it.
+func TestResolvePhysicalSkillInputEvasionNeedsHeldWeapon(t *testing.T) {
 	target := &randomDamageTestActor{pSkillEvasion: 100}
-	for _, attackType := range []item.WeaponType{item.WeaponFist, item.WeaponBow} {
-		in, ok := ResolvePhysicalSkillInput(&randomDamageTestActor{attackType: attackType}, target, modelskill.Definition{}, false, 1)
-		if !ok || in.Evaded {
-			t.Fatalf("AttackType %v evaded = %v, ok = %v; want false, true", attackType, in.Evaded, ok)
+	for _, tc := range []struct {
+		name   string
+		caster *randomDamageTestActor
+		evaded bool
+	}{
+		{name: "unarmed", caster: &randomDamageTestActor{attackType: item.WeaponFist}},
+		{name: "bow item", caster: &randomDamageTestActor{attackType: item.WeaponBow, held: item.WeaponBow, armed: true}},
+		{name: "template sword", caster: &randomDamageTestActor{attackType: item.WeaponSword}},
+		{name: "sword item", caster: &randomDamageTestActor{attackType: item.WeaponSword, held: item.WeaponSword, armed: true}, evaded: true},
+		{name: "pet weapon item", caster: &randomDamageTestActor{attackType: item.WeaponFist, held: item.WeaponPet, armed: true}, evaded: true},
+	} {
+		in, ok := ResolvePhysicalSkillInput(tc.caster, target, modelskill.Definition{}, false, 1)
+		if !ok || in.Evaded != tc.evaded {
+			t.Errorf("%s: evaded = %v, ok = %v; want %v, true", tc.name, in.Evaded, ok, tc.evaded)
 		}
-	}
-
-	in, ok := ResolvePhysicalSkillInput(&randomDamageTestActor{attackType: item.WeaponSword}, target, modelskill.Definition{}, false, 1)
-	if !ok || !in.Evaded {
-		t.Fatalf("sword evaded = %v, ok = %v; want true, true", in.Evaded, ok)
 	}
 }
 
@@ -476,23 +490,26 @@ type physicalAttackActor struct {
 	hasRace    bool
 }
 
-func (a *physicalAttackActor) ObjectID() int32                { return a.id }
-func (a *physicalAttackActor) Position() (int, int, int)      { return a.x, a.y, a.z }
-func (a *physicalAttackActor) Heading() int                   { return a.heading }
-func (a *physicalAttackActor) Level() int                     { return 1 }
-func (a *physicalAttackActor) STR() int                       { return 0 }
-func (a *physicalAttackActor) CON() int                       { return 0 }
-func (a *physicalAttackActor) DEX() int                       { return 0 }
-func (a *physicalAttackActor) INT() int                       { return 0 }
-func (a *physicalAttackActor) WIT() int                       { return 0 }
-func (a *physicalAttackActor) MEN() int                       { return 0 }
-func (a *physicalAttackActor) PAtk() float64                  { return a.pAtk }
-func (a *physicalAttackActor) PDef() float64                  { return a.pDef }
-func (a *physicalAttackActor) MAtk() float64                  { return 0 }
-func (a *physicalAttackActor) MDef() float64                  { return 0 }
-func (a *physicalAttackActor) MagicCriticalRate() float64     { return 0 }
-func (a *physicalAttackActor) CriticalRate() float64          { return 0 }
-func (a *physicalAttackActor) AttackType() item.WeaponType    { return a.attackType }
+func (a *physicalAttackActor) ObjectID() int32             { return a.id }
+func (a *physicalAttackActor) Position() (int, int, int)   { return a.x, a.y, a.z }
+func (a *physicalAttackActor) Heading() int                { return a.heading }
+func (a *physicalAttackActor) Level() int                  { return 1 }
+func (a *physicalAttackActor) STR() int                    { return 0 }
+func (a *physicalAttackActor) CON() int                    { return 0 }
+func (a *physicalAttackActor) DEX() int                    { return 0 }
+func (a *physicalAttackActor) INT() int                    { return 0 }
+func (a *physicalAttackActor) WIT() int                    { return 0 }
+func (a *physicalAttackActor) MEN() int                    { return 0 }
+func (a *physicalAttackActor) PAtk() float64               { return a.pAtk }
+func (a *physicalAttackActor) PDef() float64               { return a.pDef }
+func (a *physicalAttackActor) MAtk() float64               { return 0 }
+func (a *physicalAttackActor) MDef() float64               { return 0 }
+func (a *physicalAttackActor) MagicCriticalRate() float64  { return 0 }
+func (a *physicalAttackActor) CriticalRate() float64       { return 0 }
+func (a *physicalAttackActor) AttackType() item.WeaponType { return a.attackType }
+func (a *physicalAttackActor) HeldWeaponType() (item.WeaponType, bool) {
+	return item.WeaponNone, false
+}
 func (a *physicalAttackActor) SoulshotCharged() bool          { return a.soulshot }
 func (a *physicalAttackActor) SpiritshotCharged() bool        { return false }
 func (a *physicalAttackActor) BlessedSpiritshotCharged() bool { return false }

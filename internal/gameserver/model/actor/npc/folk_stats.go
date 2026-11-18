@@ -214,6 +214,10 @@ func (f *Folk) AttackType() item.WeaponType {
 	return f.fight.weapon.Type
 }
 
+// HeldWeaponType reports no weapon item: the template's right-hand weapon
+// shapes the attack style only.
+func (f *Folk) HeldWeaponType() (item.WeaponType, bool) { return item.WeaponNone, false }
+
 // BlessedSpiritshotCharged reports false: an NPC charges plain spiritshots
 // only.
 func (f *Folk) BlessedSpiritshotCharged() bool { return false }

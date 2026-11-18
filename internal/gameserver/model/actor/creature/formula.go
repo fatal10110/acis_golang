@@ -35,6 +35,10 @@ type FormulaActor interface {
 	MDef() float64
 	MagicCriticalRate() float64
 	AttackType() item.WeaponType
+	// HeldWeaponType reports the type of the weapon item equipped in this
+	// actor's right hand; ok is false when it holds no item. A template
+	// right-hand weapon (an NPC's) is no item, whatever AttackType says.
+	HeldWeaponType() (kind item.WeaponType, ok bool)
 
 	SoulshotCharged() bool
 	SpiritshotCharged() bool
@@ -130,7 +134,7 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
-	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.Against(nil, calcSkill(def)).CalcStat(stat.PSkillEvasion, 0) {
+	if weapon, armed := attacker.HeldWeaponType(); armed && weapon != item.WeaponBow && float64(target.Roll(100)) < target.Against(nil, calcSkill(def)).CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.PhysicalSkillInput{Evaded: true}, true
 	}
 	skillPower := casterSkillPower(attacker, def)
