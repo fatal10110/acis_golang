@@ -1,0 +1,657 @@
+== 0 [0]
+int=<0>
+long=<0>
+double=<0>
+bool=<false>
+strings=<0>
+ints=<0|>
+pairs=<>
+commapairs=ERROR
+== 1 [-0]
+int=<0>
+long=<0>
+double=<8000000000000000>
+bool=<false>
+strings=<-0>
+ints=<0|>
+pairs=<>
+commapairs=ERROR
+== 2 [+5]
+int=<5>
+long=<5>
+double=<4014000000000000>
+bool=<false>
+strings=<+5>
+ints=<5|>
+pairs=<>
+commapairs=ERROR
+== 3 [5]
+int=<5>
+long=<5>
+double=<4014000000000000>
+bool=<false>
+strings=<5>
+ints=<5|>
+pairs=<>
+commapairs=ERROR
+== 4 [5 ]
+int=ERROR
+long=ERROR
+double=<4014000000000000>
+bool=<false>
+strings=<5>
+ints=<5|>
+pairs=<>
+commapairs=ERROR
+== 5 [ 5]
+int=<5>
+long=<5>
+double=<4014000000000000>
+bool=<false>
+strings=<5>
+ints=<5|>
+pairs=<>
+commapairs=ERROR
+== 6 [007]
+int=<7>
+long=<7>
+double=<401c000000000000>
+bool=<false>
+strings=<007>
+ints=<7|>
+pairs=<>
+commapairs=ERROR
+== 7 [-5]
+int=<-5>
+long=<-5>
+double=<c014000000000000>
+bool=<false>
+strings=<-5>
+ints=<-5|>
+pairs=<>
+commapairs=ERROR
+== 8 [2147483647]
+int=<2147483647>
+long=<2147483647>
+double=<41dfffffffc00000>
+bool=<false>
+strings=<2147483647>
+ints=<2147483647|>
+pairs=<>
+commapairs=ERROR
+== 9 [2147483648]
+int=ERROR
+long=<2147483648>
+double=<41e0000000000000>
+bool=<false>
+strings=<2147483648>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 10 [-2147483648]
+int=<-2147483648>
+long=<-2147483648>
+double=<c1e0000000000000>
+bool=<false>
+strings=<-2147483648>
+ints=<-2147483648|>
+pairs=<>
+commapairs=ERROR
+== 11 [-2147483649]
+int=ERROR
+long=<-2147483649>
+double=<c1e0000000200000>
+bool=<false>
+strings=<-2147483649>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 12 [9223372036854775807]
+int=ERROR
+long=<9223372036854775807>
+double=<43e0000000000000>
+bool=<false>
+strings=<9223372036854775807>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 13 [9223372036854775808]
+int=ERROR
+long=ERROR
+double=<43e0000000000000>
+bool=<false>
+strings=<9223372036854775808>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 14 [-9223372036854775808]
+int=ERROR
+long=<-9223372036854775808>
+double=<c3e0000000000000>
+bool=<false>
+strings=<-9223372036854775808>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 15 [0x10]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<0x10>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 16 [1_000]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1_000>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 17 [1e3]
+int=ERROR
+long=ERROR
+double=<408f400000000000>
+bool=<false>
+strings=<1e3>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 18 [1.5]
+int=ERROR
+long=ERROR
+double=<3ff8000000000000>
+bool=<false>
+strings=<1.5>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 19 [.5]
+int=ERROR
+long=ERROR
+double=<3fe0000000000000>
+bool=<false>
+strings=<.5>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 20 [5.]
+int=ERROR
+long=ERROR
+double=<4014000000000000>
+bool=<false>
+strings=<5.>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 21 [-1.5e-3]
+int=ERROR
+long=ERROR
+double=<bf589374bc6a7efa>
+bool=<false>
+strings=<-1.5e-3>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 22 [NaN]
+int=ERROR
+long=ERROR
+double=<7ff8000000000000>
+bool=<false>
+strings=<NaN>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 23 [Infinity]
+int=ERROR
+long=ERROR
+double=<7ff0000000000000>
+bool=<false>
+strings=<Infinity>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 24 [1d]
+int=ERROR
+long=ERROR
+double=<3ff0000000000000>
+bool=<false>
+strings=<1d>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 25 [1f]
+int=ERROR
+long=ERROR
+double=<3ff0000000000000>
+bool=<false>
+strings=<1f>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 26 [0x1p3]
+int=ERROR
+long=ERROR
+double=<4020000000000000>
+bool=<false>
+strings=<0x1p3>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 27 [abc]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<abc>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 28 []
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 29 [ ]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 30 [true]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<true>
+strings=<true>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 31 [TRUE]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<true>
+strings=<TRUE>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 32 [True]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<true>
+strings=<True>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 33 [tRuE]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<true>
+strings=<tRuE>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 34 [false]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<false>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 35 [yes]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<yes>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 36 [1]
+int=<1>
+long=<1>
+double=<3ff0000000000000>
+bool=<false>
+strings=<1>
+ints=<1|>
+pairs=<>
+commapairs=ERROR
+== 37 [true ]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<true>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 38 [1,2,3]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2|3>
+ints=<1|2|3|>
+pairs=<>
+commapairs=ERROR
+== 39 [1 2 3]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2|3>
+ints=<1|2|3|>
+pairs=<>
+commapairs=ERROR
+== 40 [1;2;3]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2|3>
+ints=<1|2|3|>
+pairs=<>
+commapairs=ERROR
+== 41 [1, 2]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2>
+ints=<1|2|>
+pairs=<>
+commapairs=ERROR
+== 42 [1,,2]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2>
+ints=<1|2|>
+pairs=<>
+commapairs=ERROR
+== 43 [1,2,]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2>
+ints=<1|2|>
+pairs=<>
+commapairs=ERROR
+== 44 [,1]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<|1>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 45 [,]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<>
+ints=<>
+pairs=<>
+commapairs=<>
+== 46 [;]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<>
+ints=<>
+pairs=<>
+commapairs=ERROR
+== 47 [a b]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<a|b>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 48 [a,b;c d]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<a|b|c|d>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 49 [a,b,]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<a|b>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 50 [ a,b]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<a|b>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 51 [1	2]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2>
+ints=<1|2|>
+pairs=<>
+commapairs=ERROR
+== 52 [1,2147483648]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|2147483648>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 53 [2147483647,-2147483648]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<2147483647|-2147483648>
+ints=<2147483647|-2147483648|>
+pairs=<>
+commapairs=ERROR
+== 54 [1,x]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<1|x>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 55 [6651-50;6652-1]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<6651-50|6652-1>
+ints=ERROR
+pairs=<6651-50|6652-1|>
+commapairs=ERROR
+== 56 [6651-50; 6652-1]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<6651-50|6652-1>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 57 [6651 -50]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<6651|-50>
+ints=<6651|-50|>
+pairs=<>
+commapairs=ERROR
+== 58 [6651-50-5]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<6651-50-5>
+ints=ERROR
+pairs=<>
+commapairs=<6651-50|>
+== 59 [6651-50;]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<6651-50>
+ints=ERROR
+pairs=<6651-50|>
+commapairs=ERROR
+== 60 [;6651-50]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<|6651-50>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 61 [57-0,5575-0]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0|5575-0>
+ints=ERROR
+pairs=<>
+commapairs=<57-0|5575-0|>
+== 62 [57-0, 5575-0]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0|5575-0>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 63 [57-0 ]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 64 [57-0-5]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0-5>
+ints=ERROR
+pairs=<>
+commapairs=<57-0|>
+== 65 [57--5]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57--5>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 66 [-5-3]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<-5-3>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 67 [57]
+int=<57>
+long=<57>
+double=<404c800000000000>
+bool=<false>
+strings=<57>
+ints=<57|>
+pairs=<>
+commapairs=ERROR
+== 68 [57-0,]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0>
+ints=ERROR
+pairs=<>
+commapairs=<57-0|>
+== 69 [2147483648-1]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<2147483648-1>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 70 [57-2147483648]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-2147483648>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
+== 71 [57-0;58-1]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0|58-1>
+ints=ERROR
+pairs=<57-0|58-1|>
+commapairs=ERROR
+== 72 [57-0,58-1;59-2]
+int=ERROR
+long=ERROR
+double=ERROR
+bool=<false>
+strings=<57-0|58-1|59-2>
+ints=ERROR
+pairs=<>
+commapairs=ERROR
