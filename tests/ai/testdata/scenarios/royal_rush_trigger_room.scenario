@@ -4,7 +4,10 @@
 # the room (every draw 0: the first) and sends it the maker script events 1000, which takes its NPCs out of
 # the world, then 1001, which fills it again. The reference run records what the makers are sent; the
 # second room is never named, so it hears nothing. The box leaves the world after the talk, showing no page.
+# The clock line pins minute 0 on the driven clock: on the wall clock of a real-pool pass the talk lands in the
+# closing minutes one run in six, where the box says the rooms are closed and draws nothing.
 trace internal/gameserver/script/testdata/oracle/scenarios/royal_rush_trigger_room.golden
+clock 00:00:00
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
