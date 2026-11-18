@@ -17,7 +17,7 @@ var updateDefaults = flag.Bool("update-defaults", false, "rewrite testdata/refer
 // getProperty call spells it.
 type referenceDefault struct {
 	file, key string
-	// kind is bool, int, long, double, string, strings, ints or none.
+	// kind is bool, int, long, double, string, strings, ints, pairs or none.
 	kind string
 	// value is the literal as written, with a list's elements joined by ",".
 	value string
@@ -33,6 +33,9 @@ var (
 	referenceScalarDefault = regexp.MustCompile(`\b(\w+)\.getProperty\("([^"]+)",\s*(true|false|-?\d+\.\d*|-?\.\d+|-?\d+L?|"[^"]*")\)`)
 	// referenceListDefault matches a String[] or int[] array default.
 	referenceListDefault = regexp.MustCompile(`(?s)\b(\w+)\.getProperty\("([^"]+)",\s*new (String|int)\[\]\s*\{([^}]*)\}`)
+	// referenceIntPairsDefault matches parseIntIntList("Key", "id-count;..."),
+	// the item-pair list read.
+	referenceIntPairsDefault = regexp.MustCompile(`\b(\w+)\.parseIntIntList\("([^"]+)",\s*"([^"]*)"\)`)
 	// referenceNullDefault matches the one list read whose default is null.
 	referenceNullDefault = regexp.MustCompile(`\b(\w+)\.getProperty\("([^"]+)",\s*\(String\[\]\) null`)
 	// referenceBareRead matches a read with no default.
@@ -111,6 +114,11 @@ func referenceDefaultsIn(body, variable string) []referenceDefault {
 			kind = "ints"
 		}
 		out = append(out, referenceDefault{key: m[2], kind: kind, value: strings.Join(elems, ",")})
+	}
+	for _, m := range referenceIntPairsDefault.FindAllStringSubmatch(body, -1) {
+		if m[1] == variable {
+			out = append(out, referenceDefault{key: m[2], kind: "pairs", value: m[3]})
+		}
 	}
 	for _, m := range referenceNullDefault.FindAllStringSubmatch(body, -1) {
 		if m[1] == variable {

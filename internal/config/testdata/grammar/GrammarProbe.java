@@ -9,7 +9,7 @@ import net.sf.l2j.gameserver.model.holder.IntIntHolder;
 
 /**
  * Dumps what the reference's ExProperties getters read out of one value: the
- * int, long, double and boolean scalars, the delimited lists, and the two
+ * int, long, double and boolean scalars, the delimited lists of each type, and the two
  * item-pair lists. Every line of the cases file is one value, read as the
  * text after "key=" of a properties file.
  */
@@ -35,6 +35,27 @@ public class GrammarProbe
 				final StringBuilder sb = new StringBuilder();
 				for (int v : p.getProperty("k", new int[0]))
 					sb.append(v).append('|');
+				return sb.toString();
+			}));
+			System.out.println("bools=" + run(() ->
+			{
+				final StringBuilder sb = new StringBuilder();
+				for (boolean v : p.getProperty("k", new boolean[0]))
+					sb.append(v).append('|');
+				return sb.toString();
+			}));
+			System.out.println("longs=" + run(() ->
+			{
+				final StringBuilder sb = new StringBuilder();
+				for (long v : p.getProperty("k", new long[0]))
+					sb.append(v).append('|');
+				return sb.toString();
+			}));
+			System.out.println("doubles=" + run(() ->
+			{
+				final StringBuilder sb = new StringBuilder();
+				for (double v : p.getProperty("k", new double[0]))
+					sb.append(Long.toHexString(Double.doubleToLongBits(v))).append('|');
 				return sb.toString();
 			}));
 			System.out.println("pairs=" + run(() -> pairs(p.parseIntIntList("k", ""))));

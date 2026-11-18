@@ -73,11 +73,7 @@ func grammarDump(t *testing.T, value string) string {
 	n64, err := p.Int64("k", 0)
 	line("long", strconv.FormatInt(n64, 10), err)
 	f, err := p.Float64("k", 0)
-	bits := math.Float64bits(f)
-	if math.IsNaN(f) {
-		bits = 0x7ff8000000000000 // the one NaN doubleToLongBits returns
-	}
-	line("double", strconv.FormatUint(bits, 16), err)
+	line("double", strconv.FormatUint(doubleBits(f), 16), err)
 	line("bool", strconv.FormatBool(p.Bool("k", false)), nil)
 	line("strings", strings.Join(p.Strings("k", []string{}), "|"), nil)
 	ints, err := p.Ints("k", []int{})
@@ -86,10 +82,36 @@ func grammarDump(t *testing.T, value string) string {
 		list.WriteString(strconv.Itoa(v) + "|")
 	}
 	line("ints", list.String(), err)
+	bools := p.Bools("k", []bool{})
+	list.Reset()
+	for _, v := range bools {
+		list.WriteString(strconv.FormatBool(v) + "|")
+	}
+	line("bools", list.String(), nil)
+	longs, err := p.Int64s("k", []int64{})
+	list.Reset()
+	for _, v := range longs {
+		list.WriteString(strconv.FormatInt(v, 10) + "|")
+	}
+	line("longs", list.String(), err)
+	doubles, err := p.Float64s("k", []float64{})
+	list.Reset()
+	for _, v := range doubles {
+		list.WriteString(strconv.FormatUint(doubleBits(v), 16) + "|")
+	}
+	line("doubles", list.String(), err)
 	line("pairs", pairList(p.IntPairs("k", "")), nil)
 	pairs, err := p.IntPairsComma("k", "")
 	line("commapairs", pairList(pairs), err)
 	return b.String()
+}
+
+// doubleBits is doubleToLongBits: every NaN is the one canonical NaN.
+func doubleBits(f float64) uint64 {
+	if math.IsNaN(f) {
+		return 0x7ff8000000000000
+	}
+	return math.Float64bits(f)
 }
 
 func pairList(pairs []IntPair) string {

@@ -34,7 +34,7 @@ import (
 // loader spells it, read from internal/config/testdata/reference_defaults.golden.
 type referenceDefault struct {
 	file, key string
-	// kind is bool, int, long, double, string, strings, ints or none (a key
+	// kind is bool, int, long, double, string, strings, ints, pairs or none (a key
 	// the reference reads with no default).
 	kind string
 	// value is the literal as written, with a list's elements joined by ",".
@@ -294,7 +294,7 @@ func (d goDefault) matches(ref referenceDefault) (ok, checked bool) {
 		got, _ := constant.Float64Val(d.value)
 		wantF, _ := constant.Float64Val(want)
 		return got == wantF, true
-	case "string":
+	case "string", "pairs":
 		return d.value.Kind() == constant.String && constant.StringVal(d.value) == ref.value, true
 	case "none":
 		// The reference reads no default; an empty one is the same as none.
