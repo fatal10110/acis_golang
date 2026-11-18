@@ -1,0 +1,67 @@
+# Q503: Sir Gustav at cond 11 with the Scepter of Judgment: the page offering the trade links the refusal (30760-22, cond 11 to 12) and the
+# agreement (30760-23); the refusal moves the quest to cond 12 once, its repeat changes nothing, and the agreement gives the Seal of Aspiration and 250000 SP.
+# Go-only: expectations recorded from the Go run and checked by hand against the reference quest script.
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=11 <state>=STARTED
+hold 3869 1
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3847 3867 3869 3870 3871
+page default/30760.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc gustav 30760 Folk 10 0 0
+
+action gustav
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-19.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-21.htm
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-21.htm
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-22.htm
+  S QuestList 503:0x80000fff
+  S ExShowQuestMark quest=503
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-22.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 12
+  rows Q503_PursuitOfClanAmbition <cond>=12 <state>=STARTED
+  items 3869=1
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-24.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-22.htm
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-22.htm
+  S ActionFailed
+  rows Q503_PursuitOfClanAmbition <cond>=12 <state>=STARTED
+  items 3869=1
+action gustav
+  S ActionFailed
+  S NpcHtmlMessage obj=gustav item=0 page=default/30760.htm
+  S ActionFailed
+bypass npc_{gustav}_Quest
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-24.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30760-23.htm
+  S SystemMessage id=302 3:3869
+  S SystemMessage id=54 3:3870
+  S SystemMessage id=331 1:250000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=gustav item=0 page=script/quest/Q503_PursuitOfClanAmbition/30760-23.htm
+  S ActionFailed
+  Q delete-quest Q503_PursuitOfClanAmbition
+  items 3869=0 3870=1
+  state Q503_PursuitOfClanAmbition -
+  rows Q503_PursuitOfClanAmbition -

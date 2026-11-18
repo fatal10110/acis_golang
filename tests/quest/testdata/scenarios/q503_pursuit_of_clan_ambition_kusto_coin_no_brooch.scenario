@@ -1,0 +1,27 @@
+# Q503: Kusto at cond 3 for a leader holding the Black Anvil Coin and no Brooch of the Magpie (30512-04): his only link (30512-03) trades a brooch the leader lacks,
+# so the coin stays and nothing changes.
+# Go-only: expectations recorded from the Go run and checked by hand against the reference quest script.
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=3 <state>=STARTED
+hold 3871 1
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3847 3867 3869 3870 3871
+page villagemaster/30512.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc kusto 30512 VillageMaster 10 0 0
+
+action kusto
+action kusto
+  S ActionFailed
+  S NpcHtmlMessage obj=kusto item=0 page=villagemaster/30512.htm
+  S ActionFailed
+bypass npc_{kusto}_Quest
+  S NpcHtmlMessage obj=kusto item=0 page=script/quest/Q503_PursuitOfClanAmbition/30512-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30512-03.htm
+  S NpcHtmlMessage obj=kusto item=0 page=script/quest/Q503_PursuitOfClanAmbition/30512-03.htm
+  S ActionFailed
+  rows Q503_PursuitOfClanAmbition <cond>=3 <state>=STARTED
+  items 3871=1 3843=0

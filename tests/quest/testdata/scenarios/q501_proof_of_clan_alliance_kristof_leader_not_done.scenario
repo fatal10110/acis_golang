@@ -1,0 +1,22 @@
+# Q501: Sir Kristof at a started quest below cond 4 gives the clan leader 30756-10 and changes nothing: no reward, no exit (cond 4 finishes it).
+# Go-only: expectations recorded from the Go run and checked by hand against the reference quest script.
+character Leader 40
+clan 3
+quest Q501_ProofOfClanAlliance <cond>=1 <state>=STARTED
+script quest.Q501_ProofOfClanAlliance
+item 3832 3833 3834 3835 3837 3872 3873 3874 3889
+page default/30756.htm
+page script/quest/Q501_ProofOfClanAlliance/
+npc kristof 30756 Folk 10 0 0
+
+action kristof
+action kristof
+  S ActionFailed
+  S NpcHtmlMessage obj=kristof item=0 page=default/30756.htm
+  S ActionFailed
+bypass npc_{kristof}_Quest
+  S NpcHtmlMessage obj=kristof item=0 page=script/quest/Q501_ProofOfClanAlliance/30756-10.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q501_ProofOfClanAlliance <cond>=1 <state>=STARTED
+  items 3874=0
