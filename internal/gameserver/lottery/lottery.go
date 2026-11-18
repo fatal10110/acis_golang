@@ -342,8 +342,9 @@ func (l *Lottery) startRound() {
 }
 
 // nextDrawing returns the drawing following from, Unix milliseconds: 19:00
-// on from's Saturday, from's week running Sunday to Saturday, or a week
-// later when from is itself a Saturday. The milliseconds of from are kept.
+// on from's Saturday, from's week running Monday to Sunday (#5345), or a week
+// later when from is itself a Saturday. From a Sunday that Saturday is the
+// day before, already past. The milliseconds of from are kept.
 func nextDrawing(from int64, loc *time.Location) int64 {
 	t := time.UnixMilli(from).In(loc)
 	next := commons.WeekdayAt(t, 0, time.Saturday, drawHour).UnixMilli()

@@ -43,6 +43,26 @@ public class DstProbe
 		"2026-11-01T12:00:00.000"
 	};
 	
+	// Week edges for the week-based schedules: Sundays and Mondays (a Monday
+	// plus six days is a Sunday) around the clock changes, the turn of the year
+	// and a month boundary.
+	static final String[] WEEK_EDGES =
+	{
+		"2026-02-28T19:00:00.000",
+		"2026-03-01T12:00:00.250",
+		"2026-03-02T12:00:00.250",
+		"2026-03-23T12:00:00.250",
+		"2026-03-30T12:00:00.000",
+		"2026-10-18T12:00:00.250",
+		"2026-10-19T12:00:00.250",
+		"2026-10-26T12:00:00.000",
+		"2026-12-26T19:00:00.000",
+		"2026-12-27T12:00:00.250",
+		"2026-12-28T12:00:00.250",
+		"2027-01-03T12:00:00.000",
+		"2027-01-04T12:00:00.000"
+	};
+	
 	// Mondays one week either side of each clock change, probed before, at and
 	// after the 18:00 period change.
 	static final String[] MONDAYS =
@@ -81,12 +101,14 @@ public class DstProbe
 		return LocalDateTime.parse(local).atZone(ZoneId.of(zone)).toInstant().toEpochMilli();
 	}
 	
-	// The reference builds its calendars with the JVM default locale, whose first
-	// day of the week the week-based schedules depend on; these rows pin the
-	// Sunday-first (US) case. The Monday-first question is tracked in #5345.
+	// The week-based schedules depend on the calendar's first day of the week;
+	// the server runs Monday-first (ISO) weeks, so the probe pins Monday as the
+	// first day and four minimal days in the first week (#5345).
 	static Calendar at(String zone, long millis)
 	{
 		final Calendar cal = Calendar.getInstance(TimeZone.getTimeZone(zone), Locale.US);
+		cal.setFirstDayOfWeek(Calendar.MONDAY);
+		cal.setMinimalDaysInFirstWeek(4);
 		cal.setTimeInMillis(millis);
 		return cal;
 	}
@@ -182,7 +204,10 @@ public class DstProbe
 				}
 				continue;
 			}
-			for (String local : INPUTS)
+			final java.util.List<String> inputs = new java.util.ArrayList<>(java.util.Arrays.asList(INPUTS));
+			if (!kind.equals("manor"))
+				inputs.addAll(java.util.Arrays.asList(WEEK_EDGES));
+			for (String local : inputs)
 			{
 				final long in = epoch(zone, local);
 				switch (kind)

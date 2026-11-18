@@ -275,8 +275,8 @@ func (c *Championship) finish() {
 }
 
 // NextEnd returns the week end following from, Unix milliseconds: 19:00 on
-// the Tuesday of the week, running Sunday to Saturday, that holds the day
-// six days after from. The milliseconds of from are kept.
+// the Tuesday of the week, running Monday to Sunday (#5345), that holds the
+// day six days after from. The milliseconds of from are kept.
 func NextEnd(from int64, loc *time.Location) int64 {
 	return commons.WeekdayAt(time.UnixMilli(from).In(loc), 6, time.Tuesday, endHour).UnixMilli()
 }

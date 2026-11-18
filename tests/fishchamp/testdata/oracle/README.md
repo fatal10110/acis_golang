@@ -18,6 +18,7 @@ the `FishingReward` branch's `isWinner` check. The copies are unchanged
 except:
 
 - `System.currentTimeMillis()` reads a virtual clock.
+- The week end's calendar is pinned to Monday-first (ISO) weeks (#5345).
 - `ThreadPool.schedule` records a task at `now + max(0, delay)`; an
   `advance` step runs every task due by its instant, soonest first (ties in
   scheduling order), at the task's own instant.
@@ -51,6 +52,7 @@ docker run --rm -v "$PWD/tests/fishchamp/testdata:/p" -w /p/oracle \
 ```
 
 The Go test's virtual clock is in UTC and the week end reads the day of the
-week and the hour in the clock's zone, so the probe runs in UTC. The `en_US`
-locale starts the week on Sunday, which decides which Tuesday
-`Calendar.set(DAY_OF_WEEK, 3)` picks.
+week and the hour in the clock's zone, so the probe runs in UTC. The week end's
+calendar is pinned to Monday-first (ISO) weeks, the server's week rule
+(#5345), which decides which Tuesday `Calendar.set(DAY_OF_WEEK, 3)` picks;
+the `en_US` locale alone would start the week on Sunday.
