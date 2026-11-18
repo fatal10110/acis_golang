@@ -294,10 +294,19 @@ func TestPortraitSpiritFightsWhatHitsIt(t *testing.T) {
 			if in := h.AI().CurrentIntention(); in != actorai.IntentionAttack && in != actorai.IntentionCast {
 				t.Fatalf("setup: intention %v after the move, want attack or cast", in)
 			}
-			w.srv.Advance(t, 10*time.Second)
-			if w.inWorld(h) {
-				t.Fatal("the spirit is still in the world with the character beyond 5000")
+			if w.srv.DrivesClock() {
+				w.srv.Advance(t, 10*time.Second)
+				if w.inWorld(h) {
+					t.Fatal("the spirit is still in the world with the character beyond 5000")
+				}
+				return
 			}
+			// On the wall clock the check timer re-arms 10 s after it last
+			// fired, not after the start, so each late firing pushes the next
+			// one later: the check after the move can come a few hundred
+			// milliseconds past 10 s. Wait for it instead of sleeping 10 s.
+			w.srv.Advance(t, 5*time.Second)
+			w.srv.AdvanceUntil(t, "the spirit to leave with the character beyond 5000", func() bool { return !w.inWorld(h) })
 		})
 	}
 }

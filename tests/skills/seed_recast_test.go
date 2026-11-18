@@ -54,7 +54,18 @@ func TestSeedRecastGrowsPowerSeenByCastConditions(t *testing.T) {
 	startInWorld(t, c)
 	drainUntilQuiet(t, c)
 
-	castOpens := func(id int32) bool { t.Helper(); return castStarts(t, c, id) }
+	// A started cast keeps the caster busy until its hit time passes, and a
+	// request sent meanwhile is refused with ActionFailed, so each cast is
+	// let finish before the next one goes out.
+	castOpens := func(id int32) bool {
+		t.Helper()
+		started := castStarts(t, c, id)
+		if started {
+			srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
+			drainUntilQuiet(t, c)
+		}
+		return started
+	}
 	power := func() (p, effects int) {
 		onPlayerQueue(t, srv, objID, func(pc *player.Character) {
 			p, effects = pc.SeedPower(seedOfFireID), len(pc.EffectList().All())

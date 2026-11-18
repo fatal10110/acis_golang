@@ -112,6 +112,17 @@ func TestBaiumRanksSpellDamageByHPBracket(t *testing.T) {
 		w.srv.Settle(t)
 	}
 	w.srv.ReadQueued(t, w.srv.Client)
+	// The bracket is read off the damage dealt, which doubles up on a magic
+	// critical roll; pin the roll to one that never crits so every spell
+	// does the same damage and each rank beats the one before.
+	done := make(chan struct{})
+	if !w.srv.PlayerQueue(t, w.player.ObjectID()).Post(func() {
+		defer close(done)
+		w.player.(player.CharacterHolder).PlayerCharacter().SetRollSource(func(n int) int { return n - 1 })
+	}) {
+		t.Fatal("the character's queue is closed")
+	}
+	<-done
 
 	// Each bracket, from the highest HP down, so each rank beats the one
 	// before and is kept.
