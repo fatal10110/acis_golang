@@ -11,6 +11,7 @@ import (
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
@@ -301,7 +302,7 @@ func TestManifestComparisonCatchesDifferences(t *testing.T) {
 	}
 
 	// A task its entry does not schedule.
-	tasks := script.Catalog{"task.CastleTaxRefresh": taskCatalog()["task.CastleTaxRefresh"]}
+	tasks := script.Catalog{"task.CastleTaxRefresh": enginescripts.Tasks()["task.CastleTaxRefresh"]}
 	got = manifestMismatches(t, []script.Listing{{Path: "task.CastleTaxRefresh"}}, tasks, script.Config{KindOf: noTemplates, Log: zerolog.Nop()})
 	if !slices.Equal(got, []string{"task.CastleTaxRefresh: scheduled false, reference true"}) {
 		t.Fatalf("an unscheduled task gave %q, want a scheduled mismatch", got)

@@ -16,6 +16,17 @@ func TestVariantsFromEnvNamesEverySelection(t *testing.T) {
 	}
 }
 
+func TestShippedImpliesCatalogAndSpread(t *testing.T) {
+	t.Setenv(variantEnv, "shipped")
+	v := variantsFromEnv(t)
+	if !v.shipped || !v.catalog || !v.spread || v.cast || v.scripts {
+		t.Fatalf("variants = %+v, want shipped with catalog and spread", v)
+	}
+	if got, want := v.String(), "catalog,shipped,spread"; got != want {
+		t.Errorf("String() = %q, want %q", got, want)
+	}
+}
+
 func TestFixtureSizeDefaults(t *testing.T) {
 	size := fixtureSizeFromEnv(t)
 	if size.itemsPerClient <= 0 || size.backgroundChars <= 0 || size.backgroundItems <= 0 {

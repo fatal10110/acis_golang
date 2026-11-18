@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -22,7 +23,7 @@ import (
 const engineOwner = "engine"
 
 // TestScriptCatalogOwners: every script of the reference manifest (the
-// scripts.xml listing) has exactly one owner, the catalogs of scripts.go or
+// scripts.xml listing) has exactly one owner, the engine catalogs or
 // one content catalog file, and no catalog holds a script the manifest does
 // not list, but for the tasks scripts.xml lists only in a comment
 // (commentedTasks). A script not ported (a nil constructor) fails it: no
@@ -30,7 +31,7 @@ const engineOwner = "engine"
 func TestScriptCatalogOwners(t *testing.T) {
 	sagas := thirdclass.NewFamily()
 	owned := map[string]script.Catalog{engineOwner: {}}
-	for _, c := range engineCatalogs(nil, nil, sagas) {
+	for _, c := range enginescripts.Catalogs(nil, nil, sagas) {
 		maps.Copy(owned[engineOwner], c)
 	}
 	maps.Copy(owned, catalog.Scripts(sagas))

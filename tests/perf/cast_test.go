@@ -1,6 +1,7 @@
 package perf
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -49,14 +50,36 @@ func castDefinitions() []modelskill.Definition {
 type castKit struct {
 	defs *modelskill.Table
 	opt  gameservertest.Option
+	// player is the skill the clients cast, known at level 1.
+	player modelskill.ID
+	// steps are the steps of a client's eight-step cycle that cast instead of
+	// attack or walk.
+	steps []int
+	// afterAttack makes a client cast only once it has landed an attack: a
+	// cast before it let a fleeing monster outrun its client.
+	afterAttack bool
 }
 
+// newCastKit is the cast variant's kit: the two synthetic skills.
 func newCastKit(t *testing.T) *castKit {
 	t.Helper()
+	return newKit(t, modelskill.NewTable(castDefinitions()), castPlayerSkill, []int{2, 4}, false)
+}
+
+// newKit is a kit over defs, whose skill player the clients cast on the
+// given steps of their cycle; afterAttack is the kit's afterAttack field.
+func newKit(t *testing.T, defs *modelskill.Table, player modelskill.ID, steps []int, afterAttack bool) *castKit {
+	t.Helper()
 	db := sqltest.SharedDB(t)
-	defs := modelskill.NewTable(castDefinitions())
 	persistence := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), defs, gamesql.NewCharacterSkillStore(db))
-	return &castKit{defs: defs, opt: gameservertest.WithSkills(persistence)}
+	return &castKit{defs: defs, opt: gameservertest.WithSkills(persistence), player: player, steps: steps, afterAttack: afterAttack}
+}
+
+// casts reports whether the client casts, rather than attacks or walks, on
+// step of its eight-step cycle; attacked is whether it has landed an attack.
+// A nil kit (a variant without casts) never does.
+func (k *castKit) casts(step int, attacked bool) bool {
+	return k != nil && slices.Contains(k.steps, step) && (attacked || !k.afterAttack)
 }
 
 func encodeMagicSkillUse(skillID modelskill.ID) []byte {
