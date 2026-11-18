@@ -102,6 +102,7 @@ func (Creature) MAtk() float64                                { return 0 }
 func (Creature) MDef() float64                                { return 0 }
 func (Creature) MagicCriticalRate() float64                   { return 0 }
 func (Creature) AttackType() item.WeaponType                  { return item.WeaponNone }
+func (Creature) HeldWeaponType() (item.WeaponType, bool)      { return item.WeaponNone, false }
 func (Creature) SoulshotCharged() bool                        { return false }
 func (Creature) SpiritshotCharged() bool                      { return false }
 func (Creature) CalcStat(stat.Stat, float64) float64          { return 0 }

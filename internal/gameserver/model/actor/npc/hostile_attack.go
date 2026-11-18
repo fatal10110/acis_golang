@@ -149,6 +149,10 @@ func (h *Hostile) AttackType() item.WeaponType {
 	return weapon.Type
 }
 
+// HeldWeaponType reports no weapon item: the template's right-hand weapon
+// shapes the attack style only.
+func (h *Hostile) HeldWeaponType() (item.WeaponType, bool) { return item.WeaponNone, false }
+
 // AttackSpeed returns this NPC's physical attack speed stat.
 func (h *Hostile) AttackSpeed() int {
 	return int(h.calcStat(stat.PowerAttackSpeed, h.Instance.Template.AtkSpd))

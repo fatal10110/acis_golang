@@ -111,6 +111,9 @@ func (Target) SoulshotCharged() bool          { return false }
 func (Target) SpiritshotCharged() bool        { return false }
 func (Target) BlessedSpiritshotCharged() bool { return false }
 
+// HeldWeaponType reports no weapon item: a door holds none.
+func (Target) HeldWeaponType() (item.WeaponType, bool) { return item.WeaponNone, false }
+
 // CalcStat returns base: a door carries no stat modifier.
 func (Target) CalcStat(_ stat.Stat, base float64) float64 { return base }
 
