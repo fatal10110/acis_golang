@@ -14,8 +14,8 @@ import (
 
 // The zone test duellists teleport into a cuboid 1000 to 1900 east of the
 // class template's spawn point, inside the 2000 a duel allows between its
-// players. A step walked inside a region revalidates no zone, a teleport's
-// arrival does.
+// players. The fixture teleports in because a teleport's arrival revalidates
+// zones at once.
 const zoneStepX, zoneStepY = 1500, 20
 
 // arenaWithZone boots an arena whose world holds one zone over the step.

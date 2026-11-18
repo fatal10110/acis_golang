@@ -108,13 +108,16 @@ func TestPartyDuelEndsWhenTheWholeSideIsDefeated(t *testing.T) {
 		at := requireMessage(t, frames, 0, serverpackets.SystemMessageS1PartyWonTheDuel, lead.name)
 		requireExtended(t, frames, at, serverpackets.OpcodeExDuelEnd, p.name+" ExDuelEnd")
 		bowed := map[int32]bool{}
-		for _, f := range frames {
+		for idx, f := range frames {
 			if f[0] != serverpackets.OpcodeSocialAction {
 				continue
 			}
 			r := wire.NewReader(f[1:])
 			id, action := r.ReadInt32(), r.ReadInt32()
 			if action == 7 {
+				if idx >= at {
+					t.Fatalf("%s saw the bow of %d at frame %d, after the end message at %d", p.name, id, idx, at)
+				}
 				bowed[id] = true
 			}
 		}
