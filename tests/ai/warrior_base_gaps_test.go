@@ -248,6 +248,7 @@ func TestWarriorBaseIsVsChallengesAPlayerThatHitsIt(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual2f(t, raidBoot{},
 		ind2fTemplate(warriorID, npc.AIParams{"IsVs": "1"}, nil), ind2fTemplate(warriorTwoID, nil, nil), ind2fTemplate(warriorFarID, nil, nil), ind2fTemplate(ind1ListenerID, nil, nil))
+	needsDrivenClock(t, w.srv)
 	h := w.spawn(t, warriorID, 150, 0)
 	other := w.spawn(t, warriorFarID, -150, 0)
 	neighbor := w.spawn(t, warriorTwoID, 0, 200)

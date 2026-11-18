@@ -291,6 +291,7 @@ func TestFrintezzaSingsWithNothingToDo(t *testing.T) {
 	t.Run("stage 5", func(t *testing.T) {
 		t.Parallel()
 		w, f := bootFrintezzaFighting(t)
+		needsDrivenClock(t, w.srv)
 		n := script.NPCOf(f)
 		w.onQueue(t, f, func() { n.SetInt(script.SlotIntAI4, 1) })
 		if got := screenTexts(w.ticks(t, 3)); len(got) != 0 {
@@ -314,6 +315,7 @@ func TestFrintezzaSingsWithNothingToDo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w := bootFrintezza(t, fzLiveRow(7))
+			needsDrivenClock(t, w.srv)
 			f := w.frintezza(t)
 			n := script.NPCOf(f)
 			transform := w.listener(t, fzTransformID).ObjectID()
@@ -338,6 +340,7 @@ func TestFrintezzaSingsWithNothingToDo(t *testing.T) {
 	t.Run("stage 3", func(t *testing.T) {
 		t.Parallel()
 		w := bootFrintezza(t, fzLiveRow(3))
+		needsDrivenClock(t, w.srv)
 		f := w.frintezza(t)
 		w.srv.Advance(t, time.Second)
 		w.onQueue(t, f, func() { f.AI().Desires().Clear() })
@@ -406,6 +409,7 @@ func TestFrintezzaSingsOn(t *testing.T) {
 	t.Run("aborted", func(t *testing.T) {
 		t.Parallel()
 		w, f := bootFrintezzaFighting(t)
+		needsDrivenClock(t, w.srv)
 		n := script.NPCOf(f)
 		w.onQueue(t, f, func() { n.AddCastDesireUnchecked(n, power, 10000) })
 		w.srv.AdvanceUntil(t, "the cast", func() bool {
@@ -439,6 +443,7 @@ func TestFrintezzaSingsOn(t *testing.T) {
 func TestFrintezzaPlaysHisLastSong(t *testing.T) {
 	t.Parallel()
 	w, f := bootFrintezzaFighting(t)
+	needsDrivenClock(t, w.srv)
 	n := script.NPCOf(f)
 	w.send(t, f, 1, 50000)
 	w.onQueue(t, f, func() { n.AddDoNothingDesire(60, 50) })

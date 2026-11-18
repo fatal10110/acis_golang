@@ -198,6 +198,7 @@ func TestPortraitSpiritsWanderUntilMasterless(t *testing.T) {
 		t.Run(fmt.Sprint(id), func(t *testing.T) {
 			t.Parallel()
 			w := bootTombSpirits(t, nil)
+			needsDrivenClock(t, w.srv)
 			h := w.spirit(t, id, 300)
 			if d, ok := desire(h, actorai.IntentionWander); !ok || d.Weight != 5 || d.Timer != 200 {
 				t.Fatalf("wander desire = %+v, %v, want timer 200, weight 5", d, ok)
@@ -542,6 +543,7 @@ func TestUndeadBandmasterDropsTheArrow(t *testing.T) {
 		t.Run(fmt.Sprint(tc.arg1), func(t *testing.T) {
 			t.Parallel()
 			w := bootTombSpirits(t, nil)
+			needsDrivenClock(t, w.srv)
 			h := w.spawn(t, fsBandmasterID, 100, 0)
 			if tc.arg1 >= 0 {
 				w.event(t, h, 10032, tc.arg1)

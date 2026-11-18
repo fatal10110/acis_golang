@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -111,9 +112,8 @@ func (w *ind1World) ind1gFeed(t *testing.T, h *npc.Hostile, feeder attackable.Co
 // parameters, and from left the world.
 func (w *ind1World) ind1gGrown(t *testing.T, from *npc.Hostile, id int32, food modelskill.ID) *npc.Hostile {
 	t.Helper()
-	if w.inWorld(from) {
-		t.Fatalf("npc %d still in the world after it grew", from.NpcID())
-	}
+	// On the wall clock the growth timer fires a little after its delay.
+	w.srv.AdvanceUntil(t, fmt.Sprintf("npc %d to leave the world as it grows", from.NpcID()), func() bool { return !w.inWorld(from) })
 	grown := w.liveNPCs(id)
 	if len(grown) != 1 {
 		t.Fatalf("grown %d = %d NPCs, want 1", id, len(grown))

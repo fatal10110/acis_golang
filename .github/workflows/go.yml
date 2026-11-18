@@ -65,6 +65,9 @@ jobs:
           - name: pool-quest
             cache: rest
             pool: ./tests/quest ./tests/olympiad
+          - name: pool-ai
+            cache: rest
+            pool: ./tests/ai
           - name: pool-small
             cache: rest
             pool: ./tests/bbs ./tests/boat ./tests/botswarm ./tests/clan ./tests/duel ./tests/fishchamp ./tests/idfactory ./tests/lottery ./tests/party ./tests/perf ./tests/petition ./tests/wedding
@@ -79,10 +82,10 @@ jobs:
       # replaying path searches. The race detector finds nothing in them and
       # slows them several times over, so the short pool-rest job runs them
       # in their own step without it.
-      # The tests/ packages the real pool does not run, each with its reason.
+      # The tests/ packages the real pool does not run, one `name: reason` line
+      # each (none now).
       # A tests/ package on no `pool` list and not named here fails `rest`.
-      POOL_EXCLUDED: |
-        ai: its boss and hall scenarios wait out minutes of timers per test; a pool pass of main measured 22 failures on wall-clock boundary assertions, 83 cuts at long waits, and a run that stalled with every parallel slot held and no test running (goroutine dump: about 90 tests in t.Parallel's wait, none executing) after about 800 of 1058 tests; tracked in #5301
+      POOL_EXCLUDED: ""
       STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:

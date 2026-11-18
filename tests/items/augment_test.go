@@ -587,11 +587,14 @@ func TestAugmentActiveSkillKeepsReuseAcrossReequip(t *testing.T) {
 
 	// Disabled until the cast's own reuse ends, a little under reuse-worn
 	// from here (the cast took a few steps to arm it), not for a new delay.
+	// The reuse stamp can sit on the very instant the wait above observed
+	// it, and a key frees only once the clock has moved past its expiry, so
+	// the last step carries a millisecond of slack.
 	srv.Advance(t, reuse-worn-2*time.Second)
 	if !caster.SkillDisabled(key) {
 		t.Fatal("augmentation skill usable before its reuse ended")
 	}
-	srv.Advance(t, 2*time.Second)
+	srv.Advance(t, 2*time.Second+time.Millisecond)
 	if caster.SkillDisabled(key) {
 		t.Fatal("augmentation skill still disabled after its original reuse ended")
 	}

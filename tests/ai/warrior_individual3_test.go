@@ -235,6 +235,7 @@ func TestPartyLeaderCastDDTickDrawsOnlyWithDDMagic(t *testing.T) {
 				delete(tmpl.SkillsByType, npc.SkillTypeDDMagic)
 			}
 			w := bootIndividual3(t, tmpl)
+			needsDrivenClock(t, w.srv)
 			n := w.spawn(t, ind3CastDDID, 300, 0)
 			w.hit(t, n, 10)
 			w.ticks(t, 1)
