@@ -27,6 +27,9 @@ func TestDamageOverTimeTicksAtExactDueInstants(t *testing.T) {
 			Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 3, Time: 1}},
 		}})),
 	)
+	if !srv.DrivesClock() {
+		t.Skip("one-millisecond due instants need the driven clock")
+	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, skillID, 1)
 	startInWorld(t, c)
