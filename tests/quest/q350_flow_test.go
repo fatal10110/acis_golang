@@ -35,6 +35,11 @@ const (
 	redCrystal     = 4629
 	redStage1      = 4630
 	redBroken      = 4662
+	redLevel2      = 4631
+	redLevel10     = 4639
+	redLevel11     = 5577
+	greenCrystal   = 4640
+	blueCrystal    = 4651
 	timakArcherID  = 20584
 	timakLevel     = 40
 	absorbSucceed  = 974
@@ -71,6 +76,13 @@ func q350Pages() map[string]string {
 // skills and crystals, with roll as every script draw.
 func q350Fixture(t *testing.T, roll int) []gameservertest.Option {
 	t.Helper()
+	return q350FixtureFor(t, roll)
+}
+
+// q350FixtureFor is q350Fixture with the extra monster ids hostile NPCs of
+// the script's bindings.
+func q350FixtureFor(t *testing.T, roll int, monsters ...int32) []gameservertest.Option {
+	t.Helper()
 	datapack.Require(t)
 	skills, shipped := shippedSeamData()
 	crystals, err := xmldata.LoadSoulCrystalData(datapack.Path(t, "data", "xml", "soulCrystals.xml"))
@@ -78,7 +90,7 @@ func q350Fixture(t *testing.T, roll int) []gameservertest.Option {
 		t.Fatal(err)
 	}
 	templates := gameservertest.ItemTemplates().All()
-	for _, id := range []int32{redCrystal, redStage1, redBroken} {
+	for _, id := range []int32{redCrystal, redStage1, redBroken, redLevel2, redLevel10, redLevel11, greenCrystal, blueCrystal} {
 		tmpl, ok := shipped.Get(id)
 		if !ok {
 			t.Fatalf("shipped item %d missing", id)
@@ -86,12 +98,16 @@ func q350Fixture(t *testing.T, roll int) []gameservertest.Option {
 		templates = append(templates, tmpl)
 	}
 	db := sqltest.SharedDB(t)
+	kinds := map[int32]script.NPCKind{masterID: script.KindFolk, timakArcherID: script.KindHostile, darinID: script.KindFolk}
+	for _, id := range monsters {
+		kinds[id] = script.KindHostile
+	}
 	return []gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skills, gamesql.NewCharacterSkillStore(db))),
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithScriptRand(func(int) int { return roll }),
 		gameservertest.WithNPCScripts(
-			map[int32]script.NPCKind{masterID: script.KindFolk, timakArcherID: script.KindHostile, darinID: script.KindFolk},
+			kinds,
 			[]script.Listing{{Path: "quest.Q001_LettersOfLove"}, {Path: "quest.Q350_EnhanceYourWeapon"}},
 			script.Catalog{
 				"quest.Q001_LettersOfLove":     quest001.New,
