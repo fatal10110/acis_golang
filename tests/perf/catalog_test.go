@@ -41,8 +41,9 @@ type prodCatalog struct {
 }
 
 // shippedCastSkill is the shipped skill the shipped variant's clients cast:
-// Wind Strike, a single-target magic hit of 12 power at level 1 with a
-// six-second reuse, which the 1000-HP catalog monsters absorb.
+// Energy Bolt, a single-target magic hit of 13 power at level 1 with a
+// two-second hit time and a three-second reuse, which the catalog monsters
+// (given 1000 HP by loadProdCatalog) absorb.
 const shippedCastSkill = modelskill.ID(1274)
 
 // newShippedKit is the shipped variant's kit over the shipped skill table.
