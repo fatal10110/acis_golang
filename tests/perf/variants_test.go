@@ -40,11 +40,18 @@ import (
 //	         catalog package, the shipped NPC and skill tables), so the real
 //	         behaviors' hooks run on every hit. The monsters have no cast
 //	         seam: a shipped skill would one-shot the 36-HP test class (the
-//	         cast variant covers casting). It skips without a datapack.
+//	         cast variant covers casting). The engine catalogs (quests,
+//	         features, teleporters, tasks, base behaviors) join the content
+//	         catalogs, as the production boot joins them. It skips without
+//	         a datapack.
 //	         ACIS_PERF_CATALOG_NPCS bounds how many templates. It implies
 //	         spread, one region per client unless ACIS_PERF_REGIONS says
 //	         otherwise: the shipped attacked reactions (call for help) pulled
 //	         monsters onto neighbouring clients when regions were shared
+//	shipped  implies catalog; every client also casts a shipped skill
+//	         (shippedCastSkill) at its monster, through the shipped skill
+//	         table: the real skill data, effect and cast paths of a
+//	         player's cast run under load. The monsters still do not cast
 //	fixture  the database holds a production-sized item and character
 //	         population (ACIS_PERF_ITEMS per client, ACIS_PERF_BG_CHARS other
 //	         characters, ACIS_PERF_BG_ITEMS other item rows), and the run
@@ -62,9 +69,9 @@ const regionStep = 4096
 
 // variants is what ACIS_PERF_VARIANT selected.
 type variants struct {
-	spread, geo, scripts, cast, catalog, fixture bool
-	regions                                      int
-	catalogNPCs                                  int
+	spread, geo, scripts, cast, catalog, shipped, fixture bool
+	regions                                               int
+	catalogNPCs                                           int
 }
 
 func variantsFromEnv(t *testing.T) variants {
@@ -83,16 +90,21 @@ func variantsFromEnv(t *testing.T) variants {
 				v.cast = true
 			case "catalog":
 				v.catalog = true
+			case "shipped":
+				v.shipped = true
 			case "fixture":
 				v.fixture = true
 			default:
-				t.Fatalf("%s=%q: want a comma-separated list of spread, geo, scripts, cast, catalog, fixture", variantEnv, raw)
+				t.Fatalf("%s=%q: want a comma-separated list of spread, geo, scripts, cast, catalog, shipped, fixture", variantEnv, raw)
 			}
 		}
 	}
 	// The shipped attacked reactions call for help: monsters of shared
 	// regions were pulled onto clients 0 and 1, so each client of the catalog
 	// variant stands in a region of its own.
+	if v.shipped {
+		v.catalog = true
+	}
 	if v.catalog {
 		v.spread = true
 	}
@@ -147,7 +159,7 @@ func countTrue(flags ...bool) int {
 
 func (v variants) String() string {
 	var names []string
-	for name, on := range map[string]bool{"spread": v.spread, "geo": v.geo, "scripts": v.scripts, "cast": v.cast, "catalog": v.catalog, "fixture": v.fixture} {
+	for name, on := range map[string]bool{"spread": v.spread, "geo": v.geo, "scripts": v.scripts, "cast": v.cast, "catalog": v.catalog, "shipped": v.shipped, "fixture": v.fixture} {
 		if on {
 			names = append(names, name)
 		}
@@ -211,7 +223,7 @@ func (m *monsterScript) catalog() script.Catalog {
 
 // options are the boot options the variants add for a monster template:
 // ms is the counter script of the scripts and cast variants, kit the cast
-// variant's skills, cat the catalog variant's data.
+// variant's skills (the shipped variant's too), cat the catalog variant's data.
 func (v variants) options(tmpl *npc.Template, geo move.Geo, ms *monsterScript, kit *castKit, cat *prodCatalog) []gameservertest.Option {
 	var opts []gameservertest.Option
 	if v.geo {
@@ -233,6 +245,9 @@ func (v variants) options(tmpl *npc.Template, geo move.Geo, ms *monsterScript, k
 			gameservertest.WithNPCs(cat.table),
 			gameservertest.WithScriptSkills(cat.skills.All()...),
 			gameservertest.WithTemplateScripts(cat.list, cat.catalog))
+		if kit != nil {
+			opts = append(opts, kit.opt)
+		}
 	}
 	return opts
 }

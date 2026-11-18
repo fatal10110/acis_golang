@@ -75,8 +75,9 @@ goroutines back to baseline) and skips unless `ACIS_PERF_CLIENTS` is set. Select
 | `spread` | Clients stand in a square grid of regions, 4096 apart, instead of one spot, so the region fan-out and visibility bookkeeping see many occupied regions. | `ACIS_PERF_REGIONS` (default 16) |
 | `geo` | Clients and monsters stand on the shipped geodata of a Gludio tile, so movement and attacks go through `CanMove` and `Height`. Skips without geodata (it is not in the repository: `ACIS_GEODATA_DIR`, or an `aCis_datapack` that carries it). Does not combine with `spread`. | `ACIS_GEODATA_DIR` |
 | `scripts` | Every monster has a script on the production registry path, subscribed to the attack hook; the run logs how many hooks the scripts heard and fails if none ran. | none |
-| `cast` | Every client also casts a skill at its monster (two steps of eight) and every monster, wired with the AI-cast seam, answers each hit with a cast desire at its attacker, so the cast controller, the effect dispatch and the NPC cast-desire path run under load. The run fails unless every client cast and saw its monster cast. Does not combine with `scripts` or `catalog`. | none |
-| `catalog` | The monsters are copies of shipped templates, each bound to a different script of the production content catalog (`scripts.xml` plus `internal/gameserver/script/catalog`, with the shipped NPC and skill tables), so those scripts' attack hooks run on every hit and `go tool pprof -focus gameserver/script` has samples. Needs a datapack. Implies `spread` with one region per client, because the shipped behaviors aggro and call their clan, and 200 clients at one spot would put crowds of monsters on the first few. The engine catalogs (quests, features, teleporters, tasks and the base behaviors) live in `cmd/gameserver` and are not in it. Does not combine with `scripts`, `cast` or `geo`. | `ACIS_PERF_CATALOG_NPCS` (default 24), `ACIS_PERF_REGIONS` |
+| `cast` | Every client also casts a skill at its monster (two steps of eight) and every monster, wired with the AI-cast seam, answers each hit with a cast desire at its attacker, so the cast controller, the effect dispatch and the NPC cast-desire path run under load. The run fails unless every client cast and saw its monster cast. Does not combine with `scripts`, `catalog` or `shipped`. | none |
+| `catalog` | The monsters are copies of shipped templates, each bound to a different script of the production content catalog (`scripts.xml` plus `internal/gameserver/script/catalog`, with the shipped NPC and skill tables), so those scripts' attack hooks run on every hit and `go tool pprof -focus gameserver/script` has samples. Needs a datapack. Implies `spread` with one region per client, because the shipped behaviors aggro and call their clan, and 200 clients at one spot would put crowds of monsters on the first few. The engine catalogs (`internal/gameserver/script/enginescripts`: quests, features, teleporters, tasks and the base behaviors) join the content catalogs as the production boot joins them, so the registry holds all 53 engine scripts the shipped `scripts.xml` lists and monsters bound to a base behavior (Warrior, Wizard, ...) are among the picks; the harness environment has no castles, sieges or clan halls, so only the picked behaviors' attack hooks run, not the quests', features' or tasks' own. Does not combine with `scripts`, `cast` or `geo`. | `ACIS_PERF_CATALOG_NPCS` (default 24), `ACIS_PERF_REGIONS` |
+| `shipped` | `catalog` (it implies it) plus every client casts a skill from the shipped skill table (Energy Bolt, id 1274: a single-target magic hit with a 2 s hit time and 3 s reuse) at its monster, through the shipped definitions, so the real `MDAM` handler and the cast controller run under load. A client asks for the cast on every attack step once its first attack landed (a cast before it let fleeing shipped monsters such as the Rabbit outrun their client), because a swing in flight only queues the request: most requests are answered with `ActionFailed` and a few clients' casts start per cycle. The monsters do not cast: a shipped skill would one-shot the 36-HP test class. The run fails unless every client cast and at least one cast ran to its effect (`MagicSkillLaunched`). Does not combine with `scripts` or `cast`. | as `catalog` |
 | `fixture` | The database holds a production-sized population before the clients enter: `ACIS_PERF_ITEMS` inventory items per client, `ACIS_PERF_BG_CHARS` other characters and `ACIS_PERF_BG_ITEMS` other item rows, all bulk-inserted. The run ends by stopping the server with every client still connected and logs the drain and the detach (every connection saving at once on the persistence lanes); it fails if the stop outlasts `network.LivePlayerPersistWait`, the time a connection waits for its player's saves. The selection latency shows the items table's cost, since `items.owner_id` has no index. | `ACIS_PERF_ITEMS` (120), `ACIS_PERF_BG_CHARS` (2000), `ACIS_PERF_BG_ITEMS` (500000) |
 
 Each variant is one command, the baseline command with the variant set:
@@ -96,22 +97,24 @@ run passing:
 | `geo` | 3.9 / 90 / 124 ms | 18.7 s | 1066 MiB |
 | `scripts` | 4.1 / 55 / 148 ms | 21.0 s | 1037 MiB |
 | `cast` | 6.9 / 70 / 103 ms | 26.4 s | 1327 MiB |
-| `catalog` (200 regions) | 2.7 / 4.4 / 8.7 ms | 2.7 s | 57 MiB |
+| `catalog` (200 regions) | 2.6 / 4.3 / 7.7 ms | 2.7 s | 57 MiB |
+| `shipped` (`catalog` + player casts, 200 regions) | 2.9 / 4.7 / 5.7 ms | 2.6 s | 67 MiB |
 | `fixture` | 3.8 / 55 / 162 ms | 21.0 s | 1027 MiB |
 
 What each new variant shows, same run:
 
 - `cast`: 1890 player and 1251 monster `MagicSkillUse` frames in the window; `go tool pprof -top -cum -focus 'actor/cast'` puts 0.70 s of the 26.2 s CPU (2.7%) in the cast controllers, and the monsters' cast desires run inside `ai.(*Attackable).think`.
-- `catalog`: `-focus gameserver/script` is 0.03 s of 2.5 s (1.2%): the shipped scripts' hooks, dispatched through `script.(*Registry).run`. The other variants' fan-out dominates their CPU; this one has none, so the script engine's own share is visible.
+- `catalog`: `-focus gameserver/script` is 0.02 s of 2.6 s (0.8%), with 5 of the 24 monsters bound to engine base behaviors: the shipped scripts' hooks, dispatched through `script.(*Registry).run`. The other variants' fan-out dominates their CPU; this one has none, so the script engine's own share is visible.
+- `shipped`: 720 player `MagicSkillUse` frames, 395 of them ran to their effect (`MagicSkillLaunched`); `go tool pprof -top -cum -focus 'actor/cast|skill/effect|handleMagicSkillUse'` puts 0.16 s of the 2.5 s CPU (6.5%) in the cast request, `handler/skill.mdamHandler` and the cast controller.
 - `fixture` (24000 client items, 2000 other characters, 500000 other item rows, seeded in 2.2 s): selection latency p50 / p99 / max = 99 / 104 / 114 ms against 4.8 / 5.7 / 7 ms without it, the unindexed `items.owner_id` read at each character selection. Stopping the server with all 200 clients connected took 3 ms to drain and 171 ms for every connection to detach and save, against the 16 s a connection waits for its saves.
 
 The spread run is cheap because a client then sees only its own region: the baseline's cost is the
 every-client-sees-every-client fan-out.
 
 The log's `load baseline: variant=...` line names the variant; the step p50 / p99, process CPU and
-the three profiles are reported as for the baseline. Not covered: the engine catalogs' scripts (quests, features,
-teleporters, tasks, base behaviors) in the `catalog` variant, and a client that casts a shipped skill (a shipped
-skill would one-shot the 36-HP test class).
+the three profiles are reported as for the baseline. Not covered: the engine quests', features', teleporters' and
+tasks' own hooks (the harness environment has no castles, sieges or clan halls, and no client talks to an NPC), and
+monsters casting shipped skills (they would one-shot the 36-HP test class).
 
 The run logs step latency, selection latency, process CPU, GC count and pauses, the GC's CPU time, bytes allocated in
 the window, heap size, and goroutines under load. After the window it closes every client and fails
