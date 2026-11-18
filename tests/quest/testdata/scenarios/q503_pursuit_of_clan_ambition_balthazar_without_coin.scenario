@@ -1,0 +1,31 @@
+# Q503: Balthazar at cond 4 for a leader without the Black Anvil Coin (30764-02): the offer to help (30764-03) takes Gustav's second letter and moves the quest to cond 5.
+# Go-only: expectations recorded from the Go run and checked by hand against the reference quest script.
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=4 <state>=STARTED
+hold 3867 1
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3847 3867 3869 3870 3871
+page default/30764.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc balthazar 30764 Folk 10 0 0
+
+action balthazar
+action balthazar
+  S ActionFailed
+  S NpcHtmlMessage obj=balthazar item=0 page=default/30764.htm
+  S ActionFailed
+bypass npc_{balthazar}_Quest
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30764-03.htm
+  S QuestList 503:0x8000001f
+  S ExShowQuestMark quest=503
+  S SystemMessage id=302 3:3867
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=balthazar item=0 page=script/quest/Q503_PursuitOfClanAmbition/30764-03.htm
+  S ActionFailed
+  Q upsert Q503_PursuitOfClanAmbition | <cond> | 5
+  rows Q503_PursuitOfClanAmbition <cond>=5 <state>=STARTED
+  items 3867=0

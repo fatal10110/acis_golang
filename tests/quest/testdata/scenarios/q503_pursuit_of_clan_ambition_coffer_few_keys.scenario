@@ -1,0 +1,26 @@
+# Q503: the Imperial Coffer at cond 10 for a leader with five Imperial keys (30765-03): opening it needs six, so it answers 30765-05a and keeps the keys and gives no scepter.
+# Go-only: expectations recorded from the Go run and checked by hand against the reference quest script.
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=10 <state>=STARTED
+hold 3847 5
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3847 3867 3869 3870 3871
+page default/30765.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc coffer 30765 Folk 10 0 0
+
+action coffer
+action coffer
+  S ActionFailed
+  S NpcHtmlMessage obj=coffer item=0 page=default/30765.htm
+  S ActionFailed
+bypass npc_{coffer}_Quest
+  S NpcHtmlMessage obj=coffer item=0 page=script/quest/Q503_PursuitOfClanAmbition/30765-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30765-04.htm
+  S NpcHtmlMessage obj=coffer item=0 page=script/quest/Q503_PursuitOfClanAmbition/30765-05a.htm
+  S ActionFailed
+  rows Q503_PursuitOfClanAmbition <cond>=10 <state>=STARTED
+  items 3847=5 3869=0

@@ -1,0 +1,33 @@
+# Q503: Cleo at cond 12 with the Scepter of Judgment (30766-07) offers the trade (30766-08): the Seal of Aspiration and 250000 SP.
+# Go-only: expectations recorded from the Go run and checked by hand against the reference quest script.
+character Leader 40
+clan 4
+quest Q503_PursuitOfClanAmbition <cond>=12 <state>=STARTED
+hold 3869 1
+script quest.Q503_PursuitOfClanAmbition
+item 3839 3840 3841 3842 3843 3844 3846 3847 3867 3869 3870 3871
+page default/30766.htm
+page script/quest/Q503_PursuitOfClanAmbition/
+npc cleo 30766 Folk 10 0 0
+
+action cleo
+action cleo
+  S ActionFailed
+  S NpcHtmlMessage obj=cleo item=0 page=default/30766.htm
+  S ActionFailed
+bypass npc_{cleo}_Quest
+  S NpcHtmlMessage obj=cleo item=0 page=script/quest/Q503_PursuitOfClanAmbition/30766-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q503_PursuitOfClanAmbition 30766-08.htm
+  S SystemMessage id=302 3:3869
+  S SystemMessage id=54 3:3870
+  S SystemMessage id=331 1:250000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=cleo item=0 page=script/quest/Q503_PursuitOfClanAmbition/30766-08.htm
+  S ActionFailed
+  Q delete-quest Q503_PursuitOfClanAmbition
+  items 3869=0 3870=1
+  state Q503_PursuitOfClanAmbition -
+  rows Q503_PursuitOfClanAmbition -
