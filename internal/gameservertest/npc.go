@@ -723,12 +723,19 @@ func FolkTemplate(kind string, npcID int) *npc.Template {
 // production civilian spawner, standing (no route walker).
 func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location) *npc.Folk {
 	t.Helper()
+	return s.SpawnFolkNPCAtGeo(t, tmpl, at, Geo{})
+}
+
+// SpawnFolkNPCAtGeo is SpawnFolkNPCAt with an explicit movement geo, so a
+// suite can close the way to a place its NPC is sent to (GateGeo).
+func (s *Server) SpawnFolkNPCAtGeo(t *testing.T, tmpl *npc.Template, at location.Location, geo move.Geo) *npc.Folk {
+	t.Helper()
 	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
 	inst.Home, inst.HasHome = at, true
-	f, err := s.folkSpawner(nil, Geo{}).Spawn(inst, at, 0, nil)
+	f, err := s.folkSpawner(nil, geo).Spawn(inst, at, 0, nil)
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}
