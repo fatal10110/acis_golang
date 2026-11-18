@@ -98,6 +98,9 @@ func TestLoadBaseline(t *testing.T) {
 		ms.castRef = castMonsterRef
 	case v.catalog:
 		cat = loadProdCatalog(t, v.catalogNPCs)
+		if v.shipped {
+			kit = newShippedKit(t, cat.skills)
+		}
 	}
 
 	character := gameservertest.WithCharacter("Perf0", 5, 0)
@@ -124,9 +127,9 @@ func TestLoadBaseline(t *testing.T) {
 		conns = append(conns, srv.DialClient(t, account, 1))
 	}
 
-	if v.cast {
+	if kit != nil {
 		for _, id := range ids {
-			if err := srv.KnownSkills.SetKnownSkill(context.Background(), id, 0, int(castPlayerSkill), 1); err != nil {
+			if err := srv.KnownSkills.SetKnownSkill(context.Background(), id, 0, int(kit.player), 1); err != nil {
 				t.Fatalf("seed known skill: %v", err)
 			}
 		}
@@ -171,7 +174,7 @@ func TestLoadBaseline(t *testing.T) {
 			mt = cat.templates[i%len(cat.templates)]
 		}
 		monsters[i] = srv.SpawnMovingHostileNPCTemplateAtGeo(t, mt, at, at, geo)
-		if kit != nil {
+		if v.cast {
 			srv.InstallNPCCastSeam(t, monsters[i], kit.defs)
 		}
 		readers[i].monsterID.Store(monsters[i].ObjectID())
@@ -197,7 +200,7 @@ func TestLoadBaseline(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range conns {
 		wg.Go(func() {
-			samples[i] = runClient(srv, v, conns[i], readers[i], monsters[i], origins[i], i, deadline, &timeouts)
+			samples[i] = runClient(srv, kit, conns[i], readers[i], monsters[i], origins[i], i, deadline, &timeouts)
 		})
 	}
 	wg.Wait()
@@ -216,7 +219,7 @@ func TestLoadBaseline(t *testing.T) {
 	var all []time.Duration
 	var frames int64
 	disconnected, died, stationary, noAttack, strayReplies, noCast, noMonsterCast := 0, 0, 0, 0, 0, 0, 0
-	var casts, monsterCasts int64
+	var casts, monsterCasts, launched int64
 	for i, r := range readers {
 		all = append(all, samples[i]...)
 		frames += r.frames.Load()
@@ -236,6 +239,7 @@ func TestLoadBaseline(t *testing.T) {
 			noAttack++
 		}
 		casts += r.casts.Load()
+		launched += r.launched.Load()
 		monsterCasts += r.monsterCasts.Load()
 		if r.casts.Load() == 0 {
 			noCast++
@@ -279,9 +283,15 @@ func TestLoadBaseline(t *testing.T) {
 			t.Errorf("cast workload not driven: of %d clients %d never cast and %d never saw their monster cast", clients, noCast, noMonsterCast)
 		}
 	}
+	if v.shipped {
+		t.Logf("  shipped skill %d cast frames: players=%d launched=%d", kit.player, casts, launched)
+		if noCast > 0 || launched == 0 {
+			t.Errorf("shipped-skill workload not driven: of %d clients %d never cast skill %d, %d casts ran to their effect", clients, noCast, kit.player, launched)
+		}
+	}
 	if v.catalog {
 		heard := cat.attacked.Load()
-		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed, attacked hooks=%d", len(cat.templates), clients, len(cat.list), heard)
+		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed (%d from the engine catalogs, %d monsters bound to one), attacked hooks=%d", len(cat.templates), clients, len(cat.list), cat.engineListed, cat.enginePicked, heard)
 		if heard == 0 {
 			t.Errorf("the catalog variant ran no script hook: the shipped scripts were not bound")
 		}
@@ -301,7 +311,7 @@ func TestLoadBaseline(t *testing.T) {
 // A client stops early when its connection is lost or a step times out: a
 // probe reply arriving after its step gave up would otherwise be credited to
 // the next step. Both fail the run.
-func runClient(srv *gameservertest.Server, v variants, c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hostile, origin location.Location, index int, deadline time.Time, timeouts *atomic.Int64) []time.Duration {
+func runClient(srv *gameservertest.Server, kit *castKit, c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hostile, origin location.Location, index int, deadline time.Time, timeouts *atomic.Int64) []time.Duration {
 	rng := rand.New(rand.NewPCG(uint64(index), 2285))
 	tick := time.NewTicker(stepInterval)
 	defer tick.Stop()
@@ -320,15 +330,15 @@ func runClient(srv *gameservertest.Server, v variants, c *testsupport.ScriptedCl
 		}
 		sent := time.Now()
 		var action []byte
-		switch step % 8 {
-		case 0, 1, 2, 3, 4, 5: // the first click selects, the rest attack
-			if monster.CurrentHP() < monster.MaxHP()/2 {
-				monster.SetCurrentHP(monster.MaxHP())
-			}
+		phase := step % 8
+		if phase < 6 && monster.CurrentHP() < monster.MaxHP()/2 {
+			monster.SetCurrentHP(monster.MaxHP())
+		}
+		switch {
+		case kit.casts(phase, r.attacks.Load() > 0): // the monster is already the target
+			action = encodeMagicSkillUse(kit.player)
+		case phase < 6: // the first click selects, the rest attack
 			action = encodeAction(monster.ObjectID(), origin)
-			if v.cast && (step%8 == 2 || step%8 == 4) { // the monster is already the target
-				action = encodeMagicSkillUse(castPlayerSkill)
-			}
 		default: // a short walk near the monster keeps the next approach inside the attack window
 			mx, my, _ := monster.Position()
 			target := location.Location{X: mx + rng.IntN(201) - 100, Y: my + rng.IntN(201) - 100, Z: origin.Z}
@@ -379,13 +389,16 @@ type frameReader struct {
 	// monsterCasts those of its monster (monsterID, set once it spawned).
 	casts        atomic.Int64
 	monsterCasts atomic.Int64
-	monsterID    atomic.Int32
-	replies      atomic.Int64
-	lost         atomic.Bool
-	died         atomic.Bool
-	moved        atomic.Bool
-	done         atomic.Bool
-	stopped      chan struct{}
+	// launched counts the MagicSkillLaunched frames of the client's own
+	// character: casts that ran to their effect.
+	launched  atomic.Int64
+	monsterID atomic.Int32
+	replies   atomic.Int64
+	lost      atomic.Bool
+	died      atomic.Bool
+	moved     atomic.Bool
+	done      atomic.Bool
+	stopped   chan struct{}
 }
 
 func startReader(c *testsupport.ScriptedClient, id int32) *frameReader {
@@ -415,6 +428,9 @@ func startReader(c *testsupport.ScriptedClient, id int32) *frameReader {
 				case r.monsterID.Load():
 					r.monsterCasts.Add(1)
 				}
+			}
+			if len(frame) >= 9 && frame[0] == serverpackets.OpcodeMagicSkillLaunched && int32(binary.LittleEndian.Uint32(frame[1:5])) == id {
+				r.launched.Add(1)
 			}
 			if frame[0] == serverpackets.OpcodeSkillList {
 				r.replies.Add(1)
