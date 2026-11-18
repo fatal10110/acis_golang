@@ -210,8 +210,13 @@ func TestQ350MasterLinks(t *testing.T) {
 				}
 				return
 			}
-			if !slices.Contains(got, itemMessage(serverpackets.SystemMessageEarnedItemS1, tc.crystal)) {
+			sound := slices.Index(got, "S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0")
+			earned := slices.Index(got, itemMessage(serverpackets.SystemMessageEarnedItemS1, tc.crystal))
+			if earned < 0 {
 				t.Fatalf("%s sent %q, want the crystal %d", tc.event, got, tc.crystal)
+			}
+			if sound < 0 || sound > earned {
+				t.Fatalf("%s sent %q, want the middle sound before the crystal message", tc.event, got)
 			}
 			if n := w.srv.PlayerItemCount(t, w.player, tc.crystal); n != 1 {
 				t.Fatalf("crystal %d held = %d, want 1", tc.crystal, n)
