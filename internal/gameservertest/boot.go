@@ -479,7 +479,7 @@ func WithTeleports(teleports travel.TeleportTable, instants travel.InstantTable,
 
 // WithTradeClock times every pending request out against now (nil means
 // time.Now): direct trade, party, command channel, party room and friend
-// invitations alike, so a scenario can let a request expire without
+// invitations and marriage requests alike, so a scenario can let a request expire without
 // waiting.
 func WithTradeClock(now func() time.Time) Option {
 	return func(o *options) { o.tradeClock = now }
@@ -2508,7 +2508,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions
-	couples, coupleRows := bootWedding(t, db, ids, o.weddingConfig)
+	couples, coupleRows := bootWedding(t, db, ids, o.weddingConfig, o.tradeClock)
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Bookmarks = gamesql.NewBookmarkStore(db)

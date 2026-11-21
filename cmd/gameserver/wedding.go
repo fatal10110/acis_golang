@@ -48,7 +48,7 @@ func provideWedding(ctx bootContext, paths gameServerPaths, pool *sql.DB, ids *i
 		return nil, nil, err
 	}
 	log.Info().Int("count", len(couples)).Msg("wedding: loaded couples")
-	return wedding.NewManager(cfg, ids, couples), store, nil
+	return wedding.NewManager(cfg, ids, couples, nil), store, nil
 }
 
 // startWedding stores every couple once the game server has let every
