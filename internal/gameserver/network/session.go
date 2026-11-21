@@ -88,6 +88,7 @@ func (s *Session) send(frame wire.Frame, last bool) bool {
 	if observe := s.conn.observeSend; observe != nil {
 		observe(frameBytes[frameHeaderSize:])
 	}
+	op := frameOpcode(frameBytes)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -95,10 +96,7 @@ func (s *Session) send(frame wire.Frame, last bool) bool {
 	if s.cryptEnabled {
 		s.cipher.Encrypt(frameBytes[frameHeaderSize:])
 	}
-	if last {
-		return s.conn.sendLast(frame)
-	}
-	return s.conn.SendFrame(frame)
+	return s.conn.enqueue(frame, op, last)
 }
 
 // ReadFrame blocks for the next inbound frame, decrypts it, and returns its

@@ -95,6 +95,9 @@ func (c *Client) SessionKey() link.SessionKey {
 // StateAuthed. The caller (SessionValidator.Validate) is responsible for
 // having already confirmed the session before calling this.
 func (c *Client) SetAuthenticated(accountName string, key link.SessionKey) {
+	if c.Session != nil && c.Session.conn != nil {
+		c.Session.conn.setAccount(accountName)
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.accountName = accountName

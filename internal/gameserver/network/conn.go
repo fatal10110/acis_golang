@@ -1,7 +1,10 @@
 package network
 
 import (
+	"fmt"
 	"net"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -10,15 +13,24 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// outboundHighWater is how much memory a Conn's unwritten backlog may pin
-// before the peer is treated as stalled and the connection is aborted. Each
-// frame is charged what it holds until written — its pooled buffer's
-// capacity plus its queue slot (frameCost), not only its wire bytes — so a
-// flood of tiny replies is bounded like a few large frames. Frames are never
-// dropped individually: skipping one would desynchronize the client's cipher.
-// 2 MiB is several thousand typical frames, well above a healthy burst such
-// as an EnterWorld in a crowded town.
+// outboundHighWater is how large a Conn's unwritten backlog may grow — its
+// wire bytes plus a queue slot per frame (backlog.charge) — before the peer is
+// treated as stalled and the connection is aborted. Frames are never dropped
+// individually: skipping one would desynchronize the client's cipher. 2 MiB is
+// several thousand typical frames (a character or NPC appearance is a few
+// hundred bytes), well above a healthy burst such as an EnterWorld in a
+// crowded town.
 const outboundHighWater = 2 << 20
+
+// outboundPinnedLimit bounds the memory the same backlog pins (backlog.pinned).
+// A frame built in a reused pooled writer holds that writer's whole capacity,
+// up to 8 KiB, until it is written, however few bytes it carries. Charging
+// that capacity against outboundHighWater lets pool reuse cut the backlog a
+// healthy burst may reach to a few hundred frames; not bounding it at all
+// lets a peer that stops reading pin hundreds of MiB through a flood of tiny
+// replies. 16 MiB still admits about two thousand frames that each pin a
+// full-size pooled writer.
+const outboundPinnedLimit = 16 << 20
 
 // queuedFrameBytes is the queue slot each backlog frame occupies.
 const queuedFrameBytes = int(unsafe.Sizeof(wire.Frame{}))
@@ -33,9 +45,39 @@ const retainedQueueCap = 1024
 // deadline is what frees it.
 const connWriteTimeout = time.Minute
 
-// frameCost is what frame counts against outboundHighWater.
-func frameCost(frame wire.Frame) int {
-	return frame.Footprint() + queuedFrameBytes
+// abortTopOpcodes is how many of the most frequent queued opcodes the
+// backlog abort log names.
+const abortTopOpcodes = 5
+
+// backlog totals the frames a Conn has queued or is writing.
+type backlog struct {
+	frames int
+	wire   int // bytes the frames put on the wire
+	pinned int // memory the frames hold: each one's Footprint plus queue slot
+}
+
+func (b *backlog) add(frame wire.Frame) {
+	b.frames++
+	b.wire += len(frame.Bytes())
+	b.pinned += frame.Footprint() + queuedFrameBytes
+}
+
+func (b *backlog) retire(done backlog) {
+	b.frames -= done.frames
+	b.wire -= done.wire
+	b.pinned -= done.pinned
+}
+
+// charge is what the backlog counts against outboundHighWater.
+func (b backlog) charge() int {
+	return b.wire + b.frames*queuedFrameBytes
+}
+
+// admits reports whether b stays within outboundHighWater and
+// outboundPinnedLimit with frame added.
+func (b backlog) admits(frame wire.Frame) bool {
+	b.add(frame)
+	return b.charge() <= outboundHighWater && b.pinned <= outboundPinnedLimit
 }
 
 // Conn is one accepted game-client connection: a net.Conn plus an
@@ -49,13 +91,19 @@ type Conn struct {
 	// rejects reports frames SendFrame and sendLast refuse as invalid.
 	rejects *frameRejectReporter
 
-	// mu guards queue, pending, sealed and closed. It is held only to append
-	// to or swap out the queue, never across I/O.
-	mu      sync.Mutex
-	queue   []wire.Frame
-	pending int  // frameCost of every frame queued or being written
+	// mu guards queue through aborted. It is held only to append to or swap
+	// out the queue, never across I/O.
+	mu    sync.Mutex
+	queue []wire.Frame
+	// queueOps is the cleartext opcode of each frame in queue, which the
+	// backlog abort log reports; queue itself may already be encrypted.
+	queueOps []byte
+	pending  backlog // every frame queued or being written
+	// account is who the client authenticated as, for the abort log.
+	account string
 	sealed  bool // sendLast queued the final frame; later sends are dropped
 	closed  bool
+	aborted bool // the backlog limit closed the connection
 
 	wake     chan struct{} // capacity 1: queue gained frames or closed was set
 	stopping chan struct{}
@@ -113,7 +161,7 @@ func (c *Conn) writeLoop() {
 		c.mu.Lock()
 		c.closed = true
 		releaseFrames(c.queue)
-		c.queue = nil
+		c.queue, c.queueOps = nil, nil
 		c.mu.Unlock()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
@@ -125,6 +173,11 @@ func (c *Conn) writeLoop() {
 	for {
 		c.mu.Lock()
 		batch, c.queue = c.queue, batch[:0]
+		if cap(c.queueOps) > retainedQueueCap {
+			c.queueOps = nil
+		} else {
+			c.queueOps = c.queueOps[:0]
+		}
 		closed := c.closed
 		c.mu.Unlock()
 		if len(batch) == 0 {
@@ -138,14 +191,19 @@ func (c *Conn) writeLoop() {
 			}
 			continue
 		}
-		var cost int
+		var written backlog
 		var err error
-		bufs, cost, err = c.writeBatch(batch, bufs)
+		bufs, written, err = c.writeBatch(batch, bufs)
 		c.mu.Lock()
-		c.pending -= cost
+		c.pending.retire(written)
+		aborted := c.aborted
 		c.mu.Unlock()
 		if err != nil {
-			c.log.Warn().Err(err).Msg("game connection write failed, closing")
+			// A write cut off by the backlog abort closing the socket was
+			// already reported by that abort.
+			if !aborted {
+				c.log.Warn().Err(err).Msg("game connection write failed, closing")
+			}
 			return
 		}
 		if cap(batch) > retainedQueueCap {
@@ -158,24 +216,24 @@ func (c *Conn) writeLoop() {
 // net.Buffers write and releases all of them (win or lose) once the
 // write attempt finishes. It reuses bufs' storage and returns it, possibly
 // grown, for the next batch; WriteTo consumes a separate slice header, so
-// the returned one keeps the whole backing array. cost is the batch's total
-// frameCost, so the caller can retire it from pending either way.
-func (c *Conn) writeBatch(batch []wire.Frame, bufs net.Buffers) (_ net.Buffers, cost int, _ error) {
+// the returned one keeps the whole backing array. written totals the batch,
+// so the caller can retire it from pending either way.
+func (c *Conn) writeBatch(batch []wire.Frame, bufs net.Buffers) (_ net.Buffers, written backlog, _ error) {
 	defer releaseFrames(batch)
 	bufs = bufs[:0]
 	for _, frame := range batch {
 		bufs = append(bufs, frame.Bytes())
-		cost += frameCost(frame)
+		written.add(frame)
 	}
 	if err := c.Conn.SetWriteDeadline(time.Now().Add(connWriteTimeout)); err != nil {
-		return bufs, cost, err
+		return bufs, written, err
 	}
 	// WriteTo consumes the header it is called on; calling it on a field
 	// rather than a local keeps that header off the heap.
 	c.wbufs = bufs
 	_, err := c.wbufs.WriteTo(c.Conn)
 	c.wbufs = nil
-	return bufs, cost, err
+	return bufs, written, err
 }
 
 // releaseFrames releases every frame and clears the slots so a reused
@@ -190,39 +248,32 @@ func releaseFrames(frames []wire.Frame) {
 // SendFrame queues a frame without blocking and calls release exactly once
 // after the frame is written or dropped. It reports false when the
 // connection is closed, or when this frame would push the unwritten backlog
-// past outboundHighWater — the connection is aborted then, because dropping
-// one ordered frame would desynchronize the client.
+// past outboundHighWater or outboundPinnedLimit — the connection is aborted
+// then, because dropping one ordered frame would desynchronize the client.
 func (c *Conn) SendFrame(frame wire.Frame) bool {
-	if err := frame.Err(); err != nil {
-		frame.Release()
-		c.rejects.report("connection send", err)
-		return false
-	}
-	cost := frameCost(frame)
-	c.mu.Lock()
-	if c.closed || c.sealed {
-		c.mu.Unlock()
-		frame.Release()
-		return false
-	}
-	if c.pending+cost > outboundHighWater {
-		c.mu.Unlock()
-		frame.Release()
-		c.abort()
-		return false
-	}
-	c.queue = append(c.queue, frame)
-	c.pending += cost
-	c.mu.Unlock()
-	c.signal()
-	return true
+	return c.enqueue(frame, frameOpcode(frame.Bytes()), false)
 }
 
 // sendLast queues frame as the last one the peer receives: every later
 // SendFrame and sendLast is dropped. Frames queued ahead of it are still
 // written, and Close still flushes it before closing the socket. It reports
 // false, releasing frame, when the connection is already sealed or closed.
+// The final frame is never refused for the backlog limits.
 func (c *Conn) sendLast(frame wire.Frame) bool {
+	return c.enqueue(frame, frameOpcode(frame.Bytes()), true)
+}
+
+// frameOpcode is the opcode of a cleartext frame, or 0 when it has none.
+func frameOpcode(frame []byte) byte {
+	if len(frame) <= wire.FrameHeaderSize {
+		return 0
+	}
+	return frame[wire.FrameHeaderSize]
+}
+
+// enqueue is SendFrame, or sendLast when last is set, for a frame whose
+// cleartext opcode is op.
+func (c *Conn) enqueue(frame wire.Frame, op byte, last bool) bool {
 	if err := frame.Err(); err != nil {
 		frame.Release()
 		c.rejects.report("connection send", err)
@@ -234,12 +285,79 @@ func (c *Conn) sendLast(frame wire.Frame) bool {
 		frame.Release()
 		return false
 	}
+	if !last && !c.pending.admits(frame) {
+		c.abort(frame, op) // unlocks mu
+		return false
+	}
 	c.queue = append(c.queue, frame)
-	c.pending += frameCost(frame)
-	c.sealed = true
+	c.queueOps = append(c.queueOps, op)
+	c.pending.add(frame)
+	c.sealed = last
 	c.mu.Unlock()
 	c.signal()
 	return true
+}
+
+// abort closes a connection whose peer stopped reading its ordered packet
+// stream, without waiting for its writer to drain, and releases rejected, the
+// frame that did not fit. It is called with mu held by the sender that found
+// the backlog over its limits, and unlocks it.
+func (c *Conn) abort(rejected wire.Frame, op byte) {
+	c.closed, c.aborted = true, true
+	account, held, queued := c.account, c.pending, len(c.queue)
+	top := topOpcodes(c.queueOps, abortTopOpcodes)
+	c.mu.Unlock()
+
+	c.log.Warn().
+		Str("account", account).
+		Stringer("addr", c.RemoteAddr()).
+		Int("frames", held.frames).
+		Int("frames_queued", queued).
+		Int("wire_bytes", held.wire).
+		Int("charged_bytes", held.charge()).
+		Int("pinned_bytes", held.pinned).
+		Str("top_opcodes", top).
+		Str("rejected_opcode", fmt.Sprintf("0x%02x", op)).
+		Int("rejected_wire_bytes", len(rejected.Bytes())).
+		Int("rejected_pinned_bytes", rejected.Footprint()+queuedFrameBytes).
+		Int("high_water_bytes", outboundHighWater).
+		Int("pinned_limit_bytes", outboundPinnedLimit).
+		Msg("outbound backlog over high-water mark, aborting connection")
+	rejected.Release()
+	c.stop()
+	_ = c.Conn.Close()
+}
+
+// topOpcodes lists the n most frequent opcodes in ops, most frequent first,
+// as "0x03=812,0x16=40".
+func topOpcodes(ops []byte, n int) string {
+	var counts [256]int
+	for _, op := range ops {
+		counts[op]++
+	}
+	var seen []int
+	for op, count := range counts {
+		if count > 0 {
+			seen = append(seen, op)
+		}
+	}
+	slices.SortStableFunc(seen, func(a, b int) int { return counts[b] - counts[a] })
+	var out strings.Builder
+	for i, op := range seen[:min(n, len(seen))] {
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		fmt.Fprintf(&out, "0x%02x=%d", op, counts[op])
+	}
+	return out.String()
+}
+
+// setAccount labels c's backlog abort log with the account its client
+// authenticated as.
+func (c *Conn) setAccount(name string) {
+	c.mu.Lock()
+	c.account = name
+	c.mu.Unlock()
 }
 
 // ObserveSends installs fn to see every frame a Session queues on c: its
@@ -284,22 +402,6 @@ func (c *Conn) signal() {
 	case c.wake <- struct{}{}:
 	default:
 	}
-}
-
-// abort closes a connection without waiting for its writer to drain. It is
-// used when a client stopped reading its ordered packet stream. A connection
-// already closing is left to finish its own drain.
-func (c *Conn) abort() {
-	c.mu.Lock()
-	wasClosed := c.closed
-	c.closed = true
-	c.mu.Unlock()
-	if wasClosed {
-		return
-	}
-	c.log.Warn().Int("high_water_bytes", outboundHighWater).Msg("outbound backlog over high-water mark, aborting connection")
-	c.stop()
-	_ = c.Conn.Close()
 }
 
 func (c *Conn) stop() {
