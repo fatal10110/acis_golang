@@ -94,9 +94,18 @@ var approvedBindDivergences = map[string]map[string]string{
 	"quest.Q022_TragedyInVonHellmannForest": {"bind DECAYED 31528": "bind DECAYED 27217,31528"},
 }
 
-// applyApprovedDivergences rewrites the reference bind lines an owner
-// decision diverges from, and fails when such a line is gone, so a stale
-// entry cannot linger.
+// approvedAdditions: own hooks and bind lines a script has beyond the
+// reference on an owner decision, keyed by script path. Each entry names
+// the issue that records the decision.
+var approvedAdditions = map[string]struct{ hooks, binds []string }{
+	// #5162: the pure unicorn frees its cell when it decays, so a quester
+	// can summon it again.
+	"quest.Q242_PossessorOfAPreciousSoul": {hooks: []string{"onDecayed"}, binds: []string{"bind DECAYED 31747"}},
+}
+
+// applyApprovedDivergences rewrites the reference bind lines and adds the
+// hooks and bind lines an owner decision diverges with, and fails when
+// such a line is gone or already there, so a stale entry cannot linger.
 func applyApprovedDivergences(t *testing.T, scripts map[string]*manifestScript) {
 	t.Helper()
 	for path, lines := range approvedBindDivergences {
@@ -111,6 +120,26 @@ func applyApprovedDivergences(t *testing.T, scripts map[string]*manifestScript) 
 			}
 			s.binds[i] = port
 		}
+	}
+	for path, add := range approvedAdditions {
+		s, ok := scripts[path]
+		if !ok {
+			t.Fatalf("approved addition for %s: script not in the reference manifest", path)
+		}
+		for _, h := range add.hooks {
+			if slices.Contains(s.hooks, h) {
+				t.Fatalf("approved addition for %s: reference already has hook %s", path, h)
+			}
+			s.hooks = append(s.hooks, h)
+		}
+		for _, b := range add.binds {
+			if slices.Contains(s.binds, b) {
+				t.Fatalf("approved addition for %s: reference already has %q", path, b)
+			}
+			s.binds = append(s.binds, b)
+		}
+		slices.Sort(s.hooks)
+		slices.Sort(s.binds)
 	}
 }
 

@@ -8,9 +8,12 @@ import (
 )
 
 // TestQ242MatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes.
+// class: literals, engine calls and hook shapes. The decayed hook frees the
+// pure white unicorn's cell however the unicorn leaves, and cancels the
+// talk's timer on it (#5162).
 func TestQ242MatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check("q242", []string{"quest.Q242_PossessorOfAPreciousSoul"})
+	problems, err := scriptfp.Check("q242", []string{"quest.Q242_PossessorOfAPreciousSoul"},
+		"hook onDecayed none", "call Quest.cancelQuestTimer")
 	if err != nil {
 		t.Fatal(err)
 	}
