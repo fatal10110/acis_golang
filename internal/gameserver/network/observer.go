@@ -34,8 +34,13 @@ func (l *GameClientLink) observeGroup(live *livePlayer, f *npc.Folk, id int) {
 // refuses a player with a summon out and is closed outside its castle's
 // siege; any other viewpoint turns a player with a summon away without a
 // word. A player in combat is refused. An unknown viewpoint answers
-// nothing.
+// nothing. A dead player, who may still hold a tower's page opened before
+// it died, is refused before anything else, the bypass's closing
+// ActionFailed its only answer (#4953).
 func (l *GameClientLink) observe(live *livePlayer, id int) {
+	if live.Dead() {
+		return
+	}
 	loc, ok := l.observers.Location(id)
 	if !ok {
 		return

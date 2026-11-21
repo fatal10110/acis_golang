@@ -30,6 +30,11 @@ const restartTeleportOffset = 20
 // A dead attacker of the siege in progress where it lies waits out the
 // attacker respawn delay first; the restart then resolves as the player
 // stands when the wait ends.
+//
+// A dead observer stops watching first and goes back to where it left to
+// watch; the restart resolves from there once it has landed (#4953). A
+// request made while that one waits is dropped, as it would revive the
+// player where the jump back lands.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
 	if live == nil {
 		return
@@ -40,14 +45,49 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 		live.GetUpFromFakeDeath()
 		return
 	}
-	if !live.Dead() {
+	if !live.Dead() || live.observerRestart {
 		return
 	}
+	if live.ObserverMode() {
+		saved, _ := live.SavedLocation()
+		l.endObservationInPlace(live)
+		live.observerRestart = true
+		l.forceTeleportLivePlayer(live, saved, 0, nil)
+		l.restartOnceLanded(live, req.RequestType)
+		return
+	}
+	l.restartDeadPlayer(live, req.RequestType)
+}
+
+// restartOnceLanded restarts live as a request of requestType asks once
+// its teleport in flight, if any, has landed. It runs on live's queue.
+func (l *GameClientLink) restartOnceLanded(live *livePlayer, requestType int32) {
+	sim.AssertOwner(live.Queue())
+	live.teleportMu.Lock()
+	if live.Teleporting() {
+		// Held apart from the forced-teleport cap: at most one restart
+		// waits, as live.observerRestart drops any other.
+		live.deferredTeleports = append(live.deferredTeleports, func() { l.restartOnceLanded(live, requestType) })
+		live.teleportMu.Unlock()
+		return
+	}
+	live.teleportMu.Unlock()
+	live.observerRestart = false
+	if live.detached() || !live.Dead() {
+		return
+	}
+	l.restartDeadPlayer(live, requestType)
+}
+
+// restartDeadPlayer restarts the dead live as a request of requestType
+// asks, after the siege attacker respawn delay when live attacks the siege
+// in progress where it lies.
+func (l *GameClientLink) restartDeadPlayer(live *livePlayer, requestType int32) {
 	if l.siegeAttackerAt(live) {
-		l.delaySiegeRestart(live, req.RequestType)
+		l.delaySiegeRestart(live, requestType)
 		return
 	}
-	l.portDeadPlayer(live, req.RequestType)
+	l.portDeadPlayer(live, requestType)
 }
 
 // siegeAttackerAt reports whether live's clan attacks the siege in progress
