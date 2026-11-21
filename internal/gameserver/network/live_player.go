@@ -138,6 +138,10 @@ type livePlayer struct {
 	// siegeRestart is the restart a dead siege attacker waits out, nil for
 	// none; owned by p's queue. See restartpoint.go.
 	siegeRestart *sim.Timer
+	// observerRestart reports a restart waiting for this dead player's
+	// jump back from a viewpoint to land; owned by p's queue. See
+	// restartpoint.go.
+	observerRestart bool
 	// wyvernDismount is the countdown that takes a wyvern rider off its
 	// mount over ground closed to wyverns, nil for none; owned by p's
 	// queue. See wyvern_dismount.go.
