@@ -27,9 +27,9 @@ func musicOfPsycho() skill.Ref  { return skill.Ref{ID: 5007, Level: 5} }
 //
 // Spawned with no row he seals the tomb at db value 0: maker event 1001 on
 // frintessa_2515_m01, grave pathways 1 and 2 and every wall closed, 3 and 4
-// open, and the follower and its transform told 0. Restored at 1 he runs
-// maker event 1001 there again; at 2 he runs 1000 and jumps to his hall 10
-// minutes later; at 3 to 7 he closes every door, leaves his organ dummy,
+// open, and the follower and its transform told 0. Restored at 1, the entry
+// countdown, he does the same: the countdown does not outlive a restart.
+// At 2 he runs 1000 and jumps to his hall 10 minutes later; at 3 to 7 he closes every door, leaves his organ dummy,
 // plays the stage's song and runs maker event 1000.
 //
 // Script event arg1 1 and 2 (from the teleporter) set the stage and tell the
@@ -54,7 +54,11 @@ func Frintezza() script.Script {
 				s.GlobalMemo().Set(bossmemo.Frintezza, int(n.ObjectID()))
 			}
 			switch {
-			case !n.DBLoaded():
+			// Stage 1, the entry countdown, is not resumed: its timers
+			// live in memory only, so a restart in that window starts the
+			// tomb over idle and the teleporter takes entries again
+			// (#4683).
+			case !n.DBLoaded() || n.DBValue() == 1:
 				n.SetDBValue(0)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 				setTombDoors(s, 0)
@@ -64,8 +68,6 @@ func Frintezza() script.Script {
 				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-			case n.DBValue() == 1:
-				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 			case n.DBValue() == 2:
 				s.StartTimer("1001", n, nil, 600000*time.Millisecond)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1000", 0, 0)

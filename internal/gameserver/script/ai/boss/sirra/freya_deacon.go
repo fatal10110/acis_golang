@@ -89,30 +89,30 @@ func FreyaDeacon() script.Script {
 				switch {
 				case strings.EqualFold(e.Name, "2002"):
 					entrant := entrantOf(n)
-					if entrant == nil {
-						return ""
+					// A visit whose leader is gone or no longer in a party
+					// frees the deacon and reopens the garden; the payment
+					// stays taken (#5130).
+					if entrant == nil || !entrant.InParty() {
+						freeDeacon(s, n)
+						if entrant == nil {
+							return ""
+						}
+						break
 					}
 
-					if entrant.InParty() {
-						members := entrant.PartyMembers()
-						if int(n.Int(slotCount)) >= len(members) {
-							for _, partyMember := range members {
-								if script.InRadius3D(partyMember, n, 1000) {
-									allowPlayerEntry(s, partyMember)
-									partyMember.TeleportTo(script.Loc{X: 113533, Y: -126159, Z: -3488}, 0)
-								}
+					members := entrant.PartyMembers()
+					if int(n.Int(slotCount)) >= len(members) {
+						for _, partyMember := range members {
+							if script.InRadius3D(partyMember, n, 1000) {
+								allowPlayerEntry(s, partyMember)
+								partyMember.TeleportTo(script.Loc{X: 113533, Y: -126159, Z: -3488}, 0)
 							}
-
-							s.Spawner().SendMakerEvent("schuttgart13_mb2314_05m1", "11040", int(entrant.ObjectID()), 0)
-						} else {
-							n.Shout(script.NpcString(1121007))
-
-							n.SetInt(slotBusy, 0)
-							n.SetInt(slotLeader, 0)
-							n.SetSlot(slotEntrant, nil)
-
-							openBarriers(s)
 						}
+
+						s.Spawner().SendMakerEvent("schuttgart13_mb2314_05m1", "11040", int(entrant.ObjectID()), 0)
+					} else {
+						n.Shout(script.NpcString(1121007))
+						freeDeacon(s, n)
 					}
 				case strings.EqualFold(e.Name, "1005"):
 					if c0 := s.GlobalMemo().Creature(bossmemo.SculptureGarden); c0 != nil {
@@ -191,7 +191,9 @@ func deaconEvent(s *script.Script, e script.Event) string {
 
 			n.Shout(script.NpcString(1121005))
 
-			s.StartTimer("1005", n, player, 120000*time.Millisecond)
+			// The gate timer belongs to the visit, not to the leader:
+			// it runs on if the leader leaves the world (#5130).
+			s.StartTimer("1005", n, nil, 120000*time.Millisecond)
 
 			n.SetInt(slotBusy, 1)
 			n.SetInt(slotLeader, leader.ObjectID())
@@ -243,6 +245,16 @@ func deaconScriptEvent(s *script.Script, e script.ScriptEvent) {
 func entrantOf(n *script.NPC) *script.Player {
 	p, _ := n.Slot(slotEntrant).(*script.Player)
 	return p
+}
+
+// freeDeacon ends the visit: the deacon keeps no party and both barriers
+// open.
+func freeDeacon(s *script.Script, n *script.NPC) {
+	n.SetInt(slotBusy, 0)
+	n.SetInt(slotLeader, 0)
+	n.SetSlot(slotEntrant, nil)
+
+	openBarriers(s)
 }
 
 // openBarriers opens the two ice barriers.
