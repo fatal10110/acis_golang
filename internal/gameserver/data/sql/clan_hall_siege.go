@@ -40,8 +40,13 @@ func (s *ClanHallStore) LoadSiegeAttackers(ctx context.Context) ([]clanhall.Atta
 }
 
 // SaveSiegeAttackers replaces hall hallID's attackers with clanIDs, in one
-// transaction.
+// transaction. A transaction the database rolls back for a lock conflict
+// runs again.
 func (s *ClanHallStore) SaveSiegeAttackers(ctx context.Context, hallID int32, clanIDs []int32) error {
+	return retryLockConflict(ctx, func() error { return s.saveSiegeAttackers(ctx, hallID, clanIDs) })
+}
+
+func (s *ClanHallStore) saveSiegeAttackers(ctx context.Context, hallID int32, clanIDs []int32) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store hall %d siege attackers: begin: %w", hallID, err)
