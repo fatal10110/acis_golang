@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,13 +112,33 @@ func bootFrintezza(t *testing.T, row *spawn.State) *frWorld {
 // before Frintezza appears.
 func bootFrintezzaDrawn(t *testing.T, row *spawn.State, draws *ind1Draws) *frWorld {
 	t.Helper()
+	return bootFrintezzaTomb(t, row, draws, fzTomb{})
+}
+
+// fzTomb is what a boot adds to the tomb: npcmakers, placed before
+// Frintezza's when first is set, and the scripts and folk NPCs they need.
+type fzTomb struct {
+	makers  string
+	first   bool
+	scripts script.Catalog
+	folk    []int32
+	opts    []gameservertest.Option
+}
+
+// bootFrintezzaTomb is bootFrintezzaDrawn with tomb added.
+func bootFrintezzaTomb(t *testing.T, row *spawn.State, draws *ind1Draws, tomb fzTomb) *frWorld {
+	t.Helper()
 	if row != nil {
 		if err := gamesql.NewSpawnStore(sqltest.SharedDB(t)).SaveStates(context.Background(), map[string]*spawn.State{fzRow: row}); err != nil {
 			t.Fatalf("seed spawn data: %v", err)
 		}
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "fz.xml"), []byte(fzSpawnlist), 0o644); err != nil {
+	spawnlist := strings.Replace(fzSpawnlist, "</list>", tomb.makers+"</list>", 1)
+	if tomb.first {
+		spawnlist = strings.Replace(fzSpawnlist, "\t<npcmaker name=\"fz_memo\"", tomb.makers+"\t<npcmaker name=\"fz_memo\"", 1)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "fz.xml"), []byte(spawnlist), 0o644); err != nil {
 		t.Fatalf("write spawnlist: %v", err)
 	}
 	table, err := gamexml.LoadSpawnlist(dir, zerolog.Nop(), 1)
@@ -153,6 +174,10 @@ func bootFrintezzaDrawn(t *testing.T, row *spawn.State, draws *ind1Draws) *frWor
 		{Path: memo},
 		{Path: "test." + frDirector},
 	}
+	for path, ctor := range tomb.scripts {
+		catalog[path] = ctor
+		list = append(list, script.Listing{Path: path})
+	}
 	boss := warriorTemplate(fzID, nil)
 	boss.Type, boss.CorpseTime = "GrandBoss", 18
 	var templates []*npc.Template
@@ -161,6 +186,10 @@ func bootFrintezzaDrawn(t *testing.T, row *spawn.State, draws *ind1Draws) *frWor
 		tmpl.CanMove = false
 		templates = append(templates, tmpl)
 		kinds[int32(tmpl.ID)] = script.KindHostile
+	}
+	for _, id := range tomb.folk {
+		templates = append(templates, gameservertest.FolkTemplate("Folk", int(id)))
+		kinds[id] = script.KindFolk
 	}
 	song := func(id modelskill.ID, level int) modelskill.Definition {
 		d := ind1Skill(id, 600, true)
@@ -171,7 +200,7 @@ func bootFrintezzaDrawn(t *testing.T, row *spawn.State, draws *ind1Draws) *frWor
 		song(5006, 1), song(5007, 1), song(5007, 2), song(5007, 3), song(5007, 4), song(5007, 5),
 	})
 	makers := &rb5Makers{}
-	w := bootRaid(t, raidBoot{opts: []gameservertest.Option{
+	w := bootRaid(t, raidBoot{opts: append([]gameservertest.Option{
 		gameservertest.WithScriptRand(draws.rand),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithNpcSpawnSkills(skills),
@@ -179,7 +208,7 @@ func bootFrintezzaDrawn(t *testing.T, row *spawn.State, draws *ind1Draws) *frWor
 		gameservertest.WithSpawnData(),
 		gameservertest.WithMakers(makers.catalog()),
 		gameservertest.WithDoors(fzDoors()...),
-	}}, templates...)
+	}, tomb.opts...)}, templates...)
 	return &frWorld{warriorWorld: w, draws: draws, heard: heard, makers: makers}
 }
 
@@ -298,8 +327,8 @@ func TestFrintezzaSealsTheTomb(t *testing.T) {
 }
 
 // TestFrintezzaResumesHisStage runs the created hook from a row restored
-// at each stage. At 1 he runs maker event 1001 on frintessa_2515_m01 and
-// leaves the doors be. At 2 he runs maker event 1000 there and, 10 minutes
+// at each stage past the entry countdown (1, which starts over: see
+// TestFrintezzaStartsOverFromTheEntryCountdown). At 2 he runs maker event 1000 there and, 10 minutes
 // later, jumps to his hall facing 16384 with every door closed. At 3 to 7
 // he closes every door, leaves his organ dummy at the hall facing 16384,
 // runs maker event 1000 and plays the stage's song: at 3 the plain music
@@ -313,17 +342,6 @@ func TestFrintezzaSealsTheTomb(t *testing.T) {
 // (5007 level 5, 1000525).
 func TestFrintezzaResumesHisStage(t *testing.T) {
 	t.Parallel()
-	t.Run("1", func(t *testing.T) {
-		t.Parallel()
-		w := bootFrintezza(t, fzLiveRow(1))
-		if got, want := w.makers.take(), []string{"frintessa_2515_m01 1001"}; !slices.Equal(got, want) {
-			t.Fatalf("maker events = %q, want %q", got, want)
-		}
-		w.wantDoors(t, "restored at 1", fzOpen)
-		if got := w.heard.take(); len(got) != 0 {
-			t.Fatalf("heard = %q, want nothing", got)
-		}
-	})
 	t.Run("2", func(t *testing.T) {
 		t.Parallel()
 		w := bootFrintezza(t, fzLiveRow(2))
