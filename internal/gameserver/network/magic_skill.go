@@ -598,6 +598,9 @@ func (l *GameClientLink) resumeMagicSkill(live *livePlayer, queued deferredMagic
 	if !known || (def.Activation != modelskill.ActivationActive && def.Activation != modelskill.ActivationToggle) {
 		return
 	}
+	if def.Target == modelskill.TargetGround {
+		live.Character.SetGroundTarget(queued.ground.X, queued.ground.Y, queued.ground.Z)
+	}
 	if live.Character.Dead() || live.Teleporting() || live.Operating() || live.Character.ObserverMode() ||
 		live.Character.AllSkillsDisabled() || live.CastingNow() {
 		sendMagicActionFailed(live)
@@ -678,7 +681,9 @@ func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
 // on the caster, height-snapped to geodata, then runs the
 // same cast pipeline an ordinary RequestMagicSkillUse drives — the ground
 // point itself is carried out-of-band via live.Character, not as this
-// cast's resolved target.
+// cast's resolved target. Only a cast that is accepted copies the point for
+// its launch and hit, so a request deferred or refused here never moves the
+// point of a cast already in flight (#4991).
 func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientpackets.RequestExMagicSkillUseGround) {
 	if live == nil {
 		sendMagicActionFailed(live)

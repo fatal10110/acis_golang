@@ -359,6 +359,7 @@ type Character struct {
 	shortBuffTimer       stopper
 	recentFakeDeathUntil time.Time
 	groundTarget         location.Location
+	castGroundTarget     location.Location
 	castCtrl             bool
 	castShift            bool
 	target               world.Tracked

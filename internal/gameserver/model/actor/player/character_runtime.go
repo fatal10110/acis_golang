@@ -130,9 +130,12 @@ func (c *Character) SetSwampMoveBonus(bonus int) {
 	}
 }
 
-// SetGroundTarget records the last ground-click point a ground-targeted
-// skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
-// until the next ground click overwrites it.
+// SetGroundTarget records the ground-click point the ground-targeted skill
+// request being handled names, the point its approach walk and its
+// can-cast checks read. It is reused by a later request that names no point
+// of its own, until the next ground click overwrites it. A cast that is
+// accepted keeps its own copy (AcceptGroundTarget), so a later request
+// never moves it.
 func (c *Character) SetGroundTarget(x, y, z int) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
@@ -144,6 +147,24 @@ func (c *Character) GroundTarget() (x, y, z int) {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	return c.groundTarget.X, c.groundTarget.Y, c.groundTarget.Z
+}
+
+// AcceptGroundTarget copies the recorded ground-click point to the cast
+// that has just been accepted. The cast reads the copy (CastGroundTarget)
+// from then on, and only the next accepted ground cast replaces it: a
+// deferred or refused request leaves it alone (#4991).
+func (c *Character) AcceptGroundTarget() {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.castGroundTarget = c.groundTarget
+}
+
+// CastGroundTarget returns the ground point of the last accepted
+// ground-targeted cast.
+func (c *Character) CastGroundTarget() (x, y, z int) {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.castGroundTarget.X, c.castGroundTarget.Y, c.castGroundTarget.Z
 }
 
 // SetCastModifiers records the Ctrl/Shift state the player's latest CAST
