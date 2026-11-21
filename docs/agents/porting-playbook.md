@@ -68,6 +68,25 @@ only. Do not open issues to emulate these. UTF-16 length counting (`commons.UTF1
 stays a core rule, and stdlib behavior must never accept input the server would otherwise reject for
 abuse (length, name validity, duplicate names).
 
+**Parity exception: joining a party takes the joiner off the party-match waiting list** (#5000). The
+reference adds a player who accepts a room leader's party invitation to the room but leaves it on the
+waiting list. Entry into a room checks only the waiting list, so a listed player could then enter a
+second room. Go removes the joiner from the waiting list (`partymatch.Registry.PartyJoined`). Pinned by
+`TestPartyJoinedTakesJoinerOffWaitingList` (`internal/gameserver/partymatch`).
+
+**Parity exception: quick join records the real room id** (#5000). The reference stores the requested
+id, 0, on a player who quick-joins the first available room. The party-room byte in UserInfo/CharInfo
+then stays 0, the player's room chat is dropped, the leader cannot oust it, and logging out does not
+take it out of the room. Go records the id of the room actually entered (`partymatch.Registry.Join`).
+Pinned by `TestPartyRoomOpenBrowseEnterLeave` (`tests/party`): the quick-join entrant's room line
+reaches the room and its withdrawal is shown to the leader.
+
+**Parity exception: a disconnecting party leader always hands over to the first remaining member**
+(#5000). The reference refuses to promote a member who is in a duel, so when that member is first in
+line the party keeps the leader who just disconnected. Go promotes the first remaining member
+regardless (`party.Registry.Leave`); the party duel is cancelled in both. Pinned by
+`TestDisconnectingLeaderHandsOverToDuelingMember` (`internal/gameserver/party`).
+
 ## 4. Design the native Go shape
 
 Search the Go repository for existing domain types, helpers, constructors, fixtures, and package
