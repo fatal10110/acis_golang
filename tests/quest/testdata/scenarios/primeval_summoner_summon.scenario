@@ -2,10 +2,10 @@
 # Vervato's npcmaker, 240 from Vervato: outside the drift range a maker-less NPC's territory
 # would be. Paying the fee answers no page: the adena go and Vervato casts Corpse Revival on
 # himself (onTalk). Asking again while the summon is under way answers vervato005.htm before
-# any fee is asked, so the adena stay (#5157). As the cast ends Fallen's body is brought to Vervato's side, off the isle
-# (onUseSkillFinished), and three seconds later Payer is shown vervato004.htm and Vervato is free
-# again (onTimer): with the body off the isle there is none left to summon, vervato002.htm, and
-# nothing is paid.
+# any fee is asked, so the adena stay (#5157). As the cast ends Fallen's body is brought to
+# Vervato's side, off the isle (onUseSkillFinished), and three seconds later Payer is shown
+# vervato004.htm and Vervato is free again (onTimer): with the body off the isle there is none
+# left to summon, vervato002.htm, and nothing is paid.
 # Expectations are derived from the reference source (PrimevalSummoner.java); the reference
 # probe has no party member nor npcmaker territory to play this with.
 driven
