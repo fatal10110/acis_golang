@@ -138,6 +138,7 @@ func (a *liveZoneActor) reload(ix *zone.Index) {
 	onGrid := !a.offGrid && !a.live.Teleporting()
 	ix.Rebase(a, a.held, onGrid)
 	a.syncFlags()
+	a.keepBreath()
 	if !onGrid {
 		a.mu.Unlock()
 		return

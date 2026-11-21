@@ -76,6 +76,11 @@ type liveZoneActor struct {
 	// mu is released, still under deliveryMu, so the flag's UserInfo goes
 	// out before that revalidation's compass update.
 	leftBattlefield bool
+	// leftWater is set, under mu, when a water zone's exit reports the
+	// player out of the water. The pass that ran it may still enter another
+	// water zone, so the breath countdown stops only if the player ends the
+	// pass out of the water (keepBreath, #4954).
+	leftWater bool
 	// scriptZones are the zones a script reacts to that a revalidation just
 	// entered, collected under mu. The revalidation hands them to scripts
 	// once it has released both locks (fireScriptZones).
@@ -271,6 +276,7 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index) {
 	a.offGrid = true
 	ix.RemoveFrom(a, a.held.X, a.held.Y)
 	a.syncFlags()
+	a.keepBreath()
 	// A player logging out is no longer tracked for the pvp flag, so
 	// leaving a battlefield on the way out does not flag it.
 	a.leftBattlefield = false
@@ -287,6 +293,7 @@ func (a *liveZoneActor) leave(ix *zone.Index) {
 		ix.RemoveFrom(a, a.held.X, a.held.Y)
 	}
 	a.syncFlags()
+	a.keepBreath()
 	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
 	a.flagLeftBattlefield(leftBattlefield)
@@ -342,6 +349,7 @@ func (a *liveZoneActor) ReplayZoneRules(fn func()) {
 	defer a.mu.Unlock()
 	fn()
 	a.syncFlags()
+	a.keepBreath()
 }
 
 func (a *liveZoneActor) syncFlags() {
@@ -584,7 +592,8 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 
 // SwimStateChanged is the player's reaction to crossing a water zone
 // boundary: its appearance is rebroadcast (swim stance and speed), and with
-// AllowWater its breath countdown starts or stops.
+// AllowWater its breath countdown starts, or stops once the pass ends out of
+// the water (keepBreath).
 func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 	live := a.live
 	live.SetInWater(a.flags.Has(zone.FlagWater))
@@ -605,7 +614,7 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		l.water.Add(live, breathTime(live))
 		return
 	}
-	l.water.Remove(live)
+	a.leftWater = true
 }
 
 // breathTime is how long live holds its breath under water before drowning
@@ -614,20 +623,31 @@ func breathTime(live *livePlayer) time.Duration {
 	return time.Duration(live.Against(live.ConditionActor(), nil).CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
 }
 
-// keepBreath starts the breath countdown of a living player a revalidation
-// finds swimming, with AllowWater, when none runs: every position update
-// and zone revalidation checks it, not only a water boundary crossing, so a
-// player revived in the water starts drowning again. The countdown of a
-// player already tracked runs on, and a dead one is never tracked. A
+// keepBreath settles the breath countdown once a zone pass is over. It
+// starts the countdown of a living player the pass finds swimming, with
+// AllowWater, when none runs: every position update and zone revalidation
+// checks it, not only a water boundary crossing, so a player revived in the
+// water starts drowning again. The countdown of a player already tracked
+// runs on, and a dead one is never tracked. A player a water exit of the
+// pass left out of the water stops it; one the pass handed from one water
+// zone to another keeps it running, whichever zone it saw first (#4954). A
 // teleport handles the countdown itself. It runs under mu and deliveryMu,
 // as the zone callbacks do.
 func (a *liveZoneActor) keepBreath() {
+	left := a.leftWater
+	a.leftWater = false
 	live := a.live
 	l := live.link
-	if l == nil || l.water == nil || !l.playerConfig().AllowWater || !live.InWater() || live.Teleporting() {
+	if l == nil || l.water == nil || !l.playerConfig().AllowWater || live.Teleporting() {
 		return
 	}
-	l.water.Add(live, breathTime(live))
+	if live.InWater() {
+		l.water.Add(live, breathTime(live))
+		return
+	}
+	if left {
+		l.water.Remove(live)
+	}
 }
 
 // DangerStateChanged is the player's reaction to entering a damage or
