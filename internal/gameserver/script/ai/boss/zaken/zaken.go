@@ -67,11 +67,12 @@ func dest(n *script.NPC) script.Loc {
 	return script.Loc{X: int(n.Int(slotDestX)), Y: int(n.Int(slotDestY)), Z: int(n.Int(slotDestZ))}
 }
 
-// farther reports whether a lies more than r from b on the ground, in
-// 32-bit arithmetic that wraps on overflow.
+// farther reports whether a lies more than r from b on the ground. The
+// squares are taken in 64 bits so that no distance wraps into range
+// (#5131).
 func farther(a, b script.Loc, r int32) bool {
-	dx, dy := int32(a.X)-int32(b.X), int32(a.Y)-int32(b.Y)
-	return dx*dx+dy*dy > r*r
+	dx, dy := int64(a.X)-int64(b.X), int64(a.Y)-int64(b.Y)
+	return dx*dx+dy*dy > int64(r)*int64(r)
 }
 
 // moveToRoom picks a room point as Zaken's destination and makes it want

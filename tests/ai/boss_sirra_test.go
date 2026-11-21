@@ -619,7 +619,8 @@ func TestFreyaDeaconTurnsAwayAGrownParty(t *testing.T) {
 // barriers open, the deacon marks its third slot and is free. Its timers
 // still run: two minutes after the entry the memo's creature hears 10027,
 // both barriers close and the mark clears, and with no leader kept the gate
-// does nothing. Event 11037 clears the mark too.
+// lets no one in and opens both barriers again (#5130). Event 11037 clears
+// the mark too.
 func TestFreyaDeaconEndsAVisitOn10026(t *testing.T) {
 	w := bootSirra(t, 10)
 	c := w.srv.Client
@@ -647,7 +648,7 @@ func TestFreyaDeaconEndsAVisitOn10026(t *testing.T) {
 	}
 	wantSirraFrames(t, "the gate", w.advance(t, 5*time.Second), roles)
 	w.log.expect(t, "the gate")
-	w.wantBarriers(t, "the gate", false)
+	w.wantBarriers(t, "the gate", true)
 
 	w.scriptEvent(t, 10026)
 	w.log.expect(t, "10026 again", "memo heard 11039 0 0")
