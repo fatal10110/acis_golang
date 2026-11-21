@@ -275,7 +275,8 @@ type Water struct{ Zone }
 type Swimmer interface {
 	Actor
 	// SwimStateChanged switches the actor into or out of swim mode and
-	// rebroadcasts its appearance to observers.
+	// rebroadcasts its appearance to observers. Leaving one water zone
+	// while another still holds the actor reports swimming true.
 	SwimStateChanged(swimming bool)
 }
 
@@ -294,10 +295,14 @@ func (z *Water) enter(a Actor) {
 	}
 }
 
+// exit leaves the actor swimming while another water zone still holds it:
+// adjoining or overlapping zones may report this exit after the next zone's
+// entry, and the actor stays in the water (#4954).
 func (z *Water) exit(a Actor) {
-	a.ZoneFlags().Set(FlagWater, false)
+	flags := a.ZoneFlags()
+	flags.Set(FlagWater, false)
 	if s, ok := a.(Swimmer); ok {
-		s.SwimStateChanged(false)
+		s.SwimStateChanged(flags.Has(FlagWater))
 	}
 }
 
