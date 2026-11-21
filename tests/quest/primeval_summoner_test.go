@@ -183,7 +183,7 @@ func TestPrimevalSummonerTurnsAwayWithoutADeadPartyMember(t *testing.T) {
 // of the fee is told so (vervato003.htm). Paying it answers no page: the
 // adena go, Vervato casts Corpse Revival on himself, and as the cast ends
 // Fallen's body is brought to his side. Asking again during the summon
-// takes the fee again and answers vervato005.htm. Three seconds after the
+// answers vervato005.htm and keeps the adena (#5157). Three seconds after the
 // cast, Payer is shown vervato004.htm, and Vervato is free again: a dead
 // member outside the isle is no body for him.
 func TestPrimevalSummonerBringsTheDeadPartyMembers(t *testing.T) {
@@ -231,15 +231,12 @@ func TestPrimevalSummonerBringsTheDeadPartyMembers(t *testing.T) {
 		t.Fatalf("Vervato's casts = %q, want one %q", cast, want)
 	}
 
-	busy := []string{
-		fmt.Sprintf("S SystemMessage id=%d 1:%d", serverpackets.SystemMessageS1DisappearedAdena, vervatoFee),
-		pageLine(t, "vervato005.htm"), "S ActionFailed", "S ActionFailed",
-	}
+	busy := []string{pageLine(t, "vervato005.htm"), "S ActionFailed", "S ActionFailed"}
 	if got := v.ask(t); !slices.Equal(got, busy) {
 		t.Fatalf("asking during the summon = %q, want %q", got, busy)
 	}
-	if got := v.adenaLeft(t); got != 0 {
-		t.Fatalf("adena after asking during the summon = %d, want 0", got)
+	if got := v.adenaLeft(t); got != vervatoFee {
+		t.Fatalf("adena after asking during the summon = %d, want %d kept", got, vervatoFee)
 	}
 
 	v.srv.AdvanceUntil(t, "Fallen brought to Vervato", func() bool {
