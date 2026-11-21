@@ -169,6 +169,9 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 		return started, err
 	}
 	started.Plan = plan
+	if def.Target == modelskill.TargetGround {
+		caster.AcceptGroundTarget()
+	}
 
 	// A successfully started cast clears the post-fake-death grace
 	// unconditionally, right after committing. That never happens for an

@@ -347,6 +347,10 @@ type deferredMagicSkill struct {
 	// to, when the request is the current CAST intention rather than one
 	// queued behind an action in flight; 0 otherwise.
 	approach int32
+	// ground is the ground-click point recorded when the request was
+	// queued: a ground-targeted request runs at it, whatever point a later
+	// request recorded meanwhile (#4991).
+	ground location.Location
 }
 
 type itemAICastIntention struct {
@@ -716,10 +720,11 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 // deferMagicSkill stores req as the next CAST intention, against the
 // selection it was requested on, replacing whatever was queued before.
 func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse, selected world.Tracked) {
+	x, y, z := p.Character.GroundTarget()
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.clearNextIntentionLocked()
-	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected}
+	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected, ground: location.Location{X: x, Y: y, Z: z}}
 }
 
 // approachMagicSkill stores req as the current CAST intention, walking to

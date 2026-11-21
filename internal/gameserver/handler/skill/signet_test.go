@@ -54,7 +54,7 @@ func (c *signetFakeCaster) Queue() *sim.Queue { return c.queue }
 func (c *signetFakeCaster) AlikeDead() bool           { return c.dead }
 func (c *signetFakeCaster) ObjectID() int32           { return c.id }
 func (c *signetFakeCaster) Position() (int, int, int) { return c.x, c.y, c.z }
-func (c *signetFakeCaster) GroundTarget() (int, int, int) {
+func (c *signetFakeCaster) CastGroundTarget() (int, int, int) {
 	return c.gx, c.gy, c.gz
 }
 func (c *signetFakeCaster) EffectList() *effect.List { return c.list }
