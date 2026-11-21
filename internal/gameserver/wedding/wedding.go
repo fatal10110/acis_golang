@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Config is the npcs.properties wedding section.
@@ -37,6 +38,11 @@ const (
 	PageAdena          = "data/html/mods/wedding/error_adena.htm"
 )
 
+// RequestTimeout is how long a marriage request waits for its answer.
+// The dialog shows no countdown, so the wait is longer than an
+// invitation's.
+const RequestTimeout = time.Minute
+
 // The skills a wedding shows on each spouse: the wedding march, then the
 // fireworks.
 const (
@@ -58,21 +64,12 @@ type IDs interface {
 	ReleaseID(id int32)
 }
 
-// Spouse is a player as the wedding manager reads it and marks it while a
-// marriage request is pending.
+// Spouse is a player as the wedding manager reads it.
 type Spouse interface {
 	ObjectID() int32
 	Female() bool
 	Adena() int
 	WearingFormalWear() bool
-	// UnderMarryRequest reports a request the player sent or received
-	// that is not answered yet.
-	UnderMarryRequest() bool
-	SetUnderMarryRequest(bool)
-	// MarryRequesterID is the player whose request this one was asked to
-	// answer, 0 when none is waiting.
-	MarryRequesterID() int32
-	SetMarryRequesterID(int32)
 	// Pay takes count adena from the player and names the amount spent.
 	// It takes and says nothing, reporting false, when the player holds
 	// less.
@@ -86,22 +83,41 @@ type Spouse interface {
 }
 
 // Manager holds every couple and runs the marriage requests. Its methods
-// are safe for concurrent use; the request marks it sets on players change
-// only under its lock.
+// are safe for concurrent use.
 type Manager struct {
 	cfg Config
 	ids IDs
+	now func() time.Time
 
 	mu       sync.Mutex
 	couples  map[int32]Couple
 	byPlayer map[int32]int32
+	// requests holds each pending marriage request under both of its
+	// players: a player is in at most one.
+	requests map[int32]*request
+}
+
+// request is a marriage request waiting for partner's answer until
+// expires.
+type request struct {
+	requester, partner int32
+	expires            time.Time
 }
 
 // NewManager returns a Manager holding couples, numbering new ones from
-// ids. A player stored in more than one couple belongs to the one with
-// the lowest id. With nil ids no new couple can be made.
-func NewManager(cfg Config, ids IDs, couples []Couple) *Manager {
-	m := &Manager{cfg: cfg, ids: ids, couples: make(map[int32]Couple, len(couples)), byPlayer: make(map[int32]int32, 2*len(couples))}
+// ids and timing marriage requests out against now (nil means time.Now).
+// A player stored in more than one couple belongs to the one with the
+// lowest id. With nil ids no new couple can be made.
+func NewManager(cfg Config, ids IDs, couples []Couple, now func() time.Time) *Manager {
+	if now == nil {
+		now = time.Now
+	}
+	m := &Manager{
+		cfg: cfg, ids: ids, now: now,
+		couples:  make(map[int32]Couple, len(couples)),
+		byPlayer: make(map[int32]int32, 2*len(couples)),
+		requests: make(map[int32]*request),
+	}
 	sorted := slices.Clone(couples)
 	slices.SortFunc(sorted, func(a, b Couple) int { return cmp.Compare(a.ID, b.ID) })
 	for _, c := range sorted {
@@ -169,19 +185,63 @@ func (m *Manager) Greeting(s Spouse) string {
 	switch {
 	case m.byPlayer[s.ObjectID()] > 0:
 		return PageMarried
-	case s.UnderMarryRequest():
+	case m.requestLocked(s.ObjectID()) != nil:
 		return PageWaiting
 	default:
 		return PageStart
 	}
 }
 
+// Pending reports a marriage request player sent or was asked to answer
+// that is neither answered nor timed out.
+func (m *Manager) Pending(player int32) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.requestLocked(player) != nil
+}
+
+// requestLocked returns the pending request of player, nil when none. A
+// request past its time is dropped for both its players. m.mu must be
+// held.
+func (m *Manager) requestLocked(player int32) *request {
+	r := m.requests[player]
+	if r == nil {
+		return nil
+	}
+	if !m.now().Before(r.expires) {
+		m.dropLocked(r)
+		return nil
+	}
+	return r
+}
+
+// dropLocked ends r for both its players. m.mu must be held.
+func (m *Manager) dropLocked(r *request) {
+	for _, id := range []int32{r.requester, r.partner} {
+		if m.requests[id] == r {
+			delete(m.requests, id)
+		}
+	}
+}
+
+// Leave ends the marriage request player sent or was asked to answer, for
+// both players: player is leaving the world.
+func (m *Manager) Leave(player int32) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if r := m.requests[player]; r != nil {
+		m.dropLocked(r)
+	}
+}
+
 // Ask has requester ask partner to marry. It returns the refusal page, or
-// "" when the request went out: both players are then under the request
-// and partner waits on requester's answer. The checks run in order: asking
-// oneself, the same sex (unless allowed), the friend list (friends tells
-// whether they are friends), a partner already married, formal wear (when
-// required) on either, and the price on either.
+// "" when the request went out: partner then waits to answer requester
+// until RequestTimeout passes. The checks run in order: asking oneself, the
+// same sex (unless allowed), the friend list (friends tells whether they
+// are friends), a partner already married, formal wear (when required) on
+// either, the price on either, and a request either player already sent
+// or was asked to answer. A player leaving the world can neither ask nor be
+// asked, as if not found.
 func (m *Manager) Ask(requester, partner Spouse, friends bool) string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -198,10 +258,22 @@ func (m *Manager) Ask(requester, partner Spouse, friends bool) string {
 		return PageNoFormal
 	case requester.Adena() < m.cfg.Price || partner.Adena() < m.cfg.Price:
 		return PageAdena
+	case m.requestLocked(requester.ObjectID()) != nil || m.requestLocked(partner.ObjectID()) != nil:
+		return PageWaiting
 	}
-	requester.SetUnderMarryRequest(true)
-	partner.SetUnderMarryRequest(true)
-	partner.SetMarryRequesterID(requester.ObjectID())
+	// Made while both are attached, so a departure that starts meanwhile
+	// waits for it and its Leave finds it.
+	asked := false
+	requester.WhileAttached(func() {
+		partner.WhileAttached(func() {
+			r := &request{requester: requester.ObjectID(), partner: partner.ObjectID(), expires: m.now().Add(RequestTimeout)}
+			m.requests[r.requester], m.requests[r.partner] = r, r
+			asked = true
+		})
+	})
+	if !asked {
+		return PageNotFound
+	}
 	return ""
 }
 
@@ -209,8 +281,8 @@ func (m *Manager) Ask(requester, partner Spouse, friends bool) string {
 type AnswerOutcome int
 
 const (
-	// AnswerIgnored found no request to answer, or its requester offline:
-	// nothing changed.
+	// AnswerIgnored found no request to answer, or its requester offline,
+	// which ends the request.
 	AnswerIgnored AnswerOutcome = iota
 	// AnswerDeclined ended the request unmarried.
 	AnswerDeclined
@@ -236,15 +308,17 @@ type Answer struct {
 
 // Answer resolves partner's answer to the request it was asked to answer;
 // accepted is a yes. online finds the requester among the players online.
-// Every outcome but AnswerIgnored ends the request for both players.
+// Every outcome ends the request for both players, except an AnswerIgnored
+// that found none to answer.
 func (m *Manager) Answer(partner Spouse, accepted bool, online func(int32) (Spouse, bool)) Answer {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	requesterID := partner.MarryRequesterID()
-	if !partner.UnderMarryRequest() || requesterID == 0 {
+	r := m.requestLocked(partner.ObjectID())
+	if r == nil || r.partner != partner.ObjectID() {
 		return Answer{}
 	}
-	requester, ok := online(requesterID)
+	m.dropLocked(r)
+	requester, ok := online(r.requester)
 	if !ok {
 		return Answer{}
 	}
@@ -259,14 +333,10 @@ func (m *Manager) Answer(partner Spouse, accepted bool, online func(int32) (Spou
 }
 
 func (m *Manager) answer(requester, partner Spouse, accepted bool) Answer {
-	out := Answer{Outcome: AnswerDeclined, Requester: requester}
 	if accepted {
-		out = m.marry(requester, partner)
+		return m.marry(requester, partner)
 	}
-	requester.SetUnderMarryRequest(false)
-	partner.SetUnderMarryRequest(false)
-	partner.SetMarryRequesterID(0)
-	return out
+	return Answer{Outcome: AnswerDeclined, Requester: requester}
 }
 
 // marry has requester and partner each pay the price, then makes their

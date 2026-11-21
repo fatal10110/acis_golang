@@ -685,8 +685,8 @@ type GameClientLinkConfig struct {
 	// a value not above zero, means 15 minutes.
 	ReadIdleTimeout func() time.Duration
 	// TradeClock times every pending request out (direct trade, party,
-	// command channel, party room and friend invitations); nil means
-	// time.Now.
+	// command channel, party room and friend invitations, and the marriage
+	// requests of the default wedding manager); nil means time.Now.
 	TradeClock func() time.Time
 	// Relations holds the friend and block lists; nil starts with none and
 	// keeps what changes in memory only.
@@ -983,7 +983,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.wedding = cfg.Wedding
 	if link.wedding == nil {
 		ids, _ := cfg.IDs.(wedding.IDs)
-		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
+		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil, cfg.TradeClock)
 	}
 	link.fishChamp = cfg.FishingChampionship
 	if link.fishChamp == nil {

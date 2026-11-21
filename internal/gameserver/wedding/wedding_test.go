@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 )
 
 // fakeSpouse is a player whose adena and request marks the test sets.
@@ -15,21 +16,15 @@ type fakeSpouse struct {
 	// left between the manager's check and the payment.
 	payFails bool
 	// leaving refuses WhileAttached: the player is leaving the world.
-	leaving   bool
-	under     bool
-	requester int32
-	paid      int
-	refunded  int
+	leaving  bool
+	paid     int
+	refunded int
 }
 
-func (s *fakeSpouse) ObjectID() int32              { return s.id }
-func (s *fakeSpouse) Female() bool                 { return s.female }
-func (s *fakeSpouse) Adena() int                   { return s.adena }
-func (s *fakeSpouse) WearingFormalWear() bool      { return true }
-func (s *fakeSpouse) UnderMarryRequest() bool      { return s.under }
-func (s *fakeSpouse) SetUnderMarryRequest(b bool)  { s.under = b }
-func (s *fakeSpouse) MarryRequesterID() int32      { return s.requester }
-func (s *fakeSpouse) SetMarryRequesterID(id int32) { s.requester = id }
+func (s *fakeSpouse) ObjectID() int32         { return s.id }
+func (s *fakeSpouse) Female() bool            { return s.female }
+func (s *fakeSpouse) Adena() int              { return s.adena }
+func (s *fakeSpouse) WearingFormalWear() bool { return true }
 
 func (s *fakeSpouse) Pay(count int) bool {
 	if s.payFails || s.adena < count {
@@ -105,7 +100,7 @@ func TestManagerGivesSharedPlayerToLowestCoupleAndReindexesOnDivorce(t *testing.
 		{ID: 7, RequesterID: 1, PartnerID: 2},
 		{ID: 9, RequesterID: 4, PartnerID: 5},
 		{ID: 5, RequesterID: 3, PartnerID: 1},
-	})
+	}, nil)
 	for _, tc := range []struct{ player, couple, partner int32 }{
 		{1, 5, 3}, {2, 7, 1}, {3, 5, 1}, {4, 9, 5}, {5, 9, 4},
 	} {
@@ -143,8 +138,21 @@ func TestManagerGivesSharedPlayerToLowestCoupleAndReindexesOnDivorce(t *testing.
 	}
 }
 
-func TestAnswerWithRequesterOfflineLeavesRequestPending(t *testing.T) {
-	m := NewManager(testConfig(), &fakeIDs{}, nil)
+// pending fails the test unless each of players has a pending request
+// exactly as want says.
+func pending(t *testing.T, m *Manager, want bool, players ...*fakeSpouse) {
+	t.Helper()
+	for _, p := range players {
+		if got := m.Pending(p.id); got != want {
+			t.Errorf("Pending(%d) = %v, want %v", p.id, got, want)
+		}
+	}
+}
+
+// An answer finding its requester offline ends the request for both, so
+// neither stays waiting on it (#5100).
+func TestAnswerWithRequesterOfflineEndsRequest(t *testing.T) {
+	m := NewManager(testConfig(), &fakeIDs{}, nil, nil)
 	requester, partner := pair()
 	asked(t, m, requester, partner)
 
@@ -152,17 +160,65 @@ func TestAnswerWithRequesterOfflineLeavesRequestPending(t *testing.T) {
 	if out.Outcome != AnswerIgnored {
 		t.Fatalf("Outcome = %v, want AnswerIgnored", out.Outcome)
 	}
-	if !requester.under || !partner.under || partner.requester != requester.id {
-		t.Errorf("marks after ignored answer: requester under=%v, partner under=%v requester=%d; want both under, requester %d",
-			requester.under, partner.under, partner.requester, requester.id)
-	}
+	pending(t, m, false, requester, partner)
 	if requester.paid != 0 || partner.paid != 0 || len(m.Couples()) != 0 {
 		t.Errorf("ignored answer paid %d/%d or made couples %v", requester.paid, partner.paid, m.Couples())
 	}
+	if out := m.Answer(partner, true, onlineOf(requester, partner)); out.Outcome != AnswerIgnored {
+		t.Fatalf("Outcome of a second answer = %v, want AnswerIgnored", out.Outcome)
+	}
+}
 
-	// The requester back online, the same request still resolves.
-	if out := m.Answer(partner, true, onlineOf(requester, partner)); out.Outcome != AnswerMarried {
-		t.Fatalf("Outcome once online = %v, want AnswerMarried", out.Outcome)
+// A request lapses after RequestTimeout: a late answer finds none, and both
+// players may ask again.
+func TestRequestTimesOut(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	m := NewManager(testConfig(), &fakeIDs{}, nil, func() time.Time { return now })
+	requester, partner := pair()
+	asked(t, m, requester, partner)
+	now = now.Add(RequestTimeout - time.Nanosecond)
+	pending(t, m, true, requester, partner)
+	now = now.Add(time.Nanosecond)
+	pending(t, m, false, requester, partner)
+	if out := m.Answer(partner, true, onlineOf(requester, partner)); out.Outcome != AnswerIgnored {
+		t.Fatalf("Outcome of a late answer = %v, want AnswerIgnored", out.Outcome)
+	}
+	asked(t, m, partner, requester)
+}
+
+// A player under a request can neither ask nor be asked, and only the
+// partner of a request answers it.
+func TestOneRequestPerPlayer(t *testing.T) {
+	m := NewManager(testConfig(), &fakeIDs{}, nil, nil)
+	requester, partner := pair()
+	rival := &fakeSpouse{id: 300, adena: testPrice}
+	other := &fakeSpouse{id: 400, female: true, adena: testPrice}
+	asked(t, m, requester, partner)
+	if page := m.Ask(rival, partner, true); page != PageWaiting {
+		t.Errorf("Ask of an asked partner = %q, want %q", page, PageWaiting)
+	}
+	if page := m.Ask(requester, other, true); page != PageWaiting {
+		t.Errorf("Ask by a waiting requester = %q, want %q", page, PageWaiting)
+	}
+	pending(t, m, false, rival, other)
+	if out := m.Answer(requester, true, onlineOf(requester, partner)); out.Outcome != AnswerIgnored {
+		t.Errorf("the requester's own answer = %v, want AnswerIgnored", out.Outcome)
+	}
+	pending(t, m, true, requester, partner)
+	m.Leave(requester.id)
+	pending(t, m, false, requester, partner)
+}
+
+// A player leaving the world can neither ask nor be asked.
+func TestAskInvolvingLeavingPlayerFindsNobody(t *testing.T) {
+	for _, requesterLeaves := range []bool{true, false} {
+		m := NewManager(testConfig(), &fakeIDs{}, nil, nil)
+		requester, partner := pair()
+		requester.leaving, partner.leaving = requesterLeaves, !requesterLeaves
+		if page := m.Ask(requester, partner, true); page != PageNotFound {
+			t.Errorf("requester leaving=%v: Ask = %q, want %q", requesterLeaves, page, PageNotFound)
+		}
+		pending(t, m, false, requester, partner)
 	}
 }
 
@@ -175,7 +231,7 @@ func TestAnswerVoidWithoutCoupleIDClearsRequest(t *testing.T) {
 		{"NextID error", &fakeIDs{err: errors.New("exhausted")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			m := NewManager(testConfig(), tc.ids, nil)
+			m := NewManager(testConfig(), tc.ids, nil, nil)
 			requester, partner := pair()
 			asked(t, m, requester, partner)
 
@@ -183,9 +239,7 @@ func TestAnswerVoidWithoutCoupleIDClearsRequest(t *testing.T) {
 			if out.Outcome != AnswerVoid || out.Requester != Spouse(requester) {
 				t.Fatalf("Answer = %+v, want AnswerVoid from the requester", out)
 			}
-			if requester.under || partner.under || partner.requester != 0 {
-				t.Errorf("marks not cleared: requester under=%v, partner under=%v requester=%d", requester.under, partner.under, partner.requester)
-			}
+			pending(t, m, false, requester, partner)
 			if requester.paid != 0 || partner.paid != 0 || len(m.Couples()) != 0 {
 				t.Errorf("void answer paid %d/%d or made couples %v", requester.paid, partner.paid, m.Couples())
 			}
@@ -195,7 +249,7 @@ func TestAnswerVoidWithoutCoupleIDClearsRequest(t *testing.T) {
 
 func TestAnswerAcceptedChargesBothThenMarries(t *testing.T) {
 	ids := &fakeIDs{next: 40}
-	m := NewManager(testConfig(), ids, nil)
+	m := NewManager(testConfig(), ids, nil, nil)
 	requester, partner := pair()
 	asked(t, m, requester, partner)
 
@@ -224,7 +278,7 @@ func TestAnswerPaymentFailureMarriesNobodyAndRefunds(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ids := &fakeIDs{next: 40}
-			m := NewManager(testConfig(), ids, nil)
+			m := NewManager(testConfig(), ids, nil, nil)
 			requester, partner := pair()
 			asked(t, m, requester, partner)
 			requester.payFails, partner.payFails = tc.requesterFails, tc.partnerFails
@@ -242,9 +296,7 @@ func TestAnswerPaymentFailureMarriesNobodyAndRefunds(t *testing.T) {
 			if !slices.Equal(ids.released, []int32{41}) {
 				t.Errorf("released ids = %v, want [41]", ids.released)
 			}
-			if requester.under || partner.under || partner.requester != 0 {
-				t.Errorf("marks not cleared after unpaid answer")
-			}
+			pending(t, m, false, requester, partner)
 		})
 	}
 }
@@ -276,10 +328,10 @@ func TestFormatNumber(t *testing.T) {
 
 // TestAnswerToLeavingRequesterIsIgnored: a requester leaving the world is
 // answered as if offline, accepted or not: nobody pays, no couple forms,
-// and the request stays as it was.
+// and the request ends.
 func TestAnswerToLeavingRequesterIsIgnored(t *testing.T) {
 	for _, accepted := range []bool{true, false} {
-		m := NewManager(testConfig(), &fakeIDs{next: 1}, nil)
+		m := NewManager(testConfig(), &fakeIDs{next: 1}, nil, nil)
 		requester, partner := pair()
 		asked(t, m, requester, partner)
 		requester.leaving = true
@@ -289,8 +341,6 @@ func TestAnswerToLeavingRequesterIsIgnored(t *testing.T) {
 		if requester.paid != 0 || partner.paid != 0 || m.CoupleID(requester.id) != 0 {
 			t.Fatalf("accepted=%v: paid %d/%d, couple %d; want nothing", accepted, requester.paid, partner.paid, m.CoupleID(requester.id))
 		}
-		if !partner.under || partner.requester != requester.id {
-			t.Fatalf("accepted=%v: the partner's request was cleared", accepted)
-		}
+		pending(t, m, false, requester, partner)
 	}
 }

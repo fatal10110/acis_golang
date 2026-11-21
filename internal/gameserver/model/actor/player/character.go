@@ -178,9 +178,6 @@ type Character struct {
 	// saved is the position the character returns to after observing; see
 	// character_observer.go.
 	saved savedLocation
-	// marriage is the marriage request the character is part of; see
-	// character_wedding.go.
-	marriage marriageRequest
 
 	// KarmaPoints is the persisted karma value. The field is named
 	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method
