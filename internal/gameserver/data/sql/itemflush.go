@@ -31,13 +31,19 @@ func NewItemFlushStore(db *sql.DB) *ItemFlushStore {
 }
 
 // Flush writes every group in batch inside a single transaction: either all
-// of it lands or, on any error, none of it does.
+// of it lands or, on any error, none of it does. A transaction the database
+// rolls back for a lock conflict — two owners' flushes can deadlock on the
+// shared items and augmentations indexes — runs again, so the batch still
+// lands instead of being abandoned.
 func (s *ItemFlushStore) Flush(ctx context.Context, batch item.FlushBatch) error {
 	if len(batch.Saves) == 0 && len(batch.Deletes) == 0 && len(batch.AugmentationSaves) == 0 &&
 		len(batch.AugmentationDeletes) == 0 && len(batch.PetDeletes) == 0 {
 		return nil
 	}
+	return retryLockConflict(ctx, func() error { return s.flush(ctx, batch) })
+}
 
+func (s *ItemFlushStore) flush(ctx context.Context, batch item.FlushBatch) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin item flush: %w", err)
