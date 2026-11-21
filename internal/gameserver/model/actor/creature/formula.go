@@ -106,7 +106,9 @@ func damageBlocked(attacker attackable.Combatant) bool {
 }
 
 // calcSkill is def as the skill a stat calculation runs for.
-func calcSkill(def modelskill.Definition) conditions.Skill { return conditions.SkillOf(def.Stat) }
+func calcSkill(def modelskill.Definition) conditions.Skill {
+	return conditions.SkillOf(def.Extra().Stat)
+}
 
 // casterSkillPower is the physical/magic/mana skill-power term: DEATHLINK
 // and FATAL scale with the caster's current/max HP ratio; every other type
@@ -138,8 +140,8 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 		return formulas.PhysicalSkillInput{Evaded: true}, true
 	}
 	skillPower := casterSkillPower(attacker, def)
-	if soulshot && def.SoulShotBoost > 0 {
-		skillPower *= float64(def.SoulShotBoost)
+	if soulshot && def.Extra().SoulShotBoost > 0 {
+		skillPower *= float64(def.Extra().SoulShotBoost)
 	}
 	pvpMul := 1.0
 	if pvp {
@@ -288,8 +290,8 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 	}
 	soulshot := attacker.SoulshotCharged()
 	skillPower := float64(def.Power)
-	if soulshot && def.SoulShotBoost > 0 {
-		skillPower *= float64(def.SoulShotBoost)
+	if soulshot && def.Extra().SoulShotBoost > 0 {
+		skillPower *= float64(def.Extra().SoulShotBoost)
 	}
 	pvpMul := 1.0
 	if pvp {
@@ -305,7 +307,7 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 	behind := facing.IsBehind(attackerLocation)
 	front := facing.IsInFrontOf(attackerLocation)
 	landed := formulas.BlowSucceeds(formulas.BlowRateInput{
-		BaseRate: float64(def.BaseLandRate),
+		BaseRate: float64(def.Extra().BaseLandRate),
 		DexMul:   statbonus.DEXBonus[attacker.DEX()],
 		BlowMul:  attacker.Against(view(target), nil).CalcStat(stat.BlowRate, 1),
 		Behind:   behind,

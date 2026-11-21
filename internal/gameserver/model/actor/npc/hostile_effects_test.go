@@ -15,7 +15,7 @@ import (
 func TestHostileSkillSuccessInputUsesTemplateStatsAndCasterMagicAttack(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 12, MAtk: 200})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 10, MEN: 40, MDef: 50})
-	def := skill.Definition{EffectPower: 50, EffectType: "ROOT", Magic: true, LevelDepend: 1}
+	def := skill.Definition{Magic: true, LevelDepend: 1}.WithExtra(skill.Extra{EffectPower: 50, EffectType: "ROOT"})
 
 	without, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
 	if !ok {
@@ -128,9 +128,10 @@ func TestHostileSkillSuccessInputAllowsIgnoreResistsWithoutCasterStats(t *testin
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
 
 	in, ok := target.SkillSuccessInput(nil, skill.Definition{
-		EffectPower:   100,
 		IgnoreResists: true,
-	}, false, formulas.ShieldPerfect)
+	}.WithExtra(skill.Extra{
+		EffectPower: 100,
+	}), false, formulas.ShieldPerfect)
 	if !ok {
 		t.Fatal("SkillSuccessInput(ignore resists) ok = false")
 	}
@@ -151,7 +152,7 @@ func (deniedLethalCaster) CanGiveDamage() bool { return false }
 func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 40, HPMax: 500})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 45, HPMax: 500})
-	def := skill.Definition{LethalChance1: 30, LethalChance2: 10, MagicLevel: 40}
+	def := skill.Definition{MagicLevel: 40}.WithExtra(skill.Extra{LethalChance1: 30, LethalChance2: 10})
 
 	in, ok := target.LethalInput(caster, def)
 	if !ok {
@@ -178,7 +179,7 @@ func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 func TestHostileLethalInputRejectsGuardedDamage(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 40, HPMax: 500})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 45, HPMax: 500})
-	def := skill.Definition{LethalChance1: 30}
+	def := skill.Definition{}.WithExtra(skill.Extra{LethalChance1: 30})
 	target.SetInvul(true)
 	if _, ok := target.LethalInput(caster, def); ok {
 		t.Fatal("LethalInput accepted an invulnerable hostile")

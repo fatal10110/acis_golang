@@ -62,8 +62,12 @@ func TestPlayerRangedCastNeedsLineOfSight(t *testing.T) {
 			message: serverpackets.SystemMessageNotEnoughMP,
 		},
 		{
-			name:    "sight before weapon",
-			tune:    func(d *modelskill.Definition) { d.WeaponsAllowed = "BOW" },
+			name: "sight before weapon",
+			tune: func(d *modelskill.Definition) {
+				extra := d.Extra()
+				extra.WeaponsAllowed = "BOW"
+				*d = d.WithExtra(extra)
+			},
 			blind:   true,
 			message: serverpackets.SystemMessageCantSeeTarget,
 		},

@@ -136,13 +136,22 @@ func TestZeroDamageDOTTickRegistersOnMonster(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-			ID: bleed, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			CastRange: 900, HitTime: 0, StaticHitTime: true,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-			EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 0, Count: 5, Time: 1}},
-		}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+			ID:            bleed,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			CastRange:     900,
+			HitTime:       0,
+			StaticHitTime: true,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 0, Count: 5, Time: 1}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		})})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, bleed, 1)

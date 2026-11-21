@@ -22,5 +22,5 @@ func (h spawnHandler) Use(cast Cast) {
 		return
 	}
 	x, y, z := cast.Caster.Position()
-	h.place(int32(cast.Skill.NpcID), x, y, z, cast.Caster.Heading(), time.Duration(cast.Skill.DespawnDelay)*time.Millisecond)
+	h.place(int32(cast.Skill.Extra().NpcID), x, y, z, cast.Caster.Heading(), time.Duration(cast.Skill.Extra().DespawnDelay)*time.Millisecond)
 }

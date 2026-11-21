@@ -11,9 +11,13 @@ import (
 // Battle Force (id 5104) at its own level.
 func battleForce(level int) modelskill.Definition {
 	return modelskill.Definition{
-		ID: 426, Level: level, SkillType: "FUSION",
-		TriggeredID: 5104, TriggeredLevel: level,
-	}
+		ID:        426,
+		Level:     level,
+		SkillType: "FUSION",
+	}.WithExtra(modelskill.Extra{
+		TriggeredID:    5104,
+		TriggeredLevel: level,
+	})
 }
 
 func battleForceDefs() continuousDefinitions {

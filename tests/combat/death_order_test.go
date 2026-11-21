@@ -259,11 +259,22 @@ func TestMonsterKillDeathPenaltyFollowsKarmaLoss(t *testing.T) {
 // Fusion buff it triggers on its target.
 func fusionSkillDefs() []modelskill.Definition {
 	return []modelskill.Definition{
-		{
-			ID: 426, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			CastRange: 400, HitTime: 15_000, ReuseDelay: 30_000, StaticHitTime: true, StaticReuse: true,
-			Magic: true, SkillType: "FUSION", TriggeredID: 5104, TriggeredLevel: 1,
-		},
+		modelskill.Definition{
+			ID:            426,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			CastRange:     400,
+			HitTime:       15_000,
+			ReuseDelay:    30_000,
+			StaticHitTime: true,
+			StaticReuse:   true,
+			Magic:         true,
+			SkillType:     "FUSION",
+		}.WithExtra(modelskill.Extra{
+			TriggeredID:    5104,
+			TriggeredLevel: 1,
+		}),
 		{
 			ID: 5104, Level: 1, SkillType: "BUFF",
 			Effects: []modelskill.EffectTemplate{{Name: "Fusion", Time: 600}},

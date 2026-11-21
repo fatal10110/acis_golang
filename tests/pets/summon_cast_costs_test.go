@@ -139,7 +139,9 @@ func TestSummonCastMPCostFollowsConsumeRate(t *testing.T) {
 			strike.Magic, strike.Dance = tc.magic, tc.dance
 			strike.MPInitialConsume, strike.MPConsume = 10, 20
 			if tc.dance {
-				strike.NextDanceCost = 8
+				extra := strike.Extra()
+				extra.NextDanceCost = 8
+				strike = strike.WithExtra(extra)
 			}
 			h, petActor, hostile := bootWolfStrikerWithPassive(t, strike)
 			if tc.dance {

@@ -276,10 +276,18 @@ func infoServitorTemplate() *npc.Template {
 func TestAdminInfoServitorPage(t *testing.T) {
 	t.Parallel()
 	db := sqltest.SharedDB(t)
-	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
-		ID: infoServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: infoServitorID, SummonTotalLifeTime: 1_200_000, StaticHitTime: true, StaticReuse: true,
-	}}), gamesql.NewCharacterSkillStore(db))
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{modelskill.Definition{
+		ID:            infoServitorSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		StaticReuse:   true,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               infoServitorID,
+		SummonTotalLifeTime: 1_200_000,
+	})}), gamesql.NewCharacterSkillStore(db))
 	srv, gmID := bootAdmin(t, adminLevel,
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{infoServitorTemplate()})),
 		gameservertest.WithSkills(skills),

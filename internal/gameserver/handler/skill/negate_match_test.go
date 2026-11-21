@@ -12,13 +12,13 @@ import (
 // set level by resolved effect type and effect abnormal level when the
 // candidate has one, else by skill type and abnormal level.
 func TestNegateMatchesByLevelAndResolvedType(t *testing.T) {
-	mdam := modelskill.Definition{SkillType: "MDAM", AbnormalLevel: -1, EffectAbnormalLevel: -1, Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}
-	pdam := modelskill.Definition{SkillType: "PDAM", AbnormalLevel: -1, EffectAbnormalLevel: -1, Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}
+	mdam := modelskill.Definition{SkillType: "MDAM", AbnormalLevel: -1, Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}.WithExtra(modelskill.Extra{EffectAbnormalLevel: -1})
+	pdam := modelskill.Definition{SkillType: "PDAM", AbnormalLevel: -1, Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}.WithExtra(modelskill.Extra{EffectAbnormalLevel: -1})
 	poison := func(abnormal int) modelskill.Definition {
-		return modelskill.Definition{SkillType: "POISON", AbnormalLevel: abnormal, EffectAbnormalLevel: -1}
+		return modelskill.Definition{SkillType: "POISON", AbnormalLevel: abnormal}.WithExtra(modelskill.Extra{EffectAbnormalLevel: -1})
 	}
-	bleedInPoison := modelskill.Definition{SkillType: "POISON", EffectType: "BLEED", AbnormalLevel: 1, EffectAbnormalLevel: 1}
-	poisonInDebuff := modelskill.Definition{SkillType: "DEBUFF", EffectType: "POISON", AbnormalLevel: 9, EffectAbnormalLevel: 2}
+	bleedInPoison := modelskill.Definition{SkillType: "POISON", AbnormalLevel: 1}.WithExtra(modelskill.Extra{EffectType: "BLEED", EffectAbnormalLevel: 1})
+	poisonInDebuff := modelskill.Definition{SkillType: "DEBUFF", AbnormalLevel: 9}.WithExtra(modelskill.Extra{EffectType: "POISON", EffectAbnormalLevel: 2})
 	for _, tt := range []struct {
 		name    string
 		def     modelskill.Definition

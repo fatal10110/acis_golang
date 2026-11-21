@@ -65,7 +65,7 @@ func (a PlayerActor) MPCost(def *modelskill.Definition) int {
 	mp := def.MPConsume
 	if def.Dance {
 		if dc := a.danceCount(); dc > 0 {
-			mp += dc * def.NextDanceCost
+			mp += dc * def.Extra().NextDanceCost
 		}
 	}
 	return a.scaleMP(def, mp)

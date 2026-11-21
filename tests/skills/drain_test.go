@@ -30,8 +30,8 @@ func drainCasterHP(t *testing.T, srv *gameservertest.Server, objID int32) float6
 func lifeDrain(t *testing.T) modelskill.Definition {
 	t.Helper()
 	def := shippedSkill(t, 1090, 1)
-	if def.SkillType != "DRAIN" || def.AbsorbPart != 0.8 {
-		t.Fatalf("shipped 1090-1 = %s absorbPart %v, want DRAIN 0.8", def.SkillType, def.AbsorbPart)
+	if def.SkillType != "DRAIN" || def.Extra().AbsorbPart != 0.8 {
+		t.Fatalf("shipped 1090-1 = %s absorbPart %v, want DRAIN 0.8", def.SkillType, def.Extra().AbsorbPart)
 	}
 	def.HitTime, def.StaticHitTime = 500, true
 	return def
@@ -176,12 +176,24 @@ func TestReflectedDrainLandsItsEffectsFromTheReflector(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-			ID: 90, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-			SkillType: "DRAIN", Magic: true, Power: 20, AbsorbPart: 0.5, CanBeReflected: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 9}},
-		}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+			ID:             90,
+			Level:          1,
+			Activation:     modelskill.ActivationActive,
+			Target:         modelskill.TargetOne,
+			CastRange:      900,
+			HitTime:        500,
+			ReuseDelay:     60_000,
+			StaticHitTime:  true,
+			StaticReuse:    true,
+			SkillType:      "DRAIN",
+			Magic:          true,
+			Power:          20,
+			CanBeReflected: true,
+			Effects:        []modelskill.EffectTemplate{{Name: "Buff", Time: 9}},
+		}.WithExtra(modelskill.Extra{
+			AbsorbPart: 0.5,
+		})})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 90, 1)

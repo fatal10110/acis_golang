@@ -208,11 +208,20 @@ func bootServitorCaster(t *testing.T, tmpl *npc.Template, skillID int, extra ...
 			ID: summonCreatureID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 		},
-		{
-			ID: modelskill.ID(skillID), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "SUMMON", NpcID: tmpl.ID, SummonTotalLifeTime: 1_200_000,
-			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-		},
+		modelskill.Definition{
+			ID:            modelskill.ID(skillID),
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "SUMMON",
+			StaticHitTime: true,
+			HitTime:       0,
+			StaticReuse:   true,
+			ReuseDelay:    0,
+		}.WithExtra(modelskill.Extra{
+			NpcID:               tmpl.ID,
+			SummonTotalLifeTime: 1_200_000,
+		}),
 	}), gamesql.NewCharacterSkillStore(db))
 	srv := bootPets(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), tmpl})),

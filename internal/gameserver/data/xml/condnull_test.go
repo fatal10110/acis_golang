@@ -173,7 +173,7 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 			check(where+" cond", c.Root)
 		}
 		funcs(where, def.Funcs)
-		for _, eff := range append(append([]skill.EffectTemplate{}, def.Effects...), def.SelfEffects...) {
+		for _, eff := range append(append([]skill.EffectTemplate{}, def.Effects...), def.Extra().SelfEffects...) {
 			if eff.AttachCondition != nil {
 				check(where+" effect "+eff.Name+" attach", eff.AttachCondition.Root)
 			}

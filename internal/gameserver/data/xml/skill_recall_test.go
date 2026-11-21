@@ -44,10 +44,10 @@ func TestShippedRecallDestinations(t *testing.T) {
 			t.Errorf("skill %d level %d RecallType = %v, want %v", tc.id, tc.level, def.RecallType, tc.recall)
 		}
 		switch {
-		case tc.coords == nil && def.TeleCoords != nil:
-			t.Errorf("skill %d level %d TeleCoords = %+v, want none", tc.id, tc.level, *def.TeleCoords)
-		case tc.coords != nil && (def.TeleCoords == nil || *def.TeleCoords != *tc.coords):
-			t.Errorf("skill %d level %d TeleCoords = %v, want %+v", tc.id, tc.level, def.TeleCoords, *tc.coords)
+		case tc.coords == nil && def.Extra().TeleCoords != nil:
+			t.Errorf("skill %d level %d TeleCoords = %+v, want none", tc.id, tc.level, *def.Extra().TeleCoords)
+		case tc.coords != nil && (def.Extra().TeleCoords == nil || *def.Extra().TeleCoords != *tc.coords):
+			t.Errorf("skill %d level %d TeleCoords = %v, want %+v", tc.id, tc.level, def.Extra().TeleCoords, *tc.coords)
 		}
 	}
 }

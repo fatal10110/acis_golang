@@ -43,7 +43,7 @@ func (h extractableHandler) Use(cast Cast) {
 		return
 	}
 
-	products := modelskill.ParseExtractableItems(cast.Skill.ExtractableItems)
+	products := modelskill.ParseExtractableItems(cast.Skill.Extra().ExtractableItems)
 	if len(products) == 0 {
 		return
 	}

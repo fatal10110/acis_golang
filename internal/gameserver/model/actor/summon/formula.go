@@ -880,7 +880,7 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  a.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
+		ReflectChance:  a.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Extra().Stat)),
 	}
 }
 
@@ -900,8 +900,8 @@ func (a *Actor) LethalInput(caster creature.FormulaActor, def modelskill.Definit
 	}
 	attacker := caster
 	return formulas.LethalInput{
-		Chance1:       def.LethalChance1,
-		Chance2:       def.LethalChance2,
+		Chance1:       def.Extra().LethalChance1,
+		Chance2:       def.Extra().LethalChance2,
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: attacker.Level(),
 		TargetLevel:   a.Level(),

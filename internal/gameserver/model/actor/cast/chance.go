@@ -297,7 +297,7 @@ func (p *ChanceProcs) fire(ownerObj any, ownerHit bool, targetObj any, events ch
 		}
 	}
 	for _, def := range p.chanceSkills(owner) {
-		cond, ok, err := modelskill.ParseChanceCondition(def.ChanceType, def.ActivationChance)
+		cond, ok, err := modelskill.ParseChanceCondition(def.Extra().ChanceType, def.Extra().ActivationChance)
 		if ok && err == nil && p.rolls(owner, cond, events) {
 			p.castChanceSkill(owner, ownerHit, def, target)
 		}
@@ -319,7 +319,7 @@ func (p *ChanceProcs) chanceSkills(owner chanceOwner) []*modelskill.Definition {
 	var out []*modelskill.Definition
 	for id, level := range owner.SkillLevels() {
 		def, ok := p.Definitions.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: level})
-		if ok && def.Activation == modelskill.ActivationPassive && def.ChanceType != "" {
+		if ok && def.Activation == modelskill.ActivationPassive && def.Extra().ChanceType != "" {
 			out = append(out, def)
 		}
 	}
@@ -355,8 +355,8 @@ func (p *ChanceProcs) castChanceSkill(owner chanceOwner, ownHit bool, def *model
 			return
 		}
 	}
-	if def.TriggeredID > 0 {
-		triggered, ok := p.definition(def.TriggeredID, def.TriggeredLevel)
+	if def.Extra().TriggeredID > 0 {
+		triggered, ok := p.definition(def.Extra().TriggeredID, def.Extra().TriggeredLevel)
 		if !ok || triggered.SkillType == "NOTDONE" {
 			return
 		}

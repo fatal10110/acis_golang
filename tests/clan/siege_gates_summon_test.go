@@ -68,7 +68,7 @@ func callSiegeSummon(t *testing.T, w *clanWorld, ownerID int32, npcID int) *summ
 		t.Fatalf("player %d = %T, want an online character", ownerID, obj)
 	}
 	w.srv.PlayerQueue(t, ownerID).Post(func() {
-		c.SummonServitor(modelskill.Definition{ID: 13, Level: 1, SkillType: "SUMMON", NpcID: npcID, SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(modelskill.Definition{ID: 13, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: npcID, SummonTotalLifeTime: 1_200_000}))
 	})
 	var s *summon.Actor
 	w.srv.AdvanceUntil(t, "the siege summon is in the world", func() bool {

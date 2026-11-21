@@ -59,7 +59,9 @@ func summonFriendSkills() []modelskill.Definition {
 			SkillType: typ,
 		}
 		if targetItem > 0 {
-			d.TargetConsumeID, d.TargetConsumeCount = int(summonTargetItemID), targetItem
+			extra := d.Extra()
+			extra.TargetConsumeID, extra.TargetConsumeCount = int(summonTargetItemID), targetItem
+			d = d.WithExtra(extra)
 		}
 		return d
 	}

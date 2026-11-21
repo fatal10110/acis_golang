@@ -265,7 +265,7 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 	if n, ok := asNPC(target); ok {
 		hate = n.AggroHate(cast.Caster)
 	}
-	reduced := target.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).CalcStat(stat.Aggression, hate)
+	reduced := target.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Extra().Stat)).CalcStat(stat.Aggression, hate)
 	if diff := hate - reduced; diff > 0 {
 		target.ReduceAllAggroHate(float64(truncDamage(diff)))
 	}
@@ -308,8 +308,8 @@ func disableNegate(cast Cast, target Creature, land landing) {
 	}
 	list := effected.EffectList()
 
-	if len(cast.Skill.NegateIDs) > 0 {
-		for _, id := range cast.Skill.NegateIDs {
+	if len(cast.Skill.Extra().NegateIDs) > 0 {
+		for _, id := range cast.Skill.Extra().NegateIDs {
 			if id == 0 {
 				continue
 			}
@@ -322,8 +322,8 @@ func disableNegate(cast Cast, target Creature, land landing) {
 			if e.Template.StackOrder == 99 {
 				return false
 			}
-			for _, negateType := range cast.Skill.NegateTypes {
-				if negateMatches(e.Skill, negateType, cast.Skill.NegateLevel) {
+			for _, negateType := range cast.Skill.Extra().NegateTypes {
+				if negateMatches(e.Skill, negateType, cast.Skill.Extra().NegateLevel) {
 					return true
 				}
 			}
@@ -351,7 +351,7 @@ func negateMatches(s effect.Skill, negateType string, negateLevel int) bool {
 }
 
 func disableCancelDebuff(cast Cast, target Creature) {
-	removeMatching(target.EffectList(), cast.Skill.MaxNegatedEffects, func(e *effect.Effect) bool {
+	removeMatching(target.EffectList(), cast.Skill.Extra().MaxNegatedEffects, func(e *effect.Effect) bool {
 		return e.Skill.Debuff && e.Skill.CanBeDispelled && e.Template.StackOrder != 99
 	})
 }

@@ -78,11 +78,20 @@ func bootServitorPKKillSceneKarma(t *testing.T, karma int, cat *npc.Template, ex
 // strike its servitor knows.
 func pkServitorSkills() []modelskill.Definition {
 	return []modelskill.Definition{
-		{
-			ID: pkServitorSummonSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "SUMMON", NpcID: pkServitorNPCID, SummonTotalLifeTime: 1_200_000,
-			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-		},
+		modelskill.Definition{
+			ID:            pkServitorSummonSkill,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "SUMMON",
+			StaticHitTime: true,
+			HitTime:       0,
+			StaticReuse:   true,
+			ReuseDelay:    0,
+		}.WithExtra(modelskill.Extra{
+			NpcID:               pkServitorNPCID,
+			SummonTotalLifeTime: 1_200_000,
+		}),
 		{
 			ID: pkServitorStrikeSkill, Level: 1, Activation: modelskill.ActivationActive,
 			Target: modelskill.TargetOne, Offensive: true, SkillType: "PDAM",

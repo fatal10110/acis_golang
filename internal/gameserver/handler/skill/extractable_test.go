@@ -53,7 +53,7 @@ func TestExtractableGrantsTheOnlyGuaranteedProduct(t *testing.T) {
 
 	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,100.0"},
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE"}.WithExtra(modelskill.Extra{ExtractableItems: "57,10,100.0"}),
 		Targets: []Actor{},
 	})
 
@@ -73,7 +73,7 @@ func TestExtractableChecksTheRowsSlotsTogether(t *testing.T) {
 
 	extractableRegistry().Use(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,30,3,100.0"},
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE"}.WithExtra(modelskill.Extra{ExtractableItems: "57,10,30,3,100.0"}),
 		Targets: []Actor{},
 	})
 
@@ -90,7 +90,7 @@ func TestExtractableFullInventoryGrantsNothing(t *testing.T) {
 
 	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,30,1,100.0"},
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE"}.WithExtra(modelskill.Extra{ExtractableItems: "57,10,30,1,100.0"}),
 		Targets: []Actor{},
 	})
 
@@ -107,7 +107,7 @@ func TestExtractableRollMissingEveryRowReportsNothingInside(t *testing.T) {
 
 	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,0"},
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE"}.WithExtra(modelskill.Extra{ExtractableItems: "57,10,0"}),
 		Targets: []Actor{},
 	})
 
@@ -126,7 +126,7 @@ func TestExtractablePickedEmptyRowReportsNothingInside(t *testing.T) {
 
 	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "100;57,10,100"},
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE"}.WithExtra(modelskill.Extra{ExtractableItems: "100;57,10,100"}),
 		Targets: []Actor{},
 	})
 

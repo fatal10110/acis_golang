@@ -86,7 +86,7 @@ func (s *Script) AbnormalLevel(c Creature, ref skill.Ref) int32 {
 }
 
 // EffectID returns the id of the skill's added effect, 0 for none.
-func (k SkillInfo) EffectID() int32 { return int32(k.def.EffectID) }
+func (k SkillInfo) EffectID() int32 { return int32(k.def.Extra().EffectID) }
 
 // Element returns the skill's element.
 func (k SkillInfo) Element() skill.Element { return k.def.Element }

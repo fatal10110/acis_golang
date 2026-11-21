@@ -679,7 +679,7 @@ func TestEquipItemStatsGrantsNonPassiveAttachedSkillsAndArmsEquipDelay(t *testin
 			}
 			templates := item.NewTable([]*item.Template{tmpl})
 			skills := modelskill.NewTable([]modelskill.Definition{
-				{ID: modelskill.ID(tc.skillID), Level: 1, Activation: modelskill.ActivationActive, EquipDelay: tc.equipDelay},
+				modelskill.Definition{ID: modelskill.ID(tc.skillID), Level: 1, Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{EquipDelay: tc.equipDelay}),
 			})
 			inv := itemcontainer.NewPlayerInventory(1, templates)
 			p := NewPersistence(nil, skills)
@@ -742,7 +742,7 @@ func TestEquipItemStatsWithholdsNonPassiveAttachedSkillBelowWeaponExpertise(t *t
 	}
 	templates := item.NewTable([]*item.Template{tmpl})
 	skills := modelskill.NewTable([]modelskill.Definition{
-		{ID: grantedSkillID, Level: 1, Activation: modelskill.ActivationActive, EquipDelay: 30000},
+		modelskill.Definition{ID: grantedSkillID, Level: 1, Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{EquipDelay: 30000}),
 	})
 	inv := itemcontainer.NewPlayerInventory(1, templates)
 	p := NewPersistence(nil, skills)
@@ -792,7 +792,7 @@ func TestRefreshEquippedItemStatsRevokesNonPassiveAttachedSkillWhenGateIsLost(t 
 	}
 	templates := item.NewTable([]*item.Template{tmpl})
 	skills := modelskill.NewTable([]modelskill.Definition{
-		{ID: grantedSkillID, Level: 1, Activation: modelskill.ActivationActive, EquipDelay: 30000},
+		modelskill.Definition{ID: grantedSkillID, Level: 1, Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{EquipDelay: 30000}),
 	})
 	inv := itemcontainer.NewPlayerInventory(1, templates)
 	p := NewPersistence(nil, skills)

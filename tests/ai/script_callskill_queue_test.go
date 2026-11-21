@@ -29,9 +29,15 @@ func TestNPCHookCallSkillRunsOnTheCastersQueue(t *testing.T) {
 	t.Parallel()
 	dest := location.Location{X: 1000, Y: 2000, Z: -3000}
 	def := modelskill.Definition{
-		ID: selfTeleportSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "TELEPORT", HitTime: 500, TeleCoords: &dest,
-	}
+		ID:         selfTeleportSkillID,
+		Level:      1,
+		Activation: modelskill.ActivationActive,
+		Target:     modelskill.TargetSelf,
+		SkillType:  "TELEPORT",
+		HitTime:    500,
+	}.WithExtra(modelskill.Extra{
+		TeleCoords: &dest,
+	})
 	db := sqltest.SharedDB(t)
 	table := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}, def})
 	w := bootWarriorsWith(t, []gameservertest.Option{

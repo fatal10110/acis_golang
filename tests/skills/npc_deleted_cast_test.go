@@ -25,12 +25,22 @@ const (
 // launch comes 600 ms into the cast and its hit 400 ms later.
 func deletedCastDebuffSkill() modelskill.Definition {
 	return modelskill.Definition{
-		ID: deletedCastDebuff, Level: 1, Activation: modelskill.ActivationActive,
-		Target: modelskill.TargetOne, Offensive: true, Debuff: true, SkillType: "DEBUFF",
-		CastRange: 900, HitTime: 1000, StaticHitTime: true, StaticReuse: true,
-		IgnoreResists: true, EffectPower: 100,
-		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
-	}
+		ID:            deletedCastDebuff,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetOne,
+		Offensive:     true,
+		Debuff:        true,
+		SkillType:     "DEBUFF",
+		CastRange:     900,
+		HitTime:       1000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+	}.WithExtra(modelskill.Extra{
+		EffectPower: 100,
+	})
 }
 
 // deletedCastNukeSkill is a magic damage skill with the same timing.

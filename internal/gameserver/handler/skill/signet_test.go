@@ -179,9 +179,14 @@ func TestSignetPointListRegistersForTickingUntilDespawn(t *testing.T) {
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	h.queues = caster.clock
 	h.Use(Cast{Caster: caster, Skill: modelskill.Definition{
-		ID: 454, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
-	}})
+		ID:        454,
+		Level:     1,
+		SkillType: "SIGNET",
+		Radius:    180,
+		Effects:   []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})})
 
 	actors := findEffectPointObjects(state)
 	if len(actors) != 1 {
@@ -215,9 +220,14 @@ func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T)
 	})
 
 	if !r.Use(Cast{Caster: caster, Skill: modelskill.Definition{
-		ID: 454, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
-	}}) {
+		ID:        454,
+		Level:     1,
+		SkillType: "SIGNET",
+		Radius:    180,
+		Effects:   []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})}) {
 		t.Fatal("registry has no SIGNET handler")
 	}
 
@@ -245,9 +255,15 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 	state.Spawn(target, 120, 100, 0, 0)
 
 	def := modelskill.Definition{
-		ID: 454, Level: 1, SkillType: "SIGNET", EffectID: 5123, EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
-	}
+		ID:        454,
+		Level:     1,
+		SkillType: "SIGNET",
+		Radius:    180,
+		Effects:   []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectID:    5123,
+		EffectNpcID: 13018,
+	})
 
 	h.Use(Cast{Caster: caster, Skill: def})
 
@@ -288,9 +304,14 @@ func TestSignetSpawnsAtGroundTarget(t *testing.T) {
 	caster.gx, caster.gy, caster.gz = 300, 400, 50
 
 	h.Use(Cast{Caster: signetFakePlayerCaster{caster}, Skill: modelskill.Definition{
-		ID: 454, Level: 1, SkillType: "SIGNET", Target: modelskill.TargetGround,
-		EffectNpcID: 13018, Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
-	}})
+		ID:        454,
+		Level:     1,
+		SkillType: "SIGNET",
+		Target:    modelskill.TargetGround,
+		Effects:   []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})})
 
 	actors := findEffectPointObjects(state)
 	if len(actors) != 1 {
@@ -312,11 +333,17 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 	state.Spawn(target, 120, 100, 0, 0)
 
 	def := modelskill.Definition{
-		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 10,
+		ID:        1419,
+		Level:     1,
+		SkillType: "SIGNET_CASTTIME",
+		Radius:    180,
+		MPConsume: 10,
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
 		// Count: 3 exercises "skip the first two ticks" with the minimum
 		// tick count that still reaches a third, live tick.
 		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, Count: 3, Time: 1}},
-	}
+	})
 
 	h.Use(Cast{Caster: caster, Skill: def})
 
@@ -361,7 +388,13 @@ func TestSignetCasttimeAppliesEveryRecognizedSelfEffectTemplate(t *testing.T) {
 	h.queues = caster.clock
 
 	def := modelskill.Definition{
-		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 10,
+		ID:        1419,
+		Level:     1,
+		SkillType: "SIGNET_CASTTIME",
+		Radius:    180,
+		MPConsume: 10,
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
 		SelfEffects: []modelskill.EffectTemplate{
 			// An unrecognized template ahead of SignetMDam must not stop
 			// dispatch from reaching it: useCasttime walks every self
@@ -370,7 +403,7 @@ func TestSignetCasttimeAppliesEveryRecognizedSelfEffectTemplate(t *testing.T) {
 			{Name: "SomeUnimplementedSelfEffect", Self: true, Count: 3, Time: 1},
 			{Name: "SignetMDam", Self: true, Count: 3, Time: 1},
 		},
-	}
+	})
 
 	h.Use(Cast{Caster: caster, Skill: def})
 
@@ -388,9 +421,15 @@ func TestSignetCasttimeMDamDropsOnLackOfMP(t *testing.T) {
 	caster := newSignetFakeCaster(1, 100, 100, 0, 5) // below the skill's mpConsume
 	h.queues = caster.clock
 	def := modelskill.Definition{
-		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 10,
+		ID:        1419,
+		Level:     1,
+		SkillType: "SIGNET_CASTTIME",
+		Radius:    180,
+		MPConsume: 10,
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
 		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, Count: 3, Time: 1}},
-	}
+	})
 	h.Use(Cast{Caster: caster, Skill: def})
 
 	caster.clock.Advance(tickInterval)
@@ -421,9 +460,15 @@ func TestSignetNoiseCancelsDanceEffectsAfterFirstTick(t *testing.T) {
 	target.list.Add(&effect.Effect{Skill: effect.Skill{ID: 999, Dance: true}, Template: modelskill.EffectTemplate{Time: 60, Count: 1}, OnStart: func(*effect.Effect) bool { return true }})
 
 	def := modelskill.Definition{
-		ID: 455, Level: 1, SkillType: "SIGNET", EffectID: 5124, EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "SignetNoise", Count: 2, Time: 1}},
-	}
+		ID:        455,
+		Level:     1,
+		SkillType: "SIGNET",
+		Radius:    180,
+		Effects:   []modelskill.EffectTemplate{{Name: "SignetNoise", Count: 2, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectID:    5124,
+		EffectNpcID: 13018,
+	})
 	h.Use(Cast{Caster: caster, Skill: def})
 
 	actor := findEffectPointObjects(state)[0]
@@ -452,9 +497,14 @@ func TestSignetAntiSummonUnsummonsAfterFirstTick(t *testing.T) {
 	state.Spawn(target, 120, 100, 0, 0)
 
 	def := modelskill.Definition{
-		ID: 1422, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "SignetAntiSummon", Count: 2, Time: 1}},
-	}
+		ID:        1422,
+		Level:     1,
+		SkillType: "SIGNET",
+		Radius:    180,
+		Effects:   []modelskill.EffectTemplate{{Name: "SignetAntiSummon", Count: 2, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})
 	h.Use(Cast{Caster: caster, Skill: def})
 
 	actor := findEffectPointObjects(state)[0]
@@ -522,9 +572,15 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	h.queues = caster.clock
 	def := modelskill.Definition{
-		ID: 454, Level: 1, SkillType: "SIGNET", EffectID: 5123, EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
-	}
+		ID:        454,
+		Level:     1,
+		SkillType: "SIGNET",
+		Radius:    180,
+		Effects:   []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectID:    5123,
+		EffectNpcID: 13018,
+	})
 
 	h.Use(Cast{Caster: caster, Skill: def})
 
@@ -567,9 +623,12 @@ func TestSignetEffectMetaCarriesFirstTemplateStackType(t *testing.T) {
 	}
 
 	casttime := modelskill.Definition{
-		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME",
+		ID:        1419,
+		Level:     1,
+		SkillType: "SIGNET_CASTTIME",
+	}.WithExtra(modelskill.Extra{
 		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, StackType: "self_only"}},
-	}
+	})
 	if got := signetEffectMeta(casttime).StackType; got != "" {
 		t.Fatalf("self-only signet meta StackType = %q, want empty (no main templates)", got)
 	}

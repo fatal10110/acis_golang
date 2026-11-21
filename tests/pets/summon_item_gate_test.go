@@ -130,7 +130,7 @@ func bootCollarSkill(t *testing.T, summon modelskill.Definition) *petWorld {
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
 		summon,
-		{ID: wolfFeedSkill, Level: 1, Feed: wolfFeedAmount},
+		modelskill.Definition{ID: wolfFeedSkill, Level: 1}.WithExtra(modelskill.Extra{Feed: wolfFeedAmount}),
 	}), gamesql.NewCharacterSkillStore(db))
 	return bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithSkills(skills)})
 }

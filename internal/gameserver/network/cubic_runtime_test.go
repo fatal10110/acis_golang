@@ -16,9 +16,14 @@ import (
 
 func cubicRuntimeDef(id cubic.ID) modelskill.Definition {
 	return modelskill.Definition{
-		Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(id),
-		CubicActivationTime: 5, SummonTotalLifeTime: 900_000,
-	}
+		Level:     1,
+		SkillType: "SUMMON",
+		IsCubic:   true,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               int(id),
+		CubicActivationTime: 5,
+		SummonTotalLifeTime: 900_000,
+	})
 }
 
 func liveCubicRuntime(live *livePlayer, id cubic.ID) *cubic.Runtime {
@@ -119,7 +124,9 @@ func cubicOwnerOnClock(t *testing.T, link *GameClientLink, id int32, lifetime ti
 	live := newTestLivePlayer(t, id, &testsupport.FrameCapture{})
 	live.Character.Live.SetQueue(in.NewQueue("owner"))
 	def := cubicRuntimeDef(cubic.Storm)
-	def.SummonTotalLifeTime = int(lifetime / time.Millisecond)
+	extra := def.Extra()
+	extra.SummonTotalLifeTime = int(lifetime / time.Millisecond)
+	def = def.WithExtra(extra)
 	live.Character.AddOrRefreshCubic(cubic.Storm, false)
 	link.syncCubicRuntime(live, cubic.Storm, &def)
 	return live, in

@@ -32,7 +32,7 @@ func subclassClanOptions(t *testing.T) []gameservertest.Option {
 	defs := modelskill.NewTable([]modelskill.Definition{
 		{ID: laterSkill, Level: 3},
 		{ID: learnedSkill, Level: 1},
-		{ID: clanVitality, Level: 1, MinPledgeClass: 2},
+		modelskill.Definition{ID: clanVitality, Level: 1}.WithExtra(modelskill.Extra{MinPledgeClass: 2}),
 	})
 	return []gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), defs, gamesql.NewCharacterSkillStore(db))),

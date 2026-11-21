@@ -49,7 +49,7 @@ func (cubicHandler) UseResult(cast Cast) Result {
 // addCubics admits the cast's cubic: on every targeted player for a mass
 // cubic, else on the caster.
 func addCubics(cast Cast) Result {
-	id := cubic.ID(cast.Skill.NpcID)
+	id := cubic.ID(cast.Skill.Extra().NpcID)
 
 	if len(cast.Targets) > 1 {
 		// Mass-cubic cast: every targeted player except the caster

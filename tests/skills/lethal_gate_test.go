@@ -32,11 +32,21 @@ func TestLethalStrikeSkipsRaidAndNonLethalableNPCs(t *testing.T) {
 			srv := gameservertest.Boot(t,
 				gameservertest.WithCharacter("Newbie", 5, 0),
 				gameservertest.WithWantChars(1),
-				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-					CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-					SkillType: "PDAM", Power: 10, LethalChance2: 100,
-				}})),
+				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+					ID:            skillID,
+					Level:         1,
+					Activation:    modelskill.ActivationActive,
+					Target:        modelskill.TargetOne,
+					CastRange:     900,
+					HitTime:       500,
+					ReuseDelay:    60_000,
+					StaticHitTime: true,
+					StaticReuse:   true,
+					SkillType:     "PDAM",
+					Power:         10,
+				}.WithExtra(modelskill.Extra{
+					LethalChance2: 100,
+				})})),
 			)
 			c, objID := srv.Client, srv.SoleObjectID(t)
 			seedKnownSkill(t, srv, objID, skillID, 1)

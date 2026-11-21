@@ -95,7 +95,7 @@ func (m *match) callServitor(t *testing.T, p *competitor) *summon.Actor {
 	t.Helper()
 	pc := m.online(t, p)
 	m.onQueue(t, pc, func() {
-		pc.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: summonServitorID, SummonTotalLifeTime: 1_200_000})
+		pc.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: summonServitorID, SummonTotalLifeTime: 1_200_000}))
 	})
 	s := m.summonOf(t, p)
 	m.read(t)

@@ -23,7 +23,7 @@ func (appearanceHandler) Use(cast Cast) {
 			continue
 		}
 		if p, ok := target.(appearanceChanger); ok {
-			p.ChangeAppearance(def.AppearanceFace, def.AppearanceHairColor, def.AppearanceHairStyle)
+			p.ChangeAppearance(def.Extra().AppearanceFace, def.Extra().AppearanceHairColor, def.Extra().AppearanceHairStyle)
 		}
 	}
 }

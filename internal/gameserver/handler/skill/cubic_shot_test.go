@@ -37,7 +37,7 @@ func (c *shotCubicCaster) SetChargedShot(k item.ShotKind, v bool) { c.charged[k]
 // skill's static-reuse flag. A caster alike dead returns before anything
 // (L2SkillSummon.java:110-111).
 func TestCubicSummonSpendsSpiritshot(t *testing.T) {
-	storm := modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm)}
+	storm := modelskill.Definition{SkillType: "SUMMON", IsCubic: true}.WithExtra(modelskill.Extra{NpcID: int(cubic.Storm)})
 	for _, tc := range []struct {
 		name      string
 		charged   []item.ShotKind

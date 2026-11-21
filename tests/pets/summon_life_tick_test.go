@@ -27,12 +27,24 @@ const servitorLifeTick = time.Second
 // one Gemstone D.
 func lifetimeServitorSkill() modelskill.Definition {
 	return modelskill.Definition{
-		ID: killableServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: killableServitorNPCID,
-		SummonTotalLifeTime: 35_200, SummonTimeLostIdle: 500, SummonTimeLostActive: 1000,
-		ItemConsumeIDOT: int(gameservertest.GemstoneDID), ItemConsumeCountOT: 1, ItemConsumeSteps: 1,
-		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-	}
+		ID:            killableServitorSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		HitTime:       0,
+		StaticReuse:   true,
+		ReuseDelay:    0,
+	}.WithExtra(modelskill.Extra{
+		NpcID:                killableServitorNPCID,
+		SummonTotalLifeTime:  35_200,
+		SummonTimeLostIdle:   500,
+		SummonTimeLostActive: 1000,
+		ItemConsumeIDOT:      int(gameservertest.GemstoneDID),
+		ItemConsumeCountOT:   1,
+		ItemConsumeSteps:     1,
+	})
 }
 
 // bootLifetimeServitorOwner boots an owner who knows def as its servitor
@@ -228,7 +240,9 @@ func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 func TestServitorLeavesWhenItsLifetimeRunsOut(t *testing.T) {
 	t.Parallel()
 	def := lifetimeServitorSkill()
-	def.SummonTotalLifeTime, def.ItemConsumeIDOT, def.ItemConsumeCountOT, def.ItemConsumeSteps = 2000, 0, 0, 0
+	extra := def.Extra()
+	extra.SummonTotalLifeTime, extra.ItemConsumeIDOT, extra.ItemConsumeCountOT, extra.ItemConsumeSteps = 2000, 0, 0, 0
+	def = def.WithExtra(extra)
 	o := bootLifetimeServitorOwner(t, def)
 	servitor := o.summonServitor(t)
 

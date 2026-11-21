@@ -269,7 +269,7 @@ func TestShippedConditionTableRefsLoadAsBefore(t *testing.T) {
 			clause(where, &def.Conditions[i])
 		}
 		funcs(where, def.Funcs)
-		for _, e := range append(append([]skill.EffectTemplate(nil), def.Effects...), def.SelfEffects...) {
+		for _, e := range append(append([]skill.EffectTemplate(nil), def.Effects...), def.Extra().SelfEffects...) {
 			clause(where, e.AttachCondition)
 			funcs(where, e.Funcs)
 		}

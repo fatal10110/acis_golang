@@ -49,9 +49,15 @@ func TestScriptNPCCallSkillLandsOnItsTarget(t *testing.T) {
 			t.Parallel()
 			dest := location.Location{X: 1000, Y: 2000, Z: -3000}
 			def := modelskill.Definition{
-				ID: sendAwaySkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-				SkillType: "TELEPORT", HitTime: 1500, TeleCoords: &dest,
-			}
+				ID:         sendAwaySkillID,
+				Level:      1,
+				Activation: modelskill.ActivationActive,
+				Target:     modelskill.TargetOne,
+				SkillType:  "TELEPORT",
+				HitTime:    1500,
+			}.WithExtra(modelskill.Extra{
+				TeleCoords: &dest,
+			})
 			db := sqltest.SharedDB(t)
 			table := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}, def})
 			skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))

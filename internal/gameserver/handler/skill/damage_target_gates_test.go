@@ -48,7 +48,7 @@ func TestPdamSparesPlayablesForFearSparingSkills(t *testing.T) {
 			target := newTarget(tc.kind, tc.evaded)
 			result, _ := NewDefaultRegistry().UseResult(Cast{
 				Caster:  &skillTarget{},
-				Skill:   modelskill.Definition{ID: tc.id, Level: 1, SkillType: "PDAM", LethalChance1: 100},
+				Skill:   modelskill.Definition{ID: tc.id, Level: 1, SkillType: "PDAM"}.WithExtra(modelskill.Extra{LethalChance1: 100}),
 				Targets: []Actor{target},
 			})
 			if hit := target.hp < 2000; hit != tc.wantHit {
@@ -101,7 +101,7 @@ func TestBlowSelfEffectsFollowEachProcessedTarget(t *testing.T) {
 			caster := &skillTarget{effects: newTestList(nil)}
 			NewDefaultRegistry().Use(Cast{
 				Caster:  caster,
-				Skill:   modelskill.Definition{ID: 321, Level: 1, SkillType: "BLOW", SelfEffects: buffEffect()},
+				Skill:   modelskill.Definition{ID: 321, Level: 1, SkillType: "BLOW"}.WithExtra(modelskill.Extra{SelfEffects: buffEffect()}),
 				Targets: tc.targets(),
 			})
 			if got := len(caster.effects.All()); got != tc.want {

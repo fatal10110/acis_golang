@@ -85,10 +85,10 @@ func TestCharacterSummonServitorRequestsServitorSpawn(t *testing.T) {
 	c := &Character{}
 	rec := recordEvents(c)
 
-	c.SummonServitor(modelskill.Definition{NpcID: 14848})
+	c.SummonServitor(modelskill.Definition{}.WithExtra(modelskill.Extra{NpcID: 14848}))
 
 	got := event.Of[event.ServitorSummonRequested](rec)
-	if len(got) != 1 || got[0].Skill.NpcID != 14848 {
+	if len(got) != 1 || got[0].Skill.Extra().NpcID != 14848 {
 		t.Fatalf("servitor summon requests = %+v, want one with NpcID 14848", got)
 	}
 }

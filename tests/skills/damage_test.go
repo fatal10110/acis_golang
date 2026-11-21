@@ -278,13 +278,22 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-				CastRange: 900, HitTime: 0, StaticHitTime: true,
-				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				EffectPower: 100, IgnoreResists: true,
-				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
-			},
+			modelskill.Definition{
+				ID:            43,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetOne,
+				CastRange:     900,
+				HitTime:       0,
+				StaticHitTime: true,
+				SkillType:     "DEBUFF",
+				Debuff:        true,
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+			}.WithExtra(modelskill.Extra{
+				EffectType:  "DEBUFF",
+				EffectPower: 100,
+			}),
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -476,12 +485,23 @@ func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
 
 func signetMDamSkill() modelskill.Definition {
 	return modelskill.Definition{
-		ID: 1419, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 1,
-		Power: 1_000_000, Magic: true,
+		ID:            1419,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET_CASTTIME",
+		Radius:        180,
+		MPConsume:     1,
+		Power:         1_000_000,
+		Magic:         true,
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
 		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, Count: 3, Time: 1}},
-	}
+	})
 }
 
 func bootSignetMDamPair(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedClient, *testsupport.ScriptedClient, int32, int32) {
@@ -695,13 +715,22 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 		gameservertest.WithWantChars(1),
 		withWarriorBehavior(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-				CastRange: 900, HitTime: 0, StaticHitTime: true,
-				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				EffectPower: 100, IgnoreResists: true,
-				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
-			},
+			modelskill.Definition{
+				ID:            43,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetOne,
+				CastRange:     900,
+				HitTime:       0,
+				StaticHitTime: true,
+				SkillType:     "DEBUFF",
+				Debuff:        true,
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+			}.WithExtra(modelskill.Extra{
+				EffectType:  "DEBUFF",
+				EffectPower: 100,
+			}),
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -958,11 +987,21 @@ func readManadamOutcome(t *testing.T, c *testsupport.ScriptedClient) bool {
 func TestSignetPointExpiresThroughTheEffectTicker(t *testing.T) {
 	t.Parallel()
 	def := modelskill.Definition{
-		ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180, MPConsume: 1,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
-	}
+		ID:            454,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET",
+		Radius:        180,
+		MPConsume:     1,
+		Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),

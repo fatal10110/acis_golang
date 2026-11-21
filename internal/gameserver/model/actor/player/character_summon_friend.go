@@ -151,16 +151,16 @@ func (c *Character) summonTo(caster SummonFriendRequester, skill modelskill.Defi
 	if r := SummonedRefusal(c, caster); r.Refused() {
 		return r
 	}
-	if skill.TargetConsumeID > 0 && skill.TargetConsumeCount > 0 {
-		if c.ItemCount(skill.TargetConsumeID) < skill.TargetConsumeCount {
-			return SummonRefusal{Reason: SummonRefusedItem, ItemID: skill.TargetConsumeID}
+	if skill.Extra().TargetConsumeID > 0 && skill.Extra().TargetConsumeCount > 0 {
+		if c.ItemCount(skill.Extra().TargetConsumeID) < skill.Extra().TargetConsumeCount {
+			return SummonRefusal{Reason: SummonRefusedItem, ItemID: skill.Extra().TargetConsumeID}
 		}
-		if !c.ConsumeItem(skill.TargetConsumeID, skill.TargetConsumeCount) {
+		if !c.ConsumeItem(skill.Extra().TargetConsumeID, skill.Extra().TargetConsumeCount) {
 			// The count check just passed, so only a concurrent removal
 			// lands here: the summon stops rather than going on unpaid.
 			return SummonRefusal{Reason: SummonRefusedSilently}
 		}
-		c.emit(event.ItemsTaken{ItemID: int32(skill.TargetConsumeID), Count: skill.TargetConsumeCount})
+		c.emit(event.ItemsTaken{ItemID: int32(skill.Extra().TargetConsumeID), Count: skill.Extra().TargetConsumeCount})
 	}
 	x, y, z := caster.Position()
 	teleport(x, y, z, 20)

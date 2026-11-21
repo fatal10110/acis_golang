@@ -641,7 +641,7 @@ func TestCanCastWeaponDependency(t *testing.T) {
 			t.Parallel()
 			actor := &testActor{mp: 100, hp: 100, held: tt.held, physicalMuted: tt.muted}
 			ctrl := NewController(actor, nil)
-			def := modelskill.Definition{ID: 56, Level: 1, Activation: modelskill.ActivationActive, WeaponsAllowed: tt.allowed}
+			def := modelskill.Definition{ID: 56, Level: 1, Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{WeaponsAllowed: tt.allowed})
 			if err := ctrl.CanCast(testTarget{}, &def); !errors.Is(err, tt.want) || (tt.want == nil && err != nil) {
 				t.Fatalf("CanCast = %v, want %v", err, tt.want)
 			}

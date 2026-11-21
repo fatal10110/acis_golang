@@ -513,7 +513,12 @@ const (
 // the character's spell does, the other two their own.
 func ind7bDebuffs() []modelskill.Definition {
 	defs := []modelskill.Definition{ind1Skill(ind7bSongDebuff1, 600, false), ind1Skill(ind7bSongDebuff2, 600, false), ind1Skill(ind7bSongDebuff3, 600, false)}
-	defs[1].EffectID, defs[2].EffectID = 4002, 4003
+	withEffect := func(d modelskill.Definition, id int) modelskill.Definition {
+		extra := d.Extra()
+		extra.EffectID = id
+		return d.WithExtra(extra)
+	}
+	defs[1], defs[2] = withEffect(defs[1], 4002), withEffect(defs[2], 4003)
 	return defs
 }
 

@@ -85,7 +85,7 @@ func TestZeroTruncatedPDefSkillFormulasDivideByZero(t *testing.T) {
 		t.Fatalf("PDAM damage = %v, want +Inf", got)
 	}
 
-	blow, ok := target.BlowInput(attacker, skill.Definition{SkillType: "BLOW", Power: 100, BaseLandRate: 50})
+	blow, ok := target.BlowInput(attacker, skill.Definition{SkillType: "BLOW", Power: 100}.WithExtra(skill.Extra{BaseLandRate: 50}))
 	if !ok || !blow.Landed || blow.Defence != 0 {
 		t.Fatalf("BLOW input ok=%v landed=%v Defence=%v, want a landed blow with Defence 0", ok, blow.Landed, blow.Defence)
 	}
@@ -115,7 +115,7 @@ func TestZeroTruncatedMDefSkillFormulasDivideByZero(t *testing.T) {
 
 	// The landing-rate M.Atk term divides by the same 0; the [1, 99] clamp
 	// then caps it.
-	def := skill.Definition{SkillType: "DEBUFF", EffectType: "DEBUFF", Magic: true, EffectPower: 10}
+	def := skill.Definition{SkillType: "DEBUFF", Magic: true}.WithExtra(skill.Extra{EffectType: "DEBUFF", EffectPower: 10})
 	if got := creature.SkillMAtkModifier(target, attacker, def, false); !math.IsInf(got, 1) {
 		t.Fatalf("SkillMAtkModifier = %v, want +Inf", got)
 	}

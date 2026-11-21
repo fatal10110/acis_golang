@@ -36,8 +36,8 @@ func bootSkillRemoveAdmin(t *testing.T) (*gameservertest.Server, *testsupport.Sc
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
-		{ID: triggeringSkill, Level: 1, Name: "Triggering", Activation: modelskill.ActivationActive, TriggeredID: triggeredOne, TriggeredLevel: 1},
-		{ID: triggeringSkill, Level: 2, Name: "Triggering", Activation: modelskill.ActivationActive, TriggeredID: triggeredTwo, TriggeredLevel: 1},
+		modelskill.Definition{ID: triggeringSkill, Level: 1, Name: "Triggering", Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{TriggeredID: triggeredOne, TriggeredLevel: 1}),
+		modelskill.Definition{ID: triggeringSkill, Level: 2, Name: "Triggering", Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{TriggeredID: triggeredTwo, TriggeredLevel: 1}),
 		{ID: triggeredOne, Level: 1, Name: "TriggeredOne", Activation: modelskill.ActivationActive},
 		{ID: triggeredTwo, Level: 1, Name: "TriggeredTwo", Activation: modelskill.ActivationActive},
 		{

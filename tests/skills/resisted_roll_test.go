@@ -147,11 +147,18 @@ func TestChanceProcForgetFailedRollSendsResistedOnWire(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: passive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-				SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: -1,
-				TriggeredID: triggered, TriggeredLevel: 4,
-			},
+			modelskill.Definition{
+				ID:         passive,
+				Level:      1,
+				Activation: modelskill.ActivationPassive,
+				Target:     modelskill.TargetSelf,
+				SkillType:  "BUFF",
+			}.WithExtra(modelskill.Extra{
+				ChanceType:       "ON_HIT",
+				ActivationChance: -1,
+				TriggeredID:      triggered,
+				TriggeredLevel:   4,
+			}),
 			{
 				ID: triggered, Level: 4, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				SkillType: "AGGREDUCE_CHAR", Offensive: true, IgnoreResists: true, ReuseDelay: 60_000,

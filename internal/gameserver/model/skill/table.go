@@ -2,7 +2,9 @@ package skill
 
 import (
 	"cmp"
+	"reflect"
 	"slices"
+	"sort"
 	"sync/atomic"
 )
 
@@ -75,6 +77,9 @@ func NewTable(defs []Definition) *Table {
 	for pos, i := range kept {
 		d.defs[pos] = defs[i]
 		def := &d.defs[pos]
+		if pos > 0 {
+			shareExtra(def, &d.defs[pos-1])
+		}
 		span, ok := d.byID[def.ID]
 		if !ok {
 			span.start = pos
@@ -88,6 +93,16 @@ func NewTable(defs []Definition) *Table {
 	t := &Table{}
 	t.defs.Store(d)
 	return t
+}
+
+// shareExtra points def at prev's Extra when both carry the same values, so
+// neighbouring levels (most of a skill's levels differ only in their hot
+// fields) hold one Extra between them. An Extra is never changed once
+// built, which makes the sharing invisible to readers.
+func shareExtra(def, prev *Definition) {
+	if def.extra != nil && prev.extra != nil && def.extra != prev.extra && reflect.DeepEqual(def.extra, prev.extra) {
+		def.extra = prev.extra
+	}
 }
 
 func compareDefinitions(a, b *Definition) int {
@@ -117,10 +132,8 @@ func (d *definitions) get(id ID, level int) (*Definition, bool) {
 		return nil, false
 	}
 	levels := d.defs[span.start:span.end]
-	i, ok := slices.BinarySearchFunc(levels, level, func(def Definition, level int) int {
-		return cmp.Compare(def.Level, level)
-	})
-	if !ok {
+	i := sort.Search(len(levels), func(i int) bool { return levels[i].Level >= level })
+	if i == len(levels) || levels[i].Level != level {
 		return nil, false
 	}
 	return &levels[i], true

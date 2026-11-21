@@ -38,13 +38,23 @@ func TestCastHitReusesLaunchTargetAfterItDies(t *testing.T) {
 	t.Parallel()
 	const skillID = 2452
 	srv, c, objID := bootHitPhaseCaster(t, modelskill.Definition{
-		ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		CastRange: 900, HitTime: 500, StaticHitTime: true,
-		SkillType: "DEBUFF", EffectType: "DEBUFF", Offensive: true, Debuff: true,
-		EffectPower: 100, IgnoreResists: true,
-		Effects:     []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+		ID:            skillID,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetOne,
+		CastRange:     900,
+		HitTime:       500,
+		StaticHitTime: true,
+		SkillType:     "DEBUFF",
+		Offensive:     true,
+		Debuff:        true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+	}.WithExtra(modelskill.Extra{
+		EffectType:  "DEBUFF",
+		EffectPower: 100,
 		SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, Self: true}},
-	})
+	}))
 	hostile := srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
@@ -184,10 +194,18 @@ func TestFusionCastLandsForceBeforeMagicSkillUse(t *testing.T) {
 		t.Run("hit time "+strconv.Itoa(hitTime), func(t *testing.T) {
 			t.Parallel()
 			defs := []modelskill.Definition{
-				{
-					ID: fusionID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-					CastRange: 900, HitTime: hitTime, SkillType: "FUSION", TriggeredID: forceID, TriggeredLevel: 1,
-				},
+				modelskill.Definition{
+					ID:         fusionID,
+					Level:      1,
+					Activation: modelskill.ActivationActive,
+					Target:     modelskill.TargetOne,
+					CastRange:  900,
+					HitTime:    hitTime,
+					SkillType:  "FUSION",
+				}.WithExtra(modelskill.Extra{
+					TriggeredID:    forceID,
+					TriggeredLevel: 1,
+				}),
 				{
 					ID: forceID, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
 					SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},

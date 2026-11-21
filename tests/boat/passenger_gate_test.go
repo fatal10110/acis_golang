@@ -90,11 +90,20 @@ func TestSummonItemAboardRefused(t *testing.T) {
 func TestServitorSummonAboardRefused(t *testing.T) {
 	t.Parallel()
 	db := sqltest.SharedDB(t)
-	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
-		ID: summonCatSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: 12600, SummonTotalLifeTime: 1_200_000,
-		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-	}}), gamesql.NewCharacterSkillStore(db))
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{modelskill.Definition{
+		ID:            summonCatSkillID,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		HitTime:       0,
+		StaticReuse:   true,
+		ReuseDelay:    0,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               12600,
+		SummonTotalLifeTime: 1_200_000,
+	})}), gamesql.NewCharacterSkillStore(db))
 	srv, c, me, b := bootPassengerWith(t, runeBoarding, 0, func(srv *gameservertest.Server, objID int32) {
 		if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, summonCatSkillID, 1); err != nil {
 			t.Fatalf("seed known skill: %v", err)

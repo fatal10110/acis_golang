@@ -125,7 +125,7 @@ func petSkillTable(t testing.TB) *skillstate.Persistence {
 			ID: summonCreatureID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 		},
-		{ID: wolfFeedSkill, Level: 1, Feed: wolfFeedAmount},
+		modelskill.Definition{ID: wolfFeedSkill, Level: 1}.WithExtra(modelskill.Extra{Feed: wolfFeedAmount}),
 	}), gamesql.NewCharacterSkillStore(db))
 }
 

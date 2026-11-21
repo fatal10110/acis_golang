@@ -26,23 +26,41 @@ const (
 // the given classification and abnormal levels.
 func negateSeed(id modelskill.ID, skillType, effectType string, abnormal, effectAbnormal int, stackOrder float64) modelskill.Definition {
 	return modelskill.Definition{
-		ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		StaticHitTime: true, SkillType: skillType, EffectType: effectType, Debuff: true,
-		AbnormalLevel: abnormal, EffectAbnormalLevel: effectAbnormal, NegateLevel: -1,
+		ID:            id,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		StaticHitTime: true,
+		SkillType:     skillType,
+		Debuff:        true,
+		AbnormalLevel: abnormal,
 		Effects: []modelskill.EffectTemplate{{
 			Name: "Debuff", Time: 60, Icon: true,
 			StackType: "negate_seed_" + strconv.Itoa(int(id)), StackOrder: stackOrder,
 		}},
-	}
+	}.WithExtra(modelskill.Extra{
+		EffectType:          effectType,
+		EffectAbnormalLevel: effectAbnormal,
+		NegateLevel:         -1,
+	})
 }
 
 // negateSkill is a self-cast NEGATE with no effects of its own.
 func negateSkill(id modelskill.ID, level int, types []string, ids []int) modelskill.Definition {
 	return modelskill.Definition{
-		ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		StaticHitTime: true, SkillType: "NEGATE", AbnormalLevel: -1, EffectAbnormalLevel: -1,
-		NegateLevel: level, NegateTypes: types, NegateIDs: ids,
-	}
+		ID:            id,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		StaticHitTime: true,
+		SkillType:     "NEGATE",
+		AbnormalLevel: -1,
+	}.WithExtra(modelskill.Extra{
+		EffectAbnormalLevel: -1,
+		NegateLevel:         level,
+		NegateTypes:         types,
+		NegateIDs:           ids,
+	})
 }
 
 // TestNegateStripsSeededEffects lands a set of debuffs on a player, casts

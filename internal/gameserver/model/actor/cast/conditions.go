@@ -110,9 +110,9 @@ func (a SummonActor) SkillConditions(target Target, def *modelskill.Definition) 
 // type, or held shares a bit with one it names. A name that is no weapon
 // or armor type restricts nothing.
 func WeaponAllowed(def *modelskill.Definition, held int32) bool {
-	if def.WeaponsAllowed == "" {
+	if def.Extra().WeaponsAllowed == "" {
 		return true
 	}
-	allowed := item.ParseWornKindMask(def.WeaponsAllowed)
+	allowed := item.ParseWornKindMask(def.Extra().WeaponsAllowed)
 	return allowed == 0 || held&allowed != 0
 }

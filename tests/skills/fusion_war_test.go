@@ -47,10 +47,18 @@ func socialClansAtWar(t *testing.T) gameservertest.Option {
 func TestCtrlFusionLandsOnWarEnemy(t *testing.T) {
 	t.Parallel()
 	fusion := modelskill.Definition{
-		ID: modelskill.ID(warFusionSkillID), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		Offensive: true, CastRange: 900, HitTime: 15_000, SkillType: "FUSION",
-		TriggeredID: int(warFusionForceID), TriggeredLevel: 1,
-	}
+		ID:         modelskill.ID(warFusionSkillID),
+		Level:      1,
+		Activation: modelskill.ActivationActive,
+		Target:     modelskill.TargetOne,
+		Offensive:  true,
+		CastRange:  900,
+		HitTime:    15_000,
+		SkillType:  "FUSION",
+	}.WithExtra(modelskill.Extra{
+		TriggeredID:    int(warFusionForceID),
+		TriggeredLevel: 1,
+	})
 	force := modelskill.Definition{
 		ID: modelskill.ID(warFusionForceID), Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
 		SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},

@@ -36,11 +36,20 @@ func TestZeroPowerAggReduceReducesByAggressionStat(t *testing.T) {
 			srv := gameservertest.Boot(t,
 				gameservertest.WithCharacter("Reducer", 10, 0),
 				gameservertest.WithWantChars(1),
-				gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{{
-					ID: aggReduceID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-					CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
-					SkillType: "AGGREDUCE", Offensive: true, Stat: tc.skillStat,
-				}})),
+				gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{modelskill.Definition{
+					ID:            aggReduceID,
+					Level:         1,
+					Activation:    modelskill.ActivationActive,
+					Target:        modelskill.TargetOne,
+					CastRange:     900,
+					HitTime:       500,
+					StaticHitTime: true,
+					StaticReuse:   true,
+					SkillType:     "AGGREDUCE",
+					Offensive:     true,
+				}.WithExtra(modelskill.Extra{
+					Stat: tc.skillStat,
+				})})),
 			)
 			c, objID := srv.Client, srv.SoleObjectID(t)
 			seedKnownSkill(t, srv, objID, aggReduceID, 1)

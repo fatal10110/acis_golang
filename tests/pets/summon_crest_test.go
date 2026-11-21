@@ -101,11 +101,20 @@ type summonCrestWorld struct {
 func bootSummonCrest(t *testing.T, extra ...gameservertest.Option) *summonCrestWorld {
 	t.Helper()
 	db := sqltest.SharedDB(t)
-	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
-		ID: killableServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: killableServitorNPCID, SummonTotalLifeTime: 1_200_000,
-		SummonTimeLostIdle: 500, SummonTimeLostActive: 1000, StaticHitTime: true, StaticReuse: true,
-	}}), gamesql.NewCharacterSkillStore(db))
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{modelskill.Definition{
+		ID:            killableServitorSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		StaticReuse:   true,
+	}.WithExtra(modelskill.Extra{
+		NpcID:                killableServitorNPCID,
+		SummonTotalLifeTime:  1_200_000,
+		SummonTimeLostIdle:   500,
+		SummonTimeLostActive: 1000,
+	})}), gamesql.NewCharacterSkillStore(db))
 	cat := &npc.Template{
 		ID: killableServitorNPCID, TemplateID: killableServitorNPCID, Type: "Servitor", Name: "Kat the Cat", Level: 20,
 		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,

@@ -139,5 +139,5 @@ func petFoodFeedAmount(skills *skillstate.Persistence, foodRate int, templateID 
 	if !ok {
 		return 0, false
 	}
-	return def.Feed * foodRate, true
+	return def.Extra().Feed * foodRate, true
 }

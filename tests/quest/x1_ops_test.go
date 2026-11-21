@@ -173,7 +173,7 @@ func TestScriptActiveSummonAndSummonNpcID(t *testing.T) {
 		}
 	})
 	srv.RunQuest(t, objID, q001, func(_ *script.Quests, c *player.Character, _ *script.Script) {
-		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: x1ServitorID, SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: x1ServitorID, SummonTotalLifeTime: 1_200_000}))
 	})
 	var summonID int32
 	srv.AdvanceUntil(t, "the servitor is in the world", func() bool {

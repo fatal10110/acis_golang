@@ -24,8 +24,8 @@ func TestLoadSkillDefinitionsNegateStatsDoubledSeparatorLoads(t *testing.T) {
 		t.Fatalf("LoadSkillDefinitions: %v", err)
 	}
 	d, ok := table.Get(1, 1)
-	if !ok || !slices.Equal(d.NegateTypes, []string{"BUFF", "DEBUFF"}) {
-		t.Fatalf("skill 1 level 1 NegateTypes = %v (loaded %v), want [BUFF DEBUFF]", d.NegateTypes, ok)
+	if !ok || !slices.Equal(d.Extra().NegateTypes, []string{"BUFF", "DEBUFF"}) {
+		t.Fatalf("skill 1 level 1 NegateTypes = %v (loaded %v), want [BUFF DEBUFF]", d.Extra().NegateTypes, ok)
 	}
 }
 

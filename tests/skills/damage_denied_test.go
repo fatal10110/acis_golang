@@ -123,7 +123,9 @@ func TestDamageDeniedChargeDamReportsZeroDamage(t *testing.T) {
 func TestDamageDeniedBlowReportsItsDamageButLeavesHP(t *testing.T) {
 	t.Parallel()
 	def := deniedStrike("BLOW")
-	def.Power, def.BaseLandRate = 100, 1
+	extra := def.Extra()
+	def.Power, extra.BaseLandRate = 100, 1
+	def = def.WithExtra(extra)
 	d := bootDeniedCaster(t, def)
 	// Every caster roll comes up zero: the blow always lands, never crits.
 	onPlayerQueue(t, d.srv, d.objID, func(pc *player.Character) { pc.SetRollSource(func(int) int { return 0 }) })

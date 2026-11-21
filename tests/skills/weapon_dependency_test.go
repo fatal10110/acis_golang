@@ -41,10 +41,17 @@ func weaponCatalog() *item.Table {
 
 func weaponSkill(allowed string) modelskill.Definition {
 	return modelskill.Definition{
-		ID: weaponSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 500, StaticHitTime: true, MPConsume: 5, SkillType: "DUMMY",
+		ID:            weaponSkillID,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       500,
+		StaticHitTime: true,
+		MPConsume:     5,
+		SkillType:     "DUMMY",
+	}.WithExtra(modelskill.Extra{
 		WeaponsAllowed: allowed,
-	}
+	})
 }
 
 func playerMP(t *testing.T, srv *gameservertest.Server, objID int32) int {
@@ -121,11 +128,18 @@ func TestChanceSkillNeedsAllowedWeapon(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			passive := modelskill.Definition{
-				ID: weaponPassiveID, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-				SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: 5,
-				TriggeredID: onHitTriggered, TriggeredLevel: 1,
-				WeaponsAllowed: tc.allowed,
-			}
+				ID:         weaponPassiveID,
+				Level:      1,
+				Activation: modelskill.ActivationPassive,
+				Target:     modelskill.TargetSelf,
+				SkillType:  "BUFF",
+			}.WithExtra(modelskill.Extra{
+				ChanceType:       "ON_HIT",
+				ActivationChance: 5,
+				TriggeredID:      onHitTriggered,
+				TriggeredLevel:   1,
+				WeaponsAllowed:   tc.allowed,
+			})
 			if tc.cond {
 				// The player is at full HP, so the clause fails.
 				passive.Conditions = []modelskill.ConditionClause{{
