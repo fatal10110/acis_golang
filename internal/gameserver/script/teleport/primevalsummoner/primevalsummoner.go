@@ -38,8 +38,9 @@ func onCreated(_ *script.Script, e script.Created) {
 
 // onTalk takes the fee from a player with a dead party member on the
 // island and starts the summon, answering nothing. A player with none is
-// turned away, one short of the fee told so; one who pays while a summon
-// is under way pays for nothing and is told to come back.
+// turned away, one short of the fee told so. While a summon is under way
+// Vervato is busy: he tells the player to come back before asking for the
+// fee, so a second payer or a repeated talk keeps the adena (#5157).
 func onTalk(_ *script.Script, e script.Talk) string {
 	htmltext := ""
 
@@ -54,14 +55,12 @@ func onTalk(_ *script.Script, e script.Talk) string {
 
 	if i2 == 0 {
 		htmltext = "vervato002.htm"
+	} else if !script.Same(n.Slot(script.SlotCreature0), n) {
+		htmltext = "vervato005.htm"
 	} else if player.ReduceAdena(200000) {
-		if script.Same(n.Slot(script.SlotCreature0), n) {
-			n.SetSlot(script.SlotCreature0, player)
+		n.SetSlot(script.SlotCreature0, player)
 
-			n.AddCastDesire(n, skill.Ref{ID: corpseRevival, Level: 1}, 1000000)
-		} else {
-			htmltext = "vervato005.htm"
-		}
+		n.AddCastDesire(n, skill.Ref{ID: corpseRevival, Level: 1}, 1000000)
 	} else {
 		htmltext = "vervato003.htm"
 	}

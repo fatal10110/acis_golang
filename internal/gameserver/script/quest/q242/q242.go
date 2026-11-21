@@ -44,8 +44,9 @@ const (
 )
 
 // quest holds the pure white unicorn the fallen unicorn's timer spawned,
-// shared by every player: one at a time. A unicorn that left on its own
-// 30 second despawn stays held, so no fallen unicorn spawns another.
+// shared by every player: one at a time. The unicorn is let go however it
+// leaves, talked to, on its own 30 second despawn or killed, so the next
+// fallen unicorn spawns another (#5162).
 type quest struct{ pureUnicorn *script.NPCCell }
 
 // New returns the quest.
@@ -61,9 +62,12 @@ func New() script.Script {
 				virgil, kassandra, ogmar, mysteriousKnight, angelCorpse, kalis, matild, cornerstone,
 				fallenUnicorn, pureUnicorn,
 			},
+			script.EventDecayed: {pureUnicorn},
 			script.EventMyDying: {restrainerOfGlory},
 		},
-		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTimer: q.onTimer, OnTalk: onTalk, OnMyDying: onMyDying},
+		Hooks: script.Hooks{
+			OnEvent: onAdvEvent, OnTimer: q.onTimer, OnTalk: onTalk, OnDecayed: q.onDecayed, OnMyDying: onMyDying,
+		},
 	}
 }
 
@@ -147,6 +151,15 @@ func (q quest) onTimer(s *script.Script, e script.Timer) string {
 		}
 	}
 	return ""
+}
+
+// onDecayed lets the fallen unicorn spawn a pure white one again once the
+// one held has left (#5162). The talk's timer on it goes too: firing after a
+// new one spawned, it would take that one away.
+func (q quest) onDecayed(s *script.Script, e script.Decayed) {
+	if q.pureUnicorn.ClearIf(e.NPC) {
+		s.CancelTimer("pure", e.NPC, nil)
+	}
 }
 
 func onTalk(s *script.Script, e script.Talk) string {
