@@ -33,11 +33,11 @@ type signetTemplates interface {
 	Get(id int) (*npc.Template, bool)
 }
 
-// signetGrounded optionally reports the ground point a player caster picked
-// for a ground-targeted signet; a caster without one spawns the actor on
+// signetGrounded optionally reports the ground point of a player caster's
+// accepted ground-targeted cast; a caster without one spawns the actor on
 // itself.
 type signetGrounded interface {
-	GroundTarget() (int, int, int)
+	CastGroundTarget() (int, int, int)
 }
 
 // signetPeaceZoned optionally reports whether a found object sits in a
@@ -183,7 +183,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	// ground-targeted signet spawns the point on itself.
 	if caster.Kind() == actor.KindPlayer && def.Target == modelskill.TargetGround {
 		if ground, ok := caster.(signetGrounded); ok {
-			x, y, z = ground.GroundTarget()
+			x, y, z = ground.CastGroundTarget()
 		}
 	}
 	// The point never takes its caster's facing: it is placed facing 0.
