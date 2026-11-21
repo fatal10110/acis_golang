@@ -124,7 +124,7 @@ func TestWeddingMarriesAskedFriend(t *testing.T) {
 		t.Fatalf("mods_wedding = %+v, want %+v", stored, want)
 	}
 	// A restart reads the couple back: both spouses are married again.
-	reloaded := wedding.NewManager(wedding.DefaultConfig(), nil, stored)
+	reloaded := wedding.NewManager(wedding.DefaultConfig(), nil, stored, nil)
 	if reloaded.CoupleID(c.aliceID) != coupleID || reloaded.PartnerID(c.aliceID) != c.bobbyID || reloaded.PartnerID(c.bobbyID) != c.aliceID {
 		t.Fatal("the reloaded couples lost Alice and Bobby")
 	}
@@ -222,7 +222,7 @@ func TestWeddingRequestRefusals(t *testing.T) {
 			if frames := only(drainFrames(t, c.bobby), serverpackets.OpcodeConfirmDlg); len(frames) != 0 {
 				t.Fatal("a refused request reached Bobby")
 			}
-			if c.character(t, c.aliceID).UnderMarryRequest() || c.character(t, c.bobbyID).UnderMarryRequest() {
+			if c.srv.Couples.Pending(c.aliceID) || c.srv.Couples.Pending(c.bobbyID) {
 				t.Fatal("a refused request left a player under it")
 			}
 		})
@@ -269,15 +269,16 @@ func TestWeddingAlreadyMarriedPartner(t *testing.T) {
 	c.talk(t, carol)
 	frames := c.bypass(t, carol, "AskWedding Bobby")
 	c.assertPage(t, "married partner", frames, c.page(t, "error_alreadymarried.htm", "", ""))
-	if c.character(t, c.bobbyID).UnderMarryRequest() {
+	if c.srv.Couples.Pending(c.bobbyID) {
 		t.Fatal("a refused request left the married partner under it")
 	}
 }
 
-// TestWeddingAcceptRechecksSpouses pins the two checks the accept repeats,
-// so that a request cannot marry someone already married since, nor marry
-// a spouse who spent the price meanwhile: nobody is married or charged,
-// the spouse short of the price is told so, and both leave the request.
+// TestWeddingAcceptRechecksSpouses pins what the accept rechecks and
+// whose answer counts: a spouse who spent the price meanwhile leaves both
+// unmarried and uncharged, told so, and out of the request; an answer with
+// no request, or from the requester, does nothing; and a requester cannot
+// ask a second partner while the first has yet to answer.
 func TestWeddingAcceptRechecksSpouses(t *testing.T) {
 	t.Run("price spent meanwhile", func(t *testing.T) {
 		c := bootChapel(t, defaultChapel())
@@ -300,7 +301,7 @@ func TestWeddingAcceptRechecksSpouses(t *testing.T) {
 		if c.srv.Couples.CoupleID(c.aliceID) != 0 || c.adena(t, c.aliceID) != 500_000 || c.adena(t, c.bobbyID) != 2_000_000 {
 			t.Fatal("an unpaid wedding married or charged")
 		}
-		if c.character(t, c.aliceID).UnderMarryRequest() || c.character(t, c.bobbyID).UnderMarryRequest() {
+		if c.srv.Couples.Pending(c.aliceID) || c.srv.Couples.Pending(c.bobbyID) {
 			t.Fatal("an unpaid wedding left a player under the request")
 		}
 	})
@@ -322,7 +323,7 @@ func TestWeddingAcceptRechecksSpouses(t *testing.T) {
 			t.Fatal("the requester married itself to its pending partner")
 		}
 	})
-	t.Run("married meanwhile", func(t *testing.T) {
+	t.Run("second partner asked meanwhile", func(t *testing.T) {
 		c := bootChapel(t, defaultChapel())
 		third := c.srv.SeedCharacterFor(t, "player3", "Carol", 20, 0).ID
 		carol := c.srv.DialClient(t, "player3", 1)
@@ -335,29 +336,29 @@ func TestWeddingAcceptRechecksSpouses(t *testing.T) {
 		drainFrames(t, c.alice)
 		drainFrames(t, c.bobby)
 
-		// Alice asks Bobby, then, from the request form still open, Carol.
+		// Alice asks Bobby, then, from the request form still open, Carol:
+		// a requester waits for one answer at a time (#5100).
 		c.talk(t, c.alice)
 		c.bypass(t, c.alice, "AskWedding Bobby")
-		c.bypass(t, c.alice, "AskWedding Carol")
+		frames := c.bypass(t, c.alice, "AskWedding Carol")
+		c.assertPage(t, "second request", frames, c.page(t, "waitforpartner.htm", "", ""))
+		if frames := only(drainFrames(t, carol), serverpackets.OpcodeConfirmDlg); len(frames) != 0 {
+			t.Fatal("a second request reached Carol")
+		}
 		answer(t, carol, true)
 		drainFrames(t, carol)
-		drainFrames(t, c.alice)
-		drainFrames(t, c.bobby)
-		if c.srv.Couples.PartnerID(c.aliceID) != third {
-			t.Fatal("Alice did not marry Carol")
+		if c.srv.Couples.CoupleID(c.aliceID) != 0 || c.adena(t, third) != 2_000_000 {
+			t.Fatal("an answer to a refused request married or charged")
 		}
 
 		answer(t, c.bobby, true)
 		drainFrames(t, c.alice)
 		drainFrames(t, c.bobby)
-		if c.srv.Couples.PartnerID(c.aliceID) != third || c.srv.Couples.CoupleID(c.bobbyID) != 0 {
-			t.Fatal("a stale request married an already married requester")
+		if c.srv.Couples.PartnerID(c.aliceID) != c.bobbyID {
+			t.Fatal("the first request did not marry Alice and Bobby")
 		}
-		if c.adena(t, c.bobbyID) != 2_000_000 {
-			t.Fatal("a stale request charged its partner")
-		}
-		if c.character(t, c.bobbyID).UnderMarryRequest() {
-			t.Fatal("a stale request left its partner under it")
+		if c.srv.Couples.Pending(c.bobbyID) || c.srv.Couples.Pending(c.aliceID) {
+			t.Fatal("a wedding left a player under its request")
 		}
 	})
 }

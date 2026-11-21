@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
@@ -14,8 +15,9 @@ func WithWeddingConfig(cfg wedding.Config) Option {
 	return func(o *options) { o.weddingConfig = &cfg }
 }
 
-// bootWedding loads the stored couples as the boot path does.
-func bootWedding(t *testing.T, db *sql.DB, ids wedding.IDs, cfg *wedding.Config) (*wedding.Manager, *gamesql.CoupleStore) {
+// bootWedding loads the stored couples as the boot path does, timing
+// marriage requests out against now (nil means time.Now).
+func bootWedding(t *testing.T, db *sql.DB, ids wedding.IDs, cfg *wedding.Config, now func() time.Time) (*wedding.Manager, *gamesql.CoupleStore) {
 	t.Helper()
 	store := gamesql.NewCoupleStore(db)
 	couples, err := store.Load(context.Background())
@@ -26,7 +28,7 @@ func bootWedding(t *testing.T, db *sql.DB, ids wedding.IDs, cfg *wedding.Config)
 	if cfg != nil {
 		config = *cfg
 	}
-	return wedding.NewManager(config, ids, couples), store
+	return wedding.NewManager(config, ids, couples, now), store
 }
 
 // SaveCouples writes every couple to mods_wedding, as the shutdown save

@@ -68,6 +68,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// next login starts with none, so nothing it does is gated or answered
 	// as if the window were still open.
 	l.enchanting.scrolls.Clear(live.ObjectID())
+	// The marriage request it sent or was asked to answer ends for both
+	// players, so neither stays waiting on it (#5100). Any request made
+	// before the mark above is already there to clear.
+	l.wedding.Leave(live.ObjectID())
 	// Out of party matching while still in sight, so its observers see it
 	// leave its room; marked as departing first, so no room or waiting
 	// list takes it back in.
