@@ -125,6 +125,7 @@ type options struct {
 	dbFault                *dbtest.Fault
 	selectionHold          func(objectID int32)
 	characterCreateHold    func(name string) error
+	characterLoadHold      func(objectID int32)
 	scripts                *scriptOptions
 	memoLoadErr            error
 	respawnRestoreHP       float64
@@ -2349,7 +2350,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if rosterNPCs == nil {
 		rosterNPCs = npc.NewTable(nil)
 	}
-	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold}, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold, loadHold: o.characterLoadHold}, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
 	if o.admin != nil {
 		roster.SetAccessLevels(o.admin, o.log)

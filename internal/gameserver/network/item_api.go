@@ -162,6 +162,13 @@ func (l *GameClientLink) applyLiveEdit(live *livePlayer, inv *itemcontainer.Inve
 	if err != nil {
 		return err
 	}
+	if err := l.checkItemChange(inv, inst, tmpl, edit, live.CursedWeaponEquipped()); err != nil {
+		return err
+	}
+	// A summoned pet's collar is not destroyed under it.
+	if edit.Op == invops.EditDelete && live.ControlItemInUse(inst.ObjectID) {
+		return &invops.EditError{Fault: invops.EditRefused, Reason: fmt.Sprintf("item %d controls the summoned pet", inst.ObjectID)}
+	}
 	before := inst.Snapshot()
 	switch edit.Op {
 	case invops.EditSet:
@@ -217,6 +224,38 @@ func (l *GameClientLink) checkItemAdd(inv *itemcontainer.Inventory, edit invops.
 	return invops.CheckAdd(inv, edit.ItemID, edit.Count, edit.Enchant)
 }
 
+// checkItemChange refuses a change the game itself never makes: a cursed
+// weapon follows its own lifecycle and is not set, taken off, put on or
+// destroyed by request, and a holder of one (holder) keeps it in hand, so no
+// other weapon or shield, nor formal wear, goes on.
+func (l *GameClientLink) checkItemChange(inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, edit invops.ItemEdit, holder bool) error {
+	if l.cursedItem(inv, inst.ObjectID) {
+		return &invops.EditError{Fault: invops.EditRefused, Reason: fmt.Sprintf("item %d is a cursed weapon", inst.ObjectID)}
+	}
+	if edit.Op != invops.EditEquip || !holder || inst.Equipped() {
+		return nil
+	}
+	switch tmpl.Slot {
+	case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
+	default:
+		if inst.TemplateID != formalWearID {
+			return nil
+		}
+	}
+	return &invops.EditError{Fault: invops.EditRefused, Reason: "a cursed weapon's holder keeps it in hand"}
+}
+
+// holdsCursedWeapon reports whether inv, an offline character's inventory,
+// wears a cursed weapon.
+func (l *GameClientLink) holdsCursedWeapon(inv *itemcontainer.Inventory) bool {
+	for _, inst := range inv.Items() {
+		if inst.Equipped() && l.cursedItem(inv, inst.ObjectID) {
+			return true
+		}
+	}
+	return false
+}
+
 // addEditItems adds an edit's units to inv, logging each instance added to
 // or created.
 func (l *GameClientLink) addEditItems(inv *itemcontainer.Inventory, tmpl *item.Template, edit invops.ItemEdit, name string, online bool) ([]*item.Instance, error) {
@@ -248,22 +287,15 @@ func (l *GameClientLink) editStoredItems(ctx context.Context, edit invops.ItemEd
 	if l.roster == nil || l.belongings.items == nil || l.belongings.itemInstances == nil {
 		return invops.CharacterItems{}, errors.New("item api: no character or item persistence")
 	}
-	c, err := l.roster.Load(ctx, id)
-	if errors.Is(err, gamesql.ErrCharacterNotFound) {
-		return invops.CharacterItems{}, &invops.EditError{Fault: invops.EditNoCharacter, Reason: fmt.Sprintf("no character %d", id)}
-	}
-	if err != nil {
-		return invops.CharacterItems{}, fmt.Errorf("load character %d: %w", id, err)
-	}
 	// Every save the last session queued, and every write those lanes owe,
 	// lands before the rows are read.
 	if err := l.persist.Flush(ctx, id); err != nil {
 		return invops.CharacterItems{}, busyEdit("character %d still has saves queued; retry", id)
 	}
 	var out invops.CharacterItems
-	err = errors.New("item edit did not complete")
+	err := errors.New("item edit did not complete")
 	ran, _ := runUnlessAbandoned(ctx, func(fn func()) bool { return l.persist.Enqueue(id, fn) }, func() {
-		out, err = l.applyStoredEdit(c.CharacterName(), edit)
+		out, err = l.applyStoredEdit(edit)
 	})
 	if !ran {
 		return invops.CharacterItems{}, busyEdit("character %d's saves did not finish in time; nothing changed", id)
@@ -272,11 +304,21 @@ func (l *GameClientLink) editStoredItems(ctx context.Context, edit invops.ItemEd
 }
 
 // applyStoredEdit is editStoredItems' job on the character's persistence
-// lane: read, resolve, rebuild, apply, write.
-func (l *GameClientLink) applyStoredEdit(name string, edit invops.ItemEdit) (invops.CharacterItems, error) {
+// lane: read, resolve, rebuild, apply, write. The character row is read on
+// the lane too, so a deletion purging the character, which waits for the
+// lanes, lands wholly before the job or wholly after its write.
+func (l *GameClientLink) applyStoredEdit(edit invops.ItemEdit) (invops.CharacterItems, error) {
 	id := edit.CharacterID
 	ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 	defer cancel()
+	c, err := l.roster.Load(ctx, id)
+	if errors.Is(err, gamesql.ErrCharacterNotFound) {
+		return invops.CharacterItems{}, &invops.EditError{Fault: invops.EditNoCharacter, Reason: fmt.Sprintf("no character %d", id)}
+	}
+	if err != nil {
+		return invops.CharacterItems{}, fmt.Errorf("load character %d: %w", id, err)
+	}
+	name := c.CharacterName()
 	rows, err := l.belongings.items.ListByOwner(ctx, id)
 	if err != nil {
 		return invops.CharacterItems{}, fmt.Errorf("list items of character %d: %w", id, err)
@@ -323,6 +365,9 @@ func (l *GameClientLink) applyStoredChange(inv *itemcontainer.Inventory, name st
 	}
 	inst, tmpl, err := invops.CheckExpected(inv, edit)
 	if err != nil {
+		return nil, err
+	}
+	if err := l.checkItemChange(inv, inst, tmpl, edit, l.holdsCursedWeapon(inv)); err != nil {
 		return nil, err
 	}
 	before := inst.Snapshot()

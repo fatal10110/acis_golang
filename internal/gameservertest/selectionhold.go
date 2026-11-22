@@ -27,13 +27,29 @@ func WithCharacterCreateHold(hold func(name string) error) Option {
 	return func(o *options) { o.characterCreateHold = hold }
 }
 
+// WithCharacterLoadHold runs hold ahead of every read of a character row by
+// the roster, from the reading goroutine. A suite uses it to act while a
+// reader holds what it took before the read.
+func WithCharacterLoadHold(hold func(objectID int32)) Option {
+	return func(o *options) { o.characterLoadHold = hold }
+}
+
 // holdingCharacterStore is the roster's characters store, which runs hold,
-// if any, ahead of marking a row online (WithSelectionHold), and createHold
-// ahead of inserting a row (WithCharacterCreateHold).
+// if any, ahead of marking a row online (WithSelectionHold), createHold
+// ahead of inserting a row (WithCharacterCreateHold), and loadHold ahead of
+// reading one (WithCharacterLoadHold).
 type holdingCharacterStore struct {
 	*gamesql.CharacterStore
 	hold       func(objectID int32)
 	createHold func(name string) error
+	loadHold   func(objectID int32)
+}
+
+func (s holdingCharacterStore) Get(ctx context.Context, objectID int32) (*player.Character, error) {
+	if s.loadHold != nil {
+		s.loadHold(objectID)
+	}
+	return s.CharacterStore.Get(ctx, objectID)
 }
 
 func (s holdingCharacterStore) CreateWithStarters(ctx context.Context, c *player.Character, items []item.Instance, shortcuts []shortcut.Shortcut) error {

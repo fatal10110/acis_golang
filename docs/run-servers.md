@@ -215,10 +215,13 @@ it, nothing changes and the answer is `409`: list again and decide again.
   full duration. Herbs and cursed weapons are refused. A character in the world must have the
   inventory slots for it, as for `//create_item`, and sees the usual obtained-item message.
 - **edit** sets a stack's count (1 or more; a non-stackable stays at 1) and/or the enchant level.
-- **delete** removes the item whole, taking it off first when worn.
+- **delete** removes the item whole, taking it off first when worn. The collar of a pet that is out
+  is refused.
 - **equip** and **unequip** follow the player's own paperdoll rules: a bow takes its arrows into the
   left hand and leaves them on the way off, a two-handed weapon clears the off hand, formal wear
   refuses some pieces, and a hero item goes on an active hero only.
+- A cursed weapon is never edited, deleted, equipped or unequipped (`422`), and its holder puts on
+  no other weapon or shield, nor formal wear.
 
 For a character **in the world** the change goes through its live inventory on its own queue, as a
 game master's commands do: the client gets its InventoryUpdate, an equipment change also its
