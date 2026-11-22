@@ -403,6 +403,7 @@ After one GM exists, that GM can grant levels in game:
 
 - `//set access <level>` sets the level of the selected player, or the GM's own level when nothing is selected.
 - `//set access <name> <level>` sets the level of a named character, online or offline.
+- An online character moved from a game master level (`isGM="true"` in `accessLevels.xml`) to a level that is not one is saved and disconnected, and the issuing GM is told `<name> lost GM status and was disconnected.` (#5122). Its next session starts as a regular player. `//gmoff` does not disconnect.
 
 The change is saved to `characters.accesslevel`.
 

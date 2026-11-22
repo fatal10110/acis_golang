@@ -24,7 +24,8 @@ const (
 // adminSetAccess answers //set access <level> for the selected object (gm
 // itself without one), and //set access <name> <level> for the named
 // character, online or not. A character set below 0 is banned and
-// disconnected.
+// disconnected, and so is an online one taken from a game master's level to
+// one that is not (#5122).
 //
 // Any other number of arguments answers nothing on purpose; a chat
 // command leaves no client action pending.
@@ -59,7 +60,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 			return
 		}
 		found, ok := l.adminByName(name, func(target *livePlayer) {
-			l.moveToAccessLevel(target, int(level))
+			l.moveToAccessLevel(gm, target, int(level), nil)
 		}, func(objectID int32) {
 			l.storeOfflineAccessLevel(objectID, int(level))
 		})
@@ -86,24 +87,35 @@ func adminSelectedPlayer(gm *livePlayer) (*livePlayer, bool) {
 	}
 }
 
-// changeAccessLevel moves online target to level on target's queue,
-// disconnects it when level bans it, then runs report. A target already
-// leaving the world gets level stored from gm's goroutine instead.
+// changeAccessLevel moves online target to level on target's queue, runs
+// report, then disconnects target as moveToAccessLevel does. A target
+// already leaving the world gets level stored from gm's goroutine instead.
 func (l *GameClientLink) changeAccessLevel(gm, target *livePlayer, level int, report func()) {
 	onPlayerOr(gm, target, func() {
-		l.moveToAccessLevel(target, level)
-		report()
+		l.moveToAccessLevel(gm, target, level, report)
 	}, func() {
 		l.storeLeavingAccessLevel(target, level)
 		report()
 	})
 }
 
-// moveToAccessLevel moves live, on live's queue, to level, and disconnects
-// it when level bans it: its logout save then stores the ban.
-func (l *GameClientLink) moveToAccessLevel(live *livePlayer, level int) {
+// moveToAccessLevel moves live, on live's queue, to level and runs report,
+// when given. It then disconnects live when level bans it, or when live
+// loses a game master's status (#5122), gm being told so: its logout save
+// stores the level, and its next session starts without the hiding,
+// invulnerability, movement modes and speed the game master had on.
+func (l *GameClientLink) moveToAccessLevel(gm, live *livePlayer, level int, report func()) {
+	wasGM := live.IsGM()
 	l.setAccessLevel(live, level)
-	if level < 0 {
+	if report != nil {
+		report()
+	}
+	switch {
+	case level < 0:
+		live.kickClient()
+	case wasGM && !live.IsGM():
+		// Sent before the kick: gm may be live itself.
+		sendText(gm, live.CharacterName()+" lost GM status and was disconnected.")
 		live.kickClient()
 	}
 }
@@ -265,7 +277,7 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 	// it is not banned, so an unban leaves it as it is.
 	found, ok := l.adminByName(name, func(target *livePlayer) {
 		if level < 0 {
-			l.moveToAccessLevel(target, level)
+			l.moveToAccessLevel(gm, target, level, nil)
 		}
 	}, func(objectID int32) {
 		l.storeOfflineAccessLevel(objectID, level)
