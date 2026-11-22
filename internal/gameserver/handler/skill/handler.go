@@ -89,7 +89,11 @@ type Creature interface {
 	// handler adds the spiritshot state it sampled.
 	HealInput(modelskill.Definition) (formulas.HealInput, bool)
 	MaxMPValue() float64
-	SetHP(float64)
+	// ShiftHP adds delta, which may be negative, to current HP under this
+	// creature's vitals lock, capped at max HP. A change that would leave no
+	// HP writes nothing and reports true; the caller runs the death. A dead
+	// creature stays as it is and reports false.
+	ShiftHP(delta float64) (lethal bool)
 	// Kill runs this creature's death sequence at once, whatever its HP,
 	// crediting killer, and reports whether this call killed it.
 	Kill(killer attackable.Combatant) bool
@@ -102,7 +106,10 @@ type Player interface {
 
 	CP() float64
 	MaxCPValue() float64
-	SetCP(float64)
+	// AddCP and ReduceCP change CP by a clamped delta under the player's
+	// vitals lock and return the amount applied; a dead player is unchanged.
+	AddCP(float64) float64
+	ReduceCP(float64) float64
 	BreakCastOnDamage(damage float64)
 	Charges() int
 	// ReviveRestoringExp restores exp and then revives, only while the

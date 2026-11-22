@@ -590,7 +590,16 @@ func (t *skillTarget) HealEffectiveness() float64 {
 func (t *skillTarget) HP() float64         { return t.hp }
 func (t *skillTarget) MaxHPValue() float64 { return t.maxHP }
 
-func (t *skillTarget) SetHP(v float64) { t.hp = v }
+func (t *skillTarget) ShiftHP(delta float64) bool {
+	if t.dead {
+		return false
+	}
+	if t.hp+delta <= 0 {
+		return true
+	}
+	t.hp = min(t.hp+delta, t.maxHP)
+	return false
+}
 
 func (t *skillTarget) AddHP(v float64) float64 {
 	if t.effects != nil {
@@ -636,14 +645,22 @@ func (t *skillTarget) BroadcastStatus()             {}
 
 func (t *skillTarget) CP() float64         { return t.cp }
 func (t *skillTarget) MaxCPValue() float64 { return t.maxCP }
-func (t *skillTarget) SetCP(v float64) {
-	if v < 0 {
-		v = 0
+func (t *skillTarget) AddCP(v float64) float64 {
+	if t.dead || v <= 0 {
+		return 0
 	}
-	if v > t.maxCP {
-		v = t.maxCP
+	v = max(min(v, t.maxCP-t.cp), 0)
+	t.cp += v
+	return v
+}
+
+func (t *skillTarget) ReduceCP(v float64) float64 {
+	if t.dead || v <= 0 {
+		return 0
 	}
-	t.cp = v
+	v = min(v, t.cp)
+	t.cp -= v
+	return v
 }
 
 func (t *skillTarget) AddExpAndSp(_ int64, sp int) { t.sp += sp }

@@ -30,7 +30,8 @@ type neutralPlayer struct {
 func (neutralPlayer) Kind() actor.Kind                               { return actor.KindPlayer }
 func (neutralPlayer) CP() float64                                    { return 0 }
 func (neutralPlayer) MaxCPValue() float64                            { return 0 }
-func (neutralPlayer) SetCP(float64)                                  {}
+func (neutralPlayer) AddCP(float64) float64                          { return 0 }
+func (neutralPlayer) ReduceCP(float64) float64                       { return 0 }
 func (neutralPlayer) BreakCastOnDamage(float64)                      {}
 func (neutralPlayer) Charges() int                                   { return 0 }
 func (neutralPlayer) ReviveRestoringExp(float64) bool                { return false }
