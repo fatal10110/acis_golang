@@ -51,8 +51,8 @@ func TestSwimmingOrFlyingPlayerRoute(t *testing.T) {
 			if ev.Destination != tt.want {
 				t.Fatalf("destination = %+v, want %+v", ev.Destination, tt.want)
 			}
-			if len(mover.waypoints) != 0 {
-				t.Fatalf("queued waypoints %+v, want none", mover.waypoints)
+			if len(mover.rs.waypoints) != 0 {
+				t.Fatalf("queued waypoints %+v, want none", mover.rs.waypoints)
 			}
 			if len(geo.findPathCalls) != 0 || len(geo.validLocationCalls) != 0 {
 				t.Fatalf("ground route queries: %d FindPath, %d ValidLocation; want none", len(geo.findPathCalls), len(geo.validLocationCalls))
@@ -90,8 +90,8 @@ func TestSwimmingOrFlyingNonPlayerRoutesOnGround(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ev.Destination != (location.Location{X: 100}) || len(mover.waypoints) != 1 {
-			t.Fatalf("flying %v: route to %+v then %+v, want the geopath", flying, ev.Destination, mover.waypoints)
+		if ev.Destination != (location.Location{X: 100}) || len(mover.rs.waypoints) != 1 {
+			t.Fatalf("flying %v: route to %+v then %+v, want the geopath", flying, ev.Destination, mover.rs.waypoints)
 		}
 		if len(geo.flyCalls) != 0 || len(geo.validFlyCalls) != 0 {
 			t.Fatalf("flying %v: %d fly queries, want none", flying, len(geo.flyCalls)+len(geo.validFlyCalls))

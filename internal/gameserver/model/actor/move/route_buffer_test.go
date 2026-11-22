@@ -74,8 +74,8 @@ func TestRoutedMoveQueuesFinderPath(t *testing.T) {
 	if ev.Destination != want[0] {
 		t.Fatalf("first leg = %+v, want %+v", ev.Destination, want[0])
 	}
-	if !slices.Equal(mover.waypoints, want[1:]) {
-		t.Fatalf("queued legs = %+v, want %+v", mover.waypoints, want[1:])
+	if !slices.Equal(mover.rs.waypoints, want[1:]) {
+		t.Fatalf("queued legs = %+v, want %+v", mover.rs.waypoints, want[1:])
 	}
 }
 
@@ -88,12 +88,12 @@ func TestRoutedSearchLeavesWalkedRouteIntact(t *testing.T) {
 	if _, outcome, err := mover.MoveToLocationWithPathOutcome(cellAt(6, 2)); err != nil || outcome != pathRouted {
 		t.Fatalf("first request = %v, %v; want routed", outcome, err)
 	}
-	walked := slices.Clone(mover.waypoints)
+	walked := slices.Clone(mover.rs.waypoints)
 
 	for _, target := range []location.Location{cellAt(5, 0), cellAt(7, 4), cellAt(4, 1)} {
 		mover.mu.Lock()
 		_, _, outcome := mover.resolvePathLocked(target)
-		got := slices.Clone(mover.waypoints)
+		got := slices.Clone(mover.rs.waypoints)
 		mover.mu.Unlock()
 		if outcome != pathRouted {
 			t.Fatalf("search to %+v = %v, want routed", target, outcome)
@@ -108,10 +108,10 @@ func TestRoutedSearchLeavesWalkedRouteIntact(t *testing.T) {
 	if _, outcome, err := mover.MoveToLocationWithPathOutcome(cellAt(7, 4)); err != nil || outcome != pathRouted {
 		t.Fatalf("second request = %v, %v; want routed", outcome, err)
 	}
-	walked = slices.Clone(mover.waypoints)
+	walked = slices.Clone(mover.rs.waypoints)
 	mover.mu.Lock()
 	mover.resolvePathLocked(cellAt(6, 2))
-	got := slices.Clone(mover.waypoints)
+	got := slices.Clone(mover.rs.waypoints)
 	mover.mu.Unlock()
 	if !slices.Equal(got, walked) {
 		t.Fatalf("committed route after a later search = %+v, want %+v", got, walked)
@@ -141,7 +141,7 @@ func TestRoutedMoveCopiesPlainFindPathResult(t *testing.T) {
 	if _, outcome, err := mover.MoveToLocationWithPathOutcome(location.Location{X: 150}); err != nil || outcome != pathRouted {
 		t.Fatalf("request = %v, %v; want routed", outcome, err)
 	}
-	mover.waypoints[0] = location.Location{X: -1}
+	mover.rs.waypoints[0] = location.Location{X: -1}
 	if shared[1] != (location.Location{X: 100}) {
 		t.Fatal("queued legs alias the Geo's own FindPath slice")
 	}

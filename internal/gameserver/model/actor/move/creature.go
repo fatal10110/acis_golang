@@ -136,7 +136,6 @@ type CreatureMove struct {
 
 	mu                              sync.Mutex
 	origin, destination             location.Location
-	waypoints                       []location.Location
 	accurateX, accurateY, accurateZ float64
 	flying                          bool
 	// inBoat marks a player riding a boat: like a flyer, it is held at the
@@ -150,43 +149,37 @@ type CreatureMove struct {
 	// timedType is the move type the active leg's arrival was timed with;
 	// a position update that changes the type re-times the leg.
 	timedType    MoveType
-	speed        float64
 	moving       bool
 	routeBlocked bool
+	speed        float64
 	followTarget int32
-	followOffset int
 	followMode   FollowMode
-	// pawn is the target a pawn walk stops at, nil for a walk to a fixed
-	// point; pawnStop is how far short of it the walk stops, its offset for
-	// a creature pawn and 0 for any other; pawnTracks marks a tracking pawn
-	// walk; pawnGen tells one pawn walk from the next.
-	pawn       Pawn
-	pawnStop   int
-	pawnTracks bool
-	pawnGen    uint64
-	// straight marks a walk to a fixed point with path-finding off: it
-	// heads straight for its point, and a line that closes ends it blocked.
-	straight bool
 	// startSpeed, when hasStartSpeed, is the speed the first
-	// walkStartUpdates position updates of a move use; updates counts the
-	// position updates since the move started and restarts only once the
-	// move stops, not when it is retargeted.
-	startSpeed    float64
+	// walkStartUpdates position updates of a move use (see
+	// routeState.updates).
 	hasStartSpeed bool
-	updates       int
-	// lastUpdate is when the last position update, retarget catch-up or
-	// the move start ran on the queue clock. Player movers only.
-	lastUpdate time.Time
-	// catchUps counts the retarget catch-ups that stepped the mover (see
-	// catchUpLocked).
-	catchUps uint64
-	owner    moveOwner
-	timer    *sim.Timer
+	followOffset  int
+	startSpeed    float64
+	owner         moveOwner
+	timer         *sim.Timer
 	// timedSteps is how many position updates the pending arrival timer
 	// stands for.
 	timedSteps int
 	moveSeq    uint64
 	queue      *sim.Queue
+	// debug holds the debugMove and debugPath bits a game master toggles.
+	debug atomic.Uint32
+	// rs is the state only a move request uses, nil until the first one
+	// (see routeLocked) and kept from then on, so a creature that never
+	// moves does not carry it. It is guarded by mu like the rest, and is
+	// never nil while moving.
+	rs *routeState
+}
+
+// routeState is the part of a CreatureMove that only a move request and
+// the walk it starts use. Every field is guarded by the mover's mu.
+type routeState struct {
+	waypoints []location.Location
 	// routeBufs back routed waypoints so a repeated geopath search reuses
 	// their storage. waypoints may alias routeBufs[routeBuf] while a new
 	// request searches into the other one, which becomes current only when
@@ -194,14 +187,51 @@ type CreatureMove struct {
 	// still being walked.
 	routeBufs [2][]location.Location
 	routeBuf  int
-	// debug holds the debugMove and debugPath bits a game master toggles;
-	// debugOut queues, under mu, the debug events a request produced for
-	// the owner, reported once mu is released.
-	debug    atomic.Uint32
+	// pawn is the target a pawn walk stops at, nil for a walk to a fixed
+	// point; pawnStop is how far short of it the walk stops, its offset for
+	// a creature pawn and 0 for any other; pawnTracks marks a tracking pawn
+	// walk; pawnGen tells one pawn walk from the next.
+	pawn       Pawn
+	pawnStop   int
+	pawnTracks bool
+	// straight marks a walk to a fixed point with path-finding off: it
+	// heads straight for its point, and a line that closes ends it blocked.
+	straight bool
+	pawnGen  uint64
+	// updates counts the position updates since the move started and
+	// restarts only once the move stops, not when it is retargeted.
+	updates int
+	// lastUpdate is when the last position update, retarget catch-up or
+	// the move start ran on the queue clock. Player movers only.
+	lastUpdate time.Time
+	// catchUps counts the retarget catch-ups that stepped the mover (see
+	// catchUpLocked).
+	catchUps uint64
+	// debugOut queues the debug events a request produced for the owner,
+	// reported once mu is released.
 	debugOut []event.Event
-	// debugFollowed is, under mu during a follow request, the creature
-	// whose position the request heads for.
+	// debugFollowed is, during a follow request, the creature whose
+	// position the request heads for.
 	debugFollowed headed
+}
+
+// routeLocked returns the route state, creating it on the first move
+// request. Callers hold mu.
+func (m *CreatureMove) routeLocked() *routeState {
+	if m.rs == nil {
+		m.rs = &routeState{}
+	}
+	return m.rs
+}
+
+// haltLocked marks the mover stopped and drops what is left of its route
+// and pawn. Callers hold mu.
+func (m *CreatureMove) haltLocked() {
+	m.moving = false
+	if rs := m.rs; rs != nil {
+		rs.waypoints = nil
+		rs.pawn = nil
+	}
 }
 
 const (
@@ -248,8 +278,8 @@ func (m *CreatureMove) ToggleDebug(path bool) bool {
 	defer m.mu.Unlock()
 	now := m.debug.Load() ^ bit
 	m.debug.Store(now)
-	if now == 0 {
-		m.debugOut = nil
+	if now == 0 && m.rs != nil {
+		m.rs.debugOut = nil
 	}
 	return now&bit != 0
 }
@@ -266,8 +296,12 @@ func (m *CreatureMove) flushDebug() {
 		return
 	}
 	m.mu.Lock()
-	out, owner := m.debugOut, m.owner
-	m.debugOut = nil
+	if m.rs == nil {
+		m.mu.Unlock()
+		return
+	}
+	out, owner := m.rs.debugOut, m.owner
+	m.rs.debugOut = nil
 	m.mu.Unlock()
 	if owner == nil {
 		return
@@ -288,18 +322,18 @@ func (m *CreatureMove) debugStartLocked(origin, destination location.Location, p
 	ev := event.MoveDebugStart{
 		Origin:      origin,
 		Destination: destination,
-		Route:       append([]location.Location(nil), m.waypoints...),
+		Route:       append([]location.Location(nil), m.rs.waypoints...),
 		Pawn:        pawn != nil && tracks,
 		Offset:      offset,
 	}
-	followed := m.debugFollowed
+	followed := m.rs.debugFollowed
 	if h, ok := pawn.(headed); ok && !tracks {
 		followed = h
 	}
 	if followed != nil {
 		ev.Followed, ev.DestinationHeading = true, followed.Heading()
 	}
-	m.debugOut = append(m.debugOut, ev)
+	m.rs.debugOut = append(m.rs.debugOut, ev)
 }
 
 // headed is a creature that faces a heading.
@@ -441,7 +475,7 @@ func (m *CreatureMove) retimeLocked() {
 // updateSpeedLocked is the speed the current position update advances at.
 // Callers count the update first.
 func (m *CreatureMove) updateSpeedLocked() float64 {
-	if m.hasStartSpeed && m.updates <= walkStartUpdates {
+	if m.hasStartSpeed && m.rs.updates <= walkStartUpdates {
 		return m.startSpeed
 	}
 	return m.speed
@@ -452,8 +486,8 @@ func (m *CreatureMove) updateSpeedLocked() float64 {
 // It is NaN or +Inf when the speeds cannot cover it. Callers hold mu.
 func (m *CreatureMove) travelTicksLocked(distance float64) float64 {
 	var ticks float64
-	if m.hasStartSpeed && m.updates < walkStartUpdates {
-		startTicks := float64(walkStartUpdates - m.updates)
+	if m.hasStartSpeed && m.rs.updates < walkStartUpdates {
+		startTicks := float64(walkStartUpdates - m.rs.updates)
 		startStep := m.startSpeed / 10
 		if startStep > 0 && distance <= startTicks*startStep {
 			return math.Ceil(distance / startStep)
@@ -476,8 +510,8 @@ func (m *CreatureMove) arrivalDelayLocked() time.Duration {
 	distance := m.leftLocked(m.timedType, m.accurateX, m.accurateY)
 	var within float64
 	if m.onTrackedPawnLegLocked() {
-		distance = max(distance-float64(m.pawnStop), 0)
-		if m.pawnStop > 0 {
+		distance = max(distance-float64(m.rs.pawnStop), 0)
+		if m.rs.pawnStop > 0 {
 			within = 1
 		}
 	}
@@ -491,13 +525,13 @@ func (m *CreatureMove) arrivalDelayLocked() time.Duration {
 // onLastPawnLegLocked reports that the active leg is the last one of a pawn
 // walk, the leg that stops at the pawn. Callers hold mu.
 func (m *CreatureMove) onLastPawnLegLocked() bool {
-	return m.moving && m.pawn != nil && len(m.waypoints) == 0
+	return m.moving && m.rs.pawn != nil && len(m.rs.waypoints) == 0
 }
 
 // onTrackedPawnLegLocked reports that the active leg is the last one of a
 // tracking pawn walk, the leg that re-aims at the pawn. Callers hold mu.
 func (m *CreatureMove) onTrackedPawnLegLocked() bool {
-	return m.onLastPawnLegLocked() && m.pawnTracks
+	return m.onLastPawnLegLocked() && m.rs.pawnTracks
 }
 
 // setOwner records the controller this move reports milestones to. With no
@@ -680,9 +714,7 @@ func (m *CreatureMove) SetPosition(position location.Location) {
 		// Position reports arrival at the active destination; any queued
 		// segments are dropped, since the caller is the authoritative
 		// source of position corrections.
-		m.waypoints = nil
-		m.moving = false
-		m.pawn = nil
+		m.haltLocked()
 	}
 }
 
@@ -746,8 +778,9 @@ func (m *CreatureMove) followToLocationWithPathOutcome(target location.Location,
 	defer m.flushDebug()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.debugFollowed, _ = followed.(headed)
-	defer func() { m.debugFollowed = nil }()
+	rs := m.routeLocked()
+	rs.debugFollowed, _ = followed.(headed)
+	defer func() { rs.debugFollowed = nil }()
 	return m.moveToLocationLocked(target, nil, 0, false, catchUp, false)
 }
 
@@ -819,6 +852,7 @@ func (m *CreatureMove) mayCatchUp(pawn Pawn) bool {
 // a direct walk broadcasts it. Only each step and the arrival land a ground
 // mover on the floor (see stepLocked and finishLocked).
 func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn, offset int, tracks, catchUp, straight bool) (event.Move, pathFindResult, error) {
+	rs := m.routeLocked()
 	moveType := m.moveTypeLocked()
 	// Retargeting an in-flight walk keeps a mid-route block sticky through
 	// the new destination, and the start-speed update count running. Only a
@@ -827,21 +861,21 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	// catchUp holds it where it stands.
 	if !m.moving {
 		m.routeBlocked = false
-		m.updates = 0
+		rs.updates = 0
 	} else if m.playerStepsLocked() && catchUp {
 		m.catchUpLocked()
 	}
 	if m.playerStepsLocked() {
-		m.lastUpdate = m.nowLocked()
+		rs.lastUpdate = m.nowLocked()
 	}
 
 	// Same-cell requests complete on the next movement tick.
 	if target.X == m.origin.X && target.Y == m.origin.Y && (moveType == MoveGround || target.Z == m.origin.Z) {
-		m.waypoints = nil
+		rs.waypoints = nil
 		m.destination = target
 		m.setAccurateLocked(m.origin)
 		m.setPawnLocked(pawn, offset, tracks)
-		m.straight = straight
+		rs.straight = straight
 		m.moving = true
 		m.rescheduleLocked(PositionUpdateInterval)
 		m.debugStartLocked(m.origin, target, pawn, tracks, offset)
@@ -870,12 +904,12 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	origin := m.origin
 	m.setAccurateLocked(origin)
 	m.destination = destination
-	m.waypoints = waypoints
+	rs.waypoints = waypoints
 	if outcome == pathRouted {
-		m.routeBuf ^= 1
+		rs.routeBuf ^= 1
 	}
 	m.setPawnLocked(pawn, offset, tracks)
-	m.straight = straight
+	rs.straight = straight
 	m.moving = true
 	m.rescheduleLocked(m.arrivalDelayLocked())
 	m.debugStartLocked(origin, destination, pawn, tracks, offset)
@@ -892,13 +926,14 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 // tracks, or a walk to a fixed point when pawn is nil. Only a creature pawn
 // stops the walk offset short of it. Callers hold mu.
 func (m *CreatureMove) setPawnLocked(pawn Pawn, offset int, tracks bool) {
-	m.pawn = pawn
-	m.pawnStop = 0
+	rs := m.rs
+	rs.pawn = pawn
+	rs.pawnStop = 0
 	if pawn != nil && pawn.Kind().Creature() {
-		m.pawnStop = offset
+		rs.pawnStop = offset
 	}
-	m.pawnTracks = pawn != nil && tracks
-	m.pawnGen++
+	rs.pawnTracks = pawn != nil && tracks
+	rs.pawnGen++
 }
 
 // resolvePathLocked applies the three-tier route resolution a move request
@@ -942,7 +977,8 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 
 	if path, ok, tr := m.findPathLocked(target); ok && len(path) >= 2 {
 		if tr != nil {
-			m.debugOut = append(m.debugOut, event.PathDebug{Strokes: debugStrokes(tr)})
+			rs := m.routeLocked()
+			rs.debugOut = append(rs.debugOut, event.PathDebug{Strokes: debugStrokes(tr)})
 		}
 		// The pathfinder returns every corner plus the final target cell,
 		// omitting the origin. Treat the first entry as the active segment
@@ -960,7 +996,8 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 // when it commits the route. A mover whose paths are debugged searches
 // traced, and gets the trace back. Callers hold mu.
 func (m *CreatureMove) findPathLocked(target location.Location) ([]location.Location, bool, *engine.Trace) {
-	next := m.routeBuf ^ 1
+	rs := m.routeLocked()
+	next := rs.routeBuf ^ 1
 	var path []location.Location
 	var ok bool
 	var tr *engine.Trace
@@ -968,15 +1005,15 @@ func (m *CreatureMove) findPathLocked(target location.Location) ([]location.Loca
 		tr = &engine.Trace{}
 		var found []location.Location
 		found, ok = g.FindPathTraced(m.origin, target, tr)
-		path = append(m.routeBufs[next][:0], found...)
+		path = append(rs.routeBufs[next][:0], found...)
 	} else if g, into := m.geo.(pathIntoFinder); into {
-		path, ok = g.FindPathInto(m.routeBufs[next][:0], m.origin, target)
+		path, ok = g.FindPathInto(rs.routeBufs[next][:0], m.origin, target)
 	} else {
 		var found []location.Location
 		found, ok = m.geo.FindPath(m.origin, target)
-		path = append(m.routeBufs[next][:0], found...)
+		path = append(rs.routeBufs[next][:0], found...)
 	}
-	m.routeBufs[next] = path[:0]
+	rs.routeBufs[next] = path[:0]
 	return path, ok, tr
 }
 
@@ -1021,8 +1058,8 @@ func (m *CreatureMove) onArrive(seq uint64) {
 		return
 	}
 	var pawn Pawn
-	if m.onLastPawnLegLocked() && (m.pawnTracks || m.pawnStop > 0) {
-		pawn = m.pawn
+	if m.onLastPawnLegLocked() && (m.rs.pawnTracks || m.rs.pawnStop > 0) {
+		pawn = m.rs.pawn
 	}
 	owner := m.owner
 	m.mu.Unlock()
@@ -1048,7 +1085,7 @@ func (m *CreatureMove) onArrive(seq uint64) {
 		action = m.endLocked()
 	case pawn != nil:
 		action = m.runOutLegLocked(pawnAt)
-	case m.straight:
+	case m.rs.straight:
 		// A straight walk's line may close before its point: the timer
 		// runs the position updates it stands for, as for a pawn walk.
 		action = m.runOutLegLocked(location.Location{})
@@ -1089,9 +1126,10 @@ func (m *CreatureMove) runOutLegLocked(pawnAt location.Location) func() {
 	var stepFrom location.Location
 	stepped := false
 	end := false
+	rs := m.rs
 	for range max(m.timedSteps, 1) {
-		m.updates++
-		if m.pawnTracks {
+		rs.updates++
+		if rs.pawnTracks {
 			m.destination = pawnAt
 		}
 		passed := m.updateSpeedLocked() * PositionUpdateInterval.Seconds()
@@ -1113,7 +1151,7 @@ func (m *CreatureMove) runOutLegLocked(pawnAt location.Location) func() {
 		stepFrom, stepped = m.origin, true
 		m.accurateX, m.accurateY, m.accurateZ = accurate[0], accurate[1], accurate[2]
 		m.origin = next
-		if reached || (m.pawnStop > 0 && inRadius(moveType, next, pawnAt, m.pawnStop)) {
+		if reached || (rs.pawnStop > 0 && inRadius(moveType, next, pawnAt, rs.pawnStop)) {
 			end = true
 			break
 		}
@@ -1123,7 +1161,7 @@ func (m *CreatureMove) runOutLegLocked(pawnAt location.Location) func() {
 		return chain(turn, m.endLocked())
 	}
 	if player {
-		m.lastUpdate = m.nowLocked()
+		rs.lastUpdate = m.nowLocked()
 	}
 	m.retimeLocked()
 	return turn
@@ -1134,7 +1172,7 @@ func (m *CreatureMove) runOutLegLocked(pawnAt location.Location) func() {
 // walk. Callers hold mu.
 func (m *CreatureMove) turnLocked(from location.Location) func() {
 	owner := m.owner
-	if owner == nil || !m.pawnTracks {
+	if owner == nil || !m.rs.pawnTracks {
 		return nil
 	}
 	to := m.origin
@@ -1159,9 +1197,7 @@ func chain(first, second func()) func() {
 // hook for the caller to invoke after unlocking. Callers hold mu.
 func (m *CreatureMove) endLocked() func() {
 	m.rescheduleLocked(0)
-	m.waypoints = nil
-	m.moving = false
-	m.pawn = nil
+	m.haltLocked()
 	return m.arrivalHookLocked()
 }
 
@@ -1190,9 +1226,10 @@ func (m *CreatureMove) finishLocked() func() {
 	// destination with a freshly scheduled arrival timer. Scheduling a new
 	// timer advances moveSeq, so the previous segment's onArrive callback
 	// (if still in flight) is ignored.
-	for len(m.waypoints) > 0 {
-		next := m.waypoints[0]
-		m.waypoints = m.waypoints[1:]
+	rs := m.rs
+	for len(rs.waypoints) > 0 {
+		next := rs.waypoints[0]
+		rs.waypoints = rs.waypoints[1:]
 		distance := between(m.moveTypeLocked(), m.origin, next)
 		ticks := m.travelTicksLocked(distance)
 		if math.IsNaN(ticks) || ticks > maxTravelTicks {
@@ -1278,7 +1315,11 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 	// Read the pawn's position before taking mu: it may take the pawn's
 	// own locks.
 	m.mu.Lock()
-	pawn, pawnGen := m.pawn, m.pawnGen
+	var pawn Pawn
+	var pawnGen uint64
+	if m.moving {
+		pawn, pawnGen = m.rs.pawn, m.rs.pawnGen
+	}
 	m.mu.Unlock()
 	var pawnAt location.Location
 	if pawn != nil {
@@ -1296,23 +1337,24 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 	if player {
 		now = m.nowLocked()
 		if measured {
-			step = now.Sub(m.lastUpdate)
+			step = now.Sub(m.rs.lastUpdate)
 		}
 	}
 	if step <= 0 && !(player && measured) {
 		return positionUpdate{ev: m.currentEventLocked(), moving: true, seq: m.moveSeq}
 	}
-	m.updates++
+	rs := m.rs
+	rs.updates++
 
-	lastPawnLeg := pawn != nil && pawnGen == m.pawnGen && m.onLastPawnLegLocked()
-	tracking := lastPawnLeg && m.pawnTracks
+	lastPawnLeg := pawn != nil && pawnGen == rs.pawnGen && m.onLastPawnLegLocked()
+	tracking := lastPawnLeg && rs.pawnTracks
 	if tracking {
 		m.destination = pawnAt
 	}
 	var passed float64
 	if player {
 		passed = playerPassed(m.updateSpeedLocked(), step)
-		m.lastUpdate = now
+		rs.lastUpdate = now
 	} else {
 		passed = m.updateSpeedLocked() * step.Seconds()
 	}
@@ -1341,7 +1383,7 @@ func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positio
 
 	m.accurateX, m.accurateY, m.accurateZ = nextAccurate[0], nextAccurate[1], nextAccurate[2]
 	m.origin = next
-	if lastPawnLeg && m.pawnStop > 0 && inRadius(moveType, next, pawnAt, m.pawnStop) {
+	if lastPawnLeg && rs.pawnStop > 0 && inRadius(moveType, next, pawnAt, rs.pawnStop) {
 		u.hook = m.endLocked()
 		return u
 	}
@@ -1416,8 +1458,8 @@ func (m *CreatureMove) stepLocked(passed float64, moveType MoveType, maxZ int) (
 // stays on the same cell. It runs no milestone, even on reaching the
 // destination. Callers hold mu.
 func (m *CreatureMove) catchUpLocked() {
-	elapsed := m.nowLocked().Sub(m.lastUpdate)
-	m.updates++
+	elapsed := m.nowLocked().Sub(m.rs.lastUpdate)
+	m.rs.updates++
 	moveType, maxZ := m.waterLocked()
 	next, accurate, _ := m.stepLocked(playerPassed(m.updateSpeedLocked(), elapsed), moveType, maxZ)
 	if moveType == MoveGround && !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
@@ -1426,14 +1468,17 @@ func (m *CreatureMove) catchUpLocked() {
 	}
 	m.accurateX, m.accurateY, m.accurateZ = accurate[0], accurate[1], accurate[2]
 	m.origin = next
-	m.catchUps++
+	m.rs.catchUps++
 }
 
 // catchUpCount returns how many retarget catch-ups stepped the mover so far.
 func (m *CreatureMove) catchUpCount() uint64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.catchUps
+	if m.rs == nil {
+		return 0
+	}
+	return m.rs.catchUps
 }
 
 // abandonPawnWalk is the position update of the pawn walk gen once its pawn
@@ -1444,7 +1489,7 @@ func (m *CreatureMove) catchUpCount() uint64 {
 func (m *CreatureMove) abandonPawnWalk(gen uint64) (positionUpdate, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if !m.moving || m.pawn == nil || m.pawnGen != gen {
+	if !m.moving || m.rs.pawn == nil || m.rs.pawnGen != gen {
 		return positionUpdate{}, false
 	}
 	if ok, hook := m.startNextWaypointLocked(); ok {
@@ -1461,7 +1506,7 @@ func (m *CreatureMove) walkingPawn() (Pawn, uint64) {
 	if !m.moving {
 		return nil, 0
 	}
-	return m.pawn, m.pawnGen
+	return m.rs.pawn, m.rs.pawnGen
 }
 
 // maxZLocked is the highest a step from the origin may land. Callers hold
@@ -1534,9 +1579,7 @@ func (m *CreatureMove) arrivalHookLocked() func() {
 
 func (m *CreatureMove) stopBlockedLocked() func() {
 	m.rescheduleLocked(0)
-	m.waypoints = nil
-	m.moving = false
-	m.pawn = nil
+	m.haltLocked()
 	if m.owner == nil {
 		return nil
 	}
@@ -1548,20 +1591,19 @@ func (m *CreatureMove) stopBlockedLocked() func() {
 // per tick; a dry queue or a non-positive speed reports that the route is
 // exhausted. Callers hold mu.
 func (m *CreatureMove) startNextWaypointLocked() (ok bool, action func()) {
-	if len(m.waypoints) == 0 || m.speed <= 0 {
+	rs := m.rs
+	if len(rs.waypoints) == 0 || m.speed <= 0 {
 		return false, nil
 	}
-	next := m.waypoints[0]
-	m.waypoints = m.waypoints[1:]
+	next := rs.waypoints[0]
+	rs.waypoints = rs.waypoints[1:]
 	m.setAccurateLocked(m.origin)
 	m.destination = next
 
 	distance := between(m.moveTypeLocked(), m.origin, next)
 	ticks := m.travelTicksLocked(distance)
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
-		m.waypoints = nil
-		m.moving = false
-		m.pawn = nil
+		m.haltLocked()
 		return false, nil
 	}
 	m.moving = true
@@ -1593,9 +1635,7 @@ func (m *CreatureMove) CancelMove() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.rescheduleLocked(0)
-	m.waypoints = nil
-	m.moving = false
-	m.pawn = nil
+	m.haltLocked()
 }
 
 // Moving reports whether the current request has non-zero ground distance
