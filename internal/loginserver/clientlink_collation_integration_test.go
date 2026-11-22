@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/link"
 	loginsql "github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
 )
@@ -116,5 +117,37 @@ func TestClientLinkCollationEqualSpellingRefusedWhileCanonicalInGame(t *testing.
 	}
 	if _, ok := sessions.Get(accentedPlayer1); ok {
 		t.Fatalf("session issued under the typed spelling %q", accentedPlayer1)
+	}
+}
+
+// TestGameServerRefusesSessionKeysUnderCollationEqualSpelling logs in and
+// joins a server with a collation-equal spelling of player1, then presents
+// the issued keys to the session check: the typed spelling is refused, the
+// stored login player1 is accepted (#5046, #5464).
+func TestGameServerRefusesSessionKeysUnderCollationEqualSpelling(t *testing.T) {
+	store := newCollationStore(t)
+	clientAddr, l, gsAddr, servers, _ := newTestLinkPair(t, store)
+
+	servers.Register(1, testHexID)
+	gs := dialGameServer(t, gsAddr)
+	gs.handshake()
+	gs.sendGameServerAuth(1, false, false, "*", 7777, 100, testHexID)
+	if ok, _, _, failReason := gs.readAuthResult(); !ok {
+		t.Fatalf("game server auth failed with reason %d", failReason)
+	}
+	auto := link.ServerTypeAuto
+	servers.ApplyStatus(1, link.ServerStatus{Status: &auto})
+
+	c := dialLoginClient(t, clientAddr)
+	loginKey1, loginKey2 := c.login(l, accentedPlayer1, "s3cret")
+	keys := c.serverLogin(loginKey1, loginKey2, 1)
+
+	gs.sendPlayerAuthRequest(accentedPlayer1, keys)
+	if account, ok := gs.readPlayerAuthResponse(); account != accentedPlayer1 || ok {
+		t.Fatalf("PlayerAuthResponse under %q = %q, %v, want %q, false", accentedPlayer1, account, ok, accentedPlayer1)
+	}
+	gs.sendPlayerAuthRequest("player1", keys)
+	if account, ok := gs.readPlayerAuthResponse(); account != "player1" || !ok {
+		t.Fatalf("PlayerAuthResponse under player1 = %q, %v, want player1, true", account, ok)
 	}
 }
