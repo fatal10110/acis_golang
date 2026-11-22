@@ -38,7 +38,8 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 			tb.Skipf("waiting %v on the wall clock; the driven clock covers the rest", d)
 		}
 		time.Sleep(d)
-		if err := s.queues.awaitDueTimers(); err != nil {
+		end := time.Now()
+		if err := s.queues.awaitDueTimers(end); err != nil {
 			tb.Fatal(err)
 		}
 	}

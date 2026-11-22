@@ -1,8 +1,11 @@
 package sim
 
 import (
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // TestDueTimersCountsOnlyExpiriesTheClockHasNotDelivered: an armed timer is
@@ -36,4 +39,35 @@ func TestDueTimersCountsOnlyExpiriesTheClockHasNotDelivered(t *testing.T) {
 	if !ran || q.DueTimers(in.Now()) {
 		t.Fatalf("after delivery ran = %v, due = %v; want true, false", ran, q.DueTimers(in.Now()))
 	}
+}
+
+// TestDueTimersIgnoresATickAlreadyPostedToABlockedQueue: a ticker whose expiry
+// sits posted behind a running task is accepted work, so it is not reported
+// due however far the probe's clock is past its next deadline.
+func TestDueTimersIgnoresATickAlreadyPostedToABlockedQueue(t *testing.T) {
+	p := startPool(t, 1, zerolog.Nop())
+	q := p.NewQueue("q")
+	release := make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(unblock) // runs before startPool's stop, so a failure does not stall it
+	q.Post(func() { <-release })
+
+	ticker := q.Every(2*time.Millisecond, func() {})
+	tm := (*Timer)(ticker)
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(time.Millisecond) {
+		q.mu.Lock()
+		queued := tm.queued
+		q.mu.Unlock()
+		if queued {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("ticker never queued a tick while the queue was blocked")
+		}
+	}
+	if q.DueTimers(time.Now().Add(time.Hour)) {
+		t.Fatal("a tick already posted to the blocked queue reports due")
+	}
+	ticker.Stop()
+	unblock()
 }
