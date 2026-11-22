@@ -43,6 +43,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
+	"github.com/fatal10110/acis_golang/internal/gameserver/itemapi"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -1252,6 +1253,8 @@ type Server struct {
 	// cursedLink drops a monster kill's cursed weapon and runs the cursed
 	// weapons' timers.
 	cursedLink cursedLink
+	// itemEditor is the link the item API edits characters' items through.
+	itemEditor itemapi.Editor
 }
 
 // autosaveClock is the harness clock task.Autosave reads. EnterWorld's
@@ -2884,6 +2887,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,
 		cursedLink:          gcl,
+		itemEditor:          gcl,
 		Olympiad:            olympiadState,
 		Heroes:              heroes,
 		Lottery:             lotteryState,

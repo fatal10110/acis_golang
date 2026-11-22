@@ -29,7 +29,7 @@ func testBanAPI(t *testing.T) (*httptest.Server, *netutil.BanList) {
 		{Name: "game-ban", Bans: bans},
 		{Name: "game-accept-filter", Bans: filter},
 	}, zerolog.Nop())
-	ts := httptest.NewServer(routes(h))
+	ts := httptest.NewServer(mux([]Route{{Path: BansPath, Handler: h}}))
 	t.Cleanup(ts.Close)
 	return ts, bans
 }
@@ -109,7 +109,7 @@ func TestBanAPIRejectsBadRequests(t *testing.T) {
 		{"bad json", http.MethodPost, BansAddPath, "application/json", `{"ip":`, http.StatusBadRequest, "bad json"},
 		{"unknown field", http.MethodPost, BansAddPath, "application/json", `{"ip":"1.2.3.4","store":"game-ban","duration":60}`, http.StatusBadRequest, "bad json"},
 		{"trailing data", http.MethodPost, BansAddPath, "application/json", `{"ip":"1.2.3.4","store":"game-ban","permanent":true}{}`, http.StatusBadRequest, "trailing"},
-		{"too large", http.MethodPost, BansAddPath, "application/json", `{"ip":"` + strings.Repeat("1", maxBanBody) + `"}`, http.StatusRequestEntityTooLarge, "too large"},
+		{"too large", http.MethodPost, BansAddPath, "application/json", `{"ip":"` + strings.Repeat("1", MaxBody) + `"}`, http.StatusRequestEntityTooLarge, "too large"},
 		{"hostname", http.MethodPost, BansAddPath, "application/json", `{"ip":"example.com","store":"game-ban","permanent":true}`, http.StatusBadRequest, "literal IP"},
 		{"zoned", http.MethodPost, BansAddPath, "application/json", `{"ip":"fe80::1%eth0","store":"game-ban","permanent":true}`, http.StatusBadRequest, "literal IP"},
 		{"unknown store", http.MethodPost, BansRemovePath, "application/json", `{"ip":"1.2.3.4","store":"login-ban"}`, http.StatusBadRequest, "unknown store"},
