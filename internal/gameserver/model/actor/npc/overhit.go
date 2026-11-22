@@ -81,21 +81,30 @@ func overhitActingPlayer(a attackable.Combatant) attackable.Combatant {
 
 // EnableOverhit arms this NPC for an overhit check on the next HP reduction.
 func (h *Hostile) EnableOverhit() {
-	h.overhit.set(true)
+	h.ensureLoot().overhit.set(true)
 }
 
+// testOverhit settles an armed over-hit against an HP reduction; a life
+// no over-hit skill armed has nothing to settle.
 func (h *Hostile) testOverhit(attacker attackable.Combatant, damage float64) {
-	h.overhit.test(attacker, h.HP(), damage)
+	if l := h.loot.Load(); l != nil {
+		l.overhit.test(attacker, h.HP(), damage)
+	}
 }
 
 // OverhitValid reports whether player is the acting player of a successful
 // overhit strike stored on this NPC.
 func (h *Hostile) OverhitValid(player attackable.Combatant) bool {
-	return h.overhit.valid(player)
+	l := h.loot.Load()
+	return l != nil && l.overhit.valid(player)
 }
 
 // OverhitBonus returns the rounded XP bonus for a successful overhit against
 // normalExp, capped at 25% of that amount from excess damage vs max HP.
 func (h *Hostile) OverhitBonus(normalExp int64) int64 {
-	return h.overhit.bonusExp(normalExp, h.MaxHPValue())
+	l := h.loot.Load()
+	if l == nil {
+		return 0
+	}
+	return l.overhit.bonusExp(normalExp, h.MaxHPValue())
 }

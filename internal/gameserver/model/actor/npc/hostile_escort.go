@@ -46,30 +46,41 @@ func (h *Hostile) ThinkFollow(target attackable.Combatant, lastWasFollow bool) (
 }
 
 func (h *Hostile) thinkMasterEscort(master PartyMember, lastWasFollow bool) {
-	h.partyMu.RLock()
-	hasLast := h.hasLastFollow
-	lastLoc := h.lastFollowingLoc
-	h.partyMu.RUnlock()
+	l := h.links()
+	l.partyMu.RLock()
+	hasLast := l.hasLastFollow
+	lastLoc := l.lastFollowingLoc
+	l.partyMu.RUnlock()
 	dest, masterLoc, ok := claimFollowSlot(master, h, lastWasFollow, hasLast, lastLoc)
 	if !ok {
 		return
 	}
 	h.moveTo(dest)
-	h.partyMu.Lock()
-	h.lastFollowingLoc = masterLoc
-	h.hasLastFollow = true
-	h.partyMu.Unlock()
+	l.partyMu.Lock()
+	l.lastFollowingLoc = masterLoc
+	l.hasLastFollow = true
+	l.partyMu.Unlock()
 }
+
+// escortMinionBuffer is how many privates an escort step reads without
+// allocating; a larger party still works, from a heap buffer.
+const escortMinionBuffer = 32
 
 // claimFollowSlot picks minion's escort point around master and records it
 // in master.followSlots. The slots are snapshotted under the master's
-// partyMu and matched against a snapshot of its privates; other occupants are resolved through the world and every
-// position is read after unlock, so no world or actor lookup runs under the
+// partyMu and matched against the master's privates, copied into a stack
+// buffer under the party lock and resolved to their current lives after
+// it; other occupants are resolved through the world and every position
+// is read after unlock, so no world or actor lookup runs under either
 // lock. The result is written back with a re-check (commitFollowSlots).
 // masterLoc is the master position the escort points were laid out around.
 func claimFollowSlot(master PartyMember, minion *Hostile, lastWasFollow, hasLast bool, lastLoc location.Location) (dest, masterLoc location.Location, ok bool) {
 	var occupants [escortSlotCount]PartyMember
-	minions := master.Minions()
+	var buf [escortMinionBuffer]PartyMember
+	minions := topHolder(master, false).appendMinions(buf[:0])
+	for i, m := range minions {
+		minions[i] = Current(m)
+	}
 	p := master.links()
 	p.partyMu.RLock()
 	slots := p.followSlots

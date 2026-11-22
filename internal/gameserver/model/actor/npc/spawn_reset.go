@@ -89,9 +89,11 @@ func (h *Hostile) resetForSpawn() {
 	if !h.MonsterKind() {
 		return
 	}
-	h.overhit.clear()
-	h.spoil.Reset()
-	h.seed.clear()
+	if l := h.loot.Load(); l != nil {
+		l.overhit.clear()
+		l.spoil.Reset()
+		l.seed.clear()
+	}
 	h.absorb.clear()
 	if h.chestKind() {
 		h.interacted.Store(false)

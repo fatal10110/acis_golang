@@ -57,7 +57,7 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.SkillCanceled:
 		s.broadcast(func() wire.Frame { return frames.SkillCanceled(e.ObjectID) })
 	case event.Died:
-		s.broadcast(func() wire.Frame { return frames.Die(h.ObjectID(), h.SpoilPool().Sweepable()) })
+		s.broadcast(func() wire.Frame { return frames.Die(h.ObjectID(), h.Sweepable()) })
 		s.stopAttackStance()
 	case event.Revived:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameRevive(h.ObjectID()) })
