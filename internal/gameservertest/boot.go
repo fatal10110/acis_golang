@@ -43,6 +43,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
+	"github.com/fatal10110/acis_golang/internal/gameserver/itemapi"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -124,6 +125,7 @@ type options struct {
 	dbFault                *dbtest.Fault
 	selectionHold          func(objectID int32)
 	characterCreateHold    func(name string) error
+	characterLoadHold      func(objectID int32)
 	scripts                *scriptOptions
 	memoLoadErr            error
 	respawnRestoreHP       float64
@@ -1252,6 +1254,8 @@ type Server struct {
 	// cursedLink drops a monster kill's cursed weapon and runs the cursed
 	// weapons' timers.
 	cursedLink cursedLink
+	// itemEditor is the link the item API edits characters' items through.
+	itemEditor itemapi.Editor
 }
 
 // autosaveClock is the harness clock task.Autosave reads. EnterWorld's
@@ -2346,7 +2350,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if rosterNPCs == nil {
 		rosterNPCs = npc.NewTable(nil)
 	}
-	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold}, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold, createHold: o.characterCreateHold, loadHold: o.characterLoadHold}, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
 	if o.admin != nil {
 		roster.SetAccessLevels(o.admin, o.log)
@@ -2884,6 +2888,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,
 		cursedLink:          gcl,
+		itemEditor:          gcl,
 		Olympiad:            olympiadState,
 		Heroes:              heroes,
 		Lottery:             lotteryState,

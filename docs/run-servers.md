@@ -171,6 +171,89 @@ permanent login ban that must survive a restart also goes into `banned_ips.prope
 line). The gameserver has no ban file and starts with an empty `game-ban`. Removing a
 `banned_ips.properties` entry through the API lifts it until the next restart only.
 
+### Character Item API
+
+The gameserver's debug listener also serves a character item API, so an operator can fix a
+character's inventory and paperdoll while the server runs, whether the character is in the world or
+not. Like the ban API it is on only with `-debug-addr`, answers only loopback clients, reads with
+`GET`, and writes with `POST`, `Content-Type: application/json` and a body of at most 4 KiB with no
+unknown fields. The loginserver does not serve it.
+
+`GET /debug/items?character_id=268435457` lists the character's `INVENTORY` and `PAPERDOLL` items,
+by object id:
+
+```json
+{
+  "character_id": 268435457,
+  "name": "YourChar",
+  "online": false,
+  "items": [
+    {"object_id": 268435460, "item_id": 57, "count": 1500, "enchant": 0, "location": "INVENTORY", "slot": -1, "augmented": false, "mana": -1},
+    {"object_id": 268435461, "item_id": 2369, "count": 1, "enchant": 3, "location": "PAPERDOLL", "slot": 7, "augmented": false, "mana": -1}
+  ]
+}
+```
+
+`slot` is the paperdoll slot of a worn item (`-1` otherwise), `mana` a shadow item's remaining mana in
+seconds (`-1` otherwise). Every write answers with the same list as it stands after the change.
+
+| Path | Body |
+| --- | --- |
+| `/debug/items/add` | `{"character_id":268435457,"item_id":57,"count":1000,"enchant":0}` |
+| `/debug/items/edit` | `{"character_id":…,"object_id":…,"expect":{…},"count":5}`, `"enchant":3`, or both |
+| `/debug/items/delete` | `{"character_id":…,"object_id":…,"expect":{…}}` |
+| `/debug/items/equip` | `{"character_id":…,"object_id":…,"expect":{…}}` |
+| `/debug/items/unequip` | `{"character_id":…,"object_id":…,"expect":{…}}` |
+
+`expect` is the item as the caller last listed it:
+`{"item_id":57,"count":1500,"enchant":0,"location":"INVENTORY"}`. When the item no longer matches
+it, nothing changes and the answer is `409`: list again and decide again.
+
+- **add** takes object ids from the server's own id allocator. A stackable item joins the held stack
+  (the result may not pass 2147483647) and takes no enchant; any other item arrives as `count`
+  instances, at most 100 per request, each at `enchant` (0 to 65535). A shadow item starts with its
+  full duration. Herbs and cursed weapons are refused. A character in the world must have the
+  inventory slots for it, as for `//create_item`, and sees the usual obtained-item message.
+- **edit** sets a stack's count (1 or more; a non-stackable stays at 1) and/or the enchant level.
+- **delete** removes the item whole, taking it off first when worn. The collar of a pet that is out
+  is refused.
+- **equip** and **unequip** follow the player's own paperdoll rules: a bow takes its arrows into the
+  left hand and leaves them on the way off, a two-handed weapon clears the off hand, formal wear
+  refuses some pieces, and a hero item goes on an active hero only.
+- A cursed weapon is never edited, deleted, equipped or unequipped (`422`), and its holder puts on
+  no other weapon or shield, nor formal wear.
+
+For a character **in the world** the change goes through its live inventory on its own queue, as a
+game master's commands do: the client gets its InventoryUpdate, an equipment change also its
+UserInfo (and CharInfo to the players around), and the item persistence task writes the rows on its
+next tick.
+
+For a character **out of the world** the edit is a login without the session. It takes the claim a
+login takes on that character, so a login meanwhile is refused (the client stays on the character
+list and can try again) and an edit during a login answers `503`. It waits for every save the last
+session queued, then, as one job on the character's persistence lane, reads the rows, resolves them
+against item writes still held from that session (a stack destroyed in the world but not yet deleted
+from the table stays gone), applies the change and writes the result the way a logout does. The rows
+hold the change when the answer arrives. If that write fails, the answer is `500` and the change stays
+queued for the item persistence task, as a failed logout write does; list before retrying.
+
+Errors answer `{"error":"message"}` with `400` (bad request or a change that can never succeed),
+`403`, `404` (no such character or item), `405`, `409` (stale `expect`), `413`, `415`, `422` (the
+paperdoll or the character refused the change), `503` with `Retry-After: 1` (the character is
+logging in, leaving the world, or did not answer in time; nothing changed) or `500`.
+
+```bash
+curl -s 'http://127.0.0.1:6060/debug/items?character_id=268435457'
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"character_id":268435457,"item_id":57,"count":1000}' http://127.0.0.1:6060/debug/items/add
+curl -s -X POST -H 'Content-Type: application/json' \
+  -d '{"character_id":268435457,"object_id":268435461,"expect":{"item_id":2369,"count":1,"enchant":3,"location":"PAPERDOLL"},"enchant":5}' \
+  http://127.0.0.1:6060/debug/items/edit
+```
+
+Every change is logged at info level (`item api: item changed`) with the character, the operation,
+the object and item ids, and the count, enchant and location before and after.
+
 [Profiling And GC Tuning](profiling.md) covers reading these profiles, spotting goroutine leaks, the load-test profiling harness, and why the servers keep the default GC settings.
 
 ## Smoke Checks

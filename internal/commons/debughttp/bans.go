@@ -23,9 +23,10 @@ const (
 	BansRemovePath = "/debug/bans/remove"
 )
 
+// MaxBody caps a write request's body on the debug listener's APIs.
+const MaxBody = 4 << 10
+
 const (
-	// maxBanBody caps a write request's body.
-	maxBanBody = 4 << 10
 	// maxBanSeconds is the longest temporary ban, ten years; longer is
 	// asked for as permanent.
 	maxBanSeconds = 10 * 365 * 24 * 60 * 60
@@ -97,30 +98,30 @@ type banHandler struct {
 }
 
 func (h *banHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !loopbackPeer(r.RemoteAddr) {
-		writeError(w, http.StatusForbidden, "loopback clients only")
+	if !LoopbackPeer(r.RemoteAddr) {
+		WriteError(w, http.StatusForbidden, "loopback clients only")
 		return
 	}
 	switch r.URL.Path {
 	case BansPath:
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
-			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
-		writeJSON(w, http.StatusOK, h.list())
+		WriteJSON(w, http.StatusOK, h.list())
 	case BansAddPath:
 		var req addRequest
-		if decodePost(w, r, &req) {
+		if DecodePost(w, r, &req) {
 			h.add(w, req)
 		}
 	case BansRemovePath:
 		var req removeRequest
-		if decodePost(w, r, &req) {
+		if DecodePost(w, r, &req) {
 			h.remove(w, req)
 		}
 	default:
-		writeError(w, http.StatusNotFound, "not found")
+		WriteError(w, http.StatusNotFound, "not found")
 	}
 }
 
@@ -149,17 +150,17 @@ func (h *banHandler) add(w http.ResponseWriter, req addRequest) {
 	}
 	adder, ok := store.Bans.(banAdder)
 	if !ok {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("store %q does not take bans", store.Name))
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("store %q does not take bans", store.Name))
 		return
 	}
 	var d time.Duration
 	switch {
 	case req.Permanent && req.Seconds != 0:
-		writeError(w, http.StatusBadRequest, "give permanent or seconds, not both")
+		WriteError(w, http.StatusBadRequest, "give permanent or seconds, not both")
 		return
 	case req.Permanent:
 	case req.Seconds <= 0 || req.Seconds > maxBanSeconds:
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("seconds must be 1 to %d, or permanent true", maxBanSeconds))
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("seconds must be 1 to %d, or permanent true", maxBanSeconds))
 		return
 	default:
 		d = time.Duration(req.Seconds) * time.Second
@@ -167,7 +168,7 @@ func (h *banHandler) add(w http.ResponseWriter, req addRequest) {
 	added := adder.Add(addr, d)
 	h.log.Warn().Str("ip", addr.String()).Str("store", store.Name).Bool("permanent", req.Permanent).
 		Dur("duration", d).Bool("added", added).Msg("ip ban added through the ban api")
-	writeJSON(w, http.StatusOK, map[string]bool{"added": added})
+	WriteJSON(w, http.StatusOK, map[string]bool{"added": added})
 }
 
 func (h *banHandler) remove(w http.ResponseWriter, req removeRequest) {
@@ -178,7 +179,7 @@ func (h *banHandler) remove(w http.ResponseWriter, req removeRequest) {
 	removed := store.Bans.Remove(addr)
 	h.log.Warn().Str("ip", addr.String()).Str("store", store.Name).Bool("removed", removed).
 		Msg("ip ban removed through the ban api")
-	writeJSON(w, http.StatusOK, map[string]bool{"removed": removed})
+	WriteJSON(w, http.StatusOK, map[string]bool{"removed": removed})
 }
 
 // target resolves a request's literal IP address and store name, answering
@@ -186,7 +187,7 @@ func (h *banHandler) remove(w http.ResponseWriter, req removeRequest) {
 func (h *banHandler) target(w http.ResponseWriter, ip, name string) (netip.Addr, BanStore, bool) {
 	addr, err := netip.ParseAddr(ip)
 	if err != nil || addr.Zone() != "" {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("ip %q is not a literal IP address", ip))
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("ip %q is not a literal IP address", ip))
 		return netip.Addr{}, BanStore{}, false
 	}
 	for _, s := range h.stores {
@@ -194,44 +195,46 @@ func (h *banHandler) target(w http.ResponseWriter, ip, name string) (netip.Addr,
 			return addr.Unmap(), s, true
 		}
 	}
-	writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown store %q", name))
+	WriteError(w, http.StatusBadRequest, fmt.Sprintf("unknown store %q", name))
 	return netip.Addr{}, BanStore{}, false
 }
 
-// decodePost reads a POST application/json body of at most maxBanBody
+// DecodePost reads a POST application/json body of at most MaxBody
 // bytes with no unknown fields into v, answering the error itself when it
-// cannot.
-func decodePost(w http.ResponseWriter, r *http.Request, v any) bool {
+// cannot. The content type check keeps a browser's cross-site form post,
+// which cannot send application/json without a preflight, from writing.
+func DecodePost(w http.ResponseWriter, r *http.Request, v any) bool {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return false
 	}
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
-		writeError(w, http.StatusUnsupportedMediaType, "content type must be application/json")
+		WriteError(w, http.StatusUnsupportedMediaType, "content type must be application/json")
 		return false
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBanBody))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxBody))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "body too large")
+			WriteError(w, http.StatusRequestEntityTooLarge, "body too large")
 			return false
 		}
-		writeError(w, http.StatusBadRequest, "bad json: "+err.Error())
+		WriteError(w, http.StatusBadRequest, "bad json: "+err.Error())
 		return false
 	}
 	if dec.More() {
-		writeError(w, http.StatusBadRequest, "bad json: trailing data")
+		WriteError(w, http.StatusBadRequest, "bad json: trailing data")
 		return false
 	}
 	return true
 }
 
-// loopbackPeer reports whether remote, a request's RemoteAddr, is a
-// loopback address.
-func loopbackPeer(remote string) bool {
+// LoopbackPeer reports whether remote, a request's RemoteAddr, is a
+// loopback address. Every debug API answers only such peers, even when the
+// listener is bound wider.
+func LoopbackPeer(remote string) bool {
 	host, _, err := net.SplitHostPort(remote)
 	if err != nil {
 		return false
@@ -240,11 +243,13 @@ func loopbackPeer(remote string) bool {
 	return err == nil && addr.Unmap().IsLoopback()
 }
 
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+// WriteError answers status with a JSON {"error": msg} body.
+func WriteError(w http.ResponseWriter, status int, msg string) {
+	WriteJSON(w, status, map[string]string{"error": msg})
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
+// WriteJSON answers status with v encoded as JSON.
+func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v) // the client is gone if this fails

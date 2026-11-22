@@ -1,5 +1,6 @@
-// Package debughttp serves optional pprof and expvar endpoints, and the IP
-// ban API, for a running gameserver or loginserver process.
+// Package debughttp serves optional pprof and expvar endpoints, and the
+// operator APIs mounted on them, for a running gameserver or loginserver
+// process.
 package debughttp
 
 import (
@@ -30,9 +31,15 @@ func SetPlayersOnlineFunc(f func() int) {
 	playersOnlineFn.Store(f)
 }
 
-// Listen serves pprof and expvar on addr, and bans, when not nil, on
-// BansPath and below. An empty addr is a no-op.
-func Listen(addr string, bans http.Handler) (*http.Server, error) {
+// Route mounts Handler on Path and every path below it.
+type Route struct {
+	Path    string
+	Handler http.Handler
+}
+
+// Listen serves pprof and expvar on addr, and each route on its path and
+// below. An empty addr is a no-op.
+func Listen(addr string, routes ...Route) (*http.Server, error) {
 	if addr == "" {
 		return nil, nil
 	}
@@ -40,25 +47,27 @@ func Listen(addr string, bans http.Handler) (*http.Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	srv := &http.Server{Handler: routes(bans), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Handler: mux(routes), ReadHeaderTimeout: 5 * time.Second}
 	// Serve returns http.ErrServerClosed after Shutdown; the debug listener
 	// is best-effort and has no caller to report a failure to.
 	go func() { _ = srv.Serve(ln) }()
 	return srv, nil
 }
 
-// routes is the debug listener's handler: bans, when not nil, on BansPath
-// and below, and http.DefaultServeMux, which holds pprof and expvar, for
-// everything else.
-func routes(bans http.Handler) http.Handler {
-	if bans == nil {
+// mux is the debug listener's handler: each route on its path and below,
+// and http.DefaultServeMux, which holds pprof and expvar, for everything
+// else.
+func mux(routes []Route) http.Handler {
+	if len(routes) == 0 {
 		return http.DefaultServeMux
 	}
-	mux := http.NewServeMux()
-	mux.Handle("/", http.DefaultServeMux)
-	mux.Handle(BansPath, bans)
-	mux.Handle(BansPath+"/", bans)
-	return mux
+	m := http.NewServeMux()
+	m.Handle("/", http.DefaultServeMux)
+	for _, r := range routes {
+		m.Handle(r.Path, r.Handler)
+		m.Handle(r.Path+"/", r.Handler)
+	}
+	return m
 }
 
 // Shutdown stops srv when non-nil.

@@ -28,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
+	"github.com/fatal10110/acis_golang/internal/gameserver/itemapi"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -377,7 +378,7 @@ func provideClientBans(cfg gameServerConfig, log zerolog.Logger) *clientBans {
 	return &clientBans{bans: netutil.NewBanList(time.Now), filter: netutil.NewAcceptFilter(cfg.AcceptFilter, log)}
 }
 
-func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, bans *clientBans, log zerolog.Logger) {
+func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, bans *clientBans, link *network.GameClientLink, log zerolog.Logger) {
 	debughttp.SetPlayersOnlineFunc(func() int { return len(state.Players()) })
 	if paths.DebugAddr == "" {
 		return
@@ -390,7 +391,9 @@ func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, 
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			var err error
-			srv, err = debughttp.Listen(paths.DebugAddr, api)
+			srv, err = debughttp.Listen(paths.DebugAddr,
+				debughttp.Route{Path: debughttp.BansPath, Handler: api},
+				debughttp.Route{Path: itemapi.Path, Handler: itemapi.Handler(link)})
 			if err != nil {
 				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
 			}

@@ -549,6 +549,31 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 	return true
 }
 
+// SetCount sets the count of inst, a stack this inventory holds, to count,
+// at least one, and queues a modified inventory notification. It returns
+// false when inst is absent, count is below one or already held, or inst's
+// template does not stack. The check and the change happen under the locks a
+// transfer takes, so no units move between them.
+func (inv *Inventory) SetCount(inst *item.Instance, count int) bool {
+	if inst == nil || count < 1 {
+		return false
+	}
+	defer inv.lockHeld()()
+	if inv.Container.items[inst.ObjectID] != inst {
+		return false
+	}
+	if tmpl, ok := inv.Templates().Get(inst.TemplateID); !ok || !tmpl.Stackable {
+		return false
+	}
+	held := inst.CountValue()
+	if held == count {
+		return false
+	}
+	inst.AddCount(count - held)
+	inv.queueUpdateLocked(inst, UpdateModified)
+	return true
+}
+
 // SetCustomType2 sets inst's second custom type to value and queues a
 // modified inventory notification, even when the value was already set. It
 // returns false when inst is absent from this inventory.

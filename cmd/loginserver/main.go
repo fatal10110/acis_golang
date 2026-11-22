@@ -317,7 +317,7 @@ func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, bans *manager.IPBan
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			var err error
-			srv, err = debughttp.Listen(paths.DebugAddr, api)
+			srv, err = debughttp.Listen(paths.DebugAddr, debughttp.Route{Path: debughttp.BansPath, Handler: api})
 			if err != nil {
 				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
 			}
