@@ -140,7 +140,7 @@ func cancelStart(e *Effect) bool {
 		}
 
 		rate := formulas.EffectCancelSuccessRate(e.Skill.MagicLevel, cand.Skill.MagicLevel, cand.Period(), e.Template.EffectPower, vuln)
-		if formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
+		if formulas.CancelSucceeds(float64(rate), effectorRoll(e.Effector)) {
 			list.Remove(cand)
 		}
 
@@ -270,6 +270,16 @@ const spoilRoll = 10000
 // target and marks it spoiled by the caster on success. It always reports
 // success once the roll is attempted, regardless of the roll's outcome.
 
+// effectorRoll draws a percent roll in [0, 100) for a cancel-family effect
+// from its effector's combat random source when the effector has one, else
+// from the global source, so a pinned caster decides every strip.
+func effectorRoll(effector Actor) int {
+	if r, ok := effector.(interface{ Roll(n int) int }); ok {
+		return r.Roll(100)
+	}
+	return rnd.Get(100)
+}
+
 func cancelDebuffStart(e *Effect) bool {
 	if !isPlayer(e.Effected) || e.Effected.Dead() {
 		return false
@@ -286,9 +296,9 @@ func cancelDebuffStart(e *Effect) bool {
 		return true
 	}
 	now := list.now()
-	count := cancelDebuffPass(list, candidates, now, e.Skill.MagicLevel, vuln, e.Skill.MaxNegatedEffects)
+	count := cancelDebuffPass(list, e.Effector, candidates, now, e.Skill.MagicLevel, vuln, e.Skill.MaxNegatedEffects)
 	if count != 0 {
-		cancelDebuffPass(list, candidates, now, e.Skill.MagicLevel, vuln, count)
+		cancelDebuffPass(list, e.Effector, candidates, now, e.Skill.MagicLevel, vuln, count)
 	}
 	return true
 }
@@ -296,7 +306,7 @@ func cancelDebuffStart(e *Effect) bool {
 // cancelDebuffPass runs one reverse-order sweep of candidates, stripping
 // dispellable debuffs against an independent roll each, up to count
 // removals (0 meaning unlimited); it returns the remaining count.
-func cancelDebuffPass(list *List, candidates []*Effect, now time.Time, cancelLvl int, vuln float64, count int) int {
+func cancelDebuffPass(list *List, effector Actor, candidates []*Effect, now time.Time, cancelLvl int, vuln float64, count int) int {
 	lastCanceledSkillID := modelskill.ID(0)
 	for i := len(candidates) - 1; i >= 0; i-- {
 		cand := candidates[i]
@@ -309,7 +319,7 @@ func cancelDebuffPass(list *List, candidates []*Effect, now time.Time, cancelLvl
 		}
 
 		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.PeriodRemaining(now), vuln)
-		if !formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
+		if !formulas.CancelSucceeds(float64(rate), effectorRoll(effector)) {
 			continue
 		}
 
