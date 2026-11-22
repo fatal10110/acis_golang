@@ -28,12 +28,13 @@ func (a *Actor) ObjectID() int32 { return a.id }
 func (a *Actor) Move() *move.CreatureMove { return &a.movement }
 
 // InitMovement wires real geodata into this summon's movement state,
-// matching creature.NewLive's Init call, moving at its MoveSpeed. Call it
+// matching creature.NewLive's Init call, moving at its MoveSpeed and
+// configured by opts; its arrivals run on the summon's queue. Call it
 // once, before building a move.Controller over Move() (see
 // GameClientLink.wireSummonAI); a summon left uninitialized (no geodata
 // available) keeps a stationary, never-moving zero-value CreatureMove.
-func (a *Actor) InitMovement(origin location.Location, geo move.Geo) error {
-	if err := a.movement.Init(origin, a.MoveSpeed(), geo); err != nil {
+func (a *Actor) InitMovement(origin location.Location, geo move.Geo, opts ...move.Option) error {
+	if err := a.movement.Init(origin, a.MoveSpeed(), geo, a, opts...); err != nil {
 		return err
 	}
 	a.movementReady.Store(true)
@@ -58,7 +59,6 @@ func (a *Actor) refreshMoveSpeed() {
 // into the world.
 func (a *Actor) SetQueue(q *sim.Queue) {
 	a.queue.Store(q)
-	a.movement.SetQueue(q)
 	a.effects.SetQueue(q)
 }
 

@@ -13,12 +13,11 @@ import (
 // speed) never arrives until its speed returns.
 func TestCreatureMove_SetSpeedRetimesInFlightArrival(t *testing.T) {
 	geo := &recordingGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(location.Location{X: 0, Y: 0, Z: 30}, 100, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{X: 0, Y: 0, Z: 30}, 100, geo, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	arrived := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }})
 
@@ -56,12 +55,11 @@ func TestCreatureMove_SetSpeedRetimesInFlightArrival(t *testing.T) {
 // queue while a foreign queue held mu) must not finish the stalled leg.
 func TestCreatureMove_StallDropsDequeuedArrival(t *testing.T) {
 	geo := &recordingGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(location.Location{X: 0, Y: 0, Z: 30}, 100, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{X: 0, Y: 0, Z: 30}, 100, geo, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	arrived := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }})
 
@@ -95,11 +93,10 @@ func TestCreatureMove_StallDropsDequeuedArrival(t *testing.T) {
 // 5)), the rest at its speed; retargeting a walk in flight keeps the count,
 // and only a stopped move restarts it (PlayerMove.cancelMoveTask).
 func TestCreatureMoveStartSpeedCoversFirstFiveUpdates(t *testing.T) {
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	mover.SetSpeeds(200, 100)
 
 	if _, err := mover.MoveToLocation(location.Location{X: 1000}); err != nil {
@@ -138,12 +135,11 @@ func TestCreatureMoveStartSpeedCoversFirstFiveUpdates(t *testing.T) {
 // and a 200 speed take 5 updates for the first 50 and 13 for the other 250,
 // 1.8 s instead of the 1.5 s the full speed alone would take.
 func TestCreatureMoveStartSpeedTimesTheArrival(t *testing.T) {
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	mover.SetSpeeds(200, 100)
 
 	ev, err := mover.MoveToLocation(location.Location{X: 300})
@@ -174,11 +170,10 @@ func TestCreatureMoveStartSpeedTimesTheArrival(t *testing.T) {
 // Without SetSpeeds a mover (an NPC, a summon) moves at its speed from the
 // first update.
 func TestCreatureMoveWithoutStartSpeedMovesAtFullSpeed(t *testing.T) {
-	mover, err := NewCreatureMove(location.Location{}, 200, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 200, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	if _, err := mover.MoveToLocation(location.Location{X: 1000}); err != nil {
 		t.Fatal(err)
 	}

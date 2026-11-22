@@ -35,17 +35,46 @@ type Live struct {
 }
 
 // NewLive creates runtime state at origin with speed and geodata-bound
-// movement validation. owner receives stat-function callbacks from this
-// creature's active effects; a nil owner (e.g. an actor whose stats aren't
-// driven by a calculator yet) leaves those callbacks unapplied. The live
-// state keeps opts to build its effect list with on first use, so callers
-// spawning many creatures pass one shared slice.
-func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect.StatOwner, opts ...effect.Option) (*Live, error) {
-	live := &Live{effectOwner: owner, effectOpts: opts}
-	if err := live.movement.Init(origin, speed, geo); err != nil {
+// movement validation, configured by opts. owner receives stat-function
+// callbacks from this creature's active effects; a nil owner (e.g. an actor
+// whose stats aren't driven by a calculator yet) leaves those callbacks
+// unapplied. Movement arrivals run on the queue SetQueue installs.
+func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect.StatOwner, opts ...Option) (*Live, error) {
+	live := &Live{effectOwner: owner}
+	var moveOpts []move.Option
+	for _, opt := range opts {
+		if opt.effects != nil {
+			live.effectOpts = opt.effects
+		}
+		if moveOpts == nil {
+			moveOpts = opt.move
+		} else {
+			// Copy rather than append into a caller's slice.
+			moveOpts = append(moveOpts[:len(moveOpts):len(moveOpts)], opt.move...)
+		}
+	}
+	if err := live.movement.Init(origin, speed, geo, live, moveOpts...); err != nil {
 		return nil, err
 	}
 	return live, nil
+}
+
+// Option configures a Live when NewLive builds it.
+type Option struct {
+	effects []effect.Option
+	move    []move.Option
+}
+
+// WithEffects makes the live state build its effect list with opts on first
+// use. The slice is kept, so callers spawning many creatures pass one shared
+// slice.
+func WithEffects(opts ...effect.Option) Option {
+	return Option{effects: opts}
+}
+
+// WithMovement configures the creature's movement state with opts.
+func WithMovement(opts ...move.Option) Option {
+	return Option{move: opts}
 }
 
 // SetQueue makes q the queue this creature's work runs on, movement
@@ -53,7 +82,6 @@ func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect
 // the world.
 func (l *Live) SetQueue(q *sim.Queue) {
 	l.queue = q
-	l.movement.SetQueue(q)
 	if e := l.effects.Load(); e != nil {
 		e.SetQueue(q)
 	}

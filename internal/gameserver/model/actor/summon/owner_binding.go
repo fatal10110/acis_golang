@@ -75,7 +75,6 @@ func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Qu
 	a.bindOwner(owner, inv)
 	a.vitals.mu.Unlock()
 	a.queue.Store(q)
-	a.movement.SetQueue(q)
 	a.effects.SetQueue(q)
 	a.emit(event.OwnerRelinked{})
 	if !a.Dead() {

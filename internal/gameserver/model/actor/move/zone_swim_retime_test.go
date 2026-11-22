@@ -19,9 +19,7 @@ func (slopeGeo) Height(x, _, _ int) int16 { return int16(x) }
 // water zone sets, and a swimmer travels the 3D line), so a leg with height
 // left does not arrive at the stale 2D time.
 func TestZoneSwimPlayerSetSwimmingRetimesInFlightArrival(t *testing.T) {
-	mover, clock := newTestMover(t, slopeGeo{staticGeo{canMove: true}})
-	mover.SetWaterSurface(everywhereWater)
-	mover.UseZoneSwim()
+	mover, clock := newTestMover(t, slopeGeo{staticGeo{canMove: true}}, WithWaterSurface(everywhereWater), WithZoneSwim())
 	mover.SetSpeeds(100, 100)
 	arrived := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }})

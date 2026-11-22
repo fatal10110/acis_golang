@@ -233,7 +233,7 @@ func (c *folkControl) Emit(ev event.Event) {
 }
 
 // waterSurface reports the water zone at a position and its surface level,
-// the mover's move.CreatureMove.SetWaterSurface query.
+// the mover's move.WithWaterSurface query.
 func waterSurface(zones *zone.Index) func(location.Location) (int, bool) {
 	return func(position location.Location) (int, bool) {
 		water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)

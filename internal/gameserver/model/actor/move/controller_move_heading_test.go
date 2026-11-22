@@ -132,12 +132,11 @@ func TestControllerMoveStartFacesDestination(t *testing.T) {
 func TestControllerRefusedMoveKeepsHeading(t *testing.T) {
 	const staleHeading = 12345
 	self := &headingSelf{heading: staleHeading}
-	mover, err := NewCreatureMove(location.Location{}, 0, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 0, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, &eventLog{})
+	controller, err := NewController(mover, self, &eventLog{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,12 +173,11 @@ func TestControllerPlayerFriendlyFollowFacesTargetAtBroadcast(t *testing.T) {
 	newController := func(t *testing.T) (*Controller, *pawnHeadingSelf) {
 		t.Helper()
 		self := &pawnHeadingSelf{heading: staleHeading}
-		mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+		mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 		if err != nil {
 			t.Fatal(err)
 		}
-		mover.SetQueue(newMoveClock().q)
-		controller, err := NewController(mover, self, nil)
+		controller, err := NewController(mover, self, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -129,14 +129,17 @@ type Controller struct {
 // NewController adapts move for self, the position/footprint of the actor
 // move drives. sink receives Arrived and MoveBlocked; nil drops Arrived and
 // answers a blocked move with the stopped-cell correction itself.
-func NewController(move *CreatureMove, self Actor, sink event.Sink) (*Controller, error) {
+// positionUpdates ticks the controller while a move is in flight, advancing
+// the actor's position cell by cell; a nil registry leaves the move to its
+// arrival timer alone, for a mover nothing ticks (a test double).
+func NewController(move *CreatureMove, self Actor, sink event.Sink, positionUpdates PositionUpdateRegistry) (*Controller, error) {
 	if move == nil {
 		return nil, errors.New("move: nil creature move")
 	}
 	if self == nil {
 		return nil, errors.New("move: nil self")
 	}
-	c := &Controller{move: move, self: self, sink: sink}
+	c := &Controller{move: move, self: self, sink: sink, positionUpdates: positionUpdates}
 	move.setOwner(c)
 	return c, nil
 }
@@ -233,18 +236,6 @@ func (c *Controller) ObjectID() int32 {
 func (c *Controller) RegionActor() world.Tracked {
 	tracked, _ := c.self.(world.Tracked)
 	return tracked
-}
-
-// SetPositionUpdates records the registry that should tick this controller
-// while movement is in flight.
-func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
-	if c.positionUpdates != nil && c.move.Moving() {
-		c.positionUpdates.Remove(c)
-	}
-	c.positionUpdates = updates
-	if c.positionUpdates != nil && c.move.Moving() {
-		c.positionUpdates.Add(c)
-	}
 }
 
 // MaybeStartOffensiveFollow starts or refreshes a follow task toward target

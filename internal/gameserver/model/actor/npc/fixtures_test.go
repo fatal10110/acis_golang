@@ -45,7 +45,7 @@ func newTestHostile(t *testing.T, move ai.AttackableMoveController, strike ai.At
 
 func newHostileLive(t testing.TB, opts ...effect.Option) *creature.Live {
 	t.Helper()
-	live, err := creature.NewLive(location.Location{}, 100, hostileGeo{}, nil, opts...)
+	live, err := creature.NewLive(location.Location{}, 100, hostileGeo{}, nil, creature.WithEffects(opts...))
 	if err != nil {
 		t.Fatal(err)
 	}

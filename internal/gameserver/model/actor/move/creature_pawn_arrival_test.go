@@ -164,14 +164,13 @@ func TestPawnWalkArrivalTimerEndsOnUnknownPawn(t *testing.T) {
 	pawn := &trackedPawn{}
 	state.Spawn(pawn, 500, 0, 0, 0)
 
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	sink := &eventLog{}
-	controller, err := NewController(mover, self, sink)
+	controller, err := NewController(mover, self, sink, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

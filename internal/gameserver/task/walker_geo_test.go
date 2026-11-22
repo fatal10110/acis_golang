@@ -114,12 +114,11 @@ func (w *controllerWalker) SocialAction(int)                    {}
 func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 	origin := walkerNodeC
 	self := &walkerCtlSelf{x: origin.X, y: origin.Y, z: origin.Z}
-	mover, err := move.NewCreatureMove(origin, 100, routedGeo{})
+	mover, err := move.NewCreatureMove(origin, 100, routedGeo{}, move.WithQueue(sim.NewInline(time.Unix(0, 0)).NewQueue("walker")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(sim.NewInline(time.Unix(0, 0)).NewQueue("walker"))
-	ctl, err := move.NewController(mover, self, nil)
+	ctl, err := move.NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

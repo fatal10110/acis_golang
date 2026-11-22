@@ -26,15 +26,14 @@ func wallGeo() *recordingGeo {
 func newPlayerStepController(t *testing.T, speed float64, geo Geo) (*Controller, *CreatureMove, *knowingFollowSelf, *eventLog, *moveClock) {
 	t.Helper()
 	self := &knowingFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, speed, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, speed, geo, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	mover.SetSpeeds(speed, speed)
 	sink := &eventLog{}
-	controller, err := NewController(mover, self, sink)
+	controller, err := NewController(mover, self, sink, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
