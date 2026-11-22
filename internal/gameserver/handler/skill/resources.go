@@ -140,14 +140,10 @@ func (h combatPointHealHandler) UseResult(cast Cast) Result {
 		if !ok || target.Dead() || target.Invulnerable() {
 			continue
 		}
-		amount := float64(cast.Skill.Power)
-		if target.CP()+amount > target.MaxCPValue() {
-			amount = target.MaxCPValue() - target.CP()
-		}
-		// Setting CP reports the status even when nothing was missing.
-		target.SetCP(target.CP() + amount)
+		applied := target.AddCP(float64(cast.Skill.Power))
+		// The status goes out even when nothing was missing.
 		target.BroadcastStatus()
-		notifyRestored(obj, cast.Caster, amount, restoredCP, true)
+		notifyRestored(obj, cast.Caster, applied, restoredCP, true)
 	}
 	return result
 }
@@ -230,7 +226,8 @@ func (cpDamagePercentHandler) UseResult(cast Cast) Result {
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
 		target.BreakCastOnDamage(float64(damage))
 		recordDamage(&result, cast.Caster, target, damage, false, false)
-		target.SetCP(target.CP() - float64(damage))
+		// The loss lands as a delta, so a hit since the read keeps its share.
+		target.ReduceCP(float64(damage))
 		if sameObject(cast.Caster, target) {
 			// A player caster's own status goes out in order among the
 			// cast's messages.
@@ -260,6 +257,7 @@ func (h balanceLifeHandler) Use(cast Cast) {
 func (h balanceLifeHandler) UseResult(cast Cast) Result {
 	result := h.buff.UseResult(cast)
 	targets := make([]Creature, 0, len(cast.Targets))
+	snapshot := make([]float64, 0, len(cast.Targets))
 	var fullHP, currentHP float64
 	casterCursed := cursed(cast.Caster)
 
@@ -271,20 +269,26 @@ func (h balanceLifeHandler) UseResult(cast Cast) Result {
 		if !sameObject(obj, cast.Caster) && (casterCursed || cursed(obj)) {
 			continue
 		}
+		hp := target.HP()
 		fullHP += target.MaxHPValue()
-		currentHP += target.HP()
+		currentHP += hp
 		targets = append(targets, target)
+		snapshot = append(snapshot, hp)
 	}
 
 	if len(targets) == 0 || fullHP == 0 {
 		return result
 	}
 
+	// The pooled ratio comes from the snapshot above; each member then moves
+	// by its own share as a delta under its own vitals lock, so a hit landing
+	// since the snapshot keeps its effect. A share that would leave a member
+	// no HP writes nothing: the skill never kills.
 	ratio := currentHP / fullHP
-	for _, target := range targets {
-		target.SetHP(target.MaxHPValue() * ratio)
-		// A player's HP set reports its status whether or not the value
-		// moved; a summon's or NPC's SetHP republishes its own.
+	for i, target := range targets {
+		target.ShiftHP(target.MaxHPValue()*ratio - snapshot[i])
+		// A player's status goes out whether or not the value moved; a
+		// summon's or NPC's ShiftHP republishes its own.
 		if p, ok := asPlayer(target); ok {
 			p.BroadcastStatus()
 		}
@@ -314,9 +318,10 @@ func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
 
 // Use takes the skill's power straight off each live creature target's HP,
 // a door's included. It is not a hit: CP, invulnerability, damage
-// permission, hate and the wake-up side effects of damage play no part. A
-// target the loss leaves at or below zero HP dies to the caster; any other
-// target has its HP set and its status reported.
+// permission, hate and the wake-up side effects of damage play no part. The
+// loss lands as a delta under the target's vitals lock, so a hit landing
+// alongside it keeps its share. A target the loss would leave at or below
+// zero HP dies to the caster; any other target has its status reported.
 func (realDamageHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
 		if d, ok := asDoor(obj); ok {
@@ -327,14 +332,12 @@ func (realDamageHandler) Use(cast Cast) {
 		if !ok || target.Dead() {
 			continue
 		}
-		hpLeft := target.HP() - float64(cast.Skill.Power)
-		if hpLeft <= 0 {
+		if target.ShiftHP(-float64(cast.Skill.Power)) {
 			target.Kill(cast.Caster)
 			continue
 		}
-		target.SetHP(hpLeft)
-		// A summon's or NPC's SetHP reports its own status; a player's does
-		// not.
+		// A summon's or NPC's ShiftHP reports its own status; a player's
+		// does not.
 		if p, ok := asPlayer(target); ok {
 			p.BroadcastStatus()
 		}

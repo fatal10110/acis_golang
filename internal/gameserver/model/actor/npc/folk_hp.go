@@ -216,6 +216,28 @@ func (f *Folk) SetHP(value float64) {
 	f.BroadcastStatus()
 }
 
+// ShiftHP adds delta, which may be negative, to the current HP, capped at
+// max HP, and offers the targeters' health bar a refresh. A change that would
+// leave no HP writes nothing and reports true, leaving the death to the
+// caller. A dead NPC stays as it is and reports false.
+func (f *Folk) ShiftHP(delta float64) (lethal bool) {
+	maxHP := f.MaxHPValue()
+	f.vitalsMu.Lock()
+	if f.dead {
+		f.vitalsMu.Unlock()
+		return false
+	}
+	hp := f.hp + delta
+	if hp <= 0 {
+		f.vitalsMu.Unlock()
+		return true
+	}
+	f.hp = min(hp, maxHP)
+	f.vitalsMu.Unlock()
+	f.BroadcastStatus()
+	return false
+}
+
 // SetMaxHpMp fills the NPC's MP, then its HP, to their maxima and offers
 // the targeters' health bar one refresh. A dead NPC keeps its values and
 // reports nothing.
