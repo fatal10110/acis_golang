@@ -29,12 +29,12 @@ func WithDerbyTrack(runners []derby.Template, rnd derby.Rand) Option {
 	return func(o *options) { o.derby = &derbyOptions{runners: runners, rnd: rnd} }
 }
 
-func bootDerbyTrack(t *testing.T, o *derbyOptions, db *sql.DB, ids *sequentialIDs, state *world.State, zones *zone.Index) *derby.Track {
+func bootDerbyTrack(t *testing.T, o *derbyOptions, db *sql.DB, ids *sequentialIDs, state *world.State, zones *zone.Index, log zerolog.Logger) *derby.Track {
 	t.Helper()
 	if o == nil {
 		return nil
 	}
-	track, err := derby.New(context.Background(), gamesql.NewDerbyStore(db), o.runners, ids, network.DerbySink(state, zones), o.rnd, zerolog.Nop())
+	track, err := derby.New(context.Background(), gamesql.NewDerbyStore(db), o.runners, ids, network.DerbySink(state, zones), o.rnd, log)
 	if err != nil {
 		t.Fatalf("derby track: %v", err)
 	}

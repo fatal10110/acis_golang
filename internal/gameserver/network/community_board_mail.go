@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 )
 
 // unknownWriter names a mail's sender no character has.
@@ -95,8 +96,9 @@ func (l *GameClientLink) boardMailWrite(live *livePlayer, args [5]string) {
 	}
 	switch {
 	case args[0] == "Send":
-		l.sendMail(live, args[2], args[3], args[4])
-		l.showMailList(live, bbs.MailQuery{Page: 1, Folder: bbs.SentBox})
+		l.sendMail(live, args[2], args[3], args[4], func() {
+			l.showMailList(live, bbs.MailQuery{Page: 1, Folder: bbs.SentBox})
+		})
 	case strings.HasPrefix(args[0], "Search"):
 		tokens := bbs.Tokens(args[0], ";")
 		if len(tokens) < 2 {
@@ -112,20 +114,22 @@ func (l *GameClientLink) boardMailWrite(live *livePlayer, args [5]string) {
 	}
 }
 
-// mailWriters names the senders of box: a sender no character has reads
-// unknownWriter.
-func (l *GameClientLink) mailWriters(box []bbs.Mail) func(int32) string {
+// withWriters runs fn on live's queue with the namer of the senders of box,
+// their names read off the queue (withNames): a sender no character has
+// reads unknownWriter.
+func (l *GameClientLink) withWriters(live *livePlayer, box []bbs.Mail, fn func(writer func(int32) string)) {
 	ids := make([]int32, 0, len(box))
 	for _, mail := range box {
 		ids = append(ids, mail.SenderID)
 	}
-	names := l.characterNames(context.Background(), ids)
-	return func(id int32) string {
-		if name, ok := names[id]; ok {
-			return name
-		}
-		return unknownWriter
-	}
+	l.withNames(live, ids, func(names map[int32]string) {
+		fn(func(id int32) string {
+			if name, ok := names[id]; ok {
+				return name
+			}
+			return unknownWriter
+		})
+	})
 }
 
 // showMailList shows the folder page q asks for and remembers it as the
@@ -137,9 +141,11 @@ func (l *GameClientLink) showMailList(live *livePlayer, q bbs.MailQuery) {
 		return
 	}
 	box := l.board.mail.Box(live.ObjectID())
-	html, shown := bbs.RenderMailList(page, box, q, l.mailWriters(box))
-	live.board.mailPosition = shown
-	l.sendBoard(live, html)
+	l.withWriters(live, box, func(writer func(int32) string) {
+		html, shown := bbs.RenderMailList(page, box, q, writer)
+		live.board.mailPosition = shown
+		l.sendBoard(live, html)
+	})
 }
 
 // showLastMailList shows the inbox page the player was last shown.
@@ -159,7 +165,9 @@ func (l *GameClientLink) showMail(live *livePlayer, mail bbs.Mail) bool {
 	if !ok {
 		return false
 	}
-	l.sendBoard(live, bbs.RenderMailView(page, mail, l.mailWriters([]bbs.Mail{mail})(mail.SenderID)))
+	l.withWriters(live, []bbs.Mail{mail}, func(writer func(int32) string) {
+		l.sendBoard(live, bbs.RenderMailView(page, mail, writer(mail.SenderID)))
+	})
 	return true
 }
 
@@ -170,50 +178,73 @@ func (l *GameClientLink) showMailReply(live *livePlayer, mail bbs.Mail) {
 	if !ok {
 		return
 	}
-	recipients := mail.Recipients
-	if mail.SenderID != live.ObjectID() {
-		recipients = l.mailWriters([]bbs.Mail{mail})(mail.SenderID)
+	if mail.SenderID == live.ObjectID() {
+		l.sendBoardEdit(live, bbs.RenderMailReply(page, mail, mail.Recipients), " ", "Re: "+mail.Subject, "0")
+		return
 	}
-	l.sendBoardEdit(live, bbs.RenderMailReply(page, mail, recipients), " ", "Re: "+mail.Subject, "0")
+	l.withWriters(live, []bbs.Mail{mail}, func(writer func(int32) string) {
+		l.sendBoardEdit(live, bbs.RenderMailReply(page, mail, writer(mail.SenderID)), " ", "Re: "+mail.Subject, "0")
+	})
 }
 
 // sendMail sends a mail from live to the recipient list. A refusal before
 // any recipient is tried answers with its message alone; then each
 // recipient that does not take the mail answers live with its own message,
 // each online one that does is told of the new mail, and live is told the
-// mail went out once a copy reached its sent box.
-func (l *GameClientLink) sendMail(live *livePlayer, list, subject, message string) {
+// mail went out once a copy reached its sent box. then runs on live's
+// queue once the mail is answered.
+func (l *GameClientLink) sendMail(live *livePlayer, list, subject, message string, then func()) {
 	names := bbs.RecipientNames(list)
 	sender := bbs.Sender{ID: live.ObjectID(), GM: live.accessLevel().IsGM}
 	now := time.Now()
 	switch l.board.mail.CheckSend(sender.ID, sender.GM, names, now) {
 	case bbs.SendDailyLimit:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreMessagesToday))
+		then()
 		return
 	case bbs.SendTooManyRecipients:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyFiveRecipients))
+		then()
 		return
 	}
-	recipients := make([]bbs.Recipient, len(names))
-	for i, name := range names {
-		recipients[i] = l.mailRecipient(live, name)
-	}
-	deliveries, sent := l.board.mail.Send(sender, recipients, list, subject, message, now)
-	for _, d := range deliveries {
-		l.announceDelivery(live, d)
-	}
-	if sent {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSentMail))
-	}
+	// The recipients are looked up by name off the queue; whether each is
+	// online, and what it blocks, is read back on it.
+	live.deferLookup(func(ctx context.Context) {
+		refs := make([]mailRecipientRef, len(names))
+		for i, name := range names {
+			refs[i].ref, refs[i].found = l.findCharacter(ctx, name)
+		}
+		onLive(live, func() {
+			recipients := make([]bbs.Recipient, len(names))
+			for i, name := range names {
+				recipients[i] = l.mailRecipient(live, name, refs[i])
+			}
+			deliveries, sent := l.board.mail.Send(sender, recipients, list, subject, message, now)
+			for _, d := range deliveries {
+				l.announceDelivery(live, d)
+			}
+			if sent {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSentMail))
+			}
+			then()
+		})
+	})
 }
 
-// mailRecipient looks name up as a recipient of a mail from live.
-func (l *GameClientLink) mailRecipient(live *livePlayer, name string) bbs.Recipient {
+// mailRecipientRef is the stored character a mail recipient's name found.
+type mailRecipientRef struct {
+	ref   relation.Named
+	found bool
+}
+
+// mailRecipient is name, which the lookup found as found, as a recipient
+// of a mail from live.
+func (l *GameClientLink) mailRecipient(live *livePlayer, name string, found mailRecipientRef) bbs.Recipient {
 	r := bbs.Recipient{Name: name}
-	ref, found := l.findCharacter(context.Background(), name)
-	if !found {
+	if !found.found {
 		return r
 	}
+	ref := found.ref
 	r.ID, r.AccessLevel = ref.ID, ref.AccessLevel
 	if target, online := l.livePlayerByID(ref.ID); online {
 		r.Online = true

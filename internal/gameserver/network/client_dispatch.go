@@ -122,8 +122,10 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestChangeWaitType, clientpackets.DecodeRequestChangeWaitType, (*GameClientLink).handleRequestChangeWaitType)
 	register(reg, clientpackets.OpcodeRequestLinkHtml, clientpackets.DecodeRequestLinkHTML, (*GameClientLink).handleRequestLinkHTML)
 	register(reg, clientpackets.OpcodeRequestBypassToServer, clientpackets.DecodeRequestBypassToServer, (*GameClientLink).handleRequestBypassToServer)
-	register(reg, clientpackets.OpcodeRequestShowBoard, clientpackets.DecodeRequestShowBoard, whenLiveNoBody((*GameClientLink).requestShowBoard))
-	register(reg, clientpackets.OpcodeRequestBBSWrite, clientpackets.DecodeRequestBBSWrite, whenLive((*GameClientLink).requestBBSWrite))
+	register(reg, clientpackets.OpcodeRequestShowBoard, clientpackets.DecodeRequestShowBoard, whenLiveDeferring(func(l *GameClientLink, live *livePlayer, _ struct{}) {
+		l.requestShowBoard(live)
+	}))
+	register(reg, clientpackets.OpcodeRequestBBSWrite, clientpackets.DecodeRequestBBSWrite, whenLiveDeferring((*GameClientLink).requestBBSWrite))
 	register(reg, clientpackets.OpcodeSendBypassBuildCmd, clientpackets.DecodeSendBypassBuildCmd, whenLive((*GameClientLink).sendBypassBuildCmd))
 	register(reg, clientpackets.OpcodeRequestGmList, noPayload, whenLiveNoBody((*GameClientLink).requestGmList))
 	register(reg, clientpackets.OpcodeRequestGMCommand, clientpackets.DecodeRequestGMCommand, whenLive((*GameClientLink).requestGMCommand))
@@ -411,6 +413,30 @@ func whenLive[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameCli
 				handle(l, live, req)
 			})
 		}
+		return nil
+	}
+}
+
+// whenLiveDeferring is whenLive for a request whose work may defer lookups
+// off the player's queue (deferLookup): they run here, on the connection
+// goroutine under the connection's context, once the queued part returns.
+// The loop reads no next frame until they have run, so the replies keep
+// their order.
+func whenLiveDeferring[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameClientLink, context.Context, *connState, T) error {
+	return func(l *GameClientLink, ctx context.Context, cs *connState, req T) error {
+		live := cs.live
+		if live == nil {
+			return nil
+		}
+		var lookups []func(context.Context)
+		if !onLive(live, func() {
+			sim.Attribute(live.Queue(), handle)
+			handle(l, live, req)
+			lookups = live.takeLookups()
+		}) {
+			return nil
+		}
+		live.runLookups(ctx, lookups)
 		return nil
 	}
 }

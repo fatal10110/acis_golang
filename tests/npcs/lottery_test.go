@@ -67,13 +67,19 @@ func sellerPages(t *testing.T) map[string]string {
 // It returns the tickets' object ids.
 func bootLottery(t *testing.T, seed func(*sql.DB), adena int32, tickets []heldTicket, opts ...lottery.Option) (*lotteryWorld, []int32) {
 	t.Helper()
-	extra := []gameservertest.Option{
+	return bootLotteryWith(t, nil, seed, adena, tickets, opts...)
+}
+
+// bootLotteryWith is bootLottery with extra boot options.
+func bootLotteryWith(t *testing.T, boot []gameservertest.Option, seed func(*sql.DB), adena int32, tickets []heldTicket, opts ...lottery.Option) (*lotteryWorld, []int32) {
+	t.Helper()
+	extra := append([]gameservertest.Option{
 		gameservertest.WithCharacter("Talker", playerLevel, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithHTMLPages(sellerPages(t)),
 		gameservertest.WithItemTemplates(lotteryTemplates()),
 		noBypassReuse,
-	}
+	}, boot...)
 	if seed != nil {
 		extra = append(extra, gameservertest.WithLottery(lottery.DefaultConfig(), seed, opts...))
 	}
@@ -333,7 +339,11 @@ func TestLotterySellerRefusals(t *testing.T) {
 // goes on sale a minute later with an announcement.
 func TestLotteryDrawingReachesOnlinePlayers(t *testing.T) {
 	t.Parallel()
-	endDate := time.Now().Add(150 * time.Second).UnixMilli()
+	// A fixed Wednesday noon: the next round's drawing is the coming
+	// Saturday. From a Sunday it would be the Saturday just past, drawn at
+	// once with no rolls left.
+	start := time.Date(2026, time.November, 18, 12, 0, 0, 0, time.Local)
+	endDate := start.Add(150 * time.Second).UnixMilli()
 	rolls := []int{2, 6, 16, 17, 19}
 	seed := func(db *sql.DB) {
 		seedRounds(t, []any{5, 0, 0, 70000, 70000, 0, 0, 0, endDate, 0})(db)
@@ -344,7 +354,12 @@ func TestLotteryDrawingReachesOnlinePlayers(t *testing.T) {
 			}
 		}
 	}
-	w, _ := bootLottery(t, seed, 0, nil, lottery.WithRoll(func(int) int {
+	w, _ := bootLotteryWith(t, []gameservertest.Option{gameservertest.WithDrivenClockStart(start)}, seed, 0, nil, lottery.WithRoll(func(int) int {
+		if len(rolls) == 0 {
+			// Runs on the inline executor's goroutine, where t.Fatal
+			// cannot stop the test.
+			panic("lottery test: a drawing asked for more than the five seeded rolls")
+		}
 		r := rolls[0]
 		rolls = rolls[1:]
 		return r
@@ -352,9 +367,8 @@ func TestLotteryDrawingReachesOnlinePlayers(t *testing.T) {
 	if !w.srv.DrivesClock() {
 		t.Skip("waiting out a drawing needs the driven clock")
 	}
-	// The driven clock started at boot, a little behind the wall clock the
-	// drawing was seeded from.
-	w.srv.Advance(t, time.Until(time.UnixMilli(endDate))+10*time.Second)
+	// The driven clock stands at start until advanced.
+	w.srv.Advance(t, 150*time.Second+10*time.Second)
 	w.srv.AdvanceUntil(t, "the drawing", func() bool { return w.srv.Lottery.Status().Round == 6 })
 	drawn := drainFrames(t, w.c)
 	if frame, ok := firstOpcode(drawn, serverpackets.OpcodeSystemMessage); !ok ||

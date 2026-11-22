@@ -22,21 +22,33 @@ func (s *State) PlayerSeal(objectID int32) Seal {
 	return NoSeal
 }
 
-// SetPlayerInfo signs objectID up for cabal choosing seal, and counts the
-// choice toward the seal's votes; a Dawn sign-up counts for Dawn, anything
-// else for Dusk. A player signing up for the first time is written to the
-// store at once, with no stones turned in; an existing sign-up changes in
-// memory and is written with the next save.
+// SetPlayerInfo signs objectID up for cabal choosing seal (SignUp) and
+// inserts the row of a player signing up for the first time at once
+// (InsertPlayer).
 //
 // An error means only that the new player's row could not be inserted: the
 // sign-up and its seal vote are already in effect in memory, as when no
 // error is returned. A caller must not read it as "not signed up" and undo
 // what the sign-up cost; it is reported so the caller can log it.
 func (s *State) SetPlayerInfo(ctx context.Context, objectID int32, cabal Cabal, seal Seal) error {
+	row, inserted := s.SignUp(objectID, cabal, seal)
+	if !inserted {
+		return nil
+	}
+	return s.InsertPlayer(ctx, row)
+}
+
+// SignUp signs objectID up for cabal choosing seal, in memory, and counts
+// the choice toward the seal's votes; a Dawn sign-up counts for Dawn,
+// anything else for Dusk. A player signing up for the first time is
+// returned with inserted set: its row, with no stones turned in, is for the
+// caller to insert (InsertPlayer) before any save of it. An existing
+// sign-up changes in memory and is written with the next save.
+func (s *State) SignUp(objectID int32, cabal Cabal, seal Seal) (row PlayerRow, inserted bool) {
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
-
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	p, ok := s.players[objectID]
 	if ok {
 		p.Cabal, p.Seal = cabal, seal
@@ -44,7 +56,7 @@ func (s *State) SetPlayerInfo(ctx context.Context, objectID int32, cabal Cabal, 
 		p = &PlayerRow{ObjectID: objectID, Cabal: cabal, Seal: seal}
 		s.players[objectID] = p
 	}
-	inserted := *p
+	row = *p
 	if i, valid := sealIndex(seal); valid {
 		if cabal == Dawn {
 			s.row.DawnSealVotes[i]++
@@ -52,13 +64,15 @@ func (s *State) SetPlayerInfo(ctx context.Context, objectID int32, cabal Cabal, 
 			s.row.DuskSealVotes[i]++
 		}
 	}
-	s.mu.Unlock()
+	return row, !ok
+}
 
-	if ok {
-		return nil
-	}
-	if err := s.store.InsertPlayer(ctx, inserted); err != nil {
-		return fmt.Errorf("insert seven signs player %d: %w", objectID, err)
+// InsertPlayer inserts the row SignUp returned for a new sign-up.
+func (s *State) InsertPlayer(ctx context.Context, row PlayerRow) error {
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+	if err := s.store.InsertPlayer(ctx, row); err != nil {
+		return fmt.Errorf("insert seven signs player %d: %w", row.ObjectID, err)
 	}
 	return nil
 }

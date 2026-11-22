@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -148,7 +150,7 @@ func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command stri
 }
 
 // giveDerbyTicket hands live the ticket of buy, tells live it was acquired
-// and adds its price to its lane's stake.
+// and adds its price to its lane's stake, stored off the queue.
 func (l *GameClientLink) giveDerbyTicket(live *livePlayer, buy *derby.Purchase) {
 	inv := live.Inventory()
 	id, err := l.nextObjectID()
@@ -166,6 +168,9 @@ func (l *GameClientLink) giveDerbyTicket(live *livePlayer, buy *derby.Purchase) 
 	ticket.SetCustomType2(buy.Price / 100)
 	live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageAcquiredS1S2, int32(buy.Race), derby.TicketItemID))
 	l.derby.PlaceBet(buy.Lane, int64(buy.Price))
+	// The stake is stored off the queue (deferLookup).
+	track, lane := l.derby, buy.Lane
+	live.deferLookup(func(ctx context.Context) { track.SaveBet(ctx, lane) })
 }
 
 // redeemDerbyTicket destroys the ticket of redeem, naming it, then pays

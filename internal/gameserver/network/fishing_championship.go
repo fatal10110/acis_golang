@@ -78,20 +78,27 @@ func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 		l.sendFilePage(live, f.ObjectID(), fishchamp.PageNotWinner, l.setPage(fishchamp.PageNotWinner), 0)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), fishchamp.TaskTimeout)
-	paid, err := champ.Claim(ctx, live.CharacterName())
-	cancel()
-	if err != nil {
-		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("fishing championship: store the claim")
-		return
-	}
-	for _, count := range paid {
-		if count <= 0 {
-			continue
+	// The claim is stored off the queue (deferLookup); the prizes are paid
+	// back on it.
+	name, objectID := live.CharacterName(), live.ObjectID()
+	live.deferLookup(func(ctx context.Context) {
+		ctx, cancel := context.WithTimeout(ctx, fishchamp.TaskTimeout)
+		paid, err := champ.Claim(ctx, name)
+		cancel()
+		if err != nil {
+			l.log.Error().Err(err).Int32("object_id", objectID).Msg("fishing championship: store the claim")
+			return
 		}
-		live.AddCreatedItem(champ.Config().RewardItemID, int(count), l.nextObjectID)
-		l.sendFilePage(live, 0, fishchamp.PageRewarded, l.setPage(fishchamp.PageRewarded), 0)
-	}
+		onLive(live, func() {
+			for _, count := range paid {
+				if count <= 0 {
+					continue
+				}
+				live.AddCreatedItem(champ.Config().RewardItemID, int(count), l.nextObjectID)
+				l.sendFilePage(live, 0, fishchamp.PageRewarded, l.setPage(fishchamp.PageRewarded), 0)
+			}
+		})
+	})
 }
 
 // fishChampPrizeName returns the name of the item the championship pays

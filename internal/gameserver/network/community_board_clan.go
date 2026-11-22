@@ -95,8 +95,7 @@ func (l *GameClientLink) boardClanWrite(live *livePlayer, args [5]string) {
 		for i, m := range members {
 			names[i] = m.Name
 		}
-		l.sendMail(live, strings.Join(names, ";"), args[3], args[4])
-		l.showClanHome(live, cl.ID())
+		l.sendMail(live, strings.Join(names, ";"), args[3], args[4], func() { l.showClanHome(live, cl.ID()) })
 	default:
 		l.sendBoard(live, bbs.NotImplemented(args[0]))
 	}

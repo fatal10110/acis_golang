@@ -117,13 +117,6 @@ func (l *GameClientLink) friendIDs(id int32) []int32 {
 	return l.relations.FriendIDs(id)
 }
 
-// friendListEntries is id's friend list as FriendList sends it, its names
-// read under ctx; see friendEntries.
-func (l *GameClientLink) friendListEntries(ctx context.Context, id int32) []serverpackets.FriendListEntry {
-	ids := l.friendIDs(id)
-	return l.friendEntries(ids, l.characterNames(ctx, ids))
-}
-
 // friendEntries is the FriendList rows of the friends ids, named from names:
 // a friend whose character no longer exists keeps its row with an empty name.
 func (l *GameClientLink) friendEntries(ids []int32, names map[int32]string) []serverpackets.FriendListEntry {
