@@ -12,7 +12,7 @@ func (a *AI) contains(id int32, actor AIActor) bool {
 	return ok && e.actor == actor
 }
 
-// A tick posts each actor the cycle built when it was added, so a steady
+// A tick posts each actor the cycle built on its first tick, so a steady
 // tick allocates nothing per actor.
 func TestAITickAllocatesNothingPerActor(t *testing.T) {
 	ai := NewAI(nil, zerolog.Nop())

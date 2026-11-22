@@ -51,8 +51,10 @@ type AI struct {
 	*activeRegistry[int32, *aiEntry]
 }
 
-// aiEntry is one registered actor and the cycle Tick posts to its queue,
-// built once at Add so a tick makes no closure per actor.
+// aiEntry is one registered actor and the cycle Tick posts to its queue.
+// actor never changes after Add. cycle is built the first time Tick posts
+// the actor, so an actor that never wakes costs no closure and a steady tick
+// makes none; it is read and written only by the goroutine running Tick.
 type aiEntry struct {
 	actor AIActor
 	cycle func()
@@ -76,14 +78,17 @@ func (a *AI) Add(actor AIActor) {
 	if actor == nil {
 		return
 	}
-	e := &aiEntry{actor: actor}
-	e.cycle = func() {
+	a.add(actor.ObjectID(), &aiEntry{actor: actor})
+}
+
+// cycleOf returns the one-second AI cycle run on actor's queue.
+func (a *AI) cycleOf(actor AIActor) func() {
+	return func() {
 		actor.Tick()
 		if err := actor.TickThink(); err != nil {
 			a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")
 		}
 	}
-	a.add(actor.ObjectID(), e)
 }
 
 // Remove unregisters actor from recurring AI ticks. It leaves a different
@@ -116,6 +121,9 @@ func (a *AI) Tick() error {
 			}
 		} else if !canWorkInRegion(a.state, actor) {
 			continue
+		}
+		if e.cycle == nil {
+			e.cycle = a.cycleOf(actor)
 		}
 		actor.Queue().Post(e.cycle)
 	}
