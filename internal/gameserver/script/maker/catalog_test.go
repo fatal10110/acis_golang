@@ -12,7 +12,7 @@ import (
 
 // TestCatalogAgainstShippedSpawnlist pins the maker each shipped npcmaker
 // runs: the 13 no_on_start_maker and 231 event_maker npcmakers their own
-// makers, and the 7,605 default_maker npcmakers and the 958 permanent
+// makers, and the 7,621 default_maker npcmakers and the 958 permanent
 // default ones (random_spawn_treasurebox, random_maker) the default maker.
 func TestCatalogAgainstShippedSpawnlist(t *testing.T) {
 	dp := datapack.Require(t)
@@ -32,7 +32,7 @@ func TestCatalogAgainstShippedSpawnlist(t *testing.T) {
 	}{
 		{[]string{"no_on_start_maker"}, 13, true},
 		{[]string{"event_maker"}, 231, true},
-		{[]string{"default_maker"}, 7605, false},
+		{[]string{"default_maker"}, 7621, false},
 		{[]string{"random_spawn_treasurebox", "random_maker"}, 958, false},
 	} {
 		count := 0

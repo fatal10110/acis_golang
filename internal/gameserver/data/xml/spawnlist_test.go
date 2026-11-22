@@ -513,13 +513,13 @@ func TestLoadSpawnlistAgainstDatapack(t *testing.T) {
 		t.Fatalf("LoadSpawnlist(%q) error: %v", dir, err)
 	}
 
-	if got, want := table.TerritoryCount(), 9434; got != want {
+	if got, want := table.TerritoryCount(), 9450; got != want {
 		t.Fatalf("TerritoryCount() = %d, want %d", got, want)
 	}
-	if got, want := table.MakerCount(), 10072; got != want {
+	if got, want := table.MakerCount(), 10088; got != want {
 		t.Fatalf("MakerCount() = %d, want %d", got, want)
 	}
-	if got, want := table.SpawnCount(), 30137; got != want {
+	if got, want := table.SpawnCount(), 30153; got != want {
 		t.Fatalf("SpawnCount() = %d, want %d", got, want)
 	}
 
