@@ -62,12 +62,11 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30361-03.htm"
 		}
 	case questlog.StatusStarted:
-		shards := p.ItemCount(windShard)
+		shards := s.TakeAllItems(p, windShard)
 		if shards == 0 {
 			htmltext = "30361-05.htm"
 		} else {
 			htmltext = "30361-07.htm"
-			s.TakeItems(p, windShard, -1)
 			bonus := int32(0)
 			if shards >= 10 {
 				bonus = 2988

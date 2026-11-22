@@ -67,7 +67,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(p, script.SoundAccept)
 	case strings.EqualFold(e.Name, "30686-7.htm"):
-		count := p.ItemCount(jadeCrystal)
+		count := s.TakeAllItems(p, jadeCrystal)
 		if count == 0 {
 			htmltext = "30686-4.htm"
 		} else {
@@ -75,7 +75,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			if count >= 100 {
 				reward += 7400
 			}
-			s.TakeItems(p, jadeCrystal, -1)
 			s.RewardItems(p, 57, reward)
 		}
 	case strings.EqualFold(e.Name, "30686-8.htm"):

@@ -41,12 +41,11 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(p, script.SoundAccept)
 	case strings.EqualFold(e.Name, "30892-05.htm"):
-		pelts := p.ItemCount(alligatorPelt)
+		pelts := s.TakeAllItems(p, alligatorPelt)
 		reward := pelts * 60
 		if pelts > 10 {
 			reward += 3430
 		}
-		s.TakeItems(p, alligatorPelt, -1)
 		s.RewardItems(p, 57, reward)
 	case strings.EqualFold(e.Name, "30892-08.htm"):
 		s.PlaySound(p, script.SoundFinish)

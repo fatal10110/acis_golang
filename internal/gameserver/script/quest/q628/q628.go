@@ -196,8 +196,10 @@ func onTalk(s *script.Script, e script.Talk) string {
 				htmltext = "31554-05.htm"
 				st.SetCond(3)
 				s.PlaySound(p, script.SoundFinish)
-				s.TakeItems(p, splinterStakatoChitin, -1)
-				s.TakeItems(p, needleStakatoChitin, -1)
+				// Only the chitins counted for the exchange go: one landing
+				// after the count stays (#5172).
+				s.TakeHeldItems(p, splinterStakatoChitin, splinters)
+				s.TakeHeldItems(p, needleStakatoChitin, needles)
 				s.TakeItems(p, goldenRamBadgeRecruit, 1)
 				s.GiveItems(p, goldenRamBadgeSoldier, 1)
 			case !p.HasItem(splinterStakatoChitin) && !p.HasItem(needleStakatoChitin):
