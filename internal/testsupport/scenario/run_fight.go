@@ -333,13 +333,26 @@ const (
 )
 
 // jump runs a jump step: role's NPC jumps to its offset from where the
-// character first entered the world, its spawn point kept.
+// character first entered the world, its spawn point kept. An instant
+// teleport leaves the NPC in the region it jumped from; a jump is how a
+// scenario brings a far NPC back to the character, so one that lands in
+// another region is then put in that region, where the character knows it
+// and may click it.
 func (r *run) jump(t *testing.T, args []string) {
 	t.Helper()
 	n, _ := ints(args[1:])
 	h, post := r.npcQueue(t, args[0])
+	obj, _ := r.srv.State.Object(r.objs[args[0]])
 	to := script.Loc{X: r.origin.X + n[0], Y: r.origin.Y + n[1], Z: r.origin.Z + n[2]}
-	r.on(t, args[0], post, func() { script.NPCOf(h).InstantTeleportTo(to) })
+	var err error
+	r.on(t, args[0], post, func() {
+		script.NPCOf(h).InstantTeleportTo(to)
+		x, y, z := h.Position()
+		err = r.srv.State.Move(obj, x, y, z)
+	})
+	if err != nil {
+		t.Fatalf("%s: jump %s: %v", r.sc.Name, args[0], err)
+	}
 	r.srv.Settle(t)
 }
 
