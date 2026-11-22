@@ -24,7 +24,7 @@ import (
 // newTestLinkPair boots a ClientLink and a GameServerLink over real
 // sockets, sharing one registry, session store, and link roster, so the
 // account-eviction path can be exercised end to end.
-func newTestLinkPair(t *testing.T, accounts *fakeAccountStore) (clientAddr string, l *ClientLink, gsAddr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
+func newTestLinkPair(t *testing.T, accounts accountStore) (clientAddr string, l *ClientLink, gsAddr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
 	t.Helper()
 
 	dir := t.TempDir()
