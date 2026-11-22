@@ -157,14 +157,18 @@ func TestTyrannosaurusMakerCallsSailren(t *testing.T) {
 		t.Helper()
 		send("1001")
 		w.srv.Advance(t, time.Millisecond)
-		// A condition-based wait costs no time on the driven clock, where
-		// the NPC is already there; on the real pool its frames and the
-		// script events can land after the fixed spans.
 		var frames [][]byte
-		w.srv.AdvanceUntil(t, step+", the NPC shown", func() bool {
-			frames = append(frames, drainFrames(t, w.c)...)
-			return len(mw.inWorld(tyrannosaurusID)) == 1 && len(shown(frames)) >= 1
-		})
+		if w.srv.DrivesClock() {
+			// The spawn's exact instant is pinned on the driven clock.
+			frames = drainFrames(t, w.c)
+		} else {
+			// On the real pool the NPC's frames and the script events can
+			// land after the fixed spans.
+			w.srv.AdvanceUntil(t, step+", the NPC shown", func() bool {
+				frames = append(frames, drainFrames(t, w.c)...)
+				return len(mw.inWorld(tyrannosaurusID)) == 1 && len(shown(frames)) >= 1
+			})
+		}
 		count(step, 1)
 		if got := shown(frames); !slices.Equal(got, []int{tyrannosaurusID}) {
 			t.Fatalf("%s: NPCs shown = %v, want [%d]", step, got, tyrannosaurusID)

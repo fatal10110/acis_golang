@@ -307,9 +307,17 @@ func TestMerchantWindowHoldsTheItemList(t *testing.T) {
 		t.Fatalf("item list inside the window = %x, want nothing", opcodes(got))
 	}
 	w.srv.Advance(t, 1500*time.Millisecond)
+	if w.srv.DrivesClock() {
+		// The window's exact end is pinned on the driven clock.
+		if got := opcodes(w.send(t, itemList)); len(got) == 0 || got[len(got)-1] != serverpackets.OpcodeItemList {
+			t.Fatalf("item list after the window = %x, want an ItemList", got)
+		}
+		return
+	}
 	// A request inside the window is dropped without a reply, so asking
-	// again until the window has cleared is safe; the answer comes from the
-	// server's queues and can trail the drain that follows the request.
+	// again until the window has cleared is safe; on the wall clock the
+	// answer comes from the server's queues and can trail the drain that
+	// follows the request.
 	var got []byte
 	w.srv.AdvanceUntil(t, "the item list is answered after the window", func() bool {
 		got = opcodes(w.send(t, itemList))
