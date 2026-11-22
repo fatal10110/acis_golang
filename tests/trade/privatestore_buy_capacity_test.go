@@ -114,3 +114,34 @@ func TestBuyStoreSaleRefusedWhenOwnerOverWeight(t *testing.T) {
 		t.Fatalf("owner operate type with one ingot still wanted = %d, want buy", got)
 	}
 }
+
+// TestBuyStoreStackableSaleIntoHeldStackAtSlotLimit pins #4961's stackable
+// rule: a stackable item the owner already holds needs no new slot, however
+// many rows carry it. The owner sits at the two-slot limit (adena and one
+// ingot) and still buys two ingots sold as two rows of the same stack; the
+// list fills and the store closes.
+func TestBuyStoreStackableSaleIntoHeldStackAtSlotLimit(t *testing.T) {
+	t.Parallel()
+	h := bootTraders(t, gameservertest.WithInventorySlots(2, 2))
+	h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
+	h.srv.GiveItem(t, h.firstID, heavyIngot, 1)
+	ingots := h.srv.GiveItem(t, h.secondID, heavyIngot, 3)
+	h.enterAll(t)
+	openBuyStore(t, h, buyRow{heavyIngot, 0, 2, 5})
+
+	one := saleRow{ingots, heavyIngot, 0, 1, 5}
+	h.second.Send(encodeRequestPrivateStoreSell(h.firstID, one, one))
+	for range 2 {
+		assertMessage(t, h.second.Read(), serverpackets.SystemMessageS1PurchasedS3S2S, textP("TraderOne"), itemNameP(heavyIngot), numberP(1))
+		assertMessage(t, h.first.Read(), serverpackets.SystemMessagePurchasedS3S2SFromS1, textP("TraderTwo"), itemNameP(heavyIngot), numberP(1))
+	}
+	h.srv.Settle(t)
+
+	assertHeld(t, h, h.firstID, heavyIngot, 3, "owner after the sale")
+	assertHeld(t, h, h.firstID, item.AdenaID, 90, "owner after the sale")
+	assertHeld(t, h, h.secondID, heavyIngot, 1, "seller after the sale")
+	assertHeld(t, h, h.secondID, item.AdenaID, 10, "seller after the sale")
+	if got := h.srv.PlayerOperateType(t, h.firstID); got != privatestore.OperateNone {
+		t.Fatalf("owner operate type after the list filled = %d, want none", got)
+	}
+}
