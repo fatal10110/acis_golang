@@ -65,6 +65,9 @@ jobs:
           - name: pool-quest
             cache: rest
             pool: ./tests/quest ./tests/olympiad
+          - name: pool-ai
+            cache: rest
+            pool: ./tests/ai
           - name: pool-small
             cache: rest
             pool: ./tests/bbs ./tests/boat ./tests/botswarm ./tests/clan ./tests/duel ./tests/fishchamp ./tests/idfactory ./tests/lottery ./tests/party ./tests/perf ./tests/petition ./tests/wedding
@@ -80,10 +83,9 @@ jobs:
       # slows them several times over, so the short pool-rest job runs them
       # in their own step without it.
       # The tests/ packages the real pool does not run, one `name: reason` line
-      # each.
+      # each (none now).
       # A tests/ package on no `pool` list and not named here fails `rest`.
-      POOL_EXCLUDED: |
-        ai: on the real pool a different timer-boundary assertion fails on each run (wizard peace timer, sacrificial_victim, summon pull, special debuff, farm growth), so the shard turned main red; back off the pool until the remaining wall-clock assertions are driven; tracked in #5301
+      POOL_EXCLUDED: ""
       STATIC_TESTS: '^(TestScriptHandleOpsAreCurrent|TestFindResultsMatchCapturedFingerprint|TestProductionFilesHaveNoProvenanceMarkers|TestReadKeysHaveAReader)$'
     services:
       mariadb:

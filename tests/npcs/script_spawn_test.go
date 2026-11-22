@@ -281,7 +281,10 @@ func TestScriptPrivateFollowsMaster(t *testing.T) {
 	}
 
 	// The scout's despawn passes: it is no longer the master's private.
+	// On the wall clock the despawn timer fires on the span's deadline and
+	// posts to the scout's queue, so wait for the unlink rather than for the span.
 	w.srv.Advance(t, 10*time.Second)
+	w.srv.AdvanceUntil(t, "scout despawn", func() bool { return around.Decayed() && scout.Master() == nil })
 	if !around.Decayed() || slices.Contains(boss.Minions(), npc.PartyMember(scout)) || scout.Master() != nil {
 		t.Fatalf("despawned scout gone %v, still a private %v", around.Decayed(), slices.Contains(boss.Minions(), npc.PartyMember(scout)))
 	}

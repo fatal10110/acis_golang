@@ -226,12 +226,18 @@ func TestFarmGrowthStepGrowsIntoItsSilhouette(t *testing.T) {
 			ind1gWantEat(t, "after the feed", farm, 70*1000/30)
 			w.ind1gWantFeeder(t, "after the feed", farm, ind1gFood1, 1)
 
-			w.srv.Advance(t, 900*time.Millisecond)
-			if !w.inWorld(farm) {
-				t.Fatal("the calf grew before its eating ended")
+			if w.srv.DrivesClock() {
+				// A pin 100 ms before the deadline: the wall clock can oversleep it.
+				w.srv.Advance(t, 900*time.Millisecond)
+				if !w.inWorld(farm) {
+					t.Fatal("the calf grew before its eating ended")
+				}
+				w.draws.set(0, row.draws...)
+				w.srv.Advance(t, 100*time.Millisecond)
+			} else {
+				w.draws.set(0, row.draws...)
+				w.srv.Advance(t, time.Second)
 			}
-			w.draws.set(0, row.draws...)
-			w.srv.Advance(t, 100*time.Millisecond)
 			w.ind1gGrown(t, farm, row.want, ind1gFood1)
 		})
 	}

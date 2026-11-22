@@ -47,6 +47,10 @@ func (q *queues) NewQueue(id string) *sim.Queue {
 	return queue
 }
 
+// errTimersUndelivered reports a timer that stayed due for
+// shutdownDrainTimeout without the wall clock delivering its expiry.
+var errTimersUndelivered = errors.New("due timers were not delivered")
+
 // errUnsettled reports actor queues that kept a task pending past
 // shutdownDrainTimeout.
 var errUnsettled = errors.New("actor queues did not settle")
@@ -80,6 +84,39 @@ func (q *queues) settle() error {
 			return nil
 		}
 	}
+}
+
+// awaitDueTimers waits until the wall clock's goroutine has delivered every
+// timer expiry that was due at end, the instant the sleep returned, so a timer
+// set for the instant a sleep ends has posted its task before settle runs: a
+// timer fires on a goroutine of its own
+// a moment after its deadline, and a barrier posted in that gap would not wait
+// for it. The pool runs them on its own; the inline runner fires what is due
+// when it advances.
+func (q *queues) awaitDueTimers(end time.Time) error {
+	deadline := time.Now().Add(shutdownDrainTimeout)
+	for q.dueTimers(end) {
+		if time.Now().After(deadline) {
+			return errTimersUndelivered
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return nil
+}
+
+// dueTimers reports whether any queue created so far holds a timer that was
+// due at end and whose expiry is not yet delivered. end is fixed by the caller:
+// a timer that comes due after the span ended belongs to the next one.
+func (q *queues) dueTimers(end time.Time) bool {
+	q.mu.Lock()
+	all := append([]*sim.Queue(nil), q.all...)
+	q.mu.Unlock()
+	for _, queue := range all {
+		if queue.DueTimers(end) {
+			return true
+		}
+	}
+	return false
 }
 
 // runDue has the inline runner run the tasks posted and the timers already
