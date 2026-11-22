@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Class master (50000) in the starting villages and the main towns,
+one beside each town's class change masters. Not part of the original
+spawnlist: the server ships it so the class master stands there after
+every restart.
+-->
+<list>
+	<!-- Talking Island Village, beside Grand Master Bitz -->
+	<territory name="classmaster_talking_island" minZ="-3820" maxZ="-3620">
+		<node x="-83426" y="242764"/>
+		<node x="-83226" y="242764"/>
+		<node x="-83226" y="242964"/>
+		<node x="-83426" y="242964"/>
+	</territory>
+	<npcmaker name="classmaster_talking_island" territory="classmaster_talking_island" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="-83326;242864;-3720;55344" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Elven Village, beside Hierarch Asterios -->
+	<territory name="classmaster_elven_village" minZ="-2892" maxZ="-2692">
+		<node x="44692" y="52161"/>
+		<node x="44892" y="52161"/>
+		<node x="44892" y="52361"/>
+		<node x="44692" y="52361"/>
+	</territory>
+	<npcmaker name="classmaster_elven_village" territory="classmaster_elven_village" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="44792;52261;-2792;0" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Dark Elven Village, beside Master Trudy -->
+	<territory name="classmaster_dark_elven_village" minZ="-4340" maxZ="-4140">
+		<node x="11183" y="14226"/>
+		<node x="11383" y="14226"/>
+		<node x="11383" y="14426"/>
+		<node x="11183" y="14426"/>
+	</territory>
+	<npcmaker name="classmaster_dark_elven_village" territory="classmaster_dark_elven_village" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="11283;14326;-4240;31000" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Orc Village, beside Prefect Brukurse -->
+	<territory name="classmaster_orc_village" minZ="-300" maxZ="-100">
+		<node x="-46090" y="-114792"/>
+		<node x="-45890" y="-114792"/>
+		<node x="-45890" y="-114592"/>
+		<node x="-46090" y="-114592"/>
+	</territory>
+	<npcmaker name="classmaster_orc_village" territory="classmaster_orc_village" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="-45990;-114692;-200;32768" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Dwarven Village, beside Warehouse Chief Reed -->
+	<territory name="classmaster_dwarven_village" minZ="-972" maxZ="-772">
+		<node x="115035" y="-180054"/>
+		<node x="115235" y="-180054"/>
+		<node x="115235" y="-179854"/>
+		<node x="115035" y="-179854"/>
+	</territory>
+	<npcmaker name="classmaster_dwarven_village" territory="classmaster_dwarven_village" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="115135;-179954;-872;32768" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Gludin Village, beside Grand Master Ramos -->
+	<territory name="classmaster_gludin" minZ="-3220" maxZ="-3020">
+		<node x="-81788" y="149350"/>
+		<node x="-81588" y="149350"/>
+		<node x="-81588" y="149550"/>
+		<node x="-81788" y="149550"/>
+	</territory>
+	<npcmaker name="classmaster_gludin" territory="classmaster_gludin" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="-81688;149450;-3120;32768" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Gludio, beside Grand Master Rains -->
+	<territory name="classmaster_gludio" minZ="-3204" maxZ="-3004">
+		<node x="-13771" y="122879"/>
+		<node x="-13571" y="122879"/>
+		<node x="-13571" y="123079"/>
+		<node x="-13771" y="123079"/>
+	</territory>
+	<npcmaker name="classmaster_gludio" territory="classmaster_gludio" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="-13671;122979;-3104;49152" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Dion, beside Grand Master Pabris -->
+	<territory name="classmaster_dion" minZ="-3188" maxZ="-2988">
+		<node x="19516" y="144672"/>
+		<node x="19716" y="144672"/>
+		<node x="19716" y="144872"/>
+		<node x="19516" y="144872"/>
+	</territory>
+	<npcmaker name="classmaster_dion" territory="classmaster_dion" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="19616;144772;-3088;49152" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Giran, beside Grand Master Hannavalt -->
+	<territory name="classmaster_giran" minZ="-3500" maxZ="-3300">
+		<node x="85555" y="146471"/>
+		<node x="85755" y="146471"/>
+		<node x="85755" y="146671"/>
+		<node x="85555" y="146671"/>
+	</territory>
+	<npcmaker name="classmaster_giran" territory="classmaster_giran" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="85655;146571;-3400;32768" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Oren, beside Grand Master Brecson -->
+	<territory name="classmaster_oren" minZ="-1604" maxZ="-1404">
+		<node x="83009" y="54867"/>
+		<node x="83209" y="54867"/>
+		<node x="83209" y="55067"/>
+		<node x="83009" y="55067"/>
+	</territory>
+	<npcmaker name="classmaster_oren" territory="classmaster_oren" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="83109;54967;-1504;49152" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Aden, beside Grand Master Sedrick -->
+	<territory name="classmaster_aden" minZ="-2220" maxZ="-2020">
+		<node x="149216" y="24860"/>
+		<node x="149416" y="24860"/>
+		<node x="149416" y="25060"/>
+		<node x="149216" y="25060"/>
+	</territory>
+	<npcmaker name="classmaster_aden" territory="classmaster_aden" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="149316;24960;-2120;16384" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Heine, beside Grand Master Marcus -->
+	<territory name="classmaster_heine" minZ="-3724" maxZ="-3524">
+		<node x="113739" y="218323"/>
+		<node x="113939" y="218323"/>
+		<node x="113939" y="218523"/>
+		<node x="113739" y="218523"/>
+	</territory>
+	<npcmaker name="classmaster_heine" territory="classmaster_heine" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="113839;218423;-3624;0" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Goddard, beside Grand Master Bernhard -->
+	<territory name="classmaster_goddard" minZ="-2828" maxZ="-2628">
+		<node x="148688" y="-52746"/>
+		<node x="148888" y="-52746"/>
+		<node x="148888" y="-52546"/>
+		<node x="148688" y="-52546"/>
+	</territory>
+	<npcmaker name="classmaster_goddard" territory="classmaster_goddard" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="148788;-52646;-2728;49500" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Rune Township, beside Grand Master Siegmund -->
+	<territory name="classmaster_rune" minZ="-1228" maxZ="-1028">
+		<node x="38230" y="-46920"/>
+		<node x="38430" y="-46920"/>
+		<node x="38430" y="-46720"/>
+		<node x="38230" y="-46720"/>
+	</territory>
+	<npcmaker name="classmaster_rune" territory="classmaster_rune" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="38330;-46820;-1128;33000" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Town of Schuttgart, beside Grand Master Drizzit -->
+	<territory name="classmaster_schuttgart" minZ="-1620" maxZ="-1420">
+		<node x="90398" y="-141946"/>
+		<node x="90598" y="-141946"/>
+		<node x="90598" y="-141746"/>
+		<node x="90398" y="-141746"/>
+	</territory>
+	<npcmaker name="classmaster_schuttgart" territory="classmaster_schuttgart" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="90498;-141846;-1520;34000" total="1" respawn="1min"/>
+	</npcmaker>
+	
+	<!-- Hunters Village, beside Grand Master Siria -->
+	<territory name="classmaster_hunters_village" minZ="-2340" maxZ="-2140">
+		<node x="119503" y="77588"/>
+		<node x="119703" y="77588"/>
+		<node x="119703" y="77788"/>
+		<node x="119503" y="77788"/>
+	</territory>
+	<npcmaker name="classmaster_hunters_village" territory="classmaster_hunters_village" maximumNpcs="1">
+		<ai type="default_maker"/>
+		<npc id="50000" pos="119603;77688;-2240;39864" total="1" respawn="1min"/>
+	</npcmaker>
+</list>

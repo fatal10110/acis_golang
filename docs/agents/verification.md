@@ -137,7 +137,10 @@ force a downstream failure), because the database goes back to the pool for the 
 ### Datapack, geodata and reference tests
 
 The repository carries a copy of the datapack in `aCis_datapack/` (`data/xml`, `data/html`,
-`data/serverNames.xml`, `sql`, `tools`, `build.xml`), byte for byte as the full checkout ships it.
+`data/serverNames.xml`, `sql`, `tools`, `build.xml`), byte for byte as the full checkout ships it,
+plus the server's own additions, which the full checkout lacks:
+`data/xml/spawnlist/custom_classmaster.xml` (the class master in the towns, #5419). The deploy
+workflow packages this copy, so the additions reach production; keep them when resyncing the copy.
 Every test that reads it resolves the path through `internal/testsupport/datapack`, which searches
 the module root and every ancestor, so the in-repo copy wins. CI sets `ACIS_REQUIRE_DATAPACK=1`:
 a datapack test that cannot find its data fails there instead of skipping, so CI is their gate.
