@@ -121,6 +121,11 @@ type Bank interface {
 	// keeps the warehouse's adena within a 32-bit count, and returns the
 	// write that lands the change.
 	ReturnAdena(clanID int32, adena int) Landing
+	// RestoreWarehouse reads clan clanID's warehouse into memory when it is
+	// not there yet. The lease calls it before taking the halls' lock, so
+	// that TakeAdena under the lock finds the warehouse in memory and no call
+	// on the halls waits on the database.
+	RestoreWarehouse(clanID int32)
 }
 
 // NoticeKind names a message every online member of a clan is told.
@@ -492,6 +497,15 @@ func (hs *Halls) stopFeeLocked(h *hall) {
 // again, takes the hall, the members told it is lost. gen is the
 // generation the payment's timer was armed with.
 func (hs *Halls) payFee(h *hall, gen uint64) {
+	hs.mu.Lock()
+	ownerID, due := h.ownerID, h.feeGen == gen && h.fee != nil
+	hs.mu.Unlock()
+	// The owner's warehouse is read outside the lock. An owner changed
+	// meanwhile rearmed or stopped the timer, so the check below drops this
+	// payment.
+	if due && ownerID != 0 && h.data.Lease > 0 && hs.bank != nil {
+		hs.bank.RestoreWarehouse(ownerID)
+	}
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	if h.feeGen != gen || h.fee == nil {

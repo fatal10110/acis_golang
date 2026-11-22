@@ -52,6 +52,7 @@ type refusingBank struct{}
 
 func (refusingBank) TakeAdena(int32, int) (Landing, bool) { return nil, false }
 func (refusingBank) ReturnAdena(int32, int) Landing       { return nil }
+func (refusingBank) RestoreWarehouse(int32)               {}
 
 // groundsHalls restores a hall with two gates owned by groundsFormer, its
 // lease unpaid and due at start, beside the clan groundsWinner.

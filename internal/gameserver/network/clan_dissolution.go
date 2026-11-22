@@ -14,6 +14,11 @@ import (
 // clan header, or, with no delay configured, destroyed at once; either way
 // the leader then loses a full death's experience.
 func (l *GameClientLink) dissolveClan(live *livePlayer) {
+	// A clan destroyed at once destroys its warehouse's items, so a
+	// warehouse no one has used yet is read off the queue first.
+	if cl, ok := l.clanService().ClanOf(live.Character); ok && !l.clanWarehouseReady(live, cl.ID(), func() { l.dissolveClan(live) }) {
+		return
+	}
 	cl, result := l.clanService().RequestDissolve(live.Character, time.Now(), l.sieges)
 	var msg int
 	switch result {
