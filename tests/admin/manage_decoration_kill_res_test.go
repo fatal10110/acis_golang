@@ -202,11 +202,20 @@ func TestAdminManageDecorationCorpseDeleted(t *testing.T) {
 func TestAdminManageSignetPointKill(t *testing.T) {
 	t.Parallel()
 	def := modelskill.Definition{
-		ID: killSignetID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET", EffectNpcID: killPointNpcID, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 600}},
-	}
+		ID:            killSignetID,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET",
+		Radius:        180,
+		Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 600}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: killPointNpcID,
+	})
 	db := sqltest.SharedDB(t)
 	decay := newManualDecay(t)
 	srv, gmID := bootAdmin(t, adminLevel,

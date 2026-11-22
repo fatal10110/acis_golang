@@ -15,7 +15,7 @@ func TestCancelNeverStripsToggleOrDebuffEffects(t *testing.T) {
 	debuff := addBuff(t, target, modelskill.EffectTemplate{Name: "Debuff", Time: 600}, effect.Skill{Debuff: true})
 
 	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
+		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MagicLevel: 40}.WithExtra(modelskill.Extra{MaxNegatedEffects: 10}),
 		Targets: []Actor{target},
 	})
 
@@ -34,7 +34,7 @@ func TestCancelNeverStripsNonCancellableEffectType(t *testing.T) {
 	blessing := addBuff(t, target, modelskill.EffectTemplate{Name: "Buff", Time: 600, EffectType: "noblesse_blessing"}, effect.Skill{})
 
 	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
+		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MagicLevel: 40}.WithExtra(modelskill.Extra{MaxNegatedEffects: 10}),
 		Targets: []Actor{target},
 	})
 
@@ -53,7 +53,7 @@ func TestCancelNeverStripsProtectionBlessingMarkerEffect(t *testing.T) {
 	protection := addBuff(t, target, modelskill.EffectTemplate{Name: "ProtectionBlessing", Time: 600}, effect.Skill{})
 
 	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
+		Skill:   modelskill.Definition{SkillType: "CANCEL", Power: 50, MagicLevel: 40}.WithExtra(modelskill.Extra{MaxNegatedEffects: 10}),
 		Targets: []Actor{target},
 	})
 
@@ -69,7 +69,7 @@ func TestMageBaneOnlyConsidersMatchingStackTypes(t *testing.T) {
 	unrelated := addBuff(t, target, modelskill.EffectTemplate{Name: "Buff", Time: 600, StackType: "speed_up"}, effect.Skill{})
 
 	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "MAGE_BANE", Power: 50, MaxNegatedEffects: 10, MagicLevel: 40},
+		Skill:   modelskill.Definition{SkillType: "MAGE_BANE", Power: 50, MagicLevel: 40}.WithExtra(modelskill.Extra{MaxNegatedEffects: 10}),
 		Targets: []Actor{target},
 	})
 
@@ -89,10 +89,11 @@ func TestCancelRefreshesCasterSelfEffect(t *testing.T) {
 	registry.Use(Cast{
 		Caster: caster,
 		Skill: modelskill.Definition{
-			SkillType:   "CANCEL",
-			ID:          99,
+			SkillType: "CANCEL",
+			ID:        99,
+		}.WithExtra(modelskill.Extra{
 			SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Time: 600, Self: true}},
-		},
+		}),
 	})
 
 	if hasEffect(caster.list, stale) {

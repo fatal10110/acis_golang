@@ -40,72 +40,130 @@ var offensiveSkillTypes = map[string]bool{
 }
 
 // Definition holds one level's static data for one skill: its timing,
-// consumption, range, and the raw classification tags (skill/effect type,
-// formula stat key) that the skill handlers and effects interpret to decide
-// what casting the skill actually does. This type carries that data without
-// acting on it — building the effect itself, evaluating its conditions, and
-// resolving a weapon-type restriction to an equipment mask are some other
-// system's job.
+// consumption, range, and the raw classification tag (skill type) that the
+// skill handlers and effects interpret to decide what casting the skill
+// actually does. This type carries that data without acting on it —
+// building the effect itself, evaluating its conditions, and resolving a
+// weapon-type restriction to an equipment mask are some other system's job.
+//
+// The attributes only some skill types carry live in Extra, reached through
+// the Extra method. A loaded table shares one Extra between neighbouring
+// levels that carry the same values, so a Definition stays small.
 type Definition struct {
 	ID    ID
 	Level int
 
 	Name       string
 	Activation Activation
-	Magic      bool
-	Potion     bool
+	Target     Target
+	Element    Element
+	RecallType RecallType
+
+	Magic  bool
+	Potion bool
+
+	IgnoreResists bool
+	StaticReuse   bool
+	StaticHitTime bool
+	IgnoreShield  bool
+
+	Overhit          bool
+	KillByDOT        bool
+	SuicideAttack    bool
+	SiegeSummonSkill bool
+
+	// Advanced marks a SIEGE_FLAG skill putting up an advanced siege
+	// headquarters, with twice the HP.
+	Advanced bool
+
+	// IsCubic selects the cubic branch of a SUMMON skill: Extra.NpcID is
+	// then the cubic type id (matching cubic.ID) the skill grants.
+	IsCubic bool
+
+	NextActionIsAttack bool
+	Debuff             bool
+	Offensive          bool
+
+	// HeroSkill reports whether holding hero status grants this skill,
+	// independent of anything the level's own data says.
+	HeroSkill bool
+
+	DirectHPDamage   bool
+	Dance            bool
+	StayAfterDeath   bool
+	CanBeReflected   bool
+	CanBeDispelled   bool
+	ClanSkill        bool
+	SimultaneousCast bool
+
+	Power float32
 
 	MPConsume        int
 	MPInitialConsume int
 	HPConsume        int
 
-	TargetConsumeCount int
-	TargetConsumeID    int
-	ItemConsumeCount   int
-	ItemConsumeID      int
+	ItemConsumeCount int
+	ItemConsumeID    int
 
 	CastRange   int
 	EffectRange int
 
-	AbnormalLevel       int
-	EffectAbnormalLevel int
-	NegateLevel         int
+	AbnormalLevel int
 
 	HitTime  int
 	CoolTime int
 
-	ReuseDelay  int
-	EquipDelay  int
-	SharedReuse *Ref
+	ReuseDelay int
 
 	Radius int
 
-	Target Target
-	Power  float32
+	MagicLevel  int
+	LevelDepend int
 
-	Attribute   string
-	NegateTypes []string
-	NegateIDs   []int
+	// SkillType is the raw effect-classification tag the skill carries. The
+	// loader rejects an unknown one (see KnownSkillType); the skill handler
+	// registry dispatches on it.
+	SkillType string
 
+	BaseCritRate int
+	AggroPoints  int
+
+	Flight *Flight
+
+	Conditions []ConditionClause
+	Funcs      []FuncTemplate
+	Effects    []EffectTemplate
+
+	// extra is shared, never changed once the Definition is built; nil
+	// reads as the zero Extra.
+	extra *Extra
+}
+
+// Extra holds the attributes of one skill level that only some skill types
+// carry or read. A Definition shares it read-only with other levels; treat
+// every value reached through it, slices included, as immutable.
+type Extra struct {
+	SharedReuse *Ref
+
+	EquipDelay int
+
+	TargetConsumeCount int
+	TargetConsumeID    int
+
+	EffectAbnormalLevel int
+	NegateLevel         int
+
+	Attribute         string
+	NegateTypes       []string
+	NegateIDs         []int
 	MaxNegatedEffects int
-	MagicLevel        int
-	LevelDepend       int
-
-	IgnoreResists bool
-	StaticReuse   bool
-	StaticHitTime bool
 
 	// Stat names the formula key a func/condition attached elsewhere reads
 	// or writes; interpreting it is that engine's job, not this type's.
 	Stat string
 
-	IgnoreShield bool
-
-	// SkillType and EffectType are the raw effect-classification tags a
-	// skill and its (optional, separately classified) side effect carry. The
-	// loader rejects an unknown SkillType (see KnownSkillType); the skill
-	// handler registry dispatches on it.
-	SkillType  string
+	// EffectType is the raw classification tag of the skill's optional,
+	// separately classified side effect.
 	EffectType string
 
 	EffectID    int
@@ -117,30 +175,18 @@ type Definition struct {
 	// effect. -1 when unset.
 	EffectNpcID int
 
-	Element      Element
 	BaseLandRate int
 
-	Overhit          bool
-	KillByDOT        bool
-	SuicideAttack    bool
-	SiegeSummonSkill bool
-
-	// Advanced marks a SIEGE_FLAG skill putting up an advanced siege
-	// headquarters, with twice the HP.
-	Advanced bool
-
-	// IsCubic and NpcID select the cubic branch of a SUMMON skill: NpcID is
-	// the cubic type id (matching cubic.ID) the skill grants when IsCubic
-	// is set. The same NpcID attribute also carries a servitor's spawn
-	// template id when IsCubic is false, which is that branch's concern.
-	IsCubic bool
-	NpcID   int
+	// NpcID is the cubic type id a SUMMON skill grants when the
+	// Definition's IsCubic is set, and a servitor's spawn template id
+	// otherwise.
+	NpcID int
 
 	// CubicActivationTime and CubicActivationChance are a granting SUMMON
 	// skill's own "activationtime" (seconds between action ticks) and
 	// "activationchance" (percent roll gating each non-Life-Cubic tick),
 	// distinct from the unrelated ChanceSkillTrigger effect's
-	// "activationChance" attribute captured by ActivationChance above.
+	// "activationChance" attribute captured by ActivationChance below.
 	// SummonTotalLifeTime is the granted cubic's total lifetime in ms.
 	CubicActivationTime   int
 	CubicActivationChance int
@@ -164,36 +210,22 @@ type Definition struct {
 	// to its equipment mask is the item-type data's job, not this loader's.
 	WeaponsAllowed string
 
-	NextActionIsAttack bool
-	MinPledgeClass     int
+	MinPledgeClass int
 
 	TriggeredID      int
 	TriggeredLevel   int
 	ChanceType       string
 	ActivationChance int
 
-	Debuff     bool
-	Offensive  bool
 	MaxCharges int
 	NumCharges int
 
-	// HeroSkill reports whether holding hero status grants this skill,
-	// independent of anything the level's own data says.
-	HeroSkill bool
-
-	BaseCritRate  int
 	LethalChance1 int
 	LethalChance2 int
 
-	DirectHPDamage bool
-	Dance          bool
-	NextDanceCost  int
-	SoulShotBoost  float32
-	AggroPoints    int
+	NextDanceCost int
+	SoulShotBoost float32
 
-	StayAfterDeath bool
-
-	Flight    *Flight
 	FlyRadius int
 	FlyCourse float32
 
@@ -203,12 +235,6 @@ type Definition struct {
 	// regains AbsorbAbs plus AbsorbPart of the drained HP per damaged target.
 	AbsorbPart float32
 	AbsorbAbs  int
-
-	CanBeReflected bool
-	CanBeDispelled bool
-	ClanSkill      bool
-
-	SimultaneousCast bool
 
 	// ExtractableItems is the raw, unparsed product list a "capsule" skill
 	// (one that unwraps into a random item) carries, or "" when the skill
@@ -235,15 +261,32 @@ type Definition struct {
 	// places (NpcID) stays in the world; 0 or less keeps it there.
 	DespawnDelay int
 
-	// RecallType and TeleCoords are a RECALL or TELEPORT skill's
-	// destination: TeleCoords, when set, wins over RecallType.
-	RecallType RecallType
+	// TeleCoords is a RECALL or TELEPORT skill's fixed destination; when
+	// set, it wins over the Definition's RecallType.
 	TeleCoords *location.Location
 
-	Conditions  []ConditionClause
-	Funcs       []FuncTemplate
-	Effects     []EffectTemplate
 	SelfEffects []EffectTemplate
+}
+
+// noExtra is what Extra returns for a Definition built without
+// type-specific attributes.
+var noExtra Extra
+
+// Extra returns d's type-specific attributes, or a zero Extra when d carries
+// none. The result is shared with every level holding equal attributes and
+// must be treated as read-only: to change a value, copy it (*d.Extra()) and
+// pass the copy to WithExtra.
+func (d *Definition) Extra() *Extra {
+	if d.extra == nil {
+		return &noExtra
+	}
+	return d.extra
+}
+
+// WithExtra returns a copy of d carrying e as its type-specific attributes.
+func (d Definition) WithExtra(e Extra) Definition {
+	d.extra = &e
+	return d
 }
 
 // DefinitionAttrs holds one skill level's static attributes after the data
@@ -258,141 +301,70 @@ type Definition struct {
 // NewDefinition fills it in from the level's other attributes.
 type DefinitionAttrs struct {
 	Activation Activation
-	Magic      bool
-	Potion     bool
+	Target     Target
+	Element    Element
+	RecallType RecallType
 
-	MPConsume        int
-	MPInitialConsume int
-	HPConsume        int
-
-	TargetConsumeCount int
-	TargetConsumeID    int
-	ItemConsumeCount   int
-	ItemConsumeID      int
-
-	CastRange   int
-	EffectRange int
-
-	AbnormalLevel       int
-	EffectAbnormalLevel int
-	NegateLevel         int
-
-	HitTime  int
-	CoolTime int
-
-	ReuseDelay  int
-	EquipDelay  int
-	SharedReuse *Ref
-
-	Radius int
-
-	Target Target
-	Power  float32
-
-	Attribute   string
-	NegateTypes []string
-	NegateIDs   []int
-
-	MaxNegatedEffects int
-	MagicLevel        int
-	LevelDepend       int
+	Magic  bool
+	Potion bool
 
 	IgnoreResists bool
 	StaticReuse   bool
 	StaticHitTime bool
-
-	Stat string
-
-	IgnoreShield bool
-
-	SkillType  string
-	EffectType string
-
-	EffectID    int
-	EffectPower int
-	EffectLevel int
-	EffectNpcID int
-
-	Element      Element
-	BaseLandRate int
+	IgnoreShield  bool
 
 	Overhit          bool
 	KillByDOT        bool
 	SuicideAttack    bool
 	SiegeSummonSkill bool
-
-	Advanced bool
-
-	IsCubic bool
-	NpcID   int
-
-	CubicActivationTime   int
-	CubicActivationChance int
-	SummonTotalLifeTime   int
-	ExpPenalty            float32
-	SummonTimeLostIdle    int
-	SummonTimeLostActive  int
-	ItemConsumeIDOT       int
-	ItemConsumeCountOT    int
-	ItemConsumeSteps      int
-
-	WeaponsAllowed string
+	Advanced         bool
+	IsCubic          bool
 
 	NextActionIsAttack bool
-	MinPledgeClass     int
+	Debuff             bool
 
-	TriggeredID      int
-	TriggeredLevel   int
-	ChanceType       string
-	ActivationChance int
+	DirectHPDamage   bool
+	Dance            bool
+	StayAfterDeath   bool
+	CanBeReflected   bool
+	CanBeDispelled   bool
+	ClanSkill        bool
+	SimultaneousCast bool
 
-	Debuff     bool
-	MaxCharges int
-	NumCharges int
+	Power float32
+
+	MPConsume        int
+	MPInitialConsume int
+	HPConsume        int
+
+	ItemConsumeCount int
+	ItemConsumeID    int
+
+	CastRange   int
+	EffectRange int
+
+	AbnormalLevel int
+
+	HitTime  int
+	CoolTime int
+
+	ReuseDelay int
+
+	Radius int
+
+	MagicLevel  int
+	LevelDepend int
+
+	SkillType string
+
+	AggroPoints int
 
 	Offensive    *bool
 	BaseCritRate *int
 
-	LethalChance1 int
-	LethalChance2 int
+	Flight *Flight
 
-	DirectHPDamage bool
-	Dance          bool
-	NextDanceCost  int
-	SoulShotBoost  float32
-	AggroPoints    int
-
-	StayAfterDeath bool
-
-	Flight    *Flight
-	FlyRadius int
-	FlyCourse float32
-
-	Feed int
-
-	AbsorbPart float32
-	AbsorbAbs  int
-
-	CanBeReflected bool
-	CanBeDispelled bool
-	ClanSkill      bool
-
-	SimultaneousCast bool
-
-	ExtractableItems string
-
-	CreateItemIDs         []int32
-	CreateItemCount       int
-	CreateItemRandomCount int
-
-	AppearanceFace      int
-	AppearanceHairColor int
-	AppearanceHairStyle int
-
-	DespawnDelay int
-
-	RecallType RecallType
-	TeleCoords *location.Location
+	Extra
 }
 
 // NewDefinition builds one level's Definition from id, level, name (the
@@ -402,138 +374,70 @@ type DefinitionAttrs struct {
 // BaseCritRate defaults derived from the level's other attributes when a
 // leaves them unset.
 func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition {
+	extra := a.Extra
 	d := Definition{
 		ID: id, Level: level, Name: name, HeroSkill: heroSkillIDs[id],
 
 		Activation: a.Activation,
-		Magic:      a.Magic,
-		Potion:     a.Potion,
+		Target:     a.Target,
+		Element:    a.Element,
+		RecallType: a.RecallType,
 
-		MPConsume:        a.MPConsume,
-		MPInitialConsume: a.MPInitialConsume,
-		HPConsume:        a.HPConsume,
+		Magic:  a.Magic,
+		Potion: a.Potion,
 
-		TargetConsumeCount: a.TargetConsumeCount,
-		TargetConsumeID:    a.TargetConsumeID,
-		ItemConsumeCount:   a.ItemConsumeCount,
-		ItemConsumeID:      a.ItemConsumeID,
-
-		CastRange:           a.CastRange,
-		EffectRange:         a.EffectRange,
-		AbnormalLevel:       a.AbnormalLevel,
-		EffectAbnormalLevel: a.EffectAbnormalLevel,
-		NegateLevel:         a.NegateLevel,
-
-		HitTime:    a.HitTime,
-		CoolTime:   a.CoolTime,
-		ReuseDelay: a.ReuseDelay,
-		EquipDelay: a.EquipDelay,
-
-		SharedReuse: a.SharedReuse,
-
-		Radius: a.Radius,
-
-		Target: a.Target,
-		Power:  a.Power,
-
-		Attribute:   a.Attribute,
-		NegateTypes: a.NegateTypes,
-		NegateIDs:   a.NegateIDs,
-
-		MaxNegatedEffects: a.MaxNegatedEffects,
-		MagicLevel:        a.MagicLevel,
-		LevelDepend:       a.LevelDepend,
-		IgnoreResists:     a.IgnoreResists,
-		StaticReuse:       a.StaticReuse,
-		StaticHitTime:     a.StaticHitTime,
-
-		Stat:         a.Stat,
-		IgnoreShield: a.IgnoreShield,
-
-		SkillType:  a.SkillType,
-		EffectType: a.EffectType,
-
-		EffectID:    a.EffectID,
-		EffectPower: a.EffectPower,
-		EffectLevel: a.EffectLevel,
-		EffectNpcID: a.EffectNpcID,
-
-		Element:      a.Element,
-		BaseLandRate: a.BaseLandRate,
+		IgnoreResists: a.IgnoreResists,
+		StaticReuse:   a.StaticReuse,
+		StaticHitTime: a.StaticHitTime,
+		IgnoreShield:  a.IgnoreShield,
 
 		Overhit:          a.Overhit,
 		KillByDOT:        a.KillByDOT,
 		SuicideAttack:    a.SuicideAttack,
 		SiegeSummonSkill: a.SiegeSummonSkill,
-
-		Advanced: a.Advanced,
-
-		IsCubic: a.IsCubic,
-		NpcID:   a.NpcID,
-
-		CubicActivationTime:   a.CubicActivationTime,
-		CubicActivationChance: a.CubicActivationChance,
-		SummonTotalLifeTime:   a.SummonTotalLifeTime,
-		ExpPenalty:            a.ExpPenalty,
-		SummonTimeLostIdle:    a.SummonTimeLostIdle,
-		SummonTimeLostActive:  a.SummonTimeLostActive,
-		ItemConsumeIDOT:       a.ItemConsumeIDOT,
-		ItemConsumeCountOT:    a.ItemConsumeCountOT,
-		ItemConsumeSteps:      a.ItemConsumeSteps,
-
-		WeaponsAllowed: a.WeaponsAllowed,
+		Advanced:         a.Advanced,
+		IsCubic:          a.IsCubic,
 
 		NextActionIsAttack: a.NextActionIsAttack,
-		MinPledgeClass:     a.MinPledgeClass,
+		Debuff:             a.Debuff,
 
-		TriggeredID:      a.TriggeredID,
-		TriggeredLevel:   a.TriggeredLevel,
-		ChanceType:       a.ChanceType,
-		ActivationChance: a.ActivationChance,
-
-		Debuff:     a.Debuff,
-		MaxCharges: a.MaxCharges,
-		NumCharges: a.NumCharges,
-
-		LethalChance1: a.LethalChance1,
-		LethalChance2: a.LethalChance2,
-
-		DirectHPDamage: a.DirectHPDamage,
-		Dance:          a.Dance,
-		NextDanceCost:  a.NextDanceCost,
-		SoulShotBoost:  a.SoulShotBoost,
-		AggroPoints:    a.AggroPoints,
-
-		StayAfterDeath: a.StayAfterDeath,
-
-		Flight:    a.Flight,
-		FlyRadius: a.FlyRadius,
-		FlyCourse: a.FlyCourse,
-
-		Feed: a.Feed,
-
-		AbsorbPart: a.AbsorbPart,
-		AbsorbAbs:  a.AbsorbAbs,
-
+		DirectHPDamage:   a.DirectHPDamage,
+		Dance:            a.Dance,
+		StayAfterDeath:   a.StayAfterDeath,
 		CanBeReflected:   a.CanBeReflected,
 		CanBeDispelled:   a.CanBeDispelled,
 		ClanSkill:        a.ClanSkill,
 		SimultaneousCast: a.SimultaneousCast,
 
-		ExtractableItems: a.ExtractableItems,
+		Power: a.Power,
 
-		CreateItemIDs:         a.CreateItemIDs,
-		CreateItemCount:       a.CreateItemCount,
-		CreateItemRandomCount: a.CreateItemRandomCount,
+		MPConsume:        a.MPConsume,
+		MPInitialConsume: a.MPInitialConsume,
+		HPConsume:        a.HPConsume,
 
-		AppearanceFace:      a.AppearanceFace,
-		AppearanceHairColor: a.AppearanceHairColor,
-		AppearanceHairStyle: a.AppearanceHairStyle,
+		ItemConsumeCount: a.ItemConsumeCount,
+		ItemConsumeID:    a.ItemConsumeID,
 
-		DespawnDelay: a.DespawnDelay,
+		CastRange:     a.CastRange,
+		EffectRange:   a.EffectRange,
+		AbnormalLevel: a.AbnormalLevel,
 
-		RecallType: a.RecallType,
-		TeleCoords: a.TeleCoords,
+		HitTime:    a.HitTime,
+		CoolTime:   a.CoolTime,
+		ReuseDelay: a.ReuseDelay,
+
+		Radius: a.Radius,
+
+		MagicLevel:  a.MagicLevel,
+		LevelDepend: a.LevelDepend,
+
+		SkillType: a.SkillType,
+
+		AggroPoints: a.AggroPoints,
+
+		Flight: a.Flight,
+
+		extra: &extra,
 	}
 
 	d.Offensive = isTypeOffensive(d.SkillType) || d.Debuff || d.Target == TargetCorpseMob

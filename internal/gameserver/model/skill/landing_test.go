@@ -23,14 +23,20 @@ func TestLandingPowerAndEffectType(t *testing.T) {
 		{"power over 100", Definition{SkillType: "DEBUFF", Power: 101}, 20, "DEBUFF"},
 		{"power exactly 100", Definition{SkillType: "DEBUFF", Power: 100}, 100, "DEBUFF"},
 		{"no power", Definition{SkillType: "ROOT"}, 20, "ROOT"},
-		{"skill effectPower and effectType", Definition{SkillType: "MDAM", Power: 80, EffectPower: 35, EffectType: "STUN"}, 35, "STUN"},
+		{"skill effectPower and effectType", Definition{SkillType: "MDAM", Power: 80}.WithExtra(Extra{EffectPower: 35, EffectType: "STUN"}), 35, "STUN"},
 		{
 			"template power and type first",
-			Definition{SkillType: "MDAM", EffectPower: 35, EffectType: "STUN", Effects: []EffectTemplate{
-				{EffectPower: 0},
-				{EffectPower: 60, EffectType: "SLEEP"},
-				{EffectPower: 70, EffectType: "ROOT"},
-			}},
+			Definition{
+				SkillType: "MDAM",
+				Effects: []EffectTemplate{
+					{EffectPower: 0},
+					{EffectPower: 60, EffectType: "SLEEP"},
+					{EffectPower: 70, EffectType: "ROOT"},
+				},
+			}.WithExtra(Extra{
+				EffectPower: 35,
+				EffectType:  "STUN",
+			}),
 			60, "SLEEP",
 		},
 	}

@@ -153,11 +153,20 @@ func TestUnsummonShortcutDismissesServitor(t *testing.T) {
 		catNPCID       = 12600
 	)
 	db := sqltest.SharedDB(t)
-	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
-		ID: summonCatSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: catNPCID, SummonTotalLifeTime: 1_200_000,
-		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-	}}), gamesql.NewCharacterSkillStore(db))
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{modelskill.Definition{
+		ID:            summonCatSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		HitTime:       0,
+		StaticReuse:   true,
+		ReuseDelay:    0,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               catNPCID,
+		SummonTotalLifeTime: 1_200_000,
+	})}), gamesql.NewCharacterSkillStore(db))
 	cat := &npc.Template{
 		ID: catNPCID, TemplateID: catNPCID, Type: "Servitor", Name: "Kat the Cat", Level: 20,
 		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,

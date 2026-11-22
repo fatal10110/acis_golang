@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/rs/zerolog"
@@ -321,9 +321,23 @@ func loadSkillRecords(root string) ([]datadiff.Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	return recordsFromValues(table.All(), func(_ int, def skill.Definition) string {
-		return fmt.Sprintf("%d/%d", def.ID, def.Level)
-	})
+	defs := table.All()
+	records := make([]datadiff.Record, len(defs))
+	for i, def := range defs {
+		record, err := recordFromValue(fmt.Sprintf("%d/%d", def.ID, def.Level), def)
+		if err != nil {
+			return nil, err
+		}
+		// A level's type-specific attributes dump next to its own fields,
+		// under their bare names.
+		extra, err := datadiff.Flatten(def.Extra())
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(record.Fields, extra)
+		records[i] = record
+	}
+	return records, nil
 }
 
 func loadMultisellRecords(root string) ([]datadiff.Record, error) {

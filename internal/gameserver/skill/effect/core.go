@@ -350,14 +350,14 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 		MagicLevel:          def.MagicLevel,
 		LevelDepend:         def.LevelDepend,
 		AbnormalLevel:       def.AbnormalLevel,
-		EffectAbnormalLevel: def.EffectAbnormalLevel,
+		EffectAbnormalLevel: def.Extra().EffectAbnormalLevel,
 		EffectType:          def.LandingEffectType(),
-		MaxNegatedEffects:   def.MaxNegatedEffects,
-		NegateLevel:         def.NegateLevel,
-		NegateIDs:           def.NegateIDs,
-		NegateTypes:         def.NegateTypes,
-		FlyRadius:           def.FlyRadius,
-		Stat:                def.Stat,
+		MaxNegatedEffects:   def.Extra().MaxNegatedEffects,
+		NegateLevel:         def.Extra().NegateLevel,
+		NegateIDs:           def.Extra().NegateIDs,
+		NegateTypes:         def.Extra().NegateTypes,
+		FlyRadius:           def.Extra().FlyRadius,
+		Stat:                def.Extra().Stat,
 	}
 }
 

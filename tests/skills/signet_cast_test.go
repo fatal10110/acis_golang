@@ -43,12 +43,26 @@ const (
 // scaled its timings or ran a cool phase would show it.
 func signetCastSkill() modelskill.Definition {
 	return modelskill.Definition{
-		ID: signetCastID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		Offensive: true, HitTime: 2000, CoolTime: 1000, ReuseDelay: 60_000, StaticReuse: true,
-		SkillType: "SIGNET_CASTTIME", EffectNpcID: signetEffectNpcID, Radius: 180, Power: 1,
-		MPInitialConsume: 2, MPConsume: 3, ItemConsumeID: signetConsumeItem, ItemConsumeCount: 1,
+		ID:               signetCastID,
+		Level:            1,
+		Activation:       modelskill.ActivationActive,
+		Target:           modelskill.TargetSelf,
+		Offensive:        true,
+		HitTime:          2000,
+		CoolTime:         1000,
+		ReuseDelay:       60_000,
+		StaticReuse:      true,
+		SkillType:        "SIGNET_CASTTIME",
+		Radius:           180,
+		Power:            1,
+		MPInitialConsume: 2,
+		MPConsume:        3,
+		ItemConsumeID:    signetConsumeItem,
+		ItemConsumeCount: 1,
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: signetEffectNpcID,
 		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, Count: 9, Time: 2}},
-	}
+	})
 }
 
 func signetPointTemplate() *npc.Template {
@@ -344,11 +358,18 @@ func TestSignetMDamTickRefreshesSummonStatus(t *testing.T) {
 						CollisionRadius: 8, CollisionHeight: 20,
 					},
 				})),
-				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{signet, {
-					ID: servitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-					SkillType: "SUMMON", NpcID: servitorNpcID, SummonTotalLifeTime: 1_200_000,
-					StaticHitTime: true, StaticReuse: true,
-				}})),
+				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{signet, modelskill.Definition{
+					ID:            servitorSkill,
+					Level:         1,
+					Activation:    modelskill.ActivationActive,
+					Target:        modelskill.TargetSelf,
+					SkillType:     "SUMMON",
+					StaticHitTime: true,
+					StaticReuse:   true,
+				}.WithExtra(modelskill.Extra{
+					NpcID:               servitorNpcID,
+					SummonTotalLifeTime: 1_200_000,
+				})})),
 			)
 			c, objID := srv.Client, srv.SoleObjectID(t)
 			seedKnownSkill(t, srv, objID, int(signet.ID), signet.Level)

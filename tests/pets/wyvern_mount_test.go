@@ -67,8 +67,8 @@ func wyvernRiderSkills(t *testing.T) *skillstate.Persistence {
 			ID: summonCreatureID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 		},
-		{ID: wolfFeedSkill, Level: 1, Feed: wolfFeedAmount},
-		{ID: striderFeedSkill, Level: 1, Feed: wolfFeedAmount},
+		modelskill.Definition{ID: wolfFeedSkill, Level: 1}.WithExtra(modelskill.Extra{Feed: wolfFeedAmount}),
+		modelskill.Definition{ID: striderFeedSkill, Level: 1}.WithExtra(modelskill.Extra{Feed: wolfFeedAmount}),
 		{
 			ID: riderToggleSkill, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
 			SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},

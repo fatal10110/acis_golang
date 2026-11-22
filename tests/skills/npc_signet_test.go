@@ -27,11 +27,20 @@ func TestNPCSignetSpawnsPointAtCasterAndExpiresThroughTheEffectTicker(t *testing
 
 func castNPCSignet(t *testing.T, target modelskill.Target) {
 	def := modelskill.Definition{
-		ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: target, CastRange: 900,
-		HitTime: 500, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
-	}
+		ID:            454,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        target,
+		CastRange:     900,
+		HitTime:       500,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET",
+		Radius:        180,
+		Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

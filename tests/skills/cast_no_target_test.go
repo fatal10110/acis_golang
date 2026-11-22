@@ -18,10 +18,19 @@ const emptyAuraSelfBuff = modelskill.ID(9321)
 
 func emptyAuraSelfBuffDef() modelskill.Definition {
 	return modelskill.Definition{
-		ID: emptyAuraSelfBuff, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetAura,
-		Radius: 10, Offensive: true, SkillType: "PDAM", Power: 1, HitTime: 500, StaticHitTime: true,
+		ID:            emptyAuraSelfBuff,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetAura,
+		Radius:        10,
+		Offensive:     true,
+		SkillType:     "PDAM",
+		Power:         1,
+		HitTime:       500,
+		StaticHitTime: true,
+	}.WithExtra(modelskill.Extra{
 		SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, Self: true}},
-	}
+	})
 }
 
 // TestPlayerAuraOnNobodyRunsItsHandler (CreatureCast.onMagicHitTimer,

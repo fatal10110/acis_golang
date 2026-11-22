@@ -48,11 +48,19 @@ func capsuleSkills(t *testing.T, products string) *skillstate.Persistence {
 	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
 		{ID: 248, Level: 3},
 		{ID: 294, Level: 1},
-		{
-			ID: capsuleSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "EXTRACTABLE", MagicLevel: 1, StaticHitTime: true, HitTime: 500, StaticReuse: true,
+		modelskill.Definition{
+			ID:            capsuleSkillID,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "EXTRACTABLE",
+			MagicLevel:    1,
+			StaticHitTime: true,
+			HitTime:       500,
+			StaticReuse:   true,
+		}.WithExtra(modelskill.Extra{
 			ExtractableItems: products,
-		},
+		}),
 	}), gamesql.NewCharacterSkillStore(db))
 }
 

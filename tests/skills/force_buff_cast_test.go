@@ -36,10 +36,18 @@ func forceGatedSkill(id int32, attr, level string) modelskill.Definition {
 func TestForceBuffCastConditionsReadFusionLevel(t *testing.T) {
 	t.Parallel()
 	fusion := modelskill.Definition{
-		ID: modelskill.ID(forceFusionID), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		CastRange: 900, HitTime: 15_000, StaticHitTime: true, SkillType: "FUSION",
-		TriggeredID: int(battleForceID), TriggeredLevel: 1,
-	}
+		ID:            modelskill.ID(forceFusionID),
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetOne,
+		CastRange:     900,
+		HitTime:       15_000,
+		StaticHitTime: true,
+		SkillType:     "FUSION",
+	}.WithExtra(modelskill.Extra{
+		TriggeredID:    int(battleForceID),
+		TriggeredLevel: 1,
+	})
 	force := modelskill.Definition{
 		ID: modelskill.ID(battleForceID), Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
 		SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Fusion", Time: 600, Icon: true}},

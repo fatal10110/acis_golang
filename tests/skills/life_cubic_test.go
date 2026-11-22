@@ -36,12 +36,22 @@ func TestLifeCubicHealSendsOwnerStatusBeforeRejuvenating(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: summonLifeCubicSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-				SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
-				CubicActivationTime: lifeCubicInterval, SummonTotalLifeTime: 900_000,
-				StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-			},
+			modelskill.Definition{
+				ID:            summonLifeCubicSkill,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetSelf,
+				SkillType:     "SUMMON",
+				IsCubic:       true,
+				StaticHitTime: true,
+				HitTime:       0,
+				StaticReuse:   true,
+				ReuseDelay:    0,
+			}.WithExtra(modelskill.Extra{
+				NpcID:               int(cubic.Life),
+				CubicActivationTime: lifeCubicInterval,
+				SummonTotalLifeTime: 900_000,
+			}),
 			{ID: lifeCubicHealSkill, Level: 1, Power: lifeCubicHealPower},
 		})),
 	)
@@ -89,18 +99,39 @@ const (
 // stormLifetime are the two cubics' granted lifetimes.
 func cubicSummonSkills(lifeLifetime, stormLifetime time.Duration) []modelskill.Definition {
 	return []modelskill.Definition{
-		{
-			ID: summonLifeCubicSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
-			CubicActivationTime: lifeCubicInterval, SummonTotalLifeTime: int(lifeLifetime / time.Millisecond),
-			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-		},
-		{
-			ID: summonStormCubicSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm), MPConsume: stormCubicMPCost,
-			CubicActivationTime: lifeCubicInterval, SummonTotalLifeTime: int(stormLifetime / time.Millisecond),
-			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-		},
+		modelskill.Definition{
+			ID:            summonLifeCubicSkill,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "SUMMON",
+			IsCubic:       true,
+			StaticHitTime: true,
+			HitTime:       0,
+			StaticReuse:   true,
+			ReuseDelay:    0,
+		}.WithExtra(modelskill.Extra{
+			NpcID:               int(cubic.Life),
+			CubicActivationTime: lifeCubicInterval,
+			SummonTotalLifeTime: int(lifeLifetime / time.Millisecond),
+		}),
+		modelskill.Definition{
+			ID:            summonStormCubicSkill,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "SUMMON",
+			IsCubic:       true,
+			MPConsume:     stormCubicMPCost,
+			StaticHitTime: true,
+			HitTime:       0,
+			StaticReuse:   true,
+			ReuseDelay:    0,
+		}.WithExtra(modelskill.Extra{
+			NpcID:               int(cubic.Storm),
+			CubicActivationTime: lifeCubicInterval,
+			SummonTotalLifeTime: int(stormLifetime / time.Millisecond),
+		}),
 		{ID: lifeCubicHealSkill, Level: 1, Power: lifeCubicHealPower},
 	}
 }

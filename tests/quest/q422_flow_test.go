@@ -315,7 +315,7 @@ func TestQ422PkWithTheSinEaterOutOnlyWarns(t *testing.T) {
 		s.GiveItemsEnchanted(p, q422PenitentManacles, 1, 46)
 	})
 	w.srv.RunQuest(t, w.player, q422Name, func(_ *script.Quests, c *player.Character, _ *script.Script) {
-		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: x1ServitorID, SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: x1ServitorID, SummonTotalLifeTime: 1_200_000}))
 	})
 	w.srv.AdvanceUntil(t, "the Sin Eater is in the world", func() bool {
 		_, ok := w.srv.State.Summon(w.player)

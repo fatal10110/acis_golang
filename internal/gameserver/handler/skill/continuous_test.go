@@ -27,10 +27,14 @@ func TestContinuousDebuffSkipsInvulnerableTargetWithoutAttackFailed(t *testing.T
 	result := continuousHandler{}.UseResult(Cast{
 		Caster: caster,
 		Skill: modelskill.Definition{
-			SkillType: "DEBUFF", Debuff: true, Offensive: true,
-			IgnoreResists: true, EffectPower: 100,
-			Effects: buffEffect(),
-		},
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
+			IgnoreResists: true,
+			Effects:       buffEffect(),
+		}.WithExtra(modelskill.Extra{
+			EffectPower: 100,
+		}),
 		Targets: []Actor{target},
 	})
 	if result.AttackFailed != 0 {
@@ -62,10 +66,13 @@ func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
 	result := continuousHandler{}.UseResult(Cast{
 		Caster: caster,
 		Skill: modelskill.Definition{
-			SkillType: "DEBUFF", Debuff: true,
-			IgnoreResists: true, EffectPower: 100,
-			Effects: buffEffect(),
-		},
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			IgnoreResists: true,
+			Effects:       buffEffect(),
+		}.WithExtra(modelskill.Extra{
+			EffectPower: 100,
+		}),
 		Targets: []Actor{target},
 	})
 	if result.AttackFailed != 0 {
@@ -83,7 +90,7 @@ func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
 // substitute skill supplies the lethal chances.
 func TestContinuousRollsLethalAfterLandingRoll(t *testing.T) {
 	sureLethal := formulas.LethalInput{AttackerLevel: 40, TargetLevel: 40, LethalMul: 1}
-	fear := modelskill.Definition{SkillType: "FEAR", Offensive: true, LethalChance2: 100}
+	fear := modelskill.Definition{SkillType: "FEAR", Offensive: true}.WithExtra(modelskill.Extra{LethalChance2: 100})
 
 	t.Run("failed landing", func(t *testing.T) {
 		target := &skillTarget{hp: 500, lethalInput: sureLethal, lethalOK: true}
@@ -123,11 +130,11 @@ func TestContinuousRollsLethalAfterLandingRoll(t *testing.T) {
 	})
 
 	t.Run("effect-id substitute supplies the chances", func(t *testing.T) {
-		defs := continuousDefinitions{{ID: 7, Level: 1}: {ID: 7, Level: 1, SkillType: "DEBUFF", Debuff: true, LethalChance2: 100}}
+		defs := continuousDefinitions{{ID: 7, Level: 1}: modelskill.Definition{ID: 7, Level: 1, SkillType: "DEBUFF", Debuff: true}.WithExtra(modelskill.Extra{LethalChance2: 100})}
 		target := &skillTarget{hp: 500, lethalInput: sureLethal, lethalOK: true}
 		continuousHandler{defs: defs}.UseResult(Cast{
 			Caster:  &skillTarget{hp: 500},
-			Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, EffectID: 7},
+			Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true}.WithExtra(modelskill.Extra{EffectID: 7}),
 			Targets: []Actor{target},
 		})
 		if target.hp != 1 {

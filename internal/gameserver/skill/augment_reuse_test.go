@@ -48,7 +48,7 @@ func TestAugmentationActiveSkillRedisabledOnEquip(t *testing.T) {
 	)
 	// A shared reuse makes the reuse key differ from both the skill id and
 	// its own id/level key.
-	active := modelskill.Definition{ID: modelskill.ID(activeID), Level: 2, Activation: modelskill.ActivationActive, SharedReuse: &modelskill.Ref{ID: 9000, Level: 1}}
+	active := modelskill.Definition{ID: modelskill.ID(activeID), Level: 2, Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{SharedReuse: &modelskill.Ref{ID: 9000, Level: 1}})
 	passive := modelskill.Definition{ID: modelskill.ID(passiveID), Level: 1, Activation: modelskill.ActivationPassive}
 	tmpl := &item.Template{ID: swordID, Kind: item.KindWeapon, Slot: item.SlotRHand, Duration: -1, Weapon: &item.WeaponDetail{Type: item.WeaponSword}}
 

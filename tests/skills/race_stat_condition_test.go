@@ -31,7 +31,9 @@ func TestRaceAndSkillStatConditionsGateCast(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			def := shippedSkill(t, 139, 1)
-			def.Stat = tt.stat
+			extra := *def.Extra()
+			extra.Stat = tt.stat
+			def = def.WithExtra(extra)
 			def.Conditions = []modelskill.ConditionClause{{Root: tt.root, MessageID: serverpackets.SystemMessageS1CannotBeUsed, AddName: true}}
 			srv := bootTargetConditionCaster(t, def)
 			c, objID := srv.Client, srv.SoleObjectID(t)

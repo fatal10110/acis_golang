@@ -438,7 +438,7 @@ func (l *GameClientLink) newPetInventory(live *livePlayer) *itemcontainer.Invent
 // the servitor template.
 func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskill.Definition) bool {
 	link, live := s.link, s.live
-	if link == nil || live == nil || owner == nil || def.NpcID == 0 {
+	if link == nil || live == nil || owner == nil || def.Extra().NpcID == 0 {
 		return false
 	}
 	// The cast's own pre-cast gate already answered for a summon out or a
@@ -452,13 +452,13 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if live.Character.AlikeDead() || live.Character.Mounted() || link.hasActiveSummon(live) || link.restoringSummon(live) {
 		return false
 	}
-	npcTmpl, ok := link.npcs.Get(def.NpcID)
+	npcTmpl, ok := link.npcs.Get(def.Extra().NpcID)
 	if !ok {
 		return false
 	}
 	objID, err := link.ids.NextID()
 	if err != nil {
-		link.log.Error().Err(err).Int("npc_id", def.NpcID).Msg("summon: allocate servitor object id")
+		link.log.Error().Err(err).Int("npc_id", def.Extra().NpcID).Msg("summon: allocate servitor object id")
 		return false
 	}
 
@@ -467,7 +467,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		ObjectID:        objID,
 		Owner:           live,
 		Title:           live.CharacterName(),
-		NPCID:           def.NpcID,
+		NPCID:           def.Extra().NpcID,
 		CollisionRadius: npcTmpl.CollisionRadius,
 		CollisionHeight: npcTmpl.CollisionHeight,
 		RunSpeed:        npcTmpl.RunSpeed,
@@ -478,18 +478,18 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		SiegeSummon:     npcTmpl.Type == "SiegeSummon",
 		Settings:        link.playerRules,
 		OwnerInventory:  live.Inventory(),
-		ExpPenalty:      def.ExpPenalty,
+		ExpPenalty:      def.Extra().ExpPenalty,
 		CorpseTime:      time.Duration(npcTmpl.CorpseTime) * time.Second,
 		Lifetime: summon.LifetimeState{
-			TimeRemaining:       def.SummonTotalLifeTime,
-			TotalLifeTime:       def.SummonTotalLifeTime,
-			NextItemConsumeTime: summon.InitialNextConsumeTime(def.SummonTotalLifeTime, def.ItemConsumeSteps, def.ItemConsumeIDOT),
-			ItemConsumeSteps:    def.ItemConsumeSteps,
+			TimeRemaining:       def.Extra().SummonTotalLifeTime,
+			TotalLifeTime:       def.Extra().SummonTotalLifeTime,
+			NextItemConsumeTime: summon.InitialNextConsumeTime(def.Extra().SummonTotalLifeTime, def.Extra().ItemConsumeSteps, def.Extra().ItemConsumeIDOT),
+			ItemConsumeSteps:    def.Extra().ItemConsumeSteps,
 		},
-		TimeLostIdle:     def.SummonTimeLostIdle,
-		TimeLostActive:   def.SummonTimeLostActive,
-		ItemConsumeID:    int32(def.ItemConsumeIDOT),
-		ItemConsumeCount: def.ItemConsumeCountOT,
+		TimeLostIdle:     def.Extra().SummonTimeLostIdle,
+		TimeLostActive:   def.Extra().SummonTimeLostActive,
+		ItemConsumeID:    int32(def.Extra().ItemConsumeIDOT),
+		ItemConsumeCount: def.Extra().ItemConsumeCountOT,
 		Stats: summon.CombatStats{
 			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
 			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
@@ -509,7 +509,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
-		link.log.Error().Err(err).Int("npc_id", def.NpcID).Msg("summon: build servitor")
+		link.log.Error().Err(err).Int("npc_id", def.Extra().NpcID).Msg("summon: build servitor")
 		return false
 	}
 	link.wireSummonAI(servitor)

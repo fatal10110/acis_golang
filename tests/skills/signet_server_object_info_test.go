@@ -48,11 +48,20 @@ func readServerObjectInfos(c *testsupport.ScriptedClient, objID int32) [][3]int3
 func TestStillSignetPointInWaterShowsNotAttackable(t *testing.T) {
 	t.Parallel()
 	def := modelskill.Definition{
-		ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
-	}
+		ID:            454,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET",
+		Radius:        180,
+		Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})
 	form, err := zone.NewCuboid(-200_000, 200_000, -200_000, 200_000, -20_000, 20_000)
 	if err != nil {
 		t.Fatal(err)

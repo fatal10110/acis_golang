@@ -131,7 +131,7 @@ func TestCharacterBlowInputCarriesResolvedLandingRoll(t *testing.T) {
 		return 799
 	})
 
-	in, ok := target.BlowInput(caster, modelskill.Definition{ID: 1, Power: 30, SkillType: "BLOW", BaseLandRate: 1000, BaseCritRate: 100})
+	in, ok := target.BlowInput(caster, modelskill.Definition{ID: 1, Power: 30, SkillType: "BLOW", BaseCritRate: 100}.WithExtra(modelskill.Extra{BaseLandRate: 1000}))
 	if !ok {
 		t.Fatal("BlowInput() ok = false")
 	}
@@ -161,7 +161,7 @@ func TestCharacterBlowInputCarriesPhysicalSkillEvasion(t *testing.T) {
 		return 0
 	})
 
-	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW", BaseLandRate: 1000})
+	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW"}.WithExtra(modelskill.Extra{BaseLandRate: 1000}))
 	if !ok || !in.Landed || !in.Evaded {
 		t.Fatalf("BlowInput() = %+v, %v; want landed evasion", in, ok)
 	}
@@ -186,7 +186,7 @@ func TestCharacterBlowInputCarriesShieldDefense(t *testing.T) {
 		return 10
 	})
 
-	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW", BaseLandRate: 1000})
+	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW"}.WithExtra(modelskill.Extra{BaseLandRate: 1000}))
 	if !ok {
 		t.Fatal("BlowInput() ok = false")
 	}
@@ -447,7 +447,7 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 		return 0
 	})
 
-	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW", BaseLandRate: 1000})
+	in, ok := target.BlowInput(caster, modelskill.Definition{SkillType: "BLOW"}.WithExtra(modelskill.Extra{BaseLandRate: 1000}))
 	if !ok {
 		t.Fatal("BlowInput() ok = false")
 	}
@@ -514,12 +514,12 @@ func TestCharacterLethalInputRejectsAttackerWithoutDamagePermission(t *testing.T
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
 	caster.SetCanGiveDamage(false)
-	if _, ok := target.LethalInput(caster, modelskill.Definition{LethalChance1: 100}); ok {
+	if _, ok := target.LethalInput(caster, modelskill.Definition{}.WithExtra(modelskill.Extra{LethalChance1: 100})); ok {
 		t.Fatal("LethalInput accepted an attacker without damage permission")
 	}
 	caster.SetCanGiveDamage(true)
 	target.SetSpawnProtection(true)
-	if _, ok := target.LethalInput(caster, modelskill.Definition{LethalChance1: 100}); ok {
+	if _, ok := target.LethalInput(caster, modelskill.Definition{}.WithExtra(modelskill.Extra{LethalChance1: 100})); ok {
 		t.Fatal("LethalInput accepted an invulnerable target")
 	}
 }
@@ -614,7 +614,7 @@ func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 	soulCaster := liveCharacter(1, tmpl, items, soulWeapon)
 	target := liveCharacter(2, tmpl, items)
 
-	phys, ok := target.PhysicalSkillInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "PDAM", SoulShotBoost: 2})
+	phys, ok := target.PhysicalSkillInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "PDAM"}.WithExtra(modelskill.Extra{SoulShotBoost: 2}))
 	if !ok {
 		t.Fatal("PhysicalSkillInput() ok = false")
 	}
@@ -622,7 +622,7 @@ func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 		t.Fatalf("PhysicalSkillInput soulshot = %v skillPower = %v, want true/60", phys.SoulShot, phys.SkillPower)
 	}
 
-	fatal, ok := target.PhysicalSkillInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "FATAL", SoulShotBoost: 2})
+	fatal, ok := target.PhysicalSkillInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "FATAL"}.WithExtra(modelskill.Extra{SoulShotBoost: 2}))
 	if !ok {
 		t.Fatal("FATAL PhysicalSkillInput() ok = false")
 	}
@@ -631,7 +631,7 @@ func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 		t.Fatalf("FATAL soulshot = %v skillPower = %v, want true/%v", fatal.SoulShot, fatal.SkillPower, wantFatal)
 	}
 
-	blow, ok := target.BlowInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "BLOW", SoulShotBoost: 2})
+	blow, ok := target.BlowInput(soulCaster, modelskill.Definition{Power: 30, SkillType: "BLOW"}.WithExtra(modelskill.Extra{SoulShotBoost: 2}))
 	if !ok {
 		t.Fatal("BlowInput() ok = false")
 	}

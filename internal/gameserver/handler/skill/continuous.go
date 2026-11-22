@@ -124,14 +124,14 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 }
 
 func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Definition {
-	if def.EffectID == 0 || h.defs == nil {
+	if def.Extra().EffectID == 0 || h.defs == nil {
 		return def
 	}
-	level := def.EffectLevel
+	level := def.Extra().EffectLevel
 	if level == 0 {
 		level = 1
 	}
-	if resolved, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.EffectID), Level: level}); ok {
+	if resolved, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.Extra().EffectID), Level: level}); ok {
 		return *resolved
 	}
 	return def

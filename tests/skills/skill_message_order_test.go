@@ -111,12 +111,23 @@ func TestBlowResistReportsBeforeTheTargetStatus(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Rogue", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-			ID: orderSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
-			SkillType: "BLOW", Power: 1, Offensive: true, IgnoreResists: true, BaseLandRate: 1,
-			Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
-		}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+			ID:            orderSkill,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			CastRange:     900,
+			HitTime:       500,
+			StaticHitTime: true,
+			StaticReuse:   true,
+			SkillType:     "BLOW",
+			Power:         1,
+			Offensive:     true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
+		}.WithExtra(modelskill.Extra{
+			BaseLandRate: 1,
+		})})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, orderSkill, 1)

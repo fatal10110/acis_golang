@@ -58,7 +58,7 @@ func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
 	ch.Live = live
 	actor := PlayerActor{Character: ch}
 
-	dance := modelskill.Definition{Dance: true, MPConsume: 10, NextDanceCost: 4}
+	dance := modelskill.Definition{Dance: true, MPConsume: 10}.WithExtra(modelskill.Extra{NextDanceCost: 4})
 	if got := actor.MPCost(&dance); got != 10 {
 		t.Fatalf("MPCost() with no active dances = %d, want 10", got)
 	}
@@ -70,7 +70,7 @@ func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
 		t.Fatalf("MPCost() with 2 active dances = %d, want 18 (10 + 2*4)", got)
 	}
 
-	nonDance := modelskill.Definition{MPConsume: 10, NextDanceCost: 4}
+	nonDance := modelskill.Definition{MPConsume: 10}.WithExtra(modelskill.Extra{NextDanceCost: 4})
 	if got := actor.MPCost(&nonDance); got != 10 {
 		t.Fatalf("MPCost() for non-dance skill = %d, want 10, unaffected by active dances", got)
 	}

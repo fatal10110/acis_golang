@@ -379,7 +379,9 @@ func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, block forElemen
 				return err
 			}
 			if eff.Self {
-				def.SelfEffects = append(def.SelfEffects, eff)
+				extra := *def.Extra()
+				extra.SelfEffects = append(extra.SelfEffects, eff)
+				*def = def.WithExtra(extra)
 			} else {
 				def.Effects = append(def.Effects, eff)
 			}
@@ -584,54 +586,33 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		MPInitialConsume: a.intDefault("mpInitialConsume", 0),
 		HPConsume:        a.intDefault("hpConsume", 0),
 
-		TargetConsumeCount: a.intDefault("targetConsumeCount", 0),
-		TargetConsumeID:    a.intDefault("targetConsumeId", 0),
-		ItemConsumeCount:   a.intDefault("itemConsumeCount", 0),
-		ItemConsumeID:      a.intDefault("itemConsumeId", 0),
+		ItemConsumeCount: a.intDefault("itemConsumeCount", 0),
+		ItemConsumeID:    a.intDefault("itemConsumeId", 0),
 
-		CastRange:           a.intDefault("castRange", 0),
-		EffectRange:         a.intDefault("effectRange", -1),
-		AbnormalLevel:       a.intDefault("abnormalLvl", -1),
-		EffectAbnormalLevel: a.intDefault("effectAbnormalLvl", -1),
-		NegateLevel:         a.intDefault("negateLvl", -1),
+		CastRange:     a.intDefault("castRange", 0),
+		EffectRange:   a.intDefault("effectRange", -1),
+		AbnormalLevel: a.intDefault("abnormalLvl", -1),
 
 		HitTime:    a.intDefault("hitTime", 0),
 		CoolTime:   a.intDefault("coolTime", 0),
 		ReuseDelay: a.intDefault("reuseDelay", 0),
-		EquipDelay: a.intDefault("equipDelay", 0),
 
 		Radius: a.intDefault("skillRadius", 80),
 
 		Target: attrEnum(a, "target", skill.ParseTarget),
 		Power:  a.float32Default("power", 0),
 
-		Attribute: a.strDefault("attribute", ""),
+		MagicLevel:    a.intDefault("magicLvl", 0),
+		LevelDepend:   a.intDefault("lvlDepend", 0),
+		IgnoreResists: a.boolDefault("ignoreResists", false),
+		StaticReuse:   a.boolDefault("staticReuse", false),
+		StaticHitTime: a.boolDefault("staticHitTime", false),
 
-		MaxNegatedEffects: a.intDefault("maxNegated", 0),
-		MagicLevel:        a.intDefault("magicLvl", 0),
-		LevelDepend:       a.intDefault("lvlDepend", 0),
-		IgnoreResists:     a.boolDefault("ignoreResists", false),
-		StaticReuse:       a.boolDefault("staticReuse", false),
-		StaticHitTime:     a.boolDefault("staticHitTime", false),
-
-		Stat:         attrEnumDefault(a, "stat", parseStatConstant, ""),
 		IgnoreShield: a.boolDefault("ignoreShld", false),
 
 		SkillType: attrSkillType(a),
-		// effectType, chanceType and negateStats are kept as written, not
-		// checked against their name sets at load (issue #4779): an unknown
-		// name loads and simply matches nothing. effectId defaults to 0 for
-		// every type, signets included; no consumer reads the default and
-		// every shipped signet sets it.
-		EffectType: a.strDefault("effectType", ""),
 
-		EffectID:    a.intDefault("effectId", 0),
-		EffectPower: a.intDefault("effectPower", 0),
-		EffectLevel: a.intDefault("effectLevel", 0),
-		EffectNpcID: a.intDefault("effectNpcId", -1),
-
-		Element:      attrEnumDefault(a, "element", skill.ParseElement, skill.ElementNone),
-		BaseLandRate: a.intDefault("baseLandRate", 0),
+		Element: attrEnumDefault(a, "element", skill.ParseElement, skill.ElementNone),
 
 		Overhit:          a.boolDefault("overHit", false),
 		KillByDOT:        a.boolDefault("killByDOT", false),
@@ -641,68 +622,79 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		Advanced: a.boolDefault("isAdvanced", false),
 
 		IsCubic: a.boolDefault("isCubic", false),
-		NpcID:   a.intDefault("npcId", 0),
-
-		CubicActivationTime:   a.intDefault("activationtime", 8),
-		CubicActivationChance: a.intDefault("activationchance", 30),
-		SummonTotalLifeTime:   a.intDefault("summonTotalLifeTime", 1200000),
-		ExpPenalty:            a.float32Default("expPenalty", 0),
-		SummonTimeLostIdle:    a.intDefault("summonTimeLostIdle", 0),
-		SummonTimeLostActive:  a.intDefault("summonTimeLostActive", 0),
-		ItemConsumeIDOT:       a.intDefault("itemConsumeIdOT", 0),
-		ItemConsumeCountOT:    a.intDefault("itemConsumeCountOT", 0),
-		ItemConsumeSteps:      a.intDefault("itemConsumeSteps", 0),
-
-		WeaponsAllowed: a.strDefault("weaponsAllowed", ""),
 
 		NextActionIsAttack: a.boolDefault("nextActionAttack", false),
-		MinPledgeClass:     a.intDefault("minPledgeClass", 0),
 
-		TriggeredID:      a.intDefault("triggeredId", 0),
-		TriggeredLevel:   a.intDefault("triggeredLevel", 0),
-		ChanceType:       a.strDefault("chanceType", ""),
-		ActivationChance: a.intDefault("activationChance", -1),
-
-		Debuff:     a.boolDefault("isDebuff", false),
-		MaxCharges: a.intDefault("maxCharges", 0),
-		NumCharges: a.intDefault("numCharges", 0),
-
-		LethalChance1: a.intDefault("lethal1", 0),
-		LethalChance2: a.intDefault("lethal2", 0),
+		Debuff: a.boolDefault("isDebuff", false),
 
 		DirectHPDamage: a.boolDefault("dmgDirectlyToHp", false),
 		Dance:          a.boolDefault("isDance", false),
-		NextDanceCost:  a.intDefault("nextDanceCost", 0),
-		SoulShotBoost:  a.float32Default("SSBoost", 0),
 		AggroPoints:    a.intDefault("aggroPoints", 0),
 
 		StayAfterDeath: a.boolDefault("stayAfterDeath", false),
-
-		FlyRadius: a.intDefault("flyRadius", 0),
-		FlyCourse: a.float32Default("flyCourse", 0),
-
-		Feed: a.intDefault("feed", 0),
-
-		AbsorbPart: a.float32Default("absorbPart", 0),
-		AbsorbAbs:  a.intDefault("absorbAbs", 0),
 
 		CanBeReflected:   a.boolDefault("canBeReflected", true),
 		CanBeDispelled:   a.boolDefault("canBeDispeled", true),
 		ClanSkill:        a.boolDefault("isClanSkill", false),
 		SimultaneousCast: a.boolDefault("simultaneousCast", false),
 
-		ExtractableItems: a.strDefault("capsuled_items_skill", ""),
-
-		CreateItemCount:       a.intDefault("create_item_count", 0),
-		CreateItemRandomCount: a.intDefault("random_count", 1),
-
-		AppearanceFace:      a.intDefault("faceId", -1),
-		AppearanceHairColor: a.intDefault("hairColorId", -1),
-		AppearanceHairStyle: a.intDefault("hairStyleId", -1),
-
-		DespawnDelay: a.intDefault("despawnDelay", 0),
-
 		RecallType: skill.ParseRecallType(a.strDefault("recallType", "")),
+
+		Extra: skill.Extra{
+			TargetConsumeCount:  a.intDefault("targetConsumeCount", 0),
+			TargetConsumeID:     a.intDefault("targetConsumeId", 0),
+			EffectAbnormalLevel: a.intDefault("effectAbnormalLvl", -1),
+			NegateLevel:         a.intDefault("negateLvl", -1),
+			EquipDelay:          a.intDefault("equipDelay", 0),
+			Attribute:           a.strDefault("attribute", ""),
+			MaxNegatedEffects:   a.intDefault("maxNegated", 0),
+			Stat:                attrEnumDefault(a, "stat", parseStatConstant, ""),
+			// effectType, chanceType and negateStats are kept as written, not
+			// checked against their name sets at load (issue #4779): an unknown
+			// name loads and simply matches nothing. effectId defaults to 0 for
+			// every type, signets included; no consumer reads the default and
+			// every shipped signet sets it.
+			EffectType:            a.strDefault("effectType", ""),
+			EffectID:              a.intDefault("effectId", 0),
+			EffectPower:           a.intDefault("effectPower", 0),
+			EffectLevel:           a.intDefault("effectLevel", 0),
+			EffectNpcID:           a.intDefault("effectNpcId", -1),
+			BaseLandRate:          a.intDefault("baseLandRate", 0),
+			NpcID:                 a.intDefault("npcId", 0),
+			CubicActivationTime:   a.intDefault("activationtime", 8),
+			CubicActivationChance: a.intDefault("activationchance", 30),
+			SummonTotalLifeTime:   a.intDefault("summonTotalLifeTime", 1200000),
+			ExpPenalty:            a.float32Default("expPenalty", 0),
+			SummonTimeLostIdle:    a.intDefault("summonTimeLostIdle", 0),
+			SummonTimeLostActive:  a.intDefault("summonTimeLostActive", 0),
+			ItemConsumeIDOT:       a.intDefault("itemConsumeIdOT", 0),
+			ItemConsumeCountOT:    a.intDefault("itemConsumeCountOT", 0),
+			ItemConsumeSteps:      a.intDefault("itemConsumeSteps", 0),
+			WeaponsAllowed:        a.strDefault("weaponsAllowed", ""),
+			MinPledgeClass:        a.intDefault("minPledgeClass", 0),
+			TriggeredID:           a.intDefault("triggeredId", 0),
+			TriggeredLevel:        a.intDefault("triggeredLevel", 0),
+			ChanceType:            a.strDefault("chanceType", ""),
+			ActivationChance:      a.intDefault("activationChance", -1),
+			MaxCharges:            a.intDefault("maxCharges", 0),
+			NumCharges:            a.intDefault("numCharges", 0),
+			LethalChance1:         a.intDefault("lethal1", 0),
+			LethalChance2:         a.intDefault("lethal2", 0),
+			NextDanceCost:         a.intDefault("nextDanceCost", 0),
+			SoulShotBoost:         a.float32Default("SSBoost", 0),
+			FlyRadius:             a.intDefault("flyRadius", 0),
+			FlyCourse:             a.float32Default("flyCourse", 0),
+			Feed:                  a.intDefault("feed", 0),
+			AbsorbPart:            a.float32Default("absorbPart", 0),
+			AbsorbAbs:             a.intDefault("absorbAbs", 0),
+			ExtractableItems:      a.strDefault("capsuled_items_skill", ""),
+			CreateItemCount:       a.intDefault("create_item_count", 0),
+			CreateItemRandomCount: a.intDefault("random_count", 1),
+			AppearanceFace:        a.intDefault("faceId", -1),
+			AppearanceHairColor:   a.intDefault("hairColorId", -1),
+			AppearanceHairStyle:   a.intDefault("hairStyleId", -1),
+			DespawnDelay:          a.intDefault("despawnDelay", 0),
+		},
 	}
 
 	// Only a CREATE_ITEM skill reads its item ids, and it must name them.

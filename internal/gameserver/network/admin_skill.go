@@ -165,8 +165,8 @@ func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def *modelskill.
 		if err := l.skills.SetKnownSkill(target.Character, id, def.Level); err != nil {
 			l.log.Error().Err(err).Int32("object_id", target.ObjectID()).Int("skill_id", id).Msg("admin: give skill")
 		}
-		if prev, ok := l.skills.Definition(modelskill.Ref{ID: def.ID, Level: old}); ok && old > 0 && prev.TriggeredID > 1 {
-			l.removeLiveSkill(target, prev.TriggeredID, false)
+		if prev, ok := l.skills.Definition(modelskill.Ref{ID: def.ID, Level: old}); ok && old > 0 && prev.Extra().TriggeredID > 1 {
+			l.removeLiveSkill(target, prev.Extra().TriggeredID, false)
 		}
 	}
 	l.sendSkillChanges(target, before, changedSkill)
@@ -202,8 +202,8 @@ func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bo
 	}
 	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
 	l.skills.ForgetSkill(live.Character, skillID, store)
-	if known && def.TriggeredID > 1 {
-		l.removeLiveSkill(live, def.TriggeredID, false)
+	if known && def.Extra().TriggeredID > 1 {
+		l.removeLiveSkill(live, def.Extra().TriggeredID, false)
 	}
 	if live.cast != nil {
 		if cur, ok := live.cast.CurrentSkill(); ok && int(cur.ID) == skillID {

@@ -129,7 +129,7 @@ func (h signetHandler) useCasttime(cast Cast) {
 	}
 
 	meta := signetEffectMeta(cast.Skill)
-	for _, tmpl := range cast.Skill.SelfEffects {
+	for _, tmpl := range cast.Skill.Extra().SelfEffects {
 		e := h.newSelfEffect(cast.Caster, cast.Skill, meta, tmpl)
 		if e == nil {
 			continue
@@ -153,7 +153,7 @@ func (h signetHandler) newSelfEffect(caster Creature, def modelskill.Definition,
 // spawnActor builds and spawns the world actor a signet-family skill
 // carries its area effect on, attributed to and positioned at caster.
 func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc.EffectPoint, bool) {
-	tmpl, ok := h.templates.Get(def.EffectNpcID)
+	tmpl, ok := h.templates.Get(def.Extra().EffectNpcID)
 	if !ok {
 		return nil, false
 	}
@@ -206,7 +206,7 @@ func signetEffectMeta(def modelskill.Definition) effect.Skill {
 		EffectType: def.LandingEffectType(),
 
 		AbnormalLevel:       def.AbnormalLevel,
-		EffectAbnormalLevel: def.EffectAbnormalLevel,
+		EffectAbnormalLevel: def.Extra().EffectAbnormalLevel,
 	}
 }
 
@@ -233,7 +233,7 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: actor, Effected: actor}
 	e.OnStart = func(*effect.Effect) bool { return true }
 	e.OnAction = func(*effect.Effect) bool {
-		sub, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.EffectID), Level: def.Level})
+		sub, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.Extra().EffectID), Level: def.Level})
 		if !ok {
 			return true
 		}
@@ -264,7 +264,7 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 		if ef.Remaining() == ef.Template.Count-1 {
 			return true
 		}
-		sub, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.EffectID), Level: def.Level})
+		sub, ok := h.defs.Definition(modelskill.Ref{ID: modelskill.ID(def.Extra().EffectID), Level: def.Level})
 		if !ok {
 			return true
 		}

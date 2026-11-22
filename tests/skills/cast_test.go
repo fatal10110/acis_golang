@@ -823,11 +823,19 @@ func TestSkillDisabledToggleRejectionDoesNotStopMovement(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t,
 			[]modelskill.Definition{
-				{
-					ID: blockerSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-					HitTime: 0, StaticHitTime: true, StaticReuse: true, ReuseDelay: 60_000, SkillType: "DUMMY",
+				modelskill.Definition{
+					ID:            blockerSkillID,
+					Level:         1,
+					Activation:    modelskill.ActivationActive,
+					Target:        modelskill.TargetSelf,
+					HitTime:       0,
+					StaticHitTime: true,
+					StaticReuse:   true,
+					ReuseDelay:    60_000,
+					SkillType:     "DUMMY",
+				}.WithExtra(modelskill.Extra{
 					SharedReuse: &modelskill.Ref{ID: toggleSkillID, Level: 1},
-				},
+				}),
 				{
 					ID: toggleSkillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
 					MPConsume: 12, SkillType: "BUFF",
@@ -1010,15 +1018,23 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Caster", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			HitTime: hitTime, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-			HPConsume: hpConsume, SkillType: "BUFF", NumCharges: 1, MaxCharges: 3,
-			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
-			// A different effect type from the buff, so the two could only
-			// share the list rather than one replacing the other.
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+			ID:            skillID,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			HitTime:       hitTime,
+			ReuseDelay:    60_000,
+			StaticHitTime: true,
+			StaticReuse:   true,
+			HPConsume:     hpConsume,
+			SkillType:     "BUFF",
+			Effects:       []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+		}.WithExtra(modelskill.Extra{
+			NumCharges:  1,
+			MaxCharges:  3,
 			SelfEffects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, Self: true}},
-		}})),
+		})})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, skillID, 1)

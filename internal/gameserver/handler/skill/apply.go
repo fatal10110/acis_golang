@@ -29,7 +29,7 @@ func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, temp
 // every other landing it has no dead-effected refusal, so a caster the cast
 // just killed still takes them.
 func applyCasterSelfEffects(cast Cast, def modelskill.Definition) {
-	cast.reportResisted(cast.Caster, def, landEffects(cast.Caster, cast.Caster, def, def.SelfEffects, formulas.ShieldFailed, false))
+	cast.reportResisted(cast.Caster, def, landEffects(cast.Caster, cast.Caster, def, def.Extra().SelfEffects, formulas.ShieldFailed, false))
 }
 
 // applyEffectsWithLanding lands templates on effected, refusing a dead
@@ -161,7 +161,7 @@ func removeMatching(list *effect.List, limit int, remove func(*effect.Effect) bo
 // caster: an existing self effect from the same skill is dropped first, so
 // re-triggering the skill doesn't stack a duplicate of it.
 func applySelfEffects(cast Cast, def modelskill.Definition) {
-	if len(def.SelfEffects) == 0 {
+	if len(def.Extra().SelfEffects) == 0 {
 		return
 	}
 	if target, ok := cast.Caster.(effect.Actor); ok {

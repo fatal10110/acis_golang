@@ -20,9 +20,9 @@ func TestNegateTypeMatchesResolvedEffectType(t *testing.T) {
 		{"mdam resolves to paralyze", modelskill.Definition{SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}, "PARALYZE", true},
 		{"pdam resolves to stun", modelskill.Definition{SkillType: "PDAM", Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}, "STUN", true},
 		{"pdam is not paralyze", modelskill.Definition{SkillType: "PDAM"}, "PARALYZE", false},
-		{"skill-level effect type", modelskill.Definition{SkillType: "DEBUFF", EffectType: "PARALYZE", Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}, "PARALYZE", true},
-		{"first typed template wins", modelskill.Definition{SkillType: "MDAM", EffectType: "ROOT", Effects: []modelskill.EffectTemplate{{Name: "Debuff"}, {Name: "Stun", EffectType: "STUN"}}}, "STUN", true},
-		{"own skill type", modelskill.Definition{SkillType: "POISON", EffectType: "BLEED"}, "POISON", true},
+		{"skill-level effect type", modelskill.Definition{SkillType: "DEBUFF", Effects: []modelskill.EffectTemplate{{Name: "Debuff"}}}.WithExtra(modelskill.Extra{EffectType: "PARALYZE"}), "PARALYZE", true},
+		{"first typed template wins", modelskill.Definition{SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Debuff"}, {Name: "Stun", EffectType: "STUN"}}}.WithExtra(modelskill.Extra{EffectType: "ROOT"}), "STUN", true},
+		{"own skill type", modelskill.Definition{SkillType: "POISON"}.WithExtra(modelskill.Extra{EffectType: "BLEED"}), "POISON", true},
 	} {
 		if got := negateTypeMatches(SkillFromDefinition(tt.def), tt.negType); got != tt.want {
 			t.Errorf("%s: negateTypeMatches(%q) = %v, want %v", tt.name, tt.negType, got, tt.want)

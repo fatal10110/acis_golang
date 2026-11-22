@@ -19,10 +19,17 @@ const (
 // socialServitorSkill summons a servitor at its caster.
 func socialServitorSkill() modelskill.Definition {
 	return modelskill.Definition{
-		ID: modelskill.ID(socialServitorSkillID), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: int(socialServitorNpcID), SummonTotalLifeTime: 1_200_000,
-		StaticHitTime: true, StaticReuse: true,
-	}
+		ID:            modelskill.ID(socialServitorSkillID),
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		StaticReuse:   true,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               int(socialServitorNpcID),
+		SummonTotalLifeTime: 1_200_000,
+	})
 }
 
 // socialServitorNPCs is the servitor template socialServitorSkill spawns.

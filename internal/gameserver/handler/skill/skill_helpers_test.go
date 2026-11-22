@@ -696,8 +696,8 @@ func (t *skillTarget) ManaDamageInput(caster creature.FormulaActor, skill models
 
 func (t *skillTarget) LethalInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.LethalInput, bool) {
 	in := t.lethalInput
-	in.Chance1 = skill.LethalChance1
-	in.Chance2 = skill.LethalChance2
+	in.Chance1 = skill.Extra().LethalChance1
+	in.Chance2 = skill.Extra().LethalChance2
 	in.MagicLevel = skill.MagicLevel
 	return in, t.lethalOK
 }

@@ -78,10 +78,14 @@ func TestHealLandsSkillEffectsBeforeRestoringHP(t *testing.T) {
 			NewDefaultRegistry().Use(Cast{
 				Caster: caster,
 				Skill: modelskill.Definition{
-					ID: 1217, Level: 1, SkillType: skillType, Power: 30,
-					Effects:     []modelskill.EffectTemplate{{Name: "HealOverTime", Value: 10, Count: 3, Time: 1, Icon: true}},
+					ID:        1217,
+					Level:     1,
+					SkillType: skillType,
+					Power:     30,
+					Effects:   []modelskill.EffectTemplate{{Name: "HealOverTime", Value: 10, Count: 3, Time: 1, Icon: true}},
+				}.WithExtra(modelskill.Extra{
 					SelfEffects: buffEffect(),
-				},
+				}),
 				Targets: []Actor{target},
 			})
 			if got := len(target.effects.All()); got != 1 {
@@ -151,7 +155,7 @@ func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
 // stacked.
 func TestManaHealRefreshesSelfEffects(t *testing.T) {
 	caster := &skillTarget{mp: 10, maxMP: 100, effects: newTestList(nil)}
-	def := modelskill.Definition{ID: 1013, Level: 1, SkillType: "MANAHEAL", Power: 20, SelfEffects: buffEffect()}
+	def := modelskill.Definition{ID: 1013, Level: 1, SkillType: "MANAHEAL", Power: 20}.WithExtra(modelskill.Extra{SelfEffects: buffEffect()})
 	registry := NewDefaultRegistry()
 	for range 2 {
 		registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{caster}})
@@ -367,10 +371,16 @@ func TestResourceHandlersRunBuffPassFirst(t *testing.T) {
 				NewDefaultRegistry().Use(Cast{
 					Caster: caster,
 					Skill: modelskill.Definition{
-						ID: 1, Level: 1, SkillType: skillType, Power: 20,
-						Potion: shot.potion, StaticReuse: shot.staticReuse,
-						Effects: buffEffect(), SelfEffects: buffEffect(),
-					},
+						ID:          1,
+						Level:       1,
+						SkillType:   skillType,
+						Power:       20,
+						Potion:      shot.potion,
+						StaticReuse: shot.staticReuse,
+						Effects:     buffEffect(),
+					}.WithExtra(modelskill.Extra{
+						SelfEffects: buffEffect(),
+					}),
 					Targets: []Actor{target},
 				})
 				if !slices.Equal(caster.shots, shot.wantShots) || !slices.Equal(caster.shotFlags, shot.wantFlags) {

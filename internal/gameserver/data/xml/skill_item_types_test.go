@@ -23,13 +23,13 @@ func TestShippedItemSkillTypeAttrs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
 	}
-	get := func(id skill.ID, level int) skill.Definition {
+	get := func(id skill.ID, level int) *skill.Definition {
 		t.Helper()
 		def, ok := table.Get(id, level)
 		if !ok {
 			t.Fatalf("skill %d level %d missing", id, level)
 		}
-		return *def
+		return def
 	}
 
 	for _, tt := range []struct {
@@ -42,13 +42,13 @@ func TestShippedItemSkillTypeAttrs(t *testing.T) {
 		{1387, 3, []int32{2508}, 100, 300},
 	} {
 		def := get(tt.id, tt.level)
-		if !reflect.DeepEqual(def.CreateItemIDs, tt.ids) || def.CreateItemCount != tt.count || def.CreateItemRandomCount != tt.random {
+		if !reflect.DeepEqual(def.Extra().CreateItemIDs, tt.ids) || def.Extra().CreateItemCount != tt.count || def.Extra().CreateItemRandomCount != tt.random {
 			t.Errorf("skill %d-%d create ids/count/random = %v/%d/%d, want %v/%d/%d", tt.id, tt.level,
-				def.CreateItemIDs, def.CreateItemCount, def.CreateItemRandomCount, tt.ids, tt.count, tt.random)
+				def.Extra().CreateItemIDs, def.Extra().CreateItemCount, def.Extra().CreateItemRandomCount, tt.ids, tt.count, tt.random)
 		}
 	}
-	if def := get(2003, 1); def.CreateItemIDs != nil || def.CreateItemCount != 0 || def.CreateItemRandomCount != 1 {
-		t.Errorf("non CREATE_ITEM skill 2003 create ids/count/random = %v/%d/%d, want nil/0/1", def.CreateItemIDs, def.CreateItemCount, def.CreateItemRandomCount)
+	if def := get(2003, 1); def.Extra().CreateItemIDs != nil || def.Extra().CreateItemCount != 0 || def.Extra().CreateItemRandomCount != 1 {
+		t.Errorf("non CREATE_ITEM skill 2003 create ids/count/random = %v/%d/%d, want nil/0/1", def.Extra().CreateItemIDs, def.Extra().CreateItemCount, def.Extra().CreateItemRandomCount)
 	}
 
 	for _, tt := range []struct {
@@ -59,9 +59,9 @@ func TestShippedItemSkillTypeAttrs(t *testing.T) {
 		{2135, -1, -1, 6},
 	} {
 		def := get(tt.id, 1)
-		if def.AppearanceFace != tt.face || def.AppearanceHairColor != tt.hairColor || def.AppearanceHairStyle != tt.style {
+		if def.Extra().AppearanceFace != tt.face || def.Extra().AppearanceHairColor != tt.hairColor || def.Extra().AppearanceHairStyle != tt.style {
 			t.Errorf("skill %d face/hair color/hair style = %d/%d/%d, want %d/%d/%d", tt.id,
-				def.AppearanceFace, def.AppearanceHairColor, def.AppearanceHairStyle, tt.face, tt.hairColor, tt.style)
+				def.Extra().AppearanceFace, def.Extra().AppearanceHairColor, def.Extra().AppearanceHairStyle, tt.face, tt.hairColor, tt.style)
 		}
 	}
 
@@ -74,15 +74,15 @@ func TestShippedItemSkillTypeAttrs(t *testing.T) {
 		{2137, 13006, 1200000},
 	} {
 		def := get(tt.id, 1)
-		if def.NpcID != tt.npcID || def.DespawnDelay != tt.despawn {
-			t.Errorf("skill %d npc/despawn = %d/%d, want %d/%d", tt.id, def.NpcID, def.DespawnDelay, tt.npcID, tt.despawn)
+		if def.Extra().NpcID != tt.npcID || def.Extra().DespawnDelay != tt.despawn {
+			t.Errorf("skill %d npc/despawn = %d/%d, want %d/%d", tt.id, def.Extra().NpcID, def.Extra().DespawnDelay, tt.npcID, tt.despawn)
 		}
 	}
-	if def := get(2104, 1); def.DespawnDelay != 0 || def.AppearanceFace != -1 {
-		t.Errorf("skill 2104 despawn/face = %d/%d, want the defaults 0/-1", def.DespawnDelay, def.AppearanceFace)
+	if def := get(2104, 1); def.Extra().DespawnDelay != 0 || def.Extra().AppearanceFace != -1 {
+		t.Errorf("skill 2104 despawn/face = %d/%d, want the defaults 0/-1", def.Extra().DespawnDelay, def.Extra().AppearanceFace)
 	}
 
-	products := skill.ParseExtractableItems(get(2215, 1).ExtractableItems)
+	products := skill.ParseExtractableItems(get(2215, 1).Extra().ExtractableItems)
 	if len(products) != 9 {
 		t.Fatalf("skill 2215-1 rows = %d, want 9", len(products))
 	}

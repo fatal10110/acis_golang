@@ -113,7 +113,7 @@ func cubicContinuous(cast Cast, target Creature, mAtk float64, result *Result) {
 // cubicStrike rolls the owner's magic critical and the target's shield,
 // then the cubic strike damage, reporting any magic failure first.
 func cubicStrike(cast Cast, target Creature, magicFailures bool, result *Result) (damage int, crit bool, shield formulas.ShieldDefense) {
-	crit = formulas.MCritSucceeds(int(cast.Caster.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).MagicCriticalRate()), cast.Caster.Roll(1000))
+	crit = formulas.MCritSucceeds(int(cast.Caster.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Extra().Stat)).MagicCriticalRate()), cast.Caster.Roll(1000))
 	shield = resolveShieldDefense(cast.Caster, target, cast.Skill)
 	in, ok := creature.ResolveCubicMagicDamageInput(cast.Caster, target, cast.Skill, crit, shield, magicFailures)
 	if !ok {
@@ -172,8 +172,8 @@ func cubicDrain(cast Cast, target Creature, magicFailures bool, result *Result) 
 	}
 	// In single precision; the explicit conversion rounds the product
 	// before the sum, so the two steps are never fused into one.
-	part := float32(cast.Skill.AbsorbPart * float32(damage))
-	if cast.Caster.AddHP(float64(float32(cast.Skill.AbsorbAbs)+part)) > 0 && cast.Caster.Kind() == actor.KindPlayer {
+	part := float32(cast.Skill.Extra().AbsorbPart * float32(damage))
+	if cast.Caster.AddHP(float64(float32(cast.Skill.Extra().AbsorbAbs)+part)) > 0 && cast.Caster.Kind() == actor.KindPlayer {
 		result.record(CasterVitalsChanged{})
 	}
 	if target.Dead() && corpseMob {

@@ -107,7 +107,7 @@ func TestRecallMovesOnlyTheCasterInsideTheCast(t *testing.T) {
 	at := location.Location{X: -84200, Y: 244544, Z: -3728}
 	for name, def := range map[string]modelskill.Definition{
 		"recall type": {RecallType: modelskill.RecallTown},
-		"teleCoords":  {TeleCoords: &at},
+		"teleCoords":  modelskill.Definition{}.WithExtra(modelskill.Extra{TeleCoords: &at}),
 	} {
 		caster := newRecallPlayer(1)
 		member := newRecallPlayer(2)
@@ -124,7 +124,7 @@ func TestRecallMovesOnlyTheCasterInsideTheCast(t *testing.T) {
 func TestRecallTeleCoordsWinOverRecallType(t *testing.T) {
 	caster := newRecallPlayer(1)
 	at := location.Location{X: -84200, Y: 244544, Z: -3728}
-	recall(caster, modelskill.Definition{RecallType: modelskill.RecallCastle, TeleCoords: &at}, caster)
+	recall(caster, modelskill.Definition{RecallType: modelskill.RecallCastle}.WithExtra(modelskill.Extra{TeleCoords: &at}), caster)
 	if want := [][4]int{{-84200, 244544, -3728, 20}}; !slices.Equal(caster.teleports, want) || len(caster.recalls) != 0 {
 		t.Fatalf("teleports %v recalls %v, want %v and no recall", caster.teleports, caster.recalls, want)
 	}

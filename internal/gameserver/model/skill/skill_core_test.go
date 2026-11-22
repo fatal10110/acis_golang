@@ -133,22 +133,24 @@ func TestChanceConditionFires(t *testing.T) {
 // only the classification tags every skill has.
 func minimalAttrs() DefinitionAttrs {
 	return DefinitionAttrs{
-		Activation:            ActivationActive,
-		Target:                TargetOne,
-		SkillType:             "BUFF",
-		EffectRange:           -1,
-		AbnormalLevel:         -1,
-		EffectAbnormalLevel:   -1,
-		NegateLevel:           -1,
-		Radius:                80,
-		EffectNpcID:           -1,
-		Element:               ElementNone,
-		CubicActivationTime:   8,
-		CubicActivationChance: 30,
-		SummonTotalLifeTime:   1200000,
-		ActivationChance:      -1,
-		CanBeReflected:        true,
-		CanBeDispelled:        true,
+		Activation:     ActivationActive,
+		Target:         TargetOne,
+		SkillType:      "BUFF",
+		EffectRange:    -1,
+		AbnormalLevel:  -1,
+		Radius:         80,
+		Element:        ElementNone,
+		CanBeReflected: true,
+		CanBeDispelled: true,
+		Extra: Extra{
+			EffectAbnormalLevel:   -1,
+			NegateLevel:           -1,
+			EffectNpcID:           -1,
+			CubicActivationTime:   8,
+			CubicActivationChance: 30,
+			SummonTotalLifeTime:   1200000,
+			ActivationChance:      -1,
+		},
 	}
 }
 
@@ -160,7 +162,7 @@ func TestNewDefinitionCarriesAttrs(t *testing.T) {
 	if d.Target != TargetOne || d.SkillType != "BUFF" || d.Activation != ActivationActive {
 		t.Fatalf("NewDefinition() tags = %+v", d)
 	}
-	if d.EffectRange != -1 || d.AbnormalLevel != -1 || d.NegateLevel != -1 {
+	if d.EffectRange != -1 || d.AbnormalLevel != -1 || d.Extra().NegateLevel != -1 {
 		t.Fatalf("NewDefinition() (-1)-carrying fields = %+v", d)
 	}
 	if d.Radius != 80 {
@@ -183,8 +185,8 @@ func TestNewDefinitionCarriesAttrs(t *testing.T) {
 	if d.Flight != nil {
 		t.Fatalf("NewDefinition() Flight = %v, want nil", d.Flight)
 	}
-	if d.SharedReuse != nil {
-		t.Fatalf("NewDefinition() SharedReuse = %v, want nil", d.SharedReuse)
+	if d.Extra().SharedReuse != nil {
+		t.Fatalf("NewDefinition() SharedReuse = %v, want nil", d.Extra().SharedReuse)
 	}
 }
 

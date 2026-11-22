@@ -122,15 +122,23 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			// A servitor or an unarmed pet holds no weapon type at all
 			// (L2Skill.getWeaponDependancy).
 			name: "weapon not held",
-			tune: func(d *modelskill.Definition) { d.WeaponsAllowed = "DAGGER" },
+			tune: func(d *modelskill.Definition) {
+				extra := *d.Extra()
+				extra.WeaponsAllowed = "DAGGER"
+				*d = d.WithExtra(extra)
+			},
 			message: func(t *testing.T, f []byte) {
 				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
 			},
 		},
 		{
 			// CreatureCast.canCast checks sight before the weapon.
-			name:  "sight before weapon",
-			tune:  func(d *modelskill.Definition) { d.WeaponsAllowed = "DAGGER" },
+			name: "sight before weapon",
+			tune: func(d *modelskill.Definition) {
+				extra := *d.Extra()
+				extra.WeaponsAllowed = "DAGGER"
+				*d = d.WithExtra(extra)
+			},
 			blind: true,
 			message: func(t *testing.T, f []byte) {
 				assertStaticSystemMessage(t, f, serverpackets.SystemMessageCantSeeTarget)
@@ -140,7 +148,9 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			// The weapon is checked before PlayableCast's skill conditions.
 			name: "weapon before skill condition",
 			tune: func(d *modelskill.Definition) {
-				d.WeaponsAllowed = "DAGGER"
+				extra := *d.Extra()
+				extra.WeaponsAllowed = "DAGGER"
+				*d = d.WithExtra(extra)
 				d.Conditions = []modelskill.ConditionClause{{
 					Root:      modelskill.Condition{Kind: "player", Attrs: map[string]string{"hp": "50"}},
 					MessageID: serverpackets.SystemMessageNotEnoughHP,
@@ -196,7 +206,9 @@ func TestArmedPetCastNeedsAllowedWeapon(t *testing.T) {
 			t.Parallel()
 			strike := wolfStrike()
 			strike.MPInitialConsume = 5
-			strike.WeaponsAllowed = tc.allowed
+			extra := *strike.Extra()
+			extra.WeaponsAllowed = tc.allowed
+			strike = strike.WithExtra(extra)
 			catalog := item.NewTable(append(gameservertest.ItemTemplates().All(), petWeaponTemplate()))
 			h, petActor, hostile := bootWolfStrikerWith(t, strike, gameservertest.WithItemTemplates(catalog))
 			runOnPetQueue(t, petActor, func() {

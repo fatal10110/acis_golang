@@ -24,11 +24,20 @@ func TestServitorSummonTellsNearbyMonsters(t *testing.T) {
 	calls := &seeCalls{names: map[int32]string{}}
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
-		{
-			ID: summonCatSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "SUMMON", NpcID: catNPCID, SummonTotalLifeTime: 1_200_000,
-			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-		},
+		modelskill.Definition{
+			ID:            summonCatSkillID,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "SUMMON",
+			StaticHitTime: true,
+			HitTime:       0,
+			StaticReuse:   true,
+			ReuseDelay:    0,
+		}.WithExtra(modelskill.Extra{
+			NpcID:               catNPCID,
+			SummonTotalLifeTime: 1_200_000,
+		}),
 	}), gamesql.NewCharacterSkillStore(db))
 	srv := bootPets(t,
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{catTemplate()})),

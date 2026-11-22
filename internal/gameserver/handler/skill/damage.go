@@ -191,7 +191,7 @@ func chargeCaster(cast Cast) {
 		tx, ty, _ := cast.Targets[0].Position()
 		heading = from.HeadingTo(location.Location{X: tx, Y: ty})
 	}
-	point := location.OrientedLocation{Location: from, Heading: heading}.Ahead(cast.Skill.FlyRadius)
+	point := location.OrientedLocation{Location: from, Heading: heading}.Ahead(cast.Skill.Extra().FlyRadius)
 	landing := caster.ValidLocation(x, y, z, point.X, point.Y, z)
 	caster.FlyTo(landing, modelskill.FlightCharge)
 	caster.SetXYZ(landing.X, landing.Y, landing.Z)
@@ -221,7 +221,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 	}
 	modifier := 0.0
 	if caster, ok := asPlayer(cast.Caster); ok {
-		modifier = .8 + .2*float64(caster.Charges()+cast.Skill.NumCharges)
+		modifier = .8 + .2*float64(caster.Charges()+cast.Skill.Extra().NumCharges)
 	}
 	for _, obj := range cast.Targets {
 		target, ok := asDamageTarget(obj)
@@ -453,8 +453,8 @@ func drainAbsorb(cast Cast, target damageTarget, damage int) float64 {
 	}
 	// The explicit conversion rounds the product before the sum, so the
 	// two steps are never fused into one.
-	part := float32(cast.Skill.AbsorbPart * float32(drained))
-	return float64(float32(cast.Skill.AbsorbAbs) + part)
+	part := float32(cast.Skill.Extra().AbsorbPart * float32(drained))
+	return float64(float32(cast.Skill.Extra().AbsorbAbs) + part)
 }
 
 // applyDrainEffects lands a DRAIN skill's target effect list after its

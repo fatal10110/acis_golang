@@ -46,12 +46,22 @@ func contractPaymentDefs() []modelskill.Definition {
 func bootSoullessOwner(t *testing.T, level int) *servitorOwner {
 	t.Helper()
 	db := sqltest.SharedDB(t)
-	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable(append([]modelskill.Definition{{
-		ID: summonSoullessSkill, Level: level, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: killableServitorNPCID, SummonTotalLifeTime: 1_200_000,
-		SummonTimeLostIdle: 500, SummonTimeLostActive: 1000,
-		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-	}}, contractPaymentDefs()...)), gamesql.NewCharacterSkillStore(db))
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable(append([]modelskill.Definition{modelskill.Definition{
+		ID:            summonSoullessSkill,
+		Level:         level,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		HitTime:       0,
+		StaticReuse:   true,
+		ReuseDelay:    0,
+	}.WithExtra(modelskill.Extra{
+		NpcID:                killableServitorNPCID,
+		SummonTotalLifeTime:  1_200_000,
+		SummonTimeLostIdle:   500,
+		SummonTimeLostActive: 1000,
+	})}, contractPaymentDefs()...)), gamesql.NewCharacterSkillStore(db))
 	soulless := &npc.Template{
 		ID: killableServitorNPCID, TemplateID: killableServitorNPCID, Type: "Servitor", Name: "Soulless", Level: 20,
 		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,

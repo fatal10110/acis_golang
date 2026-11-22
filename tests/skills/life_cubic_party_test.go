@@ -24,12 +24,22 @@ func TestLifeCubicHealsWoundedPartyMember(t *testing.T) {
 		gameservertest.WithCharacter("Owner", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: summonLifeCubicSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-				SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Life),
-				CubicActivationTime: lifeCubicInterval, SummonTotalLifeTime: 900_000,
-				StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-			},
+			modelskill.Definition{
+				ID:            summonLifeCubicSkill,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetSelf,
+				SkillType:     "SUMMON",
+				IsCubic:       true,
+				StaticHitTime: true,
+				HitTime:       0,
+				StaticReuse:   true,
+				ReuseDelay:    0,
+			}.WithExtra(modelskill.Extra{
+				NpcID:               int(cubic.Life),
+				CubicActivationTime: lifeCubicInterval,
+				SummonTotalLifeTime: 900_000,
+			}),
 			{ID: lifeCubicHealSkill, Level: 1, Power: lifeCubicHealPower},
 		})),
 	)

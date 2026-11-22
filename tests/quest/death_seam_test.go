@@ -72,7 +72,7 @@ func deathServitorTemplate() *npc.Template {
 func (w *dialogWorld) summonServitor(t *testing.T) *summon.Actor {
 	t.Helper()
 	w.onCharacter(t, func(c *player.Character) {
-		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: deathServitorID, SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: deathServitorID, SummonTotalLifeTime: 1_200_000}))
 	})
 	var servitor *summon.Actor
 	w.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {

@@ -16,8 +16,8 @@ func createItemRegistry() *Registry {
 // level.
 func TestCreateItemWithoutProductReportsPreparedForReuse(t *testing.T) {
 	for name, def := range map[string]modelskill.Definition{
-		"no ids":     {ID: 2104, Level: 3, SkillType: "CREATE_ITEM", CreateItemCount: 1000, CreateItemRandomCount: 1},
-		"zero count": {ID: 2104, Level: 3, SkillType: "CREATE_ITEM", CreateItemIDs: []int32{1835}, CreateItemRandomCount: 1},
+		"no ids":     modelskill.Definition{ID: 2104, Level: 3, SkillType: "CREATE_ITEM"}.WithExtra(modelskill.Extra{CreateItemCount: 1000, CreateItemRandomCount: 1}),
+		"zero count": modelskill.Definition{ID: 2104, Level: 3, SkillType: "CREATE_ITEM"}.WithExtra(modelskill.Extra{CreateItemIDs: []int32{1835}, CreateItemRandomCount: 1}),
 	} {
 		t.Run(name, func(t *testing.T) {
 			caster := &extractableFakeCaster{free: 10}
@@ -43,7 +43,7 @@ func TestCreateItemWithoutRandomCountCreatesNothing(t *testing.T) {
 
 	result, _ := createItemRegistry().UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{ID: 2104, Level: 1, SkillType: "CREATE_ITEM", CreateItemIDs: []int32{1835}, CreateItemCount: 1000},
+		Skill:   modelskill.Definition{ID: 2104, Level: 1, SkillType: "CREATE_ITEM"}.WithExtra(modelskill.Extra{CreateItemIDs: []int32{1835}, CreateItemCount: 1000}),
 		Targets: []Actor{},
 	})
 

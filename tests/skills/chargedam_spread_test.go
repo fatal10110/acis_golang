@@ -14,8 +14,8 @@ import (
 func TestShippedChargeDamSkillsLandAsChargeDam(t *testing.T) {
 	for _, id := range []modelskill.ID{5, 6, 7, 9, 17, 35, 54, 261, 284} {
 		def := shippedSkill(t, id, 1)
-		if def.SkillType != "CHARGEDAM" || def.EffectType != "" {
-			t.Fatalf("skill %d = type %q effectType %q, want CHARGEDAM with no effectType", id, def.SkillType, def.EffectType)
+		if def.SkillType != "CHARGEDAM" || def.Extra().EffectType != "" {
+			t.Fatalf("skill %d = type %q effectType %q, want CHARGEDAM with no effectType", id, def.SkillType, def.Extra().EffectType)
 		}
 		if got := strings.ToUpper(def.LandingEffectType()); got != "CHARGEDAM" {
 			t.Fatalf("skill %d landing effect type = %q, want CHARGEDAM", id, got)

@@ -33,7 +33,7 @@ func PassiveFuncs(def modelskill.Definition) ([]Mod, error) {
 // ActivationPassive.
 func SkillStatFuncs(def modelskill.Definition) ([]Mod, error) {
 	owner := ModOwnerSkill(modelskill.Ref{ID: def.ID, Level: def.Level})
-	return statFuncs(owner, def.Funcs, conditions.SkillOf(def.Stat))
+	return statFuncs(owner, def.Funcs, conditions.SkillOf(def.Extra().Stat))
 }
 
 // skillLookup resolves a loaded skill definition by id and level.
