@@ -26,8 +26,15 @@ func NewSkillSaveStore(db *sql.DB) *SkillSaveStore {
 // so a save that no longer carries a given skill's reuse timer doesn't
 // leave a stale row behind from an earlier logout. Both run in one
 // transaction: a failed insert, a lost connection or a crash leaves the
-// previous rows whole, and no reader sees the character with none.
+// previous rows whole, and no reader sees the character with none. A
+// transaction the database rolls back for a lock conflict — two saves whose
+// characters share an index gap deadlock on it — runs again, so the save
+// still lands.
 func (s *SkillSaveStore) Replace(ctx context.Context, charObjID int32, classIndex int32, rows []effect.SaveRow) error {
+	return retryLockConflict(ctx, func() error { return s.replace(ctx, charObjID, classIndex, rows) })
+}
+
+func (s *SkillSaveStore) replace(ctx context.Context, charObjID int32, classIndex int32, rows []effect.SaveRow) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("save skill rows for character %d class %d: begin: %w", charObjID, classIndex, err)

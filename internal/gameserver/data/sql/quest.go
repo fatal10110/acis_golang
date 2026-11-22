@@ -51,7 +51,12 @@ func (s *QuestStore) ListByOwner(ctx context.Context, ownerID int32) ([]questlog
 // ApplyJournal runs ownerID's journal writes, in order, in one transaction:
 // either every write lands or none does. A write the database refuses for
 // its data, and a write of no known kind, fail with questlog.ErrRejected.
+// A transaction the database rolls back for a lock conflict runs again.
 func (s *QuestStore) ApplyJournal(ctx context.Context, ownerID int32, writes []questlog.Write) error {
+	return retryLockConflict(ctx, func() error { return s.applyJournal(ctx, ownerID, writes) })
+}
+
+func (s *QuestStore) applyJournal(ctx context.Context, ownerID int32, writes []questlog.Write) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("write quests for owner %d: %w", ownerID, err)

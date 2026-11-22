@@ -271,11 +271,12 @@ func TestConnWriteErrorClosesConnAndReleasesBacklog(t *testing.T) {
 	}
 }
 
-// Tiny frames are charged the buffer and queue slot they pin, not just their
-// wire bytes, so a stalled reader flooded with 3-byte replies is cut off at
-// the same memory bound as one fed large frames. Each frame here is a grown
-// pooled writer (4 KiB) reused for a 3-byte reply; the expected count is
-// derived from that capacity, independently of how the Conn measures it.
+// Tiny frames still count the buffer and queue slot they pin against the
+// pinned-memory limit, so a stalled reader flooded with 3-byte replies cannot
+// pin unbounded memory even though their wire bytes stay far below the
+// high-water mark. Each frame here is a grown pooled writer (4 KiB) reused
+// for a 3-byte reply; the expected count is derived from that capacity,
+// independently of how the Conn measures it.
 func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
@@ -288,7 +289,7 @@ func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
 		return wire.OwnedFrame(w.Frame(), w, func(*wire.Writer) {})
 	}
 	perFrame := writerCap + int(unsafe.Sizeof(wire.Frame{}))
-	want := outboundHighWater / perFrame
+	want := outboundPinnedLimit / perFrame
 
 	accepted := 0
 	for sendWithin(t, c, tinyFrame()) {
@@ -298,8 +299,8 @@ func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
 		}
 	}
 	if accepted != want {
-		t.Fatalf("accepted %d 3-byte frames each pinning a %d-byte writer, want %d under the %d-byte high-water mark",
-			accepted, writerCap, want, outboundHighWater)
+		t.Fatalf("accepted %d 3-byte frames each pinning a %d-byte writer, want %d under the %d-byte pinned limit",
+			accepted, writerCap, want, outboundPinnedLimit)
 	}
 	select {
 	case <-c.stopped:
@@ -430,7 +431,7 @@ func BenchmarkSessionSendFrameParallel(b *testing.B) {
 func awaitDrain(c *Conn) {
 	for {
 		c.mu.Lock()
-		pending := c.pending
+		pending := c.pending.charge()
 		c.mu.Unlock()
 		if pending < outboundHighWater/2 {
 			return
