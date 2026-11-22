@@ -1,6 +1,8 @@
 // Command geoprobe evaluates a sample of geodata queries (height, canMove,
 // line-of-sight, path) against the Go geo engine, and reports how well its
-// answers agree with a previously captured dump of expected answers.
+// answers agree with a previously captured dump of expected answers. A dump
+// may also carry walk records: a player's straight walk replayed as a chain
+// of position updates, named by its ID alone (see probe.Query.ID).
 package main
 
 import (
