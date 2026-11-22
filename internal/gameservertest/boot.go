@@ -1528,6 +1528,25 @@ func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 	holder.Inventory().SetLimiter(fixedSlotLimit{limit: limit, owner: holder})
 }
 
+// SetInventoryWeightLimit pins the live player's inventory weight limit to
+// limit, replacing the character's own, so an overweight rejection is
+// reachable without seeding heavy items.
+func (s *Server) SetInventoryWeightLimit(tb testing.TB, objID int32, limit int) {
+	tb.Helper()
+	holder := s.onlineCharacter(tb, objID)
+	holder.Inventory().SetLimiter(fixedWeightLimit{limit: limit, owner: holder})
+}
+
+// fixedWeightLimit is a weight limit that never changes; the slot limit
+// stays the owner's own.
+type fixedWeightLimit struct {
+	limit int
+	owner itemcontainer.Limiter
+}
+
+func (l fixedWeightLimit) InventoryLimit() int { return l.owner.InventoryLimit() }
+func (l fixedWeightLimit) WeightLimit() int    { return l.limit }
+
 // fixedSlotLimit is a slot limit that never changes; the weight limit stays
 // the owner's own.
 type fixedSlotLimit struct {
