@@ -155,7 +155,9 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 		l.broadcastCharacterInfo(live)
 		return l.beginClassChange(live, &classChange{kind: classChangeSwitch, index: cmd.One, folk: f})
 	case 6:
-		if cmd.One < 1 || cmd.One > player.MaxSubclasses {
+		// Only a slot live holds may be replaced (#5063); the refusal gets
+		// the bypass's closing ActionFailed.
+		if _, held := live.Subclass(cmd.One); !held {
 			return true
 		}
 		avail := f.AvailableSubclasses(base, subs)
@@ -168,8 +170,10 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 		if !l.subclassActionAllowed(live) {
 			return true
 		}
-		// The slot comes from a replace menu link, which names 1 to 3.
-		if cmd.One < 1 || cmd.One > player.MaxSubclasses || !f.ValidNewSubclass(base, subs, cmd.Two) {
+		// The slot comes from a replace menu link and must be one live
+		// holds (#5063): replacing an empty slot would add a subclass past
+		// the add gates.
+		if _, held := live.Subclass(cmd.One); !held || !f.ValidNewSubclass(base, subs, cmd.Two) {
 			return true
 		}
 		return l.beginClassChange(live, &classChange{kind: classChangeReplace, index: cmd.One, sub: player.NewSubClass(cmd.Two, cmd.One, l.levels), folk: f})

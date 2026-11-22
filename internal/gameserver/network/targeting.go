@@ -710,10 +710,12 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 }
 
 // playerCanAttemptInteract reports whether live may interact at all: not
-// while running a private store, trading, or holding an unexpired trade
-// request it sent or received.
+// while dead or faking death, running a private store, trading, or holding
+// an unexpired trade request it sent or received. The death refusal (#4996)
+// keeps a dialog page left open at death from teleporting, trading or
+// training a corpse.
 func (l *GameClientLink) playerCanAttemptInteract(live *livePlayer) bool {
-	if live.Operating() {
+	if live.AlikeDead() || live.Operating() {
 		return false
 	}
 	return l.trades == nil || !l.trades.ProcessingTransaction(live.ObjectID())

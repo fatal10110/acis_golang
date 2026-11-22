@@ -13,8 +13,13 @@ const enchantListLevelHint = 74
 
 // currentTrainer returns the civilian NPC live last selected when live can
 // still interact with it: the NPC every skill learn and enchant request is
-// made at.
+// made at. A dead or fake-dead player is refused with ActionFailed (#4996);
+// every other refusal answers nothing.
 func (l *GameClientLink) currentTrainer(live *livePlayer) (*npc.Folk, bool) {
+	if live.AlikeDead() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return nil, false
+	}
 	f := live.currentFolk.Load()
 	if f == nil || !l.playerCanDoInteract(live, f) {
 		return nil, false
