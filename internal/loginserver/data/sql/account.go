@@ -25,22 +25,25 @@ func NewAccountStore(db *sql.DB) *AccountStore {
 }
 
 // Account returns the account registered under login, or ErrAccountNotFound
-// if no such row exists.
+// if no such row exists. The row is matched under the table's collation,
+// which may treat other spellings (for instance accented ones) as equal to
+// the stored login; the returned account always carries the stored login,
+// so every spelling of one account resolves to one key (#5046).
 func (s *AccountStore) Account(ctx context.Context, login string) (model.Account, error) {
-	var password string
+	var stored, password string
 	var accessLevel, lastServer int
 
 	err := s.db.QueryRowContext(ctx,
-		"SELECT password, access_level, last_server FROM accounts WHERE login = ?",
+		"SELECT login, password, access_level, last_server FROM accounts WHERE login = ?",
 		login,
-	).Scan(&password, &accessLevel, &lastServer)
+	).Scan(&stored, &password, &accessLevel, &lastServer)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.Account{}, ErrAccountNotFound
 	}
 	if err != nil {
 		return model.Account{}, fmt.Errorf("query account %q: %w", login, err)
 	}
-	return model.NewAccount(login, password, accessLevel, lastServer), nil
+	return model.NewAccount(stored, password, accessLevel, lastServer), nil
 }
 
 // CreateAccount inserts a new account row with the given pre-hashed password

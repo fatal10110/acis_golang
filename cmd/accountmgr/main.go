@@ -93,7 +93,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountSto
 			if !ok {
 				return sc.Err()
 			}
-			login = strings.ToLower(v)
+			login = storedLogin(ctx, store, strings.ToLower(v))
 
 			if mode == "1" {
 				if v, ok = ask("Password: "); !ok {
@@ -152,6 +152,17 @@ func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountSto
 
 		fmt.Fprintln(out)
 	}
+}
+
+// storedLogin returns the login of the account row the database matches to
+// login, so every option acts on and reports the stored name even when the
+// table's collation equates a differently spelled one (#5046). With no
+// matching row, or when the lookup fails, login is returned unchanged.
+func storedLogin(ctx context.Context, store *sql.AccountStore, login string) string {
+	if acc, err := store.Account(ctx, login); err == nil {
+		return acc.Login
+	}
+	return login
 }
 
 func listFilter(mode string) sql.AccountFilter {
