@@ -115,10 +115,11 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 	if len(el.AI) > 0 {
 		aiParams = make(npc.AIParams, len(el.AI))
 		for _, s := range el.AI {
-			if _, seen := aiParams[s.Name]; !seen {
-				aiParamKeys = append(aiParamKeys, s.Name)
+			name := intern(s.Name)
+			if _, seen := aiParams[name]; !seen {
+				aiParamKeys = append(aiParamKeys, name)
 			}
-			aiParams[s.Name] = s.Val
+			aiParams[name] = intern(s.Val)
 		}
 	}
 
@@ -266,15 +267,15 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 	t := npc.Template{
 		ID:         id,
 		TemplateID: a.intDefault("idTemplate", id),
-		Name:       a.str("name"),
+		Name:       intern(a.str("name")),
 
-		Title: a.strDefault("title", ""),
-		Alias: a.strDefault("alias", ""),
+		Title: intern(a.strDefault("title", "")),
+		Alias: intern(a.strDefault("alias", "")),
 
 		UsingServerSideName:  a.boolDefault("usingServerSideName", false),
 		UsingServerSideTitle: a.boolDefault("usingServerSideTitle", false),
 
-		Type:          a.str("type"),
+		Type:          intern(a.str("type")),
 		Level:         a.intDefault("level", 1),
 		HitTimeFactor: a.float64Default("hitTimeFactor", 0),
 		RightHand:     a.intDefault("rHand", 0),
@@ -332,7 +333,7 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		Pet:         pet,
 	}
 	if a.has("clan") {
-		t.Clans = a.strArray("clan")
+		t.Clans = internAll(a.strArray("clan"))
 		t.ClanRange = a.int("clanRange")
 		if a.has("ignoredIds") {
 			t.IgnoredIDs = a.intArray("ignoredIds")

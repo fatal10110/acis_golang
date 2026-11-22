@@ -6,24 +6,37 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"unicode/utf8"
 )
 
-// HTML stores loaded datapack HTML pages, keyed by path relative to data/html.
-// It is safe for concurrent reads after LoadHTML returns; //reload htm
+// HTML stores the datapack HTML pages, keyed by path relative to data/html.
+// A load records which pages there are; each page is read from disk on its
+// first request and kept for later ones, so only requested pages take
+// memory. It is safe for concurrent use after LoadHTML returns; //reload htm
 // replaces the pages in place with Replace, and each read sees the old
 // pages or the new ones.
 type HTML struct {
-	pages atomic.Pointer[map[string]string]
+	pages atomic.Pointer[htmlPages]
 }
 
-// LoadHTML reads every .htm and .html file under dir into memory. A file
-// that is not valid UTF-8 cannot be read as a page: it is left out, so Get
-// reports it missing, and its path relative to dir is returned in
-// undecodable, sorted, for the caller to report.
+// htmlPages is one load of the HTML directory.
+type htmlPages struct {
+	dir string
+	// names are the pages the load found, sorted.
+	names []string
+	// read holds, per page name, the content of each page read so far.
+	read sync.Map
+}
+
+// LoadHTML lists every .htm and .html file under dir as a page, reading
+// each once to check it. A file that is not valid UTF-8 cannot be read as a
+// page: it is left out, so Get reports it missing, and its path relative to
+// dir is returned in undecodable, sorted, for the caller to report.
 func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -33,7 +46,7 @@ func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 		return nil, nil, fmt.Errorf("data/cache: html path %s is not a directory", dir)
 	}
 
-	pages := make(map[string]string)
+	var names []string
 	if err := filepath.WalkDir(dir, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("data/cache: walk html %s: %w", name, err)
@@ -56,19 +69,35 @@ func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 			undecodable = append(undecodable, key)
 			return nil
 		}
-		pages[key] = normalizeHTML(string(data))
+		names = append(names, key)
 		return nil
 	}); err != nil {
 		return nil, nil, err
 	}
-	if len(pages) == 0 {
+	if len(names) == 0 {
 		return nil, nil, fmt.Errorf("data/cache: no html files found in %s", dir)
 	}
+	sort.Strings(names)
 	sort.Strings(undecodable)
 
 	h = &HTML{}
-	h.pages.Store(&pages)
+	h.pages.Store(&htmlPages{dir: dir, names: packNames(names)})
 	return h, undecodable, nil
+}
+
+// packNames returns names in an exactly sized slice whose strings share one
+// buffer, so the page list the cache keeps is two allocations.
+func packNames(names []string) []string {
+	var buf strings.Builder
+	for _, name := range names {
+		buf.WriteString(name)
+	}
+	all := buf.String()
+	packed := make([]string, len(names))
+	for i, name := range names {
+		packed[i], all = all[:len(name)], all[len(name):]
+	}
+	return packed
 }
 
 // Replace swaps h's pages for from's, at once for every holder of h, as an
@@ -78,11 +107,33 @@ func (h *HTML) Replace(from *HTML) {
 }
 
 // loaded returns the current pages; a nil cache has none.
-func (h *HTML) loaded() map[string]string {
+func (h *HTML) loaded() *htmlPages {
 	if h == nil {
 		return nil
 	}
-	return *h.pages.Load()
+	return h.pages.Load()
+}
+
+// get returns the page named key, reading it from disk on its first
+// request. A name the load did not find is no page, without a disk read. A
+// page that cannot be read, or is no longer valid UTF-8, is missing and is
+// read again on the next request.
+func (p *htmlPages) get(key string) (string, bool) {
+	if p == nil {
+		return "", false
+	}
+	if content, ok := p.read.Load(key); ok {
+		return content.(string), true
+	}
+	if _, found := slices.BinarySearch(p.names, key); !found {
+		return "", false
+	}
+	data, err := os.ReadFile(filepath.Join(p.dir, filepath.FromSlash(key)))
+	if err != nil || !utf8.Valid(data) {
+		return "", false
+	}
+	content, _ := p.read.LoadOrStore(key, normalizeHTML(string(data)))
+	return content.(string), true
 }
 
 func normalizeHTML(content string) string {
@@ -100,27 +151,23 @@ func (h *HTML) Get(name string) (string, bool) {
 	if key == "" {
 		return "", false
 	}
-	content, ok := h.loaded()[key]
-	return content, ok
+	return h.loaded().get(key)
 }
 
 // Len returns the number of loaded pages.
 func (h *HTML) Len() int {
-	return len(h.loaded())
+	if p := h.loaded(); p != nil {
+		return len(p.names)
+	}
+	return 0
 }
 
 // Paths returns loaded page paths sorted lexically.
 func (h *HTML) Paths() []string {
-	pages := h.loaded()
-	if pages == nil {
-		return nil
+	if p := h.loaded(); p != nil {
+		return slices.Clone(p.names)
 	}
-	paths := make([]string, 0, len(pages))
-	for name := range pages {
-		paths = append(paths, name)
-	}
-	sort.Strings(paths)
-	return paths
+	return nil
 }
 
 // htmlKey is the cache key of name, "" for none. A name with a ".."
