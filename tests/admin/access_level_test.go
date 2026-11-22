@@ -306,30 +306,18 @@ func TestAdminSetAccess(t *testing.T) {
 	assertTexts(t, rest, "Player's access level is now set to 7.")
 	assertGMs(t, exchange(t, user, encodeGmList()), "Admin", "Player")
 
-	// Back to the user level: off the GM list, transactions allowed, the
-	// title kept.
+	// Back to the user level from a game master's: disconnected (#5122),
+	// off the GM list, the logout save storing the level and the title
+	// kept.
 	exchange(t, gm, encodeBuildCmd("set access Player 0"))
-	got = onlyUserInfo(t, settle(t, user))
-	if want := (userInfoAccess{title: "Admin", nameColor: userColor, titleColor: userTitleColor}); got != want {
-		t.Fatalf("UserInfo after //set access 0 = %+v, want %+v", got, want)
-	}
-	settle(t, gm)
-	assertGMs(t, exchange(t, user, encodeGmList()), "Admin")
-	frames = exchange(t, user, encodeTradeRequest(gmID))
-	for _, f := range frames {
-		if f[0] == serverpackets.OpcodeSystemMessage && int(binary.LittleEndian.Uint32(f[1:])) == serverpackets.SystemMessageNotAuthorizedToDoThat {
-			t.Fatalf("trade request refused at the user level: %x", testsupport.FrameOpcodes(frames))
-		}
-	}
-	settle(t, gm)
-	// The logout save stores the level the character left at.
-	user.Send(encodeLogout())
-	if !user.AwaitClose(5 * time.Second) {
-		t.Fatal("server kept the connection open after Logout")
-	}
+	expectKicked(t, user)
 	srv.FlushPersistence(t)
 	storedAccessLevel(t, srv, userID, userLevel)
+	if got := storedNow(t, srv, userID, "title"); got != "Admin" {
+		t.Fatalf("stored title = %q, want Admin", got)
+	}
 	drain(t, gm)
+	assertGMs(t, withoutDeletes(exchange(t, gm, encodeGmList())), "Admin")
 
 	// An offline character's stored level changes; an unknown name is
 	// reported, missing space included.
@@ -349,21 +337,22 @@ func TestAdminSetAccess(t *testing.T) {
 }
 
 // TestAdminSetAccessSelf pins //set access without a selection acting on
-// the GM itself, its colors following at once.
+// the GM itself, its colors following at once; a game master's level keeps
+// it playing (#5122).
 func TestAdminSetAccessSelf(t *testing.T) {
 	t.Parallel()
 	srv, gmID := bootAdmin(t, masterLevel)
 	gm := srv.Client
 	enterWorld(t, gm)
-	frames := exchange(t, gm, encodeBuildCmd("set access 3"))
+	frames := exchange(t, gm, encodeBuildCmd("set access 7"))
 	if len(frames) != 2 {
 		t.Fatalf("frames = %x, want UserInfo then the report", testsupport.FrameOpcodes(frames))
 	}
 	got := decodeUserInfoAccess(t, frames[0])
-	if want := (userInfoAccess{title: "General GM", nameColor: generalGMColor, titleColor: generalGMColor}); got != want {
+	if want := (userInfoAccess{gm: true, title: "Admin", nameColor: adminColor, titleColor: adminColor}); got != want {
 		t.Fatalf("UserInfo = %+v, want %+v", got, want)
 	}
-	assertTexts(t, frames[1:], "Admin's access level is now set to 3.")
+	assertTexts(t, frames[1:], "Admin's access level is now set to 7.")
 	// The title and the level reach the row with the next save
 	// (Player.setAccessLevel changes memory only).
 	srv.FlushPersistence(t)
@@ -371,17 +360,17 @@ func TestAdminSetAccessSelf(t *testing.T) {
 	if err := srv.DB.QueryRowContext(context.Background(), "SELECT title FROM characters WHERE obj_Id = ?", gmID).Scan(&before); err != nil {
 		t.Fatalf("read title: %v", err)
 	}
-	if before == "General GM" {
+	if before == "Admin" {
 		t.Fatal("title stored before the next save")
 	}
 	srv.TickAutosave(t)
-	storedAccessLevel(t, srv, gmID, generalGMLevel)
+	storedAccessLevel(t, srv, gmID, adminLevel)
 	var title string
 	if err := srv.DB.QueryRowContext(context.Background(), "SELECT title FROM characters WHERE obj_Id = ?", gmID).Scan(&title); err != nil {
 		t.Fatalf("read title: %v", err)
 	}
-	if title != "General GM" {
-		t.Fatalf("stored title = %q, want General GM", title)
+	if title != "Admin" {
+		t.Fatalf("stored title = %q, want Admin", title)
 	}
 }
 
