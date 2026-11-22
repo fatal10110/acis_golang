@@ -105,7 +105,7 @@ type TargetSnapshot struct {
 // way.
 //
 // A mover standing in a water zone swims, and one SetFlying marks flies (a
-// swimmer counts as swimming even while flying). A mover UseZoneSwim opts in
+// swimmer counts as swimming even while flying). A mover WithZoneSwim opts in
 // (a player) swims instead only while SetSwimming says its zones hold it in
 // water, which may lag behind where it stands. A swimming or flying mover
 // measures its legs, steps and pawn stops in 3D, moves its height straight
@@ -166,7 +166,8 @@ type CreatureMove struct {
 	// stands for.
 	timedSteps int
 	moveSeq    uint64
-	queue      *sim.Queue
+	// queue names the queue arrival callbacks run on; set at construction.
+	queue QueueSource
 	// debug holds the debugMove and debugPath bits a game master toggles.
 	debug atomic.Uint32
 	// rs is the state only a move request uses, nil until the first one
@@ -344,17 +345,63 @@ type headed interface {
 // NewCreatureMove builds movement state at origin with a non-negative ground
 // speed. Zero is a valid, stationary speed (e.g. an immobile scripted NPC) —
 // MoveToLocation rejects any actual movement request once speed is zero.
-func NewCreatureMove(origin location.Location, speed float64, geo Geo) (*CreatureMove, error) {
+func NewCreatureMove(origin location.Location, speed float64, geo Geo, opts ...Option) (*CreatureMove, error) {
 	state := &CreatureMove{}
-	if err := state.Init(origin, speed, geo); err != nil {
+	if err := state.Init(origin, speed, geo, nil, opts...); err != nil {
 		return nil, err
 	}
 	return state, nil
 }
 
-// Init initializes zero movement state embedded in a live actor. Do not call
-// it after the state is exposed to callers.
-func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) error {
+// QueueSource names the queue a mover's arrival callbacks run on: the owning
+// actor's, read at each use so an actor whose queue moves (a summon follows
+// its owner's) takes its movement along.
+type QueueSource interface {
+	Queue() *sim.Queue
+}
+
+// fixedQueue is the QueueSource of a mover whose queue never changes.
+type fixedQueue struct{ q *sim.Queue }
+
+func (f fixedQueue) Queue() *sim.Queue { return f.q }
+
+// Option configures a CreatureMove when NewCreatureMove or Init builds it.
+type Option func(*CreatureMove)
+
+// WithQueue runs the mover's arrival callbacks as tasks on q. A move with a
+// positive duration needs a queue.
+func WithQueue(q *sim.Queue) Option {
+	return func(m *CreatureMove) { m.queue = fixedQueue{q: q} }
+}
+
+// WithWaterSurface gives the mover the query for the water zone at a
+// position: its surface level, and whether the position lies in one. A mover
+// standing in a water zone swims, capped at the surface while the floor lies
+// deeper than waterDepthMin below it. Without one (or with a nil query) the
+// mover stays on the ground, capped at the world max.
+func WithWaterSurface(query func(location.Location) (int, bool)) Option {
+	return func(m *CreatureMove) { m.water = query }
+}
+
+// WithZoneSwim makes a player mover swim only while SetSwimming says so,
+// instead of whenever the water query finds it in a water zone. The water
+// query then only caps a flying mover at the surface.
+func WithZoneSwim() Option {
+	return func(m *CreatureMove) { m.zoneSwim = true }
+}
+
+// WithCreatureZoneSwim is WithZoneSwim for a mover that is not a player (an
+// NPC or a summon): while its zones hold it in water it swims, held at the
+// surface of the water zone it stands in when the floor lies deeper than
+// waterDepthMin below it.
+func WithCreatureZoneSwim() Option {
+	return func(m *CreatureMove) { m.zoneSwim, m.capSwimmer = true, true }
+}
+
+// Init initializes zero movement state embedded in a live actor, whose
+// arrival callbacks run on the queue queue names at each use, configured by
+// opts. Do not call it after the state is exposed to callers.
+func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo, queue QueueSource, opts ...Option) error {
 	if geo == nil {
 		return errors.New("move: nil geodata")
 	}
@@ -366,6 +413,10 @@ func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) er
 	m.setAccurateLocked(origin)
 	m.speed = speed
 	m.geo = geo
+	m.queue = queue
+	for _, opt := range opts {
+		opt(m)
+	}
 	return nil
 }
 
@@ -430,10 +481,20 @@ func (m *CreatureMove) playerStepsLocked() bool {
 // nowLocked reads the queue clock, or the zero time with no queue. Callers
 // hold mu.
 func (m *CreatureMove) nowLocked() time.Time {
-	if m.queue == nil {
+	q := m.queueLocked()
+	if q == nil {
 		return time.Time{}
 	}
-	return m.queue.Now()
+	return q.Now()
+}
+
+// queueLocked returns the queue arrival callbacks run on, nil with none.
+// Callers hold mu.
+func (m *CreatureMove) queueLocked() *sim.Queue {
+	if m.queue == nil {
+		return nil
+	}
+	return m.queue.Queue()
 }
 
 // playerPassed is how far a player's position update covering elapsed
@@ -460,7 +521,7 @@ func validSpeed(speed float64) bool {
 // the current speeds; at zero speed it stalls without an arrival until the
 // speed returns. Callers hold mu.
 func (m *CreatureMove) retimeLocked() {
-	if !m.moving || m.queue == nil {
+	if !m.moving || m.queueLocked() == nil {
 		return
 	}
 	if m.speed == 0 {
@@ -542,30 +603,11 @@ func (m *CreatureMove) setOwner(owner moveOwner) {
 	m.owner = owner
 }
 
-// SetQueue runs this movement's arrival callbacks as tasks on q, the owning
-// actor's queue. A move with a positive duration needs one.
-func (m *CreatureMove) SetQueue(q *sim.Queue) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.queue = q
-}
-
-// Queue returns the queue SetQueue installed.
+// Queue returns the queue arrival callbacks run on, nil with none.
 func (m *CreatureMove) Queue() *sim.Queue {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.queue
-}
-
-// SetWaterSurface records the query for the water zone at a position: its
-// surface level, and whether the position lies in one. A mover standing in a
-// water zone swims, capped at the surface while the floor lies deeper than
-// waterDepthMin below it. A nil query leaves the mover on the ground, capped
-// at the world max.
-func (m *CreatureMove) SetWaterSurface(query func(location.Location) (int, bool)) {
-	m.mu.Lock()
-	m.water = query
-	m.mu.Unlock()
+	return m.queueLocked()
 }
 
 // SetFlying records whether the mover flies (a wyvern rider).
@@ -584,28 +626,8 @@ func (m *CreatureMove) SetInBoat(inBoat bool) {
 	m.mu.Unlock()
 }
 
-// UseZoneSwim makes the mover swim only while SetSwimming says so, instead
-// of whenever the water query finds it in a water zone. The water query then
-// only caps a flying mover at the surface. Call it before the mover is
-// exposed.
-func (m *CreatureMove) UseZoneSwim() {
-	m.mu.Lock()
-	m.zoneSwim = true
-	m.mu.Unlock()
-}
-
-// UseCreatureZoneSwim is UseZoneSwim for a mover that is not a player (an
-// NPC or a summon): while its zones hold it in water it swims, held at the
-// surface of the water zone it stands in when the floor lies deeper than
-// waterDepthMin below it. Call it before the mover is exposed.
-func (m *CreatureMove) UseCreatureZoneSwim() {
-	m.mu.Lock()
-	m.zoneSwim, m.capSwimmer = true, true
-	m.mu.Unlock()
-}
-
 // SetSwimming records whether the mover's zones hold it in water, for a mover
-// UseZoneSwim opted in. A leg in flight is re-timed for the distance left
+// WithZoneSwim or WithCreatureZoneSwim opted in. A leg in flight is re-timed for the distance left
 // under the new move type.
 func (m *CreatureMove) SetSwimming(swimming bool) {
 	m.mu.Lock()
@@ -627,7 +649,7 @@ func (m *CreatureMove) MoveType() MoveType {
 }
 
 // moveTypeLocked is the mover's MoveType at its origin: swimming in a water
-// zone (for a UseZoneSwim mover, while SetSwimming says so), else flying
+// zone (for a WithZoneSwim mover, while SetSwimming says so), else flying
 // when SetFlying marks it, else on the ground. Callers hold mu.
 func (m *CreatureMove) moveTypeLocked() MoveType {
 	if m.zoneSwim {
@@ -644,7 +666,7 @@ func (m *CreatureMove) moveTypeLocked() MoveType {
 	return MoveGround
 }
 
-// flagTypeLocked is a UseZoneSwim mover's MoveType: swimming while
+// flagTypeLocked is a WithZoneSwim mover's MoveType: swimming while
 // SetSwimming says so, else flying when SetFlying marks it, else on the
 // ground. Callers hold mu.
 func (m *CreatureMove) flagTypeLocked() MoveType {
@@ -1045,7 +1067,7 @@ func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 		return
 	}
 	seq := m.moveSeq
-	m.timer = m.queue.After(duration, func() { m.onArrive(seq) })
+	m.timer = m.queueLocked().After(duration, func() { m.onArrive(seq) })
 }
 
 func (m *CreatureMove) onArrive(seq uint64) {
@@ -1521,10 +1543,10 @@ func (m *CreatureMove) maxZLocked() int {
 // mover stands in when the floor lies deeper than waterDepthMin below it,
 // else the world max. It queries the water zone once. Callers hold mu.
 //
-// A UseZoneSwim mover (a player) is held at the surface while it rides a
+// A WithZoneSwim mover (a player) is held at the surface while it rides a
 // boat, swimming or not, and otherwise only while it flies, never while it
 // swims: a flyer whose zones do not hold it in water yet stays capped at the
-// surface of the water zone it stands in until they do. A UseCreatureZoneSwim mover is held there only
+// surface of the water zone it stands in until they do. A WithCreatureZoneSwim mover is held there only
 // while it swims.
 func (m *CreatureMove) waterLocked() (MoveType, int) {
 	if m.zoneSwim {

@@ -11,9 +11,7 @@ import (
 // MoveType.SWIM; CreatureMove.getMoveType reads the flags).
 func newZoneSwimPlayer(t *testing.T, water func(location.Location) (int, bool)) *CreatureMove {
 	t.Helper()
-	mover, _ := newTestMover(t, staticGeo{canMove: true})
-	mover.SetWaterSurface(water)
-	mover.UseZoneSwim()
+	mover, _ := newTestMover(t, staticGeo{canMove: true}, WithWaterSurface(water), WithZoneSwim())
 	mover.SetSpeeds(100, 100)
 	return mover
 }
@@ -88,9 +86,7 @@ func TestFlyingPlayerCappedAtSurfaceUntilZonesAddSwim(t *testing.T) {
 // (GeoEngine.getHeight - WaterZone.getWaterZ < -20): over shallow water a
 // flyer climbs past it.
 func TestFlyingPlayerOverShallowWaterIsNotCapped(t *testing.T) {
-	mover, _ := newTestMover(t, staticGeo{canMove: true, height: 40})
-	mover.SetWaterSurface(func(location.Location) (int, bool) { return 50, true })
-	mover.UseZoneSwim()
+	mover, _ := newTestMover(t, staticGeo{canMove: true, height: 40}, WithWaterSurface(func(location.Location) (int, bool) { return 50, true }), WithZoneSwim())
 	mover.SetSpeeds(100, 100)
 	mover.SetFlying(true)
 	if _, err := mover.MoveToLocation(location.Location{X: 30, Z: 200}); err != nil {

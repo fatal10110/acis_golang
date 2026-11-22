@@ -12,12 +12,11 @@ func (*npcFollowSelf) OffensiveFollowLead() bool { return true }
 
 func TestControllerPlayerOffensiveFollowUses3DRange(t *testing.T) {
 	self := &playerFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,12 +42,11 @@ func TestControllerPlayerOffensiveFollowRangeIsStrict(t *testing.T) {
 		{39, false},
 	} {
 		self := &playerFollowSelf{}
-		mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+		mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 		if err != nil {
 			t.Fatal(err)
 		}
-		mover.SetQueue(newMoveClock().q)
-		controller, err := NewController(mover, self, nil)
+		controller, err := NewController(mover, self, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -92,12 +90,11 @@ func TestControllerNPCOffensiveFollowAddsLeadOnlyForMovingTargets(t *testing.T) 
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 			if err != nil {
 				t.Fatal(err)
 			}
-			mover.SetQueue(newMoveClock().q)
-			controller, err := NewController(mover, tt.self, nil)
+			controller, err := NewController(mover, tt.self, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -121,12 +118,11 @@ func (*npcChaseSelf) OffensiveFollowIsPawnMove() bool { return false }
 
 func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t *testing.T) {
 	self := &npcChaseSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,12 +151,11 @@ func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t
 // MoveToPawn is re-sent until the attack thinks again.
 func TestControllerPlayerAttackApproachRunsNoRecheck(t *testing.T) {
 	self := &playerFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,12 +178,11 @@ func TestControllerPlayerAttackApproachRunsNoRecheck(t *testing.T) {
 
 func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
 	self := &npcChaseSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,12 +203,11 @@ func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
 
 func TestControllerDefersToActorOwnedOffensiveFollowTicker(t *testing.T) {
 	self := &tickerOwnedFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

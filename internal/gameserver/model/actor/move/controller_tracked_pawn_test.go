@@ -36,13 +36,12 @@ func TestControllerPawnWalkEndsOnUnknownTrackedPawn(t *testing.T) {
 	pawn := &trackedPawn{}
 	state.Spawn(pawn, 500, 0, 0, 0)
 
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	sink := &eventLog{}
-	controller, err := NewController(mover, self, sink)
+	controller, err := NewController(mover, self, sink, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

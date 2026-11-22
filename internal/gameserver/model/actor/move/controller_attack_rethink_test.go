@@ -10,12 +10,11 @@ import (
 // toward a stationary target at x=500, two position updates into the walk.
 func newRethinkController(t *testing.T, self *playerFollowSelf) (*Controller, *followTarget) {
 	t.Helper()
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,12 +79,11 @@ func TestControllerRootedPlayerAttackRethinkSendsNoWalk(t *testing.T) {
 // actor's walk toward an unmoved target as is: its think sends nothing.
 func TestControllerNonPlayerAttackRethinkLeavesConvergedWalk(t *testing.T) {
 	self := &summonFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

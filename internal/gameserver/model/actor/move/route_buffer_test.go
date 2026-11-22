@@ -45,11 +45,10 @@ func newRoutedMover(t testing.TB, origin location.Location) (*CreatureMove, *eng
 	t.Helper()
 
 	e, finder := wallRouteGeo(t)
-	mover, err := NewCreatureMove(origin, 160, NewGeo(e, finder))
+	mover, err := NewCreatureMove(origin, 160, NewGeo(e, finder), WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	return mover, e, finder
 }
 
@@ -133,11 +132,10 @@ func (g fixedPathGeo) FindPath(_, _ location.Location) ([]location.Location, boo
 
 func TestRoutedMoveCopiesPlainFindPathResult(t *testing.T) {
 	shared := []location.Location{{X: 50}, {X: 100}, {X: 150}}
-	mover, err := NewCreatureMove(location.Location{}, 160, fixedPathGeo{path: shared})
+	mover, err := NewCreatureMove(location.Location{}, 160, fixedPathGeo{path: shared}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	if _, outcome, err := mover.MoveToLocationWithPathOutcome(location.Location{X: 150}); err != nil || outcome != pathRouted {
 		t.Fatalf("request = %v, %v; want routed", outcome, err)
 	}

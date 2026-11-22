@@ -91,26 +91,20 @@ func (f *Folk) EnableMovement(m FolkMovement) (*FolkWalker, error) {
 	if m.Queue == nil {
 		return nil, errors.New("npc: folk movement needs a queue")
 	}
-	cm, err := move.NewCreatureMove(f.Instance.Home, f.MoveSpeed(), m.Geo)
-	if err != nil {
-		return nil, fmt.Errorf("npc %d folk movement: %w", f.Instance.Template.ID, err)
-	}
-	cm.SetQueue(m.Queue)
-	if m.WaterSurface != nil {
-		cm.SetWaterSurface(m.WaterSurface)
-	}
+	moveOpts := []move.Option{move.WithQueue(m.Queue), move.WithWaterSurface(m.WaterSurface)}
 	if f.zones.ix != nil {
 		// The NPC swims while its water zones hold it, not wherever the
 		// water query finds it.
-		cm.UseCreatureZoneSwim()
+		moveOpts = append(moveOpts, move.WithCreatureZoneSwim())
+	}
+	cm, err := move.NewCreatureMove(f.Instance.Home, f.MoveSpeed(), m.Geo, moveOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("npc %d folk movement: %w", f.Instance.Template.ID, err)
 	}
 	motion := &folkMotion{Folk: f, cfg: m, move: cm}
-	ctl, err := move.NewController(cm, motion, motion)
+	ctl, err := move.NewController(cm, motion, motion, m.Positions)
 	if err != nil {
 		return nil, err
-	}
-	if m.Positions != nil {
-		ctl.SetPositionUpdates(m.Positions)
 	}
 	motion.ctl = ctl
 	motion.walker = &FolkWalker{folkMotion: motion}

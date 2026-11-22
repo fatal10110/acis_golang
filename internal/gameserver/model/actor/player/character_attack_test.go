@@ -113,7 +113,7 @@ func TestCharacterMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 		attacker := liveCharacter(2, tmpl, items)
 		target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
 		attacker.SetLastKnownPosition(location.Location{X: ax, Y: ay, Z: 0}, 0)
-		live, err := creature.NewLive(location.Location{X: ax, Y: ay, Z: 0}, 0, permissiveGeo{}, attacker, effect.WithEnv(effect.Env{Night: hitNight(night)}))
+		live, err := creature.NewLive(location.Location{X: ax, Y: ay, Z: 0}, 0, permissiveGeo{}, attacker, creature.WithEffects(effect.WithEnv(effect.Env{Night: hitNight(night)})))
 		if err != nil {
 			t.Fatal(err)
 		}

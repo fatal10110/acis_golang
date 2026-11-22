@@ -37,12 +37,10 @@ func TestSwimmingOrFlyingPlayerRoute(t *testing.T) {
 				findPathOK:       true,
 				validFlyLocation: stop,
 			}
-			mover, _ := newTestMover(t, geo)
+			mover, _ := newTestMover(t, geo, WithWaterSurface(swimWater(!tt.flying)))
 			mover.SetSpeeds(100, 100)
 			if tt.flying {
 				mover.SetFlying(true)
-			} else {
-				mover.SetWaterSurface(everywhereWater)
 			}
 			ev, err := mover.MoveToLocation(target)
 			if err != nil {
@@ -80,11 +78,9 @@ func TestSwimmingOrFlyingNonPlayerRoutesOnGround(t *testing.T) {
 			findPath:   []location.Location{{X: 100}, {X: 300, Y: 40, Z: 120}},
 			findPathOK: true,
 		}
-		mover, _ := newTestMover(t, geo)
+		mover, _ := newTestMover(t, geo, WithWaterSurface(swimWater(!flying)))
 		if flying {
 			mover.SetFlying(true)
-		} else {
-			mover.SetWaterSurface(everywhereWater)
 		}
 		ev, err := mover.MoveToLocation(location.Location{X: 300, Y: 40, Z: 120})
 		if err != nil {
@@ -118,8 +114,7 @@ func TestWaterSurfaceCapsOnlyNonPlayerSwimmers(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mover, _ := newTestMover(t, staticGeo{canMove: true})
-			mover.SetWaterSurface(shallowSurface)
+			mover, _ := newTestMover(t, staticGeo{canMove: true}, WithWaterSurface(shallowSurface))
 			mover.SetFlying(tt.flying)
 			if tt.player {
 				mover.SetSpeeds(100, 100)
