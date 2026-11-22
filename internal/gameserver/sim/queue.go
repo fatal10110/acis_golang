@@ -81,6 +81,22 @@ func (q *Queue) Accepted() uint64 {
 	return q.accepted
 }
 
+// DueTimers reports whether q holds an armed timer or ticker whose deadline
+// is at or before now and whose expiry the clock has not yet posted to q: one
+// the clock's goroutine is about to deliver. An expiry already posted counts
+// as accepted work, not as due. A test harness letting wall time pass uses it
+// to wait for the timers that time made due before it reads what they did.
+func (q *Queue) DueTimers(now time.Time) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for t := q.timers; t != nil; t = t.succ {
+		if !t.done && !t.queued && !t.next.After(now) {
+			return true
+		}
+	}
+	return false
+}
+
 // Now reads the clock q's timers run on: the wall clock on a Pool, the
 // virtual clock on an Inline loop. Deadlines compared against q's timers
 // must be taken from it.
