@@ -58,13 +58,12 @@ func TestPositionUpdateDropsStepOvertakenByTeleport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			self := &chaseSelf{}
-			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 			if err != nil {
 				t.Fatal(err)
 			}
-			mover.SetQueue(newMoveClock().q)
 			sink := &stepHookSink{}
-			controller, err := NewController(mover, self, sink)
+			controller, err := NewController(mover, self, sink, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

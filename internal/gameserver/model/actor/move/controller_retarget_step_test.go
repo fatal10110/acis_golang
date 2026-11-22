@@ -33,15 +33,14 @@ func (g switchGeo) CanMove(int, int, int, int, int, int) bool { return !*g.close
 func newRetargetController(t *testing.T, speed float64) (*Controller, *CreatureMove, *retargetSelf, *moveClock, *bool) {
 	t.Helper()
 	closed := new(bool)
-	mover, err := NewCreatureMove(location.Location{}, speed, switchGeo{closed: closed})
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, speed, switchGeo{closed: closed}, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	mover.SetSpeeds(speed, speed)
 	self := &retargetSelf{}
-	controller, err := NewController(mover, self, &eventLog{})
+	controller, err := NewController(mover, self, &eventLog{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

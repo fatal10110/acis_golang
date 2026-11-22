@@ -128,7 +128,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, attackCtl ai.AttackController, skills ...actorcast.Definitions) *npc.Hostile {
 	t.Helper()
 	tmpl := inst.Template
-	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, effect.WithEnv(s.effectEnv))
+	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, s.npcLiveOptions()...)
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
@@ -455,18 +455,17 @@ func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at
 	tmpl := inst.Template
 	inst.Kind = npc.InstanceKind(tmpl.Type)
 	statRef := &movingHostileStatRef{}
-	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, effect.WithEnv(s.effectEnv))
+	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, s.npcLiveOptions()...)
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
 	live.SetQueue(s.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)))
 	locRef := &movingHostileLocatedRef{}
 	control := &movingHostileControl{server: s}
-	moveCtl, err := move.NewController(live.Move(), locRef, control)
+	moveCtl, err := move.NewController(live.Move(), locRef, control, s.positions)
 	if err != nil {
 		t.Fatalf("new move controller: %v", err)
 	}
-	moveCtl.SetPositionUpdates(s.positions)
 	actorRef := &hostileActorRef{}
 	attackCtl := attack.NewAttackable(actorRef, control)
 	attackCtl.SetQueue(live.Queue())
@@ -688,13 +687,21 @@ func (parkedAttack) CanAttack(attackable.Combatant) bool { return false }
 func (parkedAttack) DoAttack(attackable.Combatant)       {}
 func (parkedAttack) Stop()                               {}
 
+// npcLiveOptions builds a fixture NPC's live state as boot builds every live
+// NPC's: with the suite's effect environment, swimming while the zones the
+// suite supplied through WithZones hold it in water.
+func (s *Server) npcLiveOptions() []creature.Option {
+	opts := []creature.Option{creature.WithEffects(effect.WithEnv(s.effectEnv))}
+	if s.zones != nil {
+		opts = append(opts, creature.WithMovement(move.WithCreatureZoneSwim()))
+	}
+	return opts
+}
+
 // installZones gives a fixture NPC the zone membership boot gives every
 // live NPC, over the zones the suite supplied through WithZones.
 func (s *Server) installZones(hostile *npc.Hostile) {
 	hostile.SetZones(s.zones)
-	if s.zones != nil && hostile.Live != nil {
-		hostile.Move().UseCreatureZoneSwim()
-	}
 }
 
 // FolkTemplate is a fixture civilian NPC template of the given instance

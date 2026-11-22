@@ -375,7 +375,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	live.SetQueue(idleQueue())
 	ch.Live = live
 	control := &testControllerSink{}
-	moveCtl, err := move.NewController(ch.Move(), ch, control)
+	moveCtl, err := move.NewController(ch.Move(), ch, control, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

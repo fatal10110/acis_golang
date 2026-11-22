@@ -25,15 +25,15 @@ func (testVessel) OustLocation() location.Location { return location.Location{} 
 func TestBoardHoldsServerStepsAtWaterSurface(t *testing.T) {
 	const surface = 50
 	c := liveCharacter(1, combatTemplate(), combatItems())
-	live, err := creature.NewLive(location.Location{}, 100, seabedGeo{}, c)
+	live, err := creature.NewLive(location.Location{}, 100, seabedGeo{}, c, creature.WithMovement(
+		move.WithWaterSurface(func(location.Location) (int, bool) { return surface, true }),
+		move.WithZoneSwim()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	live.SetQueue(idleQueue())
 	c.Live = live
 	mover := c.Move()
-	mover.SetWaterSurface(func(location.Location) (int, bool) { return surface, true })
-	mover.UseZoneSwim()
 	mover.SetSwimming(true)
 	mover.SetSpeeds(100, 100)
 

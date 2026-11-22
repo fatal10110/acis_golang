@@ -22,6 +22,14 @@ func (p *kindPawn) Position() (int, int, int) { return p.x, p.y, p.z }
 // above the test floor.
 func everywhereWater(location.Location) (int, bool) { return 10_000, true }
 
+// swimWater is everywhereWater for a mover that swims, no water otherwise.
+func swimWater(swim bool) func(location.Location) (int, bool) {
+	if swim {
+		return everywhereWater
+	}
+	return nil
+}
+
 // gateGeo is open geodata whose lines close once closed is set.
 type gateGeo struct {
 	staticGeo
@@ -30,14 +38,15 @@ type gateGeo struct {
 
 func (g gateGeo) CanMove(int, int, int, int, int, int) bool { return !*g.closed }
 
-func newTestMover(t *testing.T, geo Geo) (*CreatureMove, *moveClock) {
+// newTestMover builds a mover at the origin moving 100 units per second on
+// a test clock, configured by opts.
+func newTestMover(t *testing.T, geo Geo, opts ...Option) (*CreatureMove, *moveClock) {
 	t.Helper()
-	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, 100, geo, append([]Option{WithQueue(clock.q)}, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	return mover, clock
 }
 
@@ -88,10 +97,7 @@ func TestChasePawnStopMeasuresByMoveType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mover, _ := newTestMover(t, staticGeo{canMove: true})
-			if tt.water != nil {
-				mover.SetWaterSurface(tt.water)
-			}
+			mover, _ := newTestMover(t, staticGeo{canMove: true}, WithWaterSurface(tt.water))
 			if got := mover.MoveType(); got != tt.wantType {
 				t.Fatalf("MoveType() = %d, want %d", got, tt.wantType)
 			}
@@ -116,8 +122,7 @@ func TestChasePawnStopMeasuresByMoveType(t *testing.T) {
 // each update adds dz * fraction to it, measuring dz from the current cell,
 // and lands on Math.round of it.
 func TestSwimmingPlayerStepRoundsAccurateHeight(t *testing.T) {
-	mover, _ := newTestMover(t, staticGeo{canMove: true})
-	mover.SetWaterSurface(everywhereWater)
+	mover, _ := newTestMover(t, staticGeo{canMove: true}, WithWaterSurface(everywhereWater))
 	mover.SetSpeeds(100, 100)
 	if _, err := mover.MoveToLocation(location.Location{X: 300, Z: 100}); err != nil {
 		t.Fatal(err)
@@ -159,8 +164,7 @@ func TestFlyingMoverSkipsGroundGeodata(t *testing.T) {
 // A same-cell request of a swimmer to another height is a real move, not a
 // same-cell arrival.
 func TestSwimmingMoverClimbsInPlace(t *testing.T) {
-	mover, _ := newTestMover(t, staticGeo{canMove: true})
-	mover.SetWaterSurface(everywhereWater)
+	mover, _ := newTestMover(t, staticGeo{canMove: true}, WithWaterSurface(everywhereWater))
 	ev, err := mover.MoveToLocation(location.Location{Z: 25})
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +193,7 @@ func TestPawnWalkStopsShortOnlyOfCreatures(t *testing.T) {
 	for _, tt := range tests {
 		self := &playerFollowSelf{}
 		mover, _ := newTestMover(t, staticGeo{canMove: true})
-		controller, err := NewController(mover, self, nil)
+		controller, err := NewController(mover, self, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,10 +243,7 @@ func TestFollowTaskRangeMeasuresByMoveType(t *testing.T) {
 	above := func() *followTarget { return &followTarget{z: 100} }
 	t.Run("FollowTick", func(t *testing.T) {
 		for _, swim := range []bool{true, false} {
-			mover, _ := newTestMover(t, staticGeo{canMove: true})
-			if swim {
-				mover.SetWaterSurface(everywhereWater)
-			}
+			mover, _ := newTestMover(t, staticGeo{canMove: true}, WithWaterSurface(swimWater(swim)))
 			mover.StartFriendlyFollow(2, 40)
 			_, moved, err := mover.FollowTick(TargetSnapshot{ObjectID: 2, Position: location.Location{Z: 100}, Known: true}, 0)
 			if err != nil {
@@ -256,10 +257,7 @@ func TestFollowTaskRangeMeasuresByMoveType(t *testing.T) {
 	t.Run("summon offensive recheck", func(t *testing.T) {
 		for _, swim := range []bool{true, false} {
 			self := &summonChaseSelf{}
-			controller, mover, _, _ := newChaseController(t, self, staticGeo{canMove: true})
-			if swim {
-				mover.SetWaterSurface(everywhereWater)
-			}
+			controller, _, _, _ := newChaseController(t, self, staticGeo{canMove: true}, WithWaterSurface(swimWater(swim)))
 			target := above()
 			if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || following {
 				t.Fatalf("swim %v: MaybeStartOffensiveFollow() = %v, %v; want in reach (2D)", swim, following, err)
@@ -276,10 +274,7 @@ func TestFollowTaskRangeMeasuresByMoveType(t *testing.T) {
 	t.Run("friendly follow", func(t *testing.T) {
 		for _, swim := range []bool{true, false} {
 			self := &summonChaseSelf{}
-			controller, mover, _, _ := newChaseController(t, self, staticGeo{canMove: true})
-			if swim {
-				mover.SetWaterSurface(everywhereWater)
-			}
+			controller, mover, _, _ := newChaseController(t, self, staticGeo{canMove: true}, WithWaterSurface(swimWater(swim)))
 			if _, err := controller.MaybeStartFriendlyFollow(above(), 40); err != nil {
 				t.Fatal(err)
 			}
@@ -290,10 +285,7 @@ func TestFollowTaskRangeMeasuresByMoveType(t *testing.T) {
 	})
 	t.Run("player friendly follow", func(t *testing.T) {
 		for _, swim := range []bool{true, false} {
-			controller, mover, _ := newPlayerFriendlyFollowController(t)
-			if swim {
-				mover.SetWaterSurface(everywhereWater)
-			}
+			controller, mover, _ := newPlayerFriendlyFollowController(t, WithWaterSurface(swimWater(swim)))
 			if _, err := controller.MaybeStartFriendlyFollow(above(), 40); err != nil {
 				t.Fatal(err)
 			}
@@ -326,8 +318,7 @@ func (g shelfGeo) Height(x, _, _ int) int16 {
 // Expected cells follow the reference formula step by step: ground steps of
 // 10 to X 100, then 3D steps toward (400,0,-300).
 func TestChaseIntoWaterRetimesArrival(t *testing.T) {
-	mover, clock := newTestMover(t, shelfGeo{staticGeo: staticGeo{canMove: true}, dropAt: 350})
-	mover.SetWaterSurface(func(at location.Location) (int, bool) { return 10_000, at.X >= 100 })
+	mover, clock := newTestMover(t, shelfGeo{staticGeo: staticGeo{canMove: true}, dropAt: 350}, WithWaterSurface(func(at location.Location) (int, bool) { return 10_000, at.X >= 100 }))
 	pawn := &kindPawn{kind: actor.KindNPC, x: 400, z: -300}
 	if _, _, err := mover.ChasePawnWithPathOutcome(pawn, 40); err != nil {
 		t.Fatal(err)
@@ -354,10 +345,8 @@ func TestChaseIntoWaterRetimesArrival(t *testing.T) {
 func TestPawnWalkArrivalTimerStopsShortIn3D(t *testing.T) {
 	for _, mode := range []string{"swim", "fly"} {
 		closed := false
-		mover, clock := newTestMover(t, gateGeo{staticGeo: staticGeo{canMove: true}, closed: &closed})
-		if mode == "swim" {
-			mover.SetWaterSurface(everywhereWater)
-		} else {
+		mover, clock := newTestMover(t, gateGeo{staticGeo: staticGeo{canMove: true}, closed: &closed}, WithWaterSurface(swimWater(mode == "swim")))
+		if mode != "swim" {
 			mover.SetFlying(true)
 		}
 		if _, _, err := mover.MoveToPawnWithPathOutcome(&kindPawn{kind: actor.KindNPC, x: 300, z: 300}, 40); err != nil {
@@ -382,8 +371,7 @@ func TestPawnWalkArrivalTimerStopsShortIn3D(t *testing.T) {
 // reference formula step by step: ground steps of 10 to X 50, its accurate
 // height reaching -39.53, then 3D steps rounding it.
 func TestPlayerWadingInSwimsFromAccurateHeight(t *testing.T) {
-	mover, _ := newTestMover(t, shelfGeo{staticGeo: staticGeo{canMove: true}, dropAt: 350})
-	mover.SetWaterSurface(func(at location.Location) (int, bool) { return 10_000, at.X >= 50 })
+	mover, _ := newTestMover(t, shelfGeo{staticGeo: staticGeo{canMove: true}, dropAt: 350}, WithWaterSurface(func(at location.Location) (int, bool) { return 10_000, at.X >= 50 }))
 	mover.SetSpeeds(100, 100)
 	if _, err := mover.MoveToLocation(location.Location{X: 400, Z: -300}); err != nil {
 		t.Fatal(err)

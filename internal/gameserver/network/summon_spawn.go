@@ -560,22 +560,19 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
-		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, l.geo); err != nil {
+		var moveOpts []move.Option
+		if l.zones != nil {
+			// A summon swims while its water zones hold it, not wherever
+			// the water query finds it.
+			moveOpts = []move.Option{move.WithWaterSurface(waterSurface(l.zones)), move.WithCreatureZoneSwim()}
+		}
+		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, l.geo, moveOpts...); err != nil {
 			l.log.Warn().Err(err).Msg("summon: create movement controller")
+		} else if controller, err := move.NewController(actor.Move(), actor, sink, l.positions); err != nil {
+			l.log.Warn().Err(err).Msg("summon: attach movement controller")
 		} else {
-			setWaterSurface(actor.Move(), l.zones)
-			if l.zones != nil {
-				// A summon swims while its water zones hold it, not
-				// wherever the water query finds it.
-				actor.Move().UseCreatureZoneSwim()
-			}
-			if controller, err := move.NewController(actor.Move(), actor, sink); err != nil {
-				l.log.Warn().Err(err).Msg("summon: attach movement controller")
-			} else {
-				controller.SetPositionUpdates(l.positions)
-				moveController = controller
-				sink.move = controller
-			}
+			moveController = controller
+			sink.move = controller
 		}
 	}
 	attackController := attack.NewPlayable(actor, sink)

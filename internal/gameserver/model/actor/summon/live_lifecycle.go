@@ -229,7 +229,6 @@ func (a *Actor) ShownAsOwnedBy(playerID int32) bool {
 // of a's work runs during the move.
 func (a *Actor) AdoptCorpseQueue(q *sim.Queue) {
 	a.queue.Store(q)
-	a.movement.SetQueue(q)
 	a.effects.SetQueue(q)
 }
 

@@ -18,16 +18,15 @@ type summonChaseSelf struct{ chaseSelf }
 
 func (*summonChaseSelf) OwnsOffensiveFollowTicker() bool { return true }
 
-func newChaseController(t *testing.T, self Actor, geo Geo) (*Controller, *CreatureMove, *eventLog, *moveClock) {
+func newChaseController(t *testing.T, self Actor, geo Geo, opts ...Option) (*Controller, *CreatureMove, *eventLog, *moveClock) {
 	t.Helper()
-	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, 100, geo, append([]Option{WithQueue(clock.q)}, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	sink := &eventLog{}
-	controller, err := NewController(mover, self, sink)
+	controller, err := NewController(mover, self, sink, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -74,13 +74,12 @@ func TestPlayerUpdateAfterRetargetWalksTimeSinceIt(t *testing.T) {
 // An NPC or summon mover (no SetSpeeds) still walks the nominal interval
 // per update, however late the update runs.
 func TestNonPlayerUpdateWalksNominalInterval(t *testing.T) {
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
-	controller, err := NewController(mover, &knowingFollowSelf{}, &eventLog{})
+	controller, err := NewController(mover, &knowingFollowSelf{}, &eventLog{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

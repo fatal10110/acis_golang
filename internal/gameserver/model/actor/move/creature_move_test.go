@@ -41,12 +41,10 @@ func TestNewCreatureMoveAcceptsZeroSpeed(t *testing.T) {
 	geo := &recordingGeo{canMove: true}
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 
-	m, err := NewCreatureMove(origin, 0, geo)
+	m, err := NewCreatureMove(origin, 0, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatalf("NewCreatureMove() error = %v, want nil", err)
 	}
-
-	m.SetQueue(newMoveClock().q)
 
 	if _, err := m.MoveToLocation(location.Location{X: 100, Y: 20, Z: 30}); err == nil {
 		t.Fatal("MoveToLocation() error = nil, want error for zero-speed actor")
@@ -224,11 +222,10 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 				speed = test.speed
 			}
 			geo := &recordingGeo{canMove: test.canMove, height: 30}
-			mover, err := NewCreatureMove(moverOrigin, speed, geo)
+			mover, err := NewCreatureMove(moverOrigin, speed, geo, WithQueue(newMoveClock().q))
 			if err != nil {
 				t.Fatal(err)
 			}
-			mover.SetQueue(newMoveClock().q)
 			if test.initialTarget != nil {
 				if _, err := mover.MoveToLocation(*test.initialTarget); err != nil {
 					t.Fatal(err)
@@ -262,11 +259,10 @@ func TestCreatureMove_MoveToLocationPassesRequestedCoordinates(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	target := location.Location{X: 60, Y: 70, Z: 999}
 	geo := &recordingGeo{canMove: true, height: 42}
-	mover, err := NewCreatureMove(origin, 50, geo)
+	mover, err := NewCreatureMove(origin, 50, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
@@ -283,11 +279,10 @@ func TestCreatureMove_MoveToLocationPassesRequestedCoordinates(t *testing.T) {
 
 func TestCreatureMove_UpdatePositionStopsWhenObstacleCloses(t *testing.T) {
 	geo := &recordingGeo{canMove: true}
-	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	mover, err := NewCreatureMove(location.Location{}, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
@@ -320,11 +315,10 @@ func TestCreatureMove_UpdatePositionStopsWhenObstacleCloses(t *testing.T) {
 
 func TestCreatureMove_UpdatePositionChecksFinalStepForNewObstacle(t *testing.T) {
 	geo := &recordingGeo{canMove: true}
-	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	mover, err := NewCreatureMove(location.Location{}, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
@@ -355,11 +349,10 @@ func TestCreatureMove_UpdatePositionStopsWhenDynamicNSWECloses(t *testing.T) {
 	}
 	origin := location.Location{X: engine.WorldX(0), Y: engine.WorldY(0)}
 	target := location.Location{X: engine.WorldX(2), Y: origin.Y}
-	mover, err := NewCreatureMove(origin, 160, NewGeo(e, nil))
+	mover, err := NewCreatureMove(origin, 160, NewGeo(e, nil), WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
@@ -394,11 +387,10 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 		findPathOK: true,
 		canMoveAt:  func(int, int, int, int, int, int) bool { return allow },
 	}
-	mover, err := NewCreatureMove(location.Location{Z: 30}, 100, geo)
+	mover, err := NewCreatureMove(location.Location{Z: 30}, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	advanced := 0
@@ -482,11 +474,10 @@ func startBlockedMidRouteMove(t *testing.T) (mover *CreatureMove, allow *bool, a
 		canMoveAt:  func(int, int, int, int, int, int) bool { return *allow },
 	}
 	var err error
-	mover, err = NewCreatureMove(location.Location{Z: 30}, 100, geo)
+	mover, err = NewCreatureMove(location.Location{Z: 30}, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	arrivedN, blockedN := 0, 0
 	arrived, blocked = &arrivedN, &blockedN
 	mover.setOwner(&hookOwner{onArrived: func() { arrivedN++ }, onBlocked: func() { blockedN++ }})
@@ -564,11 +555,10 @@ func TestCreatureMove_UpdatePositionResamplesDestinationHeight(t *testing.T) {
 	}
 	origin := location.Location{X: engine.WorldX(0), Y: engine.WorldY(0)}
 	target := location.Location{X: engine.WorldX(2), Y: origin.Y}
-	mover, err := NewCreatureMove(origin, 100, heightGeo{engine: e})
+	mover, err := NewCreatureMove(origin, 100, heightGeo{engine: e}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
 	}
@@ -595,11 +585,10 @@ func TestCreatureMove_UpdatePositionBiasesGroundHeightAndCapsWorldZ(t *testing.T
 	origin := location.Location{Z: 100}
 	target := location.Location{X: 100}
 	geo := &recordingGeo{canMove: true, height: 16420}
-	mover, err := NewCreatureMove(origin, 100, geo)
+	mover, err := NewCreatureMove(origin, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
 	}
@@ -626,11 +615,10 @@ func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	current := location.Location{X: 60, Y: 20, Z: 30}
 	geo := &recordingGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(origin, 50, geo)
+	mover, err := NewCreatureMove(origin, 50, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	if _, err := mover.MoveToLocation(current); err != nil {
 		t.Fatal(err)
@@ -663,11 +651,10 @@ func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
 func TestCreatureMove_MoveToLocationRejectsUnrepresentableDuration(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	geo := &recordingGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(origin, math.SmallestNonzeroFloat64, geo)
+	mover, err := NewCreatureMove(origin, math.SmallestNonzeroFloat64, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	if _, err := mover.MoveToLocation(location.Location{X: 11, Y: 20, Z: 999}); err == nil {
 		t.Fatal("MoveToLocation() error = nil")
@@ -701,12 +688,11 @@ func TestCreatureMove_MoveToLocationRoutesThroughPathfindWaypoints(t *testing.T)
 		findPath:   waypoints,
 		findPathOK: true,
 	}
-	mover, err := NewCreatureMove(origin, 50, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(origin, 50, geo, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	arrivedCalls := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrivedCalls++ }})
 
@@ -773,12 +759,11 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 		findPathOK:    false,
 		validLocation: fallback,
 	}
-	mover, err := NewCreatureMove(origin, 50, geo)
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(origin, 50, geo, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	arrivedCalls := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrivedCalls++ }})
 
@@ -818,11 +803,10 @@ func TestCreatureMove_MoveToLocationNoProgressFallbackStartsZeroDistanceArrival(
 		findPathOK: false,
 		// ValidLocation left zero → stub returns the call's origin.
 	}
-	mover, err := NewCreatureMove(origin, 50, geo)
+	mover, err := NewCreatureMove(origin, 50, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	// Seed an in-flight destination so the new request must replace it.
 	mover.destination = prior
 	mover.moving = true

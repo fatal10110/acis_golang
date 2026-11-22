@@ -49,12 +49,11 @@ func TestControllerNPCOffensiveFollowInReachBySight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			self := &npcSightSelf{movesToTarget: tt.movesToTarget, sees: tt.sees}
-			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+			mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 			if err != nil {
 				t.Fatal(err)
 			}
-			mover.SetQueue(newMoveClock().q)
-			controller, err := NewController(mover, self, nil)
+			controller, err := NewController(mover, self, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -723,17 +723,20 @@ var (
 	_ player.LineOfSightIgnoring = move.EngineGeo{}
 )
 
-func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
-	if mover == nil || zones == nil {
-		return
+// waterSurface is the water query a mover over zones takes: the surface
+// level of the water zone at a position, and whether the position lies in
+// one. No zones give no query, which keeps the mover on the ground.
+func waterSurface(zones *zone.Index) func(location.Location) (int, bool) {
+	if zones == nil {
+		return nil
 	}
-	mover.SetWaterSurface(func(position location.Location) (int, bool) {
+	return func(position location.Location) (int, bool) {
 		water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
 		if !ok {
 			return 0, false
 		}
 		return water.WaterLevel(), true
-	})
+	}
 }
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
@@ -820,14 +823,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 
 	x, y, z := c.Position()
-	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.MoveSpeed(), l.geo, c, effect.WithEnv(l.effects))
+	// A player swims while its zones hold it in water, not wherever the
+	// water query finds it.
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.MoveSpeed(), l.geo, c,
+		creature.WithEffects(effect.WithEnv(l.effects)),
+		creature.WithMovement(move.WithWaterSurface(waterSurface(l.zones)), move.WithZoneSwim()))
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
-	setWaterSurface(creatureLive.Move(), l.zones)
-	// A player swims while its zones hold it in water, not wherever the
-	// water query finds it.
-	creatureLive.Move().UseZoneSwim()
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	access := l.admin.Resolve(c.AccessLevel)
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.SendFrame, log: l.log}
@@ -843,11 +846,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// The controllers act as live, the object the world registers: the
 	// creatures a swing or a follow reaches see the same player the world,
 	// the AI and every known list hold.
-	moveCtl, err := move.NewController(c.Move(), live, live)
+	moveCtl, err := move.NewController(c.Move(), live, live, l.positions)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
-	moveCtl.SetPositionUpdates(l.positions)
 	attackCtl := attack.NewPlayer(live, live)
 	attackCtl.SetQueue(creatureLive.Queue())
 	combat := ai.NewPlayerAttack(live, moveCtl, attackCtl)

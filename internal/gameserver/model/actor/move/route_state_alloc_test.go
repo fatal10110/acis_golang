@@ -10,11 +10,10 @@ import (
 
 // A position update of a walk already in flight allocates nothing.
 func TestInFlightPositionUpdateAllocatesNothing(t *testing.T) {
-	mover, err := NewCreatureMove(location.Location{}, 120, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 120, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	if _, err := mover.MoveToLocation(location.Location{X: 60000}); err != nil {
 		t.Fatal(err)
 	}

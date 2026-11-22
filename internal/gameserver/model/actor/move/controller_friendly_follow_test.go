@@ -22,15 +22,14 @@ func (s *knowingFollowSelf) Knows(attackable.Combatant) bool { return !s.forgot 
 func (s *knowingFollowSelf) BroadcastStop()                  { s.stopped++ }
 func (s *knowingFollowSelf) SetHeading(h int)                { s.headings = append(s.headings, h) }
 
-func newPlayerFriendlyFollowController(t *testing.T) (*Controller, *CreatureMove, *knowingFollowSelf) {
+func newPlayerFriendlyFollowController(t *testing.T, opts ...Option) (*Controller, *CreatureMove, *knowingFollowSelf) {
 	t.Helper()
 	self := &knowingFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, append([]Option{WithQueue(newMoveClock().q)}, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
-	controller, err := NewController(mover, self, nil)
+	controller, err := NewController(mover, self, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,14 +236,13 @@ func (l *eventLog) arrivals() int {
 func newPawnWalkController(t *testing.T) (*Controller, *CreatureMove, *knowingFollowSelf, *eventLog, *moveClock) {
 	t.Helper()
 	self := &knowingFollowSelf{}
-	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	clock := newMoveClock()
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true}, WithQueue(clock.q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := newMoveClock()
-	mover.SetQueue(clock.q)
 	sink := &eventLog{}
-	controller, err := NewController(mover, self, sink)
+	controller, err := NewController(mover, self, sink, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

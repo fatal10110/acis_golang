@@ -12,11 +12,10 @@ import (
 // later stops keep it.
 func TestStationaryMoverHoldsNoRouteState(t *testing.T) {
 	origin := location.Location{X: 100, Y: 200, Z: -50}
-	mover, err := NewCreatureMove(origin, 120, staticGeo{canMove: true})
+	mover, err := NewCreatureMove(origin, 120, staticGeo{canMove: true}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	_ = mover.Position()
 	mover.SetPosition(origin)

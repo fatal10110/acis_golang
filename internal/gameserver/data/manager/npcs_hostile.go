@@ -233,24 +233,23 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	control := &w.control
 	control.walker, control.log, control.chance = walker, log, castEffects.Chance
 	statRef := &w.stat
-	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effectOpts...)
+	var moveOpts []move.Option
+	if zones != nil {
+		// The NPC swims while its water zones hold it, not wherever the
+		// water query finds it.
+		moveOpts = []move.Option{move.WithWaterSurface(waterSurface(zones)), move.WithCreatureZoneSwim()}
+	}
+	live, err := creature.NewLive(inst.Home, speed, geo, statRef, creature.WithEffects(effectOpts...), creature.WithMovement(moveOpts...))
 	if err != nil {
 		return nil, nil, err
 	}
 	live.SetQueue(queue)
-	if zones != nil {
-		live.Move().SetWaterSurface(waterSurface(zones))
-		// The NPC swims while its water zones hold it, not wherever the
-		// water query finds it.
-		live.Move().UseCreatureZoneSwim()
-	}
 
 	locRef := &w.located
-	moveCtl, err := move.NewController(live.Move(), locRef, control)
+	moveCtl, err := move.NewController(live.Move(), locRef, control, positions)
 	if err != nil {
 		return nil, nil, err
 	}
-	moveCtl.SetPositionUpdates(positions)
 
 	actorRef := &w.actor
 	routeMove := &w.routeMove

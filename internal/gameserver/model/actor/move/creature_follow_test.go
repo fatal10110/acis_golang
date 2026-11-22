@@ -19,11 +19,10 @@ func TestCreatureMove_FollowTickAllocs(t *testing.T) {
 	geo := staticGeo{canMove: true, height: 30}
 
 	t.Run("no-op path", func(t *testing.T) {
-		mover, err := NewCreatureMove(origin, 50, geo)
+		mover, err := NewCreatureMove(origin, 50, geo, WithQueue(newMoveClock().q))
 		if err != nil {
 			t.Fatal(err)
 		}
-		mover.SetQueue(newMoveClock().q)
 		target := TargetSnapshot{ObjectID: 2, Known: true, Position: location.Location{X: 500, Y: 20, Z: 30}}
 
 		allocs := testing.AllocsPerRun(1000, func() {
@@ -37,12 +36,11 @@ func TestCreatureMove_FollowTickAllocs(t *testing.T) {
 	})
 
 	t.Run("move-triggering path", func(t *testing.T) {
-		mover, err := NewCreatureMove(origin, 50, geo)
+		clock := newMoveClock()
+		mover, err := NewCreatureMove(origin, 50, geo, WithQueue(clock.q))
 		if err != nil {
 			t.Fatal(err)
 		}
-		clock := newMoveClock()
-		mover.SetQueue(clock.q)
 		mover.StartFriendlyFollow(2, 70)
 		target := TargetSnapshot{
 			ObjectID:        2,
@@ -77,11 +75,10 @@ func TestCreatureMove_FollowTickUsesCurrentPosition(t *testing.T) {
 		CollisionRadius: 5,
 	}
 	geo := &recordingGeo{canMove: true, height: 0}
-	mover, err := NewCreatureMove(spawn, 100, geo)
+	mover, err := NewCreatureMove(spawn, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	mover.SetPosition(current)
 	mover.StartFriendlyFollow(target.ObjectID, 20)
 
@@ -106,11 +103,10 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 		Known:           true,
 	}
 	geo := &recordingGeo{canMove: true, height: 30}
-	mover, err := NewCreatureMove(origin, 50, geo)
+	mover, err := NewCreatureMove(origin, 50, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	mover.StartFriendlyFollow(target.ObjectID, 70)
 	ev, moved, err := mover.FollowTick(target, 9.9)
@@ -149,11 +145,10 @@ func TestCreatureMove_FriendlyFollowTickMovesAtExactRange(t *testing.T) {
 		Position:        location.Location{X: 100, Y: 20, Z: 30},
 		CollisionRadius: 10.9,
 	}
-	mover, err := NewCreatureMove(origin, 50, &recordingGeo{canMove: true, height: 30})
+	mover, err := NewCreatureMove(origin, 50, &recordingGeo{canMove: true, height: 30}, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 	mover.StartFriendlyFollow(target.ObjectID, 70)
 
 	ev, moved, err := mover.FollowTick(target, 9.9)
@@ -230,11 +225,10 @@ func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			geo := &recordingGeo{canMove: true, height: 30}
-			mover, err := NewCreatureMove(origin, 50, geo)
+			mover, err := NewCreatureMove(origin, 50, geo, WithQueue(newMoveClock().q))
 			if err != nil {
 				t.Fatal(err)
 			}
-			mover.SetQueue(newMoveClock().q)
 			if test.start != nil {
 				test.start(mover)
 			}
@@ -265,11 +259,10 @@ func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 	origin := location.Location{X: 0, Y: 0, Z: 0}
 	geo := &recordingGeo{canMove: true, height: 0}
-	mover, err := NewCreatureMove(origin, 100, geo)
+	mover, err := NewCreatureMove(origin, 100, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	mover.StartOffensiveFollow(9, 40)
 	if got := mover.FollowInterval(); got != 500*time.Millisecond {
@@ -304,11 +297,10 @@ func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 
 func TestCreatureMove_CancelFollow(t *testing.T) {
 	geo := &recordingGeo{canMove: true}
-	mover, err := NewCreatureMove(location.Location{}, 50, geo)
+	mover, err := NewCreatureMove(location.Location{}, 50, geo, WithQueue(newMoveClock().q))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.SetQueue(newMoveClock().q)
 
 	mover.StartFriendlyFollow(2, 70)
 	mover.CancelFollow()
