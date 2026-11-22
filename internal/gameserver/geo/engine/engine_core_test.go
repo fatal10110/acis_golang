@@ -57,7 +57,7 @@ func TestEngineDynamicObjectBlocksAndRestoresMovement(t *testing.T) {
 	}
 }
 
-func TestEngineEvictsDynamicBlockAfterLastObjectRemove(t *testing.T) {
+func TestEngineDropsOverlayAfterLastObjectRemove(t *testing.T) {
 	e := New()
 	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
 	if err != nil {
@@ -222,16 +222,18 @@ func TestEngineDynamicMaskGatesUncoveredBlocks(t *testing.T) {
 }
 
 // assertDynamicMaskMatchesBlocks checks the gate invariant: a bit is set for
-// exactly the blocks dynamicBlocks holds an overlay for. A missing bit hides a
-// live overlay from every query; a stale bit only wastes a lookup, but either
-// way it means the clone-and-swap discipline leaked.
+// exactly the blocks whose dynamicBlocks entry carries an object. A missing
+// bit hides a live overlay from every query; a stale bit only wastes a
+// lookup, but either way it means the publish discipline leaked.
 func assertDynamicMaskMatchesBlocks(t *testing.T, e *Engine) {
 	t.Helper()
 
 	want := map[blockKey]bool{}
 	if current := e.dynamicBlocks.Load(); current != nil {
-		for key := range *current {
-			want[key] = true
+		for key, b := range *current {
+			if !b.Empty() {
+				want[key] = true
+			}
 		}
 	}
 	set := 0
@@ -260,11 +262,11 @@ func assertDynamicMaskMatchesBlocks(t *testing.T, e *Engine) {
 	}
 }
 
-// TestEngineDynamicMaskAcrossRegionSeam exercises rebuildMasks' multi-region
+// TestEngineDynamicMaskAcrossRegionSeam exercises setMaskBit's multi-region
 // path: an object spanning the geo-cell seam between two adjacent regions
 // touches blocks in two different tiles in one toggleObject call, which is
 // the only input that can catch tileX/tileY transposed with local blockX/
-// blockY, or the dedupe loop in rebuildMasks matching the wrong tile.
+// blockY.
 // Regressed against a reviewer finding on #2292: every other test in this
 // file builds its engine at a single tile (TileXMin, TileYMin), so blockX ==
 // blockX % block.RegionBlocksX and blockX / block.RegionBlocksX == 0
@@ -335,12 +337,20 @@ func TestEngineDynamicMaskAcrossRegionSeam(t *testing.T) {
 	}
 }
 
+// dynamicBlockCount counts the blocks carrying a live overlay. A block whose
+// last object left keeps its map entry, so emptied entries are not counted.
 func dynamicBlockCount(e *Engine) int {
 	current := e.dynamicBlocks.Load()
 	if current == nil {
 		return 0
 	}
-	return len(*current)
+	n := 0
+	for _, b := range *current {
+		if !b.Empty() {
+			n++
+		}
+	}
+	return n
 }
 
 // ---- from engine_test.go ----
