@@ -320,7 +320,13 @@ func (l *List) Remove(e *Effect) {
 	l.mu.Lock()
 	l.remove(e, &pending, &exits)
 	l.mu.Unlock()
+	l.finishRemove(pending, exits)
+}
 
+// finishRemove runs, after l.mu is released, what a removal queued under
+// it: the stat removal and next-member activation, the icon refresh, then
+// the exit hooks.
+func (l *List) finishRemove(pending, exits []func()) {
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
 	runHooks(exits)
@@ -574,7 +580,7 @@ func (l *List) runActivations() {
 	var after []func()
 	for len(l.deferred) > 0 {
 		next := l.deferred[0]
-		if !l.headsLocked(next.e) || next.e.inUse {
+		if !l.headsLocked(next.e) || next.e.inUse.Load() {
 			l.deferred = l.deferred[1:]
 			continue
 		}
@@ -631,7 +637,7 @@ func (l *List) activateOne(act activation) func() {
 	l.mu.Lock()
 	heads := l.headsLocked(e)
 	if heads {
-		e.inUse = true
+		e.inUse.Store(true)
 		e.startFailed.Store(!ok)
 		if ok {
 			l.attachStatFuncs(fns)
@@ -707,7 +713,7 @@ func (l *List) add(e *Effect, pending *[]func()) {
 	for _, old := range retiring {
 		// Retirement left old in use (see retireExit). It has run every exit
 		// hook this insertion owes it, so its removal must not run another.
-		old.inUse = false
+		old.inUse.Store(false)
 		l.holdExit(old)
 		l.remove(old, pending, pending)
 	}

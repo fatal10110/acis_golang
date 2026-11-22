@@ -181,7 +181,7 @@ func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []ef
 	}
 	var out []effect.ActiveEffect
 	for _, e := range list.All() {
-		ref := modelskill.Ref{ID: e.Skill.ID, Level: e.Level}
+		ref := modelskill.Ref{ID: e.Skill.ID, Level: list.Level(e)}
 		def, ok := p.definition(ref)
 		if !ok {
 			continue

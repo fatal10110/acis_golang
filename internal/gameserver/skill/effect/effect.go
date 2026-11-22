@@ -30,9 +30,11 @@ type Effect struct {
 	RejectsIfAffected bool
 
 	// Level is the applied skill level this effect instance represents,
-	// initialized from Skill.Level. Every kind treats it as fixed for the
-	// effect's lifetime except a fusion effect's IncreaseEffect/
-	// DecreaseForce, which grow or shrink it while the effect stays live.
+	// initialized from Skill.Level. It is fixed for the effect's lifetime
+	// except a seed's, whose charge grows in place under the list lock
+	// (List.IncreasePower); read a held effect's level through List.Level or
+	// List.ActiveBySkillID. A force changes level by replacing the effect
+	// (List.IncreaseForce).
 	Level int
 
 	OnStart    func(*Effect) bool
@@ -45,7 +47,10 @@ type Effect struct {
 	// every other kind.
 	landing location.Location
 
-	inUse bool
+	// inUse marks e as the active member of its stack group. Written under
+	// the list lock; the owner's effect tick reads it without that lock, so
+	// it is atomic.
+	inUse atomic.Bool
 	// startFailed records that e's latest activation ran an on-start hook
 	// that reported false. e stays held and in use all the same, so its flag
 	// counts, it keeps its stack group's head and a playable shows its icon,
@@ -111,7 +116,7 @@ func (e *Effect) InUse() bool {
 	if e == nil {
 		return false
 	}
-	return e.inUse
+	return e.inUse.Load()
 }
 
 // Remaining reports the scheduler's remaining-tick counter. On the first
@@ -402,10 +407,10 @@ func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
 // the effect is in use, and the schedule only stops once the count is
 // exhausted or the effect actually leaves the list — see List.remove.
 func (e *Effect) beginExit() func() {
-	if !e.inUse {
+	if !e.inUse.Load() {
 		return nil
 	}
-	e.inUse = false
+	e.inUse.Store(false)
 	if e.OnExit == nil {
 		return nil
 	}
@@ -431,7 +436,7 @@ func (e *Effect) finishExit() func() {
 // already retired, then the stack-head change (beginExit), which clears the
 // flag. add clears it for good before e's list removal, which runs no hook.
 func (e *Effect) retireExit() func() {
-	if !e.inUse || e.startFailed.Load() || e.OnExit == nil {
+	if !e.inUse.Load() || e.startFailed.Load() || e.OnExit == nil {
 		return nil
 	}
 	return func() { e.OnExit(e) }

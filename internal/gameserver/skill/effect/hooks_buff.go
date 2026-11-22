@@ -238,19 +238,11 @@ func negateLevelAllows(candidate Skill, negateLvl int) bool {
 }
 
 // fusionAction is a fusion effect's periodic tick: it never ends on its own
-// action timer, only when its Time runs out or IncreaseEffect/
-// DecreaseForce removes it.
+// action timer, only when its Time runs out or a force change
+// (List.IncreaseForce, List.DecreaseForce) replaces it.
 func fusionAction(*Effect) bool {
 	return true
 }
-
-// IncreaseEffect grows a live fusion effect by one level, up to maxLevel.
-// It removes this instance from list and, unless it was already at
-// maxLevel, asks reapply to install a fresh instance at the grown level —
-// exactly what constructing a new effect at that level in this one's place
-// would produce. Doing nothing at maxLevel (rather than reapplying at the
-// same level) is deliberate: the growth attempt is a plain no-op once the
-// effect is already maxed out.
 
 func chanceSkillTriggerStart(e *Effect) bool {
 	e.Effected.AddChanceTrigger(e)
