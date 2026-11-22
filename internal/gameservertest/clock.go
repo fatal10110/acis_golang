@@ -23,7 +23,9 @@ import (
 // real pool it sleeps for d, except that a suite's pool pass skips the rest
 // of the test when d is longer than maxWallAdvance (a test WithRealPool
 // pins has no inline pass, so it still sleeps). Either way the tasks posted
-// by then have run when it returns.
+// by then have run when it returns, those of a timer set for the instant the
+// span ends included: the real pool waits for the timers that came due
+// during the sleep to post before it settles.
 func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	tb.Helper()
 	if s.queues.advance != nil {
@@ -36,6 +38,10 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 			tb.Skipf("waiting %v on the wall clock; the driven clock covers the rest", d)
 		}
 		time.Sleep(d)
+		end := time.Now()
+		if err := s.queues.awaitDueTimers(end); err != nil {
+			tb.Fatal(err)
+		}
 	}
 	s.Settle(tb)
 }
