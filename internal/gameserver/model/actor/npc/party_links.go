@@ -1,9 +1,8 @@
 package npc
 
 import (
-	"maps"
-	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -74,7 +73,7 @@ func (h *Hostile) Template() *Template { return h.Instance.Template }
 func (f *Folk) Template() *Template { return f.Instance.Template }
 
 // partyLinks is what one life of an NPC keeps of its party: the escort
-// points around it. Hostile and Folk embed it. The party membership itself,
+// points around it. escortLinks holds it. The party membership itself,
 // master and privates, is the spawn slot's (party), so it carries over from
 // one life to the next.
 type partyLinks struct {
@@ -91,7 +90,32 @@ type partyLinks struct {
 	hasLastFollow    bool
 }
 
-func (p *partyLinks) links() *partyLinks { return p }
+// escortLinks are an NPC's partyLinks, made the first time the NPC
+// escorts or is escorted: only a master or a private ever uses them.
+// Hostile and Folk embed it.
+type escortLinks struct {
+	p atomic.Pointer[partyLinks]
+}
+
+// links returns the NPC's partyLinks, making them on first use; the first
+// one published is the one every caller gets.
+func (e *escortLinks) links() *partyLinks {
+	if p := e.p.Load(); p != nil {
+		return p
+	}
+	if p := new(partyLinks); e.p.CompareAndSwap(nil, p) {
+		return p
+	}
+	return e.p.Load()
+}
+
+// resetFollow frees the escort points and forgets the last escort step of
+// an NPC that has partyLinks; it makes none.
+func (e *escortLinks) resetFollow() {
+	if p := e.p.Load(); p != nil {
+		p.resetFollow()
+	}
+}
 
 // party is an NPC's party membership: its master and its privates. The
 // spawn slot keeps it in its Scratch, so a respawned NPC is still the
@@ -113,14 +137,18 @@ type party struct {
 	spawned bool
 }
 
-// party returns the NPC's party membership, its spawn slot's.
-func (b *spawnBinding) party() *party { return &b.scratch.party }
+// party returns the NPC's party membership, its spawn slot's; create
+// makes it when the NPC has none, otherwise nil is returned for none.
+func (b *spawnBinding) party(create bool) *party { return b.scratch.partyOf(create) }
 
 // Master returns the NPC's master, nil for none: an NPC that is no
 // private, or a private whose master died and let it go. A master that has
 // respawned since is returned as its current life.
 func (b *spawnBinding) Master() PartyMember {
-	p := b.party()
+	p := b.party(false)
+	if p == nil {
+		return nil
+	}
 	p.mu.RLock()
 	m := p.master
 	p.mu.RUnlock()
@@ -130,7 +158,10 @@ func (b *spawnBinding) Master() PartyMember {
 // SetMaster links this NPC to its master, or unlinks it for nil. Linking
 // makes the NPC a private of master for good.
 func (b *spawnBinding) SetMaster(master PartyMember) {
-	p := b.party()
+	p := b.party(master != nil)
+	if p == nil {
+		return
+	}
 	p.mu.Lock()
 	p.master = master
 	if master != nil {
@@ -143,7 +174,10 @@ func (b *spawnBinding) SetMaster(master PartyMember) {
 // current life; nil for an NPC that is not a private. Unlike Master it
 // stays set once the master died and let the private go.
 func (b *spawnBinding) SpawnMaster() PartyMember {
-	p := b.party()
+	p := b.party(false)
+	if p == nil {
+		return nil
+	}
 	p.mu.RLock()
 	m := p.spawnMaster
 	p.mu.RUnlock()
@@ -156,16 +190,23 @@ func (b *spawnBinding) IsPrivate() bool { return b.SpawnMaster() != nil }
 // holder returns the party whose privates this NPC's party uses: its top
 // master's, following each master's own master, or its own when it has no
 // master. Master links form no cycle: an NPC is linked only to an NPC that
-// existed before it.
-func (b *spawnBinding) holder() *party {
+// existed before it. create makes the party when it has none, otherwise
+// nil is returned for none.
+func (b *spawnBinding) holder(create bool) *party {
 	m := b.Master()
 	if m == nil {
-		return b.party()
+		return b.party(create)
 	}
+	return topHolder(m, create)
+}
+
+// topHolder returns the party whose privates m's party uses: its top
+// master's, or m's own when m has no master; see holder.
+func topHolder(m PartyMember, create bool) *party {
 	for next := m.Master(); next != nil; next = m.Master() {
 		m = next
 	}
-	return &m.Scratch().party
+	return m.Scratch().partyOf(create)
 }
 
 // keptMinions returns the privates map of p, making p a master when it had
@@ -183,11 +224,11 @@ func (b *spawnBinding) AddMinion(minion PartyMember) {
 	if minion == nil {
 		return
 	}
-	own := b.party()
+	own := b.party(true)
 	own.mu.Lock()
 	own.spawned = true
 	own.mu.Unlock()
-	p := b.holder()
+	p := b.holder(true)
 	p.mu.Lock()
 	p.keptMinions()[minion.Scratch()] = minion
 	p.mu.Unlock()
@@ -199,7 +240,7 @@ func (b *spawnBinding) RemoveMinion(minion PartyMember) {
 	if minion == nil {
 		return
 	}
-	p := b.holder()
+	p := b.holder(true)
 	p.mu.Lock()
 	delete(p.keptMinions(), minion.Scratch())
 	p.mu.Unlock()
@@ -208,7 +249,7 @@ func (b *spawnBinding) RemoveMinion(minion PartyMember) {
 // ClearMinions forgets every private of this NPC's party, leaving them in
 // the world.
 func (b *spawnBinding) ClearMinions() {
-	p := b.holder()
+	p := b.holder(true)
 	p.mu.Lock()
 	p.minions = make(map[*Scratch]PartyMember)
 	p.mu.Unlock()
@@ -218,39 +259,53 @@ func (b *spawnBinding) ClearMinions() {
 // each as its current life, dead and decayed ones included: its master's
 // when it has one, its own otherwise.
 func (b *spawnBinding) Minions() []PartyMember {
-	return b.holder().snapshot(false)
+	return b.holder(false).snapshot(false)
 }
 
 // PartyMinions returns what Minions does. An NPC with no master keeps
 // privates of its own from then on: it is a master, with no private at
 // first.
 func (b *spawnBinding) PartyMinions() []PartyMember {
-	return b.holder().snapshot(true)
+	return b.holder(true).snapshot(true)
 }
 
 // snapshot returns p's privates, each as its current life; keep makes p a
-// master when it had none.
+// master when it had none. A nil p has none.
 func (p *party) snapshot(keep bool) []PartyMember {
 	var minions []PartyMember
 	if keep {
 		p.mu.Lock()
-		minions = slices.Collect(maps.Values(p.keptMinions()))
+		p.keptMinions()
 		p.mu.Unlock()
-	} else {
-		p.mu.RLock()
-		minions = slices.Collect(maps.Values(p.minions))
-		p.mu.RUnlock()
 	}
+	minions = p.appendMinions(minions)
 	for i, minion := range minions {
 		minions[i] = Current(minion)
 	}
 	return minions
 }
 
+// appendMinions appends p's privates as they were recorded, not resolved
+// to their current lives, to dst and returns it. A nil p has none.
+func (p *party) appendMinions(dst []PartyMember) []PartyMember {
+	if p == nil {
+		return dst
+	}
+	p.mu.RLock()
+	for _, m := range p.minions {
+		dst = append(dst, m)
+	}
+	p.mu.RUnlock()
+	return dst
+}
+
 // IsMaster reports whether this NPC has kept privates of its own, in this
 // life or an earlier one.
 func (b *spawnBinding) IsMaster() bool {
-	p := b.party()
+	p := b.party(false)
+	if p == nil {
+		return false
+	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.minions != nil
@@ -259,7 +314,10 @@ func (b *spawnBinding) IsMaster() bool {
 // SpawnedPrivates reports whether a private was ever spawned for this NPC,
 // in this life or an earlier one.
 func (b *spawnBinding) SpawnedPrivates() bool {
-	p := b.party()
+	p := b.party(false)
+	if p == nil {
+		return false
+	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.spawned

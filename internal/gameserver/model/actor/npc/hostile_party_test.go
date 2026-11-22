@@ -77,15 +77,16 @@ func TestFollowSlotCommitKeepsAConcurrentClaim(t *testing.T) {
 	claimed := snapshot
 	claimed[3] = 0
 	claimed[5] = 2
-	master.followSlots = snapshot
-	master.followSlots[5] = 9
+	links := master.links()
+	links.followSlots = snapshot
+	links.followSlots[5] = 9
 
-	master.commitFollowSlots(snapshot, claimed)
+	links.commitFollowSlots(snapshot, claimed)
 
-	if got := master.followSlots[3]; got != 0 {
+	if got := links.followSlots[3]; got != 0 {
 		t.Fatalf("slot 3 = %d, want 0 (cleared, unchanged since the snapshot)", got)
 	}
-	if got := master.followSlots[5]; got != 9 {
+	if got := links.followSlots[5]; got != 9 {
 		t.Fatalf("slot 5 = %d, want 9 (the concurrent claim stands)", got)
 	}
 }

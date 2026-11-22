@@ -68,17 +68,21 @@ type ScratchCreature interface {
 // value for each new life. A Scratch is the NPC's identity across its
 // lives. It is safe for concurrent use; each call is atomic on its own.
 type Scratch struct {
-	mu          sync.Mutex
-	ints        [intSlotCount]int32
-	creatures   [creatureSlotCount]ScratchCreature
+	mu   sync.Mutex
+	ints [intSlotCount]int32
+	// creatures are the creature slots, nil until one is first set: few
+	// NPCs' scripts keep a creature.
+	creatures   *[creatureSlotCount]ScratchCreature
 	scriptValue int32
 	// life is the NPC the slot placed last, nil before the first.
 	life PartyMember
 	// lookNeighbor is when the slot's NPC last looked around; it carries
 	// over to the next life with the rest of the NPC's identity.
 	lookNeighbor lookNeighborClock
-	// party is the NPC's master and privates, in every life.
-	party party
+	// membership is the NPC's master and privates, in every life; nil
+	// until the NPC first joins a party (partyOf). Once made it is never
+	// replaced.
+	membership atomic.Pointer[party]
 	// territory is the NPC's out-of-territory state, in every life.
 	territory ai.TerritoryMemory
 	// scriptTimers is what the script engine keeps of the timers bound to
@@ -138,6 +142,9 @@ func (s *Scratch) CompareAndExchangeInt(slot IntSlot, expected, v int32) int32 {
 func (s *Scratch) Creature(slot CreatureSlot) ScratchCreature {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.creatures == nil {
+		return nil
+	}
 	return s.creatures[slot]
 }
 
@@ -145,7 +152,26 @@ func (s *Scratch) Creature(slot CreatureSlot) ScratchCreature {
 func (s *Scratch) SetCreature(slot CreatureSlot, c ScratchCreature) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.creatures == nil {
+		if c == nil {
+			return
+		}
+		s.creatures = new([creatureSlotCount]ScratchCreature)
+	}
 	s.creatures[slot] = c
+}
+
+// partyOf returns the NPC's party membership. create makes it when the
+// NPC has none, the first one published winning; otherwise nil is
+// returned for none.
+func (s *Scratch) partyOf(create bool) *party {
+	if p := s.membership.Load(); p != nil || !create {
+		return p
+	}
+	if p := new(party); s.membership.CompareAndSwap(nil, p) {
+		return p
+	}
+	return s.membership.Load()
 }
 
 // ScriptValue returns the script value.
