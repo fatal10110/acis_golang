@@ -15,7 +15,12 @@
 #      ran (no marker, no tables) never reports healthy either;
 #   6. the first start over the real datapack loads its schema: acis then
 #      holds one table per sql/*.sql file. The datapack is the repository's
-#      aCis_datapack/ copy, or ACIS_SMOKE_DATAPACK when set.
+#      aCis_datapack/ copy, or ACIS_SMOKE_DATAPACK when set;
+#   7. a directory holding only docker-compose.yml, ops/docker/initdb and
+#      that datapack, with no config directory and no reference tree,
+#      boots the whole stack: the init service fills config/ from the
+#      image's bundle and registers the game server, and the game server
+#      links to the login server.
 #
 # Steps 1-5 use a generated stub datapack, so they check the compose mounts,
 # the init script and the healthcheck apart from the shipped schema.
@@ -23,8 +28,9 @@
 # Run from anywhere: ops/docker/smoke-test.sh. It tags the image
 # acis-golang:smoke, uses the compose project acis-smoke (its own volume,
 # removed on exit) and publishes the database on ACIS_DB_PORT (default
-# 3306). The db service has a fixed container name, so a running
-# docker-compose.yml database on the same host makes this fail.
+# 3306), and step 7 the client ports on ACIS_LOGIN_PORT and ACIS_GAME_PORT
+# (default 2106 and 7777): a stack on the same host that publishes the same
+# ports makes this fail.
 set -eu
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -34,6 +40,8 @@ work=$(mktemp -d)
 
 export ACIS_DB_ROOT_PASSWORD=smoke
 export ACIS_DB_PORT="${ACIS_DB_PORT:-3306}"
+export ACIS_LOGIN_PORT="${ACIS_LOGIN_PORT:-2106}"
+export ACIS_GAME_PORT="${ACIS_GAME_PORT:-7777}"
 
 compose() {
 	docker compose --project-directory "$root" -f "$root/docker-compose.yml" -p "$project" "$@"
@@ -52,7 +60,7 @@ broken=acis-smoke-broken-db
 
 clean_project() {
 	docker rm -f "$broken" >/dev/null 2>&1 || true
-	compose down -v --remove-orphans >/dev/null 2>&1 || true
+	compose --profile servers down -v --remove-orphans >/dev/null 2>&1 || true
 }
 
 cleanup() {
@@ -90,6 +98,8 @@ docker build -t "$image" "$root"
 for bin in gameserver loginserver gsregister accountmgr; do
 	docker run --rm "$image" "$bin" -h >/dev/null 2>&1 || fail "$bin -h did not exit 0 in $image"
 done
+docker run --rm "$image" sh -c 'command -v acis-init && test -f /usr/local/share/acis/config/server.properties' >/dev/null ||
+	fail "$image lacks acis-init or its config bundle"
 echo "smoke: image builds and its binaries run"
 
 # 3a. Schema seed from a stub datapack: full_install.sql drops the tables,
@@ -229,6 +239,36 @@ ACIS_DATAPACK_DIR="$datapack" compose up -d --wait --wait-timeout 300 db ||
 got=$(acis_tables) || { compose logs db >&2; fail "cannot count acis tables"; }
 [ "$got" = "$want" ] || { compose logs db >&2; fail "acis has $got tables, want $want (one per sql/*.sql)"; }
 echo "smoke: real datapack schema loaded $got tables"
+clean_project
+
+# 7. A stack without a reference tree. The datapack is copied into the
+# stack directory, so what the servers write stays out of $datapack, and
+# the servers run as this user, so the cleanup can remove what they wrote.
+# The repository copy has no geodata, so the stack enables no region.
+stack=$work/stack
+mkdir -p "$stack/ops/docker" "$stack/datapack"
+cp "$root/docker-compose.yml" "$stack/"
+cp -R "$root/ops/docker/initdb" "$stack/ops/docker/"
+cp -R "$datapack/sql" "$datapack/tools" "$datapack/data" "$stack/datapack/"
+stack_compose() {
+	ACIS_IMAGE="$image" ACIS_DATAPACK_DIR=./datapack ACIS_GEO_REGIONS=none \
+		ACIS_UID="$(id -u)" ACIS_GID="$(id -g)" \
+		docker compose --project-directory "$stack" -f "$stack/docker-compose.yml" -p "$project" "$@"
+}
+stack_state() {
+	stack_compose --profile servers ps -a >&2 || true
+	stack_compose --profile servers logs init loginserver >&2 || true
+	stack_compose --profile servers logs --tail 50 gameserver >&2 || true
+}
+stack_compose --profile servers up -d >&2 || { stack_state; fail "compose up did not start the stack"; }
+tries=0
+until stack_compose logs gameserver 2>&1 | grep -q 'linked to loginserver'; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 150 ] || { stack_state; fail "the game server did not link to the login server"; }
+	sleep 2
+done
+[ -f "$stack/config/hexid.txt" ] || { stack_state; fail "the init service wrote no config/hexid.txt"; }
+echo "smoke: a stack without a reference tree boots and links"
 clean_project
 
 echo "smoke: ok"

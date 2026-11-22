@@ -8,8 +8,10 @@
 #   ACIS_DATAPACK_DIR      aCis_datapack checkout (default ../aCis_datapack):
 #                          its sql/ and tools/ seed a new database, its data/
 #                          is the servers' datapack
-#   ACIS_CONFIG_DIR        server config directory (default ./config); create
-#                          it with ops/docker/init-config.sh
+#   ACIS_CONFIG_DIR        server config directory (default ./config); the
+#                          init service fills an empty one with the config
+#                          bundle the image carries, or create it from a
+#                          reference config with ops/docker/init-config.sh
 #   ACIS_LOG_DIR           log root (default ./log); each server logs under
 #                          its own loginserver/ or gameserver/ subdirectory
 #   ACIS_CACHE_DIR         game server cache directory (default ./cache); it
@@ -20,15 +22,30 @@
 #                          (default 127.0.0.1, loopback only)
 #   ACIS_DB_PORT           host port for the database (default 3306)
 #   ACIS_MARIADB_TAG       mariadb image tag (default 11, the version CI tests)
-#   ACIS_UID, ACIS_GID     host user the servers run as (default 1000); must
-#                          be able to write the config, log, cache and
+#   ACIS_UID, ACIS_GID     host user the servers run as (default 1000); the
+#                          init service gives it the config, log, cache and
 #                          datapack data/crests directories
+#   ACIS_IMAGE             server image (default acis-golang:local, built
+#                          from this checkout)
+#   ACIS_LOGIN_PORT        host port for login clients (default 2106)
+#   ACIS_GAME_PORT         game client port, on the host and in the container
+#                          (default 7777); the init service writes it to
+#                          GameserverPort, which the login server hands to
+#                          clients
+#   ACIS_PUBLIC_HOST, ACIS_GAMESERVER_HOSTNAME, ACIS_MAX_ONLINE_USERS,
+#   ACIS_AUTO_CREATE_ACCOUNTS, ACIS_LOGIN_TRY_BEFORE_BAN, ACIS_ACCEPT_FILTER,
+#   ACIS_ACCEPT_FILTER_ALLOWLIST, ACIS_GEO_REGIONS
+#                          per-stack config keys the init service writes
+#                          when set (ops/docker/acis-init.sh)
 #   TZ                     server time zone (default UTC); Seven Signs,
 #                          Olympiad, sieges and other timers run on local time
+#
+# Container names come from the compose project (-p, or the directory name),
+# so two stacks with their own project names and ports run side by side.
 
 x-acis-server: &acis-server
   build: .
-  image: acis-golang:local
+  image: ${ACIS_IMAGE:-acis-golang:local}
   profiles: ["servers"]
   user: "${ACIS_UID:-1000}:${ACIS_GID:-1000}"
   restart: unless-stopped
@@ -38,7 +55,6 @@ x-acis-server: &acis-server
 services:
   db:
     image: mariadb:${ACIS_MARIADB_TAG:-11}
-    container_name: mariadb-server
     restart: always
     environment:
       MARIADB_ROOT_PASSWORD: ${ACIS_DB_ROOT_PASSWORD:-123321}
@@ -74,14 +90,48 @@ services:
       retries: 30
       start_period: 60s
 
+  # Runs once per `up`, before the servers: fills an empty config directory
+  # from the image's bundle, writes the compose and per-stack keys, registers
+  # game server 1 (config/hexid.txt), and hands the writable directories to
+  # ACIS_UID. It runs as root only to create and chown those directories.
+  init:
+    <<: *acis-server
+    command: ["acis-init"]
+    user: "0:0"
+    restart: "no"
+    environment:
+      TZ: ${TZ:-UTC}
+      ACIS_UID: ${ACIS_UID:-1000}
+      ACIS_GID: ${ACIS_GID:-1000}
+      ACIS_DB_ROOT_PASSWORD: ${ACIS_DB_ROOT_PASSWORD:-123321}
+      ACIS_GAME_PORT: ${ACIS_GAME_PORT:-7777}
+      ACIS_PUBLIC_HOST: ${ACIS_PUBLIC_HOST:-}
+      ACIS_GAMESERVER_HOSTNAME: ${ACIS_GAMESERVER_HOSTNAME:-}
+      ACIS_MAX_ONLINE_USERS: ${ACIS_MAX_ONLINE_USERS:-}
+      ACIS_AUTO_CREATE_ACCOUNTS: ${ACIS_AUTO_CREATE_ACCOUNTS:-}
+      ACIS_LOGIN_TRY_BEFORE_BAN: ${ACIS_LOGIN_TRY_BEFORE_BAN:-}
+      ACIS_ACCEPT_FILTER: ${ACIS_ACCEPT_FILTER:-}
+      ACIS_ACCEPT_FILTER_ALLOWLIST: ${ACIS_ACCEPT_FILTER_ALLOWLIST:-}
+      ACIS_GEO_REGIONS: ${ACIS_GEO_REGIONS:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${ACIS_CONFIG_DIR:-./config}:/opt/acis/config
+      - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/data:/opt/acis/data
+      - ${ACIS_LOG_DIR:-./log}:/opt/acis/log
+      - ${ACIS_CACHE_DIR:-./cache}:/opt/acis/cache
+
   loginserver:
     <<: *acis-server
     command: ["loginserver", "-server-names", "data/serverNames.xml"]
     depends_on:
       db:
         condition: service_healthy
+      init:
+        condition: service_completed_successfully
     ports:
-      - "2106:2106"
+      - "${ACIS_LOGIN_PORT:-2106}:2106"
     volumes:
       - ${ACIS_CONFIG_DIR:-./config}:/opt/acis/config
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/data:/opt/acis/data
@@ -97,10 +147,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      init:
+        condition: service_completed_successfully
       loginserver:
         condition: service_started
     ports:
-      - "7777:7777"
+      - "${ACIS_GAME_PORT:-7777}:${ACIS_GAME_PORT:-7777}"
     volumes:
       - ${ACIS_CONFIG_DIR:-./config}:/opt/acis/config
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/data:/opt/acis/data

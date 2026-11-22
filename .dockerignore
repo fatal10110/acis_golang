@@ -8,6 +8,8 @@ backups
 docs
 tests
 ops
+!ops/docker/config
+!ops/docker/acis-init.sh
 **/testdata
 *.test
 *.out
