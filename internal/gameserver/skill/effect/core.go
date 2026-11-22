@@ -148,8 +148,8 @@ const (
 	// configured skill-type/level threshold.
 	TypeNegate Type = "NEGATE"
 	// TypeFusion links a skill's applied level to a scalable force effect:
-	// IncreaseEffect/DecreaseForce can grow or shrink it while it's active,
-	// instead of it only ever starting or ending outright.
+	// List.IncreaseForce/DecreaseForce replace it one level up or down
+	// while it's active, instead of it only ever starting or ending outright.
 	TypeFusion Type = "FUSION"
 	// TypeSignetGround marks the caster-side half of a ground signet: the
 	// effect that owns the signet's world actor for as long as it runs.
@@ -209,7 +209,7 @@ const (
 	// TypeSeed is an elemental-seed charge: a pure counter (Level tracks its
 	// power, starting at the skill's own level) with no start/exit/tick
 	// behavior of its own. Recasting the same seed skill on an already-seeded
-	// target grows the existing instance's power in place via IncreasePower
+	// target grows the existing instance's power in place via List.IncreasePower
 	// instead of replacing it.
 	TypeSeed Type = "SEED"
 	// TypeRecovery lowers a player target's death-penalty debuff level by
@@ -472,7 +472,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		}
 	}
 
-	// A seed effect's Level is a charge counter (IncreasePower), not the
+	// A seed effect's Level is a charge counter (List.IncreasePower), not the
 	// applied skill level: it always starts at 1, regardless of the skill
 	// level.
 	level := skill.Level
@@ -729,40 +729,6 @@ func wireTemplateAbnormal(e *Effect) {
 			stopAbnormalEffect(e.Effected, mask)
 		}
 	}
-}
-
-func (e *Effect) IncreaseEffect(list *List, maxLevel int, reapply func(level int)) {
-	if e == nil || list == nil || e.Level >= maxLevel {
-		return
-	}
-	e.Level++
-	list.Remove(e)
-	if reapply != nil {
-		reapply(e.Level)
-	}
-}
-
-// DecreaseForce shrinks a live fusion effect by one level. Once its level
-// drops below 1 it is removed outright instead of reapplied.
-func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
-	if e == nil || list == nil {
-		return
-	}
-	e.Level--
-	list.Remove(e)
-	if e.Level >= 1 && reapply != nil {
-		reapply(e.Level)
-	}
-}
-
-// IncreasePower grows a live seed effect's charge level by one in place: unlike
-// a fusion effect's IncreaseEffect, the same instance keeps running — only its
-// Level (power) changes, nothing is removed or reapplied.
-func (e *Effect) IncreasePower() {
-	if e == nil {
-		return
-	}
-	e.Level++
 }
 
 // iconLevel reports the level to send on this effect's abnormal-status

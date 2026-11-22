@@ -170,6 +170,9 @@ func (l *List) emptyLocked() bool {
 // queues while the owner's effect tick runs.
 type List struct {
 	mu sync.Mutex
+	// forceMu runs the force and seed level changes on l one at a time (see
+	// IncreaseForce). Taken before mu, never under it.
+	forceMu sync.Mutex
 
 	owner        StatOwner
 	activity     ActivityRegistry
@@ -362,7 +365,7 @@ func (l *List) StartedAffected(flag Flag) bool {
 	defer l.mu.Unlock()
 	for _, group := range [][]*Effect{l.buffs, l.debuffs} {
 		for _, e := range group {
-			if e != nil && e.inUse && e.Flag&flag != 0 {
+			if e != nil && e.inUse.Load() && e.Flag&flag != 0 {
 				return true
 			}
 		}
@@ -393,12 +396,12 @@ func (l *List) active() []*Effect {
 
 	effects := make([]*Effect, 0, len(l.buffs)+len(l.debuffs))
 	for _, e := range l.buffs {
-		if e != nil && e.inUse {
+		if e != nil && e.inUse.Load() {
 			effects = append(effects, e)
 		}
 	}
 	for _, e := range l.debuffs {
-		if e != nil && e.inUse {
+		if e != nil && e.inUse.Load() {
 			effects = append(effects, e)
 		}
 	}
@@ -424,7 +427,7 @@ func (l *List) ActiveBySkillID(id int) (level int, ok bool) {
 			if e == nil || int(e.Skill.ID) != id {
 				continue
 			}
-			if e.inUse {
+			if e.inUse.Load() {
 				return e.Level, true
 			}
 			held = e

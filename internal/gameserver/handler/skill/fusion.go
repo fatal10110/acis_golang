@@ -19,11 +19,12 @@ type fusionHandler struct {
 func (fusionHandler) Types() []string { return []string{"FUSION"} }
 
 // Use starts a fusion channel: each target already carrying a live effect owned
-// by the cast skill's TriggeredID grows it via IncreaseEffect, capped at that
-// triggered skill's max level. A target with no such effect gets the triggered
-// skill's effects applied fresh. The channel-abort DecreaseForce path (gated on
-// a geo-range check) is wired via cast/schedule.go's ScheduleFusion, not this
-// Use handler — a Use handler does not run abort cleanup.
+// by the cast skill's TriggeredID grows it via List.IncreaseForce, capped at
+// that triggered skill's max level. A target with no such effect gets the
+// triggered skill's effects applied fresh. The channel-abort DecreaseForce
+// path (gated on a geo-range check) is wired via cast/schedule.go's
+// ScheduleFusion, not this Use handler — a Use handler does not run abort
+// cleanup.
 func (h fusionHandler) Use(cast Cast) {
 	if h.defs == nil {
 		return
@@ -43,14 +44,11 @@ func (h fusionHandler) start(caster Creature, target effect.Actor, castSkill mod
 		return
 	}
 	triggeredID := modelskill.ID(castSkill.Extra().TriggeredID)
-	if e := firstEffectByID(list, triggeredID); e != nil {
-		maxLevel := h.defs.MaxLevel(triggeredID)
-		e.IncreaseEffect(list, maxLevel, func(level int) {
-			h.applyTriggered(caster, target, triggeredID, level)
-		})
-		return
-	}
-	h.applyTriggered(caster, target, triggeredID, castSkill.Extra().TriggeredLevel)
+	list.IncreaseForce(triggeredID, h.defs.MaxLevel(triggeredID), func(level int) {
+		h.applyTriggered(caster, target, triggeredID, level)
+	}, func() {
+		h.applyTriggered(caster, target, triggeredID, castSkill.Extra().TriggeredLevel)
+	})
 }
 
 // StartFusion lands castSkill's force on effected as its FUSION channel
@@ -80,14 +78,9 @@ func DecreaseFusion(defs Definitions, caster Creature, effected attackable.Comba
 	if !ok || defs == nil {
 		return
 	}
-	list := target.EffectList()
 	triggeredID := modelskill.ID(castSkill.Extra().TriggeredID)
-	e := firstEffectByID(list, triggeredID)
-	if e == nil {
-		return
-	}
 	h := fusionHandler{defs: defs}
-	e.DecreaseForce(list, func(level int) {
+	target.EffectList().DecreaseForce(triggeredID, func(level int) {
 		h.applyTriggered(caster, effected, triggeredID, level)
 	})
 }
