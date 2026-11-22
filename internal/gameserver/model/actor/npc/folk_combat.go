@@ -74,8 +74,8 @@ type folkCombat struct {
 	running        atomic.Bool
 	inCombat       atomic.Bool
 	abnormalEffect atomic.Int32
-	invul          atomic.Bool
-	immobilized    atomic.Bool
+	invul          creature.SourceSet
+	immobilized    creature.SourceSet
 	// paralyzed is the transient paralysis lock a GM sets; see SetParalyzed.
 	paralyzed atomic.Bool
 
@@ -250,7 +250,7 @@ func (f *Folk) RecentFakeDeath() bool { return false }
 // MovementDisabled reports a template that cannot move, an immobilized,
 // paralyzed or dead NPC, or a teleport under way.
 func (f *Folk) MovementDisabled() bool {
-	return !f.Instance.Template.CanMove || f.immobilized.Load() || f.Paralyzed() || f.Dead() || (f.motion != nil && f.motion.teleporting.Load())
+	return !f.Instance.Template.CanMove || f.immobilized.Held() || f.Paralyzed() || f.Dead() || (f.motion != nil && f.motion.teleporting.Load())
 }
 
 // SilentMoving reports whether an effect lets the NPC move unseen.

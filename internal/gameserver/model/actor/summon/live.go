@@ -162,8 +162,8 @@ type Owner interface {
 // Actor is a live pet or servitor placed in world.State next to its owner.
 //
 // State methods guard the embedded Presence. level, pet growth state, name,
-// fed, belowUnsummonLimit, lifetime, combat stat bases, and invul are guarded
-// by statusMu; HP, MP, and dead are guarded by vitals.mu. Both are safe to
+// fed, belowUnsummonLimit, lifetime, and combat stat bases are guarded by
+// statusMu; invul and immobilized guard themselves; HP, MP, and dead are guarded by vitals.mu. Both are safe to
 // read from any goroutine,
 // including the world-visibility goroutine driving Discover. The remaining
 // fields are owned by the summon's queue (see Queue and Post): commands and
@@ -218,14 +218,13 @@ type Actor struct {
 	settings Settings
 
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
-	// lifetime, combat stat bases, and invul:
+	// lifetime, and combat stat bases:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
 	// via Level/Name/Fed/Lifetime when another player discovers this summon,
 	// on the queue that drives that visibility change, while the owner's
 	// queue writes them (world.Observer's contract,
 	// internal/gameserver/world/visibility.go).
 	statusMu sync.RWMutex
-	invul    bool
 	level    int
 	name     string
 	named    bool
@@ -320,11 +319,15 @@ type Actor struct {
 
 	// stateMu also guards intent and target: another actor's skill landing
 	// on this summon retargets or idles it from that actor's queue.
-	stateMu                             sync.RWMutex
-	paralyzed, teleporting, immobilized bool
+	stateMu                sync.RWMutex
+	paralyzed, teleporting bool
+	// invul guards itself. immobilized does too; stateMu orders its changes
+	// with unfollowBeforeImmobilized.
+	invul, immobilized creature.SourceSet
 	// unfollowBeforeImmobilized is whether the summon had follow mode off
-	// when its movement lock was last set; clearing the lock restores that
-	// mode. Its zero value restores following, the default before any set.
+	// when a movement-lock source was last set; ending the last source
+	// restores that mode. Its zero value restores following, the default
+	// before any set.
 	unfollowBeforeImmobilized bool
 	intent                    Intent
 	target                    world.Tracked

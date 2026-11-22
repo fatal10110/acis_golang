@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -484,40 +485,47 @@ func (a *Actor) SetParalyzed(v bool) bool {
 	return true
 }
 
-// Immobilized reports whether this summon's movement-lock flag is set, e.g.
-// by ImobilePetBuff. Distinct from the FlagRooted effect.
+// Immobilized reports whether any of this summon's movement-lock sources is
+// active, e.g. ImobilePetBuff. Distinct from the FlagRooted effect.
 func (a *Actor) Immobilized() bool {
-	a.stateMu.RLock()
-	defer a.stateMu.RUnlock()
-	return a.immobilized
+	return a.immobilized.Held()
 }
 
-// SetImmobilized sets or clears this summon's movement-lock flag and reports
-// whether the flag actually changed. Every set, including one while the lock
-// is already held, records the current follow mode and drops a following
-// summon out of follow mode, idling it; every clear restores the follow mode
-// the last set recorded, whatever the owner toggled in between. Before any
-// set has run, a clear restores following. Two stacked locks therefore end
-// in the follow mode the summon had when the second one landed.
+// SetImmobilized sets or clears this summon's direct (command or script)
+// movement-lock source; see SetImmobilizedSource.
+func (a *Actor) SetImmobilized(v bool) bool {
+	return a.SetImmobilizedSource(creature.DirectSource{}, v)
+}
+
+// SetImmobilizedSource adds or removes src as a movement-lock source and
+// reports whether the lock actually changed; it holds while any source does
+// (#5084). Every set, including one while the lock is already held, records
+// the current follow mode and drops a following summon out of follow mode,
+// idling it; every clear that leaves no source held restores the follow
+// mode the last set recorded, whatever the owner toggled in between. Before
+// any set has run, such a clear restores following. Two stacked locks
+// therefore end, once both have ended, in the follow mode the summon had
+// when the second one landed.
 //
 // Effect hooks call this from the applying actor's queue or the effect
 // list's expiry tick. Every value it touches has its own guard (stateMu,
 // the atomic followOff, the AI loop's mutex), and the follow change runs
 // after stateMu is released because it takes stateMu itself.
-func (a *Actor) SetImmobilized(v bool) bool {
+func (a *Actor) SetImmobilizedSource(src any, on bool) bool {
 	a.stateMu.Lock()
-	changed := a.immobilized != v
-	a.immobilized = v
-	if v {
+	changed := a.immobilized.Set(src, on)
+	if on {
 		a.unfollowBeforeImmobilized = a.followOff.Load()
 	}
+	held := a.immobilized.Held()
 	following := !a.unfollowBeforeImmobilized
 	a.stateMu.Unlock()
 
-	if !v {
-		a.setFollowStatus(following)
-	} else if following {
+	switch {
+	case on && following:
 		a.setFollowStatus(false)
+	case !on && !held:
+		a.setFollowStatus(following)
 	}
 	return changed
 }

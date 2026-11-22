@@ -70,10 +70,14 @@ type Actor interface {
 	TryToIdle()
 	ClearTarget()
 	StopAttack()
-	// SetImmobilized reports whether the movement lock actually changed.
-	SetImmobilized(bool) bool
-	// SetInvul reports whether the invulnerability flag actually changed.
-	SetInvul(bool) bool
+	// SetImmobilizedSource adds or removes src (an effect holds itself) as a
+	// movement-lock source and reports whether the lock actually changed. The
+	// lock holds while any source does (#5084).
+	SetImmobilizedSource(src any, on bool) bool
+	// SetInvulSource adds or removes src (an effect holds itself) as an
+	// invulnerability source and reports whether invulnerability actually
+	// changed. It holds while any source does (#5084).
+	SetInvulSource(src any, on bool) bool
 	Afraid() bool
 	FearImmune() bool
 	// FleeFrom runs the actor distance units directly away from effector,

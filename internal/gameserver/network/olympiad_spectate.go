@@ -111,7 +111,7 @@ func (l *GameClientLink) enterOlympiadObserverMode(live *livePlayer, id int) boo
 		live.SetSavedLocation(live.CurrentLocation())
 	}
 	l.clearLiveTarget(live)
-	live.SetInvul(true)
+	live.SetInvulSource(spectatorInvul, true)
 	live.SetInvisible(true)
 	l.teleportLivePlayer(live, spawns[spectatorSpawn], 0)
 	live.SendFrame(serverpackets.FrameExOlympiadMode(serverpackets.OlympiadModeObserver))
@@ -149,7 +149,7 @@ func (l *GameClientLink) stopWatchingStadium(live *livePlayer) location.Location
 	live.tryToIdle(live.DenyAIAction())
 	l.clearLiveTarget(live)
 	live.SetInvisible(false)
-	live.SetInvul(false)
+	live.SetInvulSource(spectatorInvul, false)
 	live.SendFrame(serverpackets.FrameExOlympiadMode(serverpackets.OlympiadModeNone))
 	saved, _ := live.SavedLocation()
 	return saved

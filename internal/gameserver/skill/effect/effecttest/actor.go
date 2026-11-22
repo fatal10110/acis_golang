@@ -43,8 +43,8 @@ func (Actor) StopMove()                                                {}
 func (Actor) TryToIdle()                                               {}
 func (Actor) ClearTarget()                                             {}
 func (Actor) StopAttack()                                              {}
-func (Actor) SetImmobilized(bool) bool                                 { return false }
-func (Actor) SetInvul(bool) bool                                       { return false }
+func (Actor) SetImmobilizedSource(any, bool) bool                      { return false }
+func (Actor) SetInvulSource(any, bool) bool                            { return false }
 func (Actor) Afraid() bool                                             { return false }
 func (Actor) FearImmune() bool                                         { return false }
 func (Actor) FleeFrom(effect.Actor, int)                               {}
