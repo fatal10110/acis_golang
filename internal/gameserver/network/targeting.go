@@ -929,11 +929,15 @@ func (l *GameClientLink) selectable(live *livePlayer, target world.Tracked) bool
 	return true
 }
 
-// knownToClicker reports whether live may click target: live itself, an
-// object in live's known list, or a player of live's own party wherever it
-// is. An object off the grid is known to nobody.
+// knownToClicker reports whether live may click target: live itself, its own
+// summon (whose whereabouts its pet window already shows), an object in
+// live's known list, or a player of live's own party wherever it is. An
+// object off the grid is known to nobody.
 func (l *GameClientLink) knownToClicker(live *livePlayer, target world.Tracked) bool {
 	if target.ObjectID() == live.ObjectID() {
+		return true
+	}
+	if pet, ok := target.(*summon.Actor); ok && pet.ShownAsOwnedBy(live.ObjectID()) {
 		return true
 	}
 	if c, ok := target.(attackable.Combatant); ok {
