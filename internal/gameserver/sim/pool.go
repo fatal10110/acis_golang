@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -20,6 +19,11 @@ const drainSlice = 64
 
 // slowTask is the task duration above which the watchdog logs the queue.
 const slowTask = 50 * time.Millisecond
+
+// idleTaskCap is the most task-buffer capacity a queue keeps once a drain
+// empties it: what one drain can take. A larger buffer, grown by a burst, is
+// released so thousands of idle owner queues do not each pin one.
+const idleTaskCap = drainSlice
 
 // highWater is the pending-task count above which a queue's backlog is
 // logged, once per crossing. Queues stay unbounded; the log is the signal.
@@ -37,7 +41,7 @@ type Pool struct {
 	// with stealing if it shows up in profiles.
 	mu      sync.Mutex
 	wake    sync.Cond
-	runq    []*Queue
+	runq    fifo[*Queue]
 	stopped atomic.Bool // written under mu
 }
 
@@ -119,15 +123,15 @@ func (p *Pool) enqueue(q *Queue, fn func()) bool {
 			p.mu.Unlock()
 			return false
 		}
-		p.runq = append(p.runq, q)
+		p.runq.push(q)
 		p.mu.Unlock()
 		p.wake.Signal()
 		q.scheduled = true
 	}
-	q.tasks = append(q.tasks, fn)
-	if len(q.tasks) > highWater && !q.backlog {
+	q.tasks.push(fn)
+	if q.tasks.len() > highWater && !q.backlog {
 		q.backlog = true
-		p.log.Warn().Str("queue", q.name()).Int("pending", len(q.tasks)).Msg("sim: queue backlog over high-water mark")
+		p.log.Warn().Str("queue", q.name()).Int("pending", q.tasks.len()).Msg("sim: queue backlog over high-water mark")
 	}
 	return true
 }
@@ -157,7 +161,7 @@ func (p *Pool) work(s *slot, idle chan<- struct{}) {
 	var batch [drainSlice]func()
 	for {
 		p.mu.Lock()
-		for len(p.runq) == 0 {
+		for p.runq.len() == 0 {
 			if p.stopped.Load() {
 				p.mu.Unlock()
 				stopped = true
@@ -165,9 +169,7 @@ func (p *Pool) work(s *slot, idle chan<- struct{}) {
 			}
 			p.wake.Wait()
 		}
-		q := p.runq[0]
-		p.runq[0] = nil
-		p.runq = p.runq[1:]
+		q := p.runq.pop()
 		p.mu.Unlock()
 		p.drain(q, s, &batch)
 	}
@@ -179,10 +181,8 @@ func (p *Pool) work(s *slot, idle chan<- struct{}) {
 // the pool is stopping.
 func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 	q.mu.Lock()
-	n := copy(batch[:], q.tasks)
-	clear(q.tasks[:n])
-	q.tasks = q.tasks[n:]
-	if len(q.tasks) <= highWater {
+	n := q.tasks.take(batch[:])
+	if q.tasks.len() <= highWater {
 		q.backlog = false
 	}
 	q.mu.Unlock()
@@ -193,15 +193,18 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 	defer func() {
 		q.mu.Lock()
 		if i < n {
-			q.tasks = append(slices.Clone(batch[i+1:n]), q.tasks...)
+			q.tasks.unshift(batch[i+1 : n])
 			clear(batch[i+1 : n])
 		}
-		more := len(q.tasks) > 0
+		more := q.tasks.len() > 0
+		if !more {
+			q.tasks.release(idleTaskCap)
+		}
 		q.scheduled = more
 		q.mu.Unlock()
 		if more {
 			p.mu.Lock()
-			p.runq = append(p.runq, q)
+			p.runq.push(q)
 			p.mu.Unlock()
 			p.wake.Signal()
 		}
