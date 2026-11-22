@@ -52,6 +52,24 @@ func (r *activeRegistry[K, V]) remove(key K, value V) {
 	}
 }
 
+// removeMatch unregisters key only while match reports true for the entry
+// registered under it.
+func (r *activeRegistry[K, V]) removeMatch(key K, match func(V) bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if current, ok := r.entries[key]; ok && match(current) {
+		delete(r.entries, key)
+	}
+}
+
+// get returns the value registered under key.
+func (r *activeRegistry[K, V]) get(key K) (V, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	v, ok := r.entries[key]
+	return v, ok
+}
+
 // contains reports whether value is currently registered under key.
 func (r *activeRegistry[K, V]) contains(key K, value V) bool {
 	r.mu.Lock()

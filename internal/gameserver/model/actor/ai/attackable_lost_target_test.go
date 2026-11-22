@@ -220,7 +220,7 @@ func TestFirstCycleKeepsAttackWhoseDesireLeft(t *testing.T) {
 		t.Fatalf("setup: CurrentIntention() = %v, want attack", got)
 	}
 	brain.Desires().Clear()
-	brain.latched = intention{}
+	brain.setLatched(intention{})
 	owner.hooks.points = nil
 
 	if err := brain.TickThink(); err != nil {

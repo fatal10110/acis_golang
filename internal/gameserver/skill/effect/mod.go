@@ -367,6 +367,12 @@ func (c *Calculator) Calc(actor stat.Actor, base float64, target conditions.Acto
 	return calcChain(mods, builtin, actor, base, target, skill)
 }
 
+// CalcBuiltin is Calc for a chain with no Mod attached: builtin (nil for
+// none) alone, run without a Calculator.
+func CalcBuiltin(builtin funcs.Func, actor stat.Actor, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	return calcChain(nil, builtin, actor, base, target, skill)
+}
+
 // calcChain runs mods, sorted by Op's order, around builtin as Calc
 // describes.
 func calcChain(mods []Mod, builtin funcs.Func, actor stat.Actor, base float64, target conditions.Actor, skill conditions.Skill) float64 {

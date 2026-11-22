@@ -66,11 +66,12 @@ func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill
 		calc = f.statCalcs[s]
 	}
 	f.statMu.RUnlock()
-	if calc == nil {
-		bare := effect.NewCalculator(f.builtin(s))
-		calc = &bare
+	var value float64
+	if calc != nil {
+		value = calc.Calc(f.statActor(), base, target, skill)
+	} else {
+		value = effect.CalcBuiltin(f.builtin(s), f.statActor(), base, target, skill)
 	}
-	value := calc.Calc(f.statActor(), base, target, skill)
 	// A non-positive result floors at one even when no modifier or builtin
 	// applies to s, where the base would otherwise pass through unchanged.
 	// Nothing reads such a stat at zero: shield defence is read only after a

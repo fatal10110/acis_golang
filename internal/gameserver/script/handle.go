@@ -68,9 +68,14 @@ type Creature interface {
 // creature is a handle on a creature that is neither an NPC nor a player.
 type creature struct{ self attackable.Combatant }
 
-// NewNPC returns a handle on the hostile NPC h.
+// NewNPC returns the handle on the hostile NPC h. A handle holds nothing
+// but its NPC, so h keeps the first one made and every hook shares it.
 func NewNPC(h *npc.Hostile) *NPC {
-	return &NPC{self: h}
+	if n, ok := h.ScriptHandle().(*NPC); ok {
+		return n
+	}
+	n, _ := h.KeepScriptHandle(&NPC{self: h}).(*NPC)
+	return n
 }
 
 // NPCOf returns the handle on the live NPC n, a hostile or a civilian
