@@ -288,27 +288,26 @@ func (a *Actor) Invul() bool {
 	if a == nil {
 		return false
 	}
-	a.statusMu.RLock()
-	invul := a.invul
-	a.statusMu.RUnlock()
-	if invul {
+	if a.invul.Held() {
 		return true
 	}
 	owner := a.currentOwner()
 	return owner != nil && owner.SpawnProtected()
 }
 
-// SetInvul sets or clears this summon's invulnerability flag and reports
-// whether it changed.
+// SetInvul sets or clears this summon's direct (command or script)
+// invulnerability source and reports whether invulnerability changed.
 func (a *Actor) SetInvul(v bool) bool {
+	return a.SetInvulSource(creature.DirectSource{}, v)
+}
+
+// SetInvulSource adds or removes src as an invulnerability source and
+// reports whether invulnerability changed: it holds while any source does.
+func (a *Actor) SetInvulSource(src any, on bool) bool {
 	if a == nil {
 		return false
 	}
-	a.statusMu.Lock()
-	defer a.statusMu.Unlock()
-	changed := a.invul != v
-	a.invul = v
-	return changed
+	return a.invul.Set(src, on)
 }
 
 // CanGiveDamage reports whether the owner may inflict damage through this summon.

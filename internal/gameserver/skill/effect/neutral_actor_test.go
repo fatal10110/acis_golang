@@ -41,8 +41,8 @@ func (neutralActor) StopMove()                                         {}
 func (neutralActor) TryToIdle()                                        {}
 func (neutralActor) ClearTarget()                                      {}
 func (neutralActor) StopAttack()                                       {}
-func (neutralActor) SetImmobilized(bool) bool                          { return false }
-func (neutralActor) SetInvul(bool) bool                                { return false }
+func (neutralActor) SetImmobilizedSource(any, bool) bool               { return false }
+func (neutralActor) SetInvulSource(any, bool) bool                     { return false }
 func (neutralActor) Afraid() bool                                      { return false }
 func (neutralActor) FearImmune() bool                                  { return false }
 func (neutralActor) FleeFrom(Actor, int)                               {}

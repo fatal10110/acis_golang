@@ -32,8 +32,13 @@ func (f *Folk) SetParalyzed(v bool) bool { return f.paralyzed.CompareAndSwap(!v,
 // Afraid reports whether an effect fears the NPC.
 func (f *Folk) Afraid() bool { return f.effects.IsAffected(effect.FlagFear) }
 
-// SetImmobilized sets the movement lock and reports whether it changed.
-func (f *Folk) SetImmobilized(v bool) bool { return f.immobilized.Swap(v) != v }
+// SetImmobilized sets or clears the direct (command or script) movement-lock
+// source and reports whether the lock changed.
+func (f *Folk) SetImmobilized(v bool) bool { return f.immobilized.Set(creature.DirectSource{}, v) }
+
+// SetImmobilizedSource adds or removes src as a movement-lock source and
+// reports whether the lock changed: it holds while any source does.
+func (f *Folk) SetImmobilizedSource(src any, on bool) bool { return f.immobilized.Set(src, on) }
 
 // CancelVulnerability returns the cancel vulnerability multiplier.
 func (f *Folk) CancelVulnerability(string) float64 { return f.CalcStat(stat.CancelVuln, 1) }

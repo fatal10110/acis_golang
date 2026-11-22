@@ -155,12 +155,12 @@ func (t *liveEffectTarget) StopAttack() {
 	t.events = append(t.events, "stop-attack")
 }
 
-func (t *liveEffectTarget) SetInvul(v bool) bool {
+func (t *liveEffectTarget) SetInvulSource(_ any, v bool) bool {
 	t.events = append(t.events, fmt.Sprintf("invul:%v", v))
 	return true
 }
 
-func (t *liveEffectTarget) SetImmobilized(v bool) bool {
+func (t *liveEffectTarget) SetImmobilizedSource(_ any, v bool) bool {
 	t.events = append(t.events, fmt.Sprintf("immobilized:%v", v))
 	return true
 }

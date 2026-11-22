@@ -8,6 +8,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 )
 
+// spectatorInvul is the invulnerability source a player holds while
+// watching through a broadcasting tower or an olympiad arena. Both views
+// share it, so leaving either one ends it.
+type spectatorInvulSource struct{}
+
+var spectatorInvul spectatorInvulSource
+
 // showObserverGroups opens broadcasting tower f's list of viewpoint
 // groups, in place of its chat window. It reports false for an NPC that
 // is no tower.
@@ -83,7 +90,7 @@ func (l *GameClientLink) enterObserverMode(live *livePlayer, loc observer.Locati
 	}
 	live.Character.StandUp()
 	live.SetSavedLocation(live.CurrentLocation())
-	live.SetInvul(true)
+	live.SetInvulSource(spectatorInvul, true)
 	live.SetInvisible(true)
 	live.SetParalyzed(true)
 	// The player cannot act any more: the abort is answered as a
@@ -118,7 +125,7 @@ func (l *GameClientLink) stopObserving(live *livePlayer) location.Location {
 	live.tryToIdle(live.DenyAIAction())
 	l.clearLiveTarget(live)
 	live.SetInvisible(false)
-	live.SetInvul(false)
+	live.SetInvulSource(spectatorInvul, false)
 	live.SetParalyzed(false)
 	saved, _ := live.SavedLocation()
 	live.SendFrame(serverpackets.FrameObserverEnd(saved))

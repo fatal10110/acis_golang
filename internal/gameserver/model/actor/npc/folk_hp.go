@@ -381,13 +381,18 @@ func (f *Folk) RegenShort() bool {
 }
 
 // Invul reports whether the NPC is invulnerable.
-func (f *Folk) Invul() bool { return f.invul.Load() }
+func (f *Folk) Invul() bool { return f.invul.Held() }
 
 // Invulnerable reports whether the NPC ignores direct resource effects.
 func (f *Folk) Invulnerable() bool { return f.Invul() }
 
-// SetInvul sets invulnerability and reports whether it changed.
-func (f *Folk) SetInvul(v bool) bool { return f.invul.Swap(v) != v }
+// SetInvul sets or clears the direct (command or script) invulnerability
+// source and reports whether invulnerability changed.
+func (f *Folk) SetInvul(v bool) bool { return f.invul.Set(creature.DirectSource{}, v) }
+
+// SetInvulSource adds or removes src as an invulnerability source and
+// reports whether invulnerability changed: it holds while any source does.
+func (f *Folk) SetInvulSource(src any, on bool) bool { return f.invul.Set(src, on) }
 
 // CanBeHealed reports whether the NPC may be healed.
 func (f *Folk) CanBeHealed() bool { return !f.Invul() && !f.SiegeFlag() }

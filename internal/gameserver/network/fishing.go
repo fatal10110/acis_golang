@@ -32,6 +32,12 @@ const (
 	soundTypeMusic = 1
 )
 
+// fishingLock is the movement-lock source a fisher holds from casting the
+// line until the fishing ends.
+type fishingLockSource struct{}
+
+var fishingLock fishingLockSource
+
 // fishingDeps is what a cast line draws from: the fish table and the dice.
 type fishingDeps struct {
 	table *fish.Table
@@ -155,7 +161,7 @@ func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, 
 	if live.move != nil {
 		live.move.Stop()
 	}
-	live.SetImmobilized(true)
+	live.SetImmobilizedSource(fishingLock, true)
 	run := &live.fishing
 	run.stance.Cast(lureID)
 	live.SetFishingBait(bait)
@@ -355,7 +361,7 @@ func (l *GameClientLink) endFishing(live *livePlayer, win bool) {
 		return serverpackets.FrameExFishingEnd(live.ObjectID(), win)
 	})
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageReelLineAndStopFishing))
-	live.SetImmobilized(false)
+	live.SetImmobilizedSource(fishingLock, false)
 }
 
 // spawnFishingMonster places the monster live's catch turned into at its

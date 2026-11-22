@@ -40,8 +40,8 @@ func (ep *EffectPoint) StopMove()                                               
 func (ep *EffectPoint) TryToIdle()                                               {}
 func (ep *EffectPoint) ClearTarget()                                             {}
 func (ep *EffectPoint) StopAttack()                                              {}
-func (ep *EffectPoint) SetImmobilized(bool) bool                                 { return false }
-func (ep *EffectPoint) SetInvul(bool) bool                                       { return false }
+func (ep *EffectPoint) SetImmobilizedSource(any, bool) bool                      { return false }
+func (ep *EffectPoint) SetInvulSource(any, bool) bool                            { return false }
 func (ep *EffectPoint) Afraid() bool                                             { return false }
 func (ep *EffectPoint) FearImmune() bool                                         { return false }
 func (ep *EffectPoint) FleeFrom(effect.Actor, int)                               {}

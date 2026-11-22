@@ -29,8 +29,8 @@ type Live struct {
 	// Status flags are independent of each other and settable from any
 	// goroutine; no reader needs two of them to change together.
 	paralyzed   atomic.Bool
-	immobilized atomic.Bool
-	invul       atomic.Bool
+	immobilized SourceSet
+	invul       SourceSet
 	teleporting atomic.Bool
 }
 
@@ -246,38 +246,52 @@ func (l *Live) SetParalyzed(v bool) bool {
 	return l.paralyzed.CompareAndSwap(!v, v)
 }
 
-// Invul reports whether this creature is currently invulnerable.
+// Invul reports whether this creature is currently invulnerable: any
+// invulnerability source is active, or it is teleporting.
 func (l *Live) Invul() bool {
 	if l == nil {
 		return false
 	}
-	return l.invul.Load() || l.teleporting.Load()
+	return l.invul.Held() || l.teleporting.Load()
 }
 
-// SetInvul sets or clears this creature's invulnerability flag and reports
-// whether it changed. Teleporting creatures remain invulnerable.
+// SetInvul sets or clears the direct (command or script) invulnerability
+// source and reports whether invulnerability changed. Other sources keep it
+// held.
 func (l *Live) SetInvul(v bool) bool {
+	return l.SetInvulSource(DirectSource{}, v)
+}
+
+// SetInvulSource adds or removes src as a source of invulnerability and
+// reports whether invulnerability changed: it holds while any source does.
+func (l *Live) SetInvulSource(src any, on bool) bool {
 	if l == nil {
 		return false
 	}
-	return l.invul.CompareAndSwap(!v, v)
+	return l.invul.Set(src, on)
 }
 
-// Immobilized reports whether this creature's movement-lock flag is set.
+// Immobilized reports whether any movement-lock source is active.
 func (l *Live) Immobilized() bool {
 	if l == nil {
 		return false
 	}
-	return l.immobilized.Load()
+	return l.immobilized.Held()
 }
 
-// SetImmobilized sets or clears this creature's movement-lock flag and
-// reports whether it changed.
+// SetImmobilized sets or clears the direct movement-lock source and reports
+// whether the lock changed.
 func (l *Live) SetImmobilized(v bool) bool {
+	return l.SetImmobilizedSource(DirectSource{}, v)
+}
+
+// SetImmobilizedSource adds or removes src as a source of the movement lock
+// and reports whether the lock changed: it holds while any source does.
+func (l *Live) SetImmobilizedSource(src any, on bool) bool {
 	if l == nil {
 		return false
 	}
-	return l.immobilized.CompareAndSwap(!v, v)
+	return l.immobilized.Set(src, on)
 }
 
 // Teleporting reports whether this creature is in the client-visible

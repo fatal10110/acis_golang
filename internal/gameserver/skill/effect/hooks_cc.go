@@ -123,24 +123,24 @@ func immobileUntilAttackedAction(e *Effect) bool {
 
 func immobilizeEffectorStart(e *Effect) bool {
 	if e.Effector != nil {
-		e.Effector.SetImmobilized(true)
+		e.Effector.SetImmobilizedSource(e, true)
 	}
 	return true
 }
 
 func immobilizeEffectorExit(e *Effect) {
 	if e.Effector != nil {
-		e.Effector.SetImmobilized(false)
+		e.Effector.SetImmobilizedSource(e, false)
 	}
 }
 
 func invincibleStart(e *Effect) bool {
-	e.Effected.SetInvul(true)
+	e.Effected.SetInvulSource(e, true)
 	return true
 }
 
 func invincibleExit(e *Effect) {
-	e.Effected.SetInvul(false)
+	e.Effected.SetInvulSource(e, false)
 }
 
 func muteStart(e *Effect) bool {
@@ -173,14 +173,14 @@ func paralyzeExit(e *Effect) {
 func petrificationStart(e *Effect) bool {
 	startAbnormalEffect(e.Effected, modelskill.AbnormalHold2)
 	e.Effected.AbortAll(false)
-	e.Effected.SetInvul(true)
+	e.Effected.SetInvulSource(e, true)
 	return true
 }
 
 func petrificationExit(e *Effect) {
 	stopAbnormalEffect(e.Effected, modelskill.AbnormalHold2)
 	thinkIfNotPlayer(e.Effected)
-	e.Effected.SetInvul(false)
+	e.Effected.SetInvulSource(e, false)
 }
 
 func thinkIfNotPlayer(target Actor) {
@@ -234,12 +234,12 @@ func immobilizePetBuffStart(e *Effect) bool {
 	if !ok || summon.OwnerID() != e.Effector.ObjectID() {
 		return false
 	}
-	summon.SetImmobilized(true)
+	summon.SetImmobilizedSource(e, true)
 	return true
 }
 
 func immobilizePetBuffExit(e *Effect) {
-	e.Effected.SetImmobilized(false)
+	e.Effected.SetImmobilizedSource(e, false)
 }
 
 // throwUpStart computes a knockback's landing point and starts the
