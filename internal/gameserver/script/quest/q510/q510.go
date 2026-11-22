@@ -71,10 +71,9 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "31331-1.htm"
 		}
 	case questlog.StatusStarted:
-		count := 50 * e.Player.ItemCount(tyrannosaurusClaw)
+		count := 50 * s.TakeAllItems(e.Player, tyrannosaurusClaw)
 		if count > 0 {
 			htmltext = "31331-7.htm"
-			s.TakeItems(e.Player, tyrannosaurusClaw, -1)
 			e.Player.AddClanReputation(count)
 			e.Player.SystemMessageNumbers(clanQuestCompleted, count)
 			e.Player.BroadcastClanInfo()

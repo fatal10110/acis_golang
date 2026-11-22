@@ -97,9 +97,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(e.Player, script.SoundAccept)
 	case strings.EqualFold(e.Name, "31350-08.htm"):
-		count := e.Player.ItemCount(scripture)
-
-		s.TakeItems(e.Player, scripture, -1)
+		count := s.TakeAllItems(e.Player, scripture)
 		bonus := int32(0)
 		if count >= 10 {
 			bonus = 33940

@@ -64,14 +64,12 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30437-02.htm"
 		}
 	case questlog.StatusStarted:
-		golem := p.ItemCount(golemHeartstone)
-		broken := p.ItemCount(brokenHeartstone)
+		golem := s.TakeAllItems(p, golemHeartstone)
+		broken := s.TakeAllItems(p, brokenHeartstone)
 		if golem+broken == 0 {
 			htmltext = "30437-04.htm"
 		} else {
 			htmltext = "30437-05.htm"
-			s.TakeItems(p, golemHeartstone, -1)
-			s.TakeItems(p, brokenHeartstone, -1)
 			bonus := int32(0)
 			if golem+broken > 10 {
 				bonus = 1183

@@ -83,14 +83,12 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30155-03.htm"
 		}
 	case questlog.StatusStarted:
-		ratFangs := e.Player.ItemCount(wereratFang)
-		varoolFangs := e.Player.ItemCount(varoolFoulclawFang)
+		ratFangs := s.TakeAllItems(e.Player, wereratFang)
+		varoolFangs := s.TakeAllItems(e.Player, varoolFoulclawFang)
 		if ratFangs+varoolFangs == 0 {
 			htmltext = "30155-05.htm"
 		} else {
 			htmltext = "30155-07.htm"
-			s.TakeItems(e.Player, wereratFang, -1)
-			s.TakeItems(e.Player, varoolFoulclawFang, -1)
 			bonus := int32(0)
 			if ratFangs > 10 {
 				bonus = 5000
