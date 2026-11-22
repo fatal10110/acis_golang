@@ -502,6 +502,7 @@ func TestBaiumSleepsAfterThirtyQuietMinutes(t *testing.T) {
 // db value 1 is saved.
 func TestBaiumResumesInsideItsLair(t *testing.T) {
 	w := bootBaium(t, "116033;17447;10107;0")
+	needsDrivenClock(t, w.srv)
 	if n := len(baiumNPCs(w, baiumStoneID)); n != 0 {
 		t.Fatalf("%d stones, want none", n)
 	}

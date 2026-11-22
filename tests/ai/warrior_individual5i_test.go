@@ -293,6 +293,7 @@ func (w *ind1World) ind5iArrive(t *testing.T, h *npc.Hostile) {
 func TestRunAwayToClanRunsCallsItsKinAndHeadsHome(t *testing.T) {
 	t.Parallel()
 	w, h := ind5iDenRunner(t)
+	needsDrivenClock(t, w.srv)
 	home := script.NPCOf(h).SpawnLocation()
 	w.ind5iFlee(t, h, 77)
 	w.ind5iArrive(t, h)
@@ -409,6 +410,7 @@ func TestRunAwayToClanWalksOnAfterADetour(t *testing.T) {
 func TestRunAwayToClanTimerWaitsOutAFight(t *testing.T) {
 	t.Parallel()
 	w, h := ind5iDenRunner(t)
+	needsDrivenClock(t, w.srv)
 	w.ind5iFlee(t, h, 0)
 	w.ind5iArrive(t, h)
 	w.srv.Advance(t, 14900*time.Millisecond)

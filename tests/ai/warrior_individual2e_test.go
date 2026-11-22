@@ -504,6 +504,7 @@ func TestWarriorPhysicalSpecialAreaAggressiveKeepsItsParentsLines(t *testing.T) 
 func TestWarriorPhysicalSpecialGatheringAggressiveCallsEveryFiveSeconds(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual2e(t, raidBoot{}, ind2eTemplate(ind2eGatherID, nil, nil), warriorTemplate(ind1ListenerID, nil))
+	needsDrivenClock(t, w.srv)
 	n := w.spawn(t, ind2eGatherID, 1500, 0)
 	near := w.spawn(t, ind1ListenerID, 1500, 300)
 	far := w.spawn(t, ind1ListenerID, 1500, 800)

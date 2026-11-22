@@ -65,6 +65,7 @@ func ind8Socials(frames [][]byte, objectID int32) []int32 {
 func TestSacrificialVictimLeavesItsSacrifice(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual8(t, raidBoot{}, ind8Folk(ind8OfferingID, nil), warriorTemplate(ind8SacrificeID, nil))
+	needsDrivenClock(t, w.srv)
 	c, _ := w.place(t, ind8OfferingID, 100, 0)
 	offering := c.(*npc.Folk)
 	at := ind8At(offering)

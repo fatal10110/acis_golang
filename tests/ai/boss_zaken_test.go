@@ -520,6 +520,7 @@ func TestZakenMassTeleportSendsAMarkOnce(t *testing.T) {
 	t.Parallel()
 	room6 := location.Location{X: 55970, Y: 217770, Z: -3216}
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	h := w.zaken(t)
 	w.settle(t)
 	mate := (&ind1World{warriorWorld: w.warriorWorld}).joinCharacter(t, "mate", "Mate")

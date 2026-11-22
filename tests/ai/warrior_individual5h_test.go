@@ -291,6 +291,7 @@ func TestPhysicalSpecialShotRangeDebuffAggressiveDebuffsBelowAThird(t *testing.T
 func TestPriestBuffsTheMonstersAroundIt(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual5h(t, raidBoot{}, ind5hStill(ind5hPriestID))
+	needsDrivenClock(t, w.srv)
 	n := w.spawn(t, ind5hPriestID, 1500, 0)
 	decoy := w.spawn(t, unboundID, 1600, 0)
 	w.srv.Advance(t, 19900*time.Millisecond)

@@ -332,6 +332,7 @@ func TestAndreasTellsItsFoeWhenHit(t *testing.T) {
 func TestAndreasTeleportsAtItsHPSteps(t *testing.T) {
 	t.Parallel()
 	w, andreas, _ := rb7AndreasWorld(t, false)
+	needsDrivenClock(t, w.srv)
 	self := andreas.ObjectID()
 	teleport := map[modelskill.ID]ind1Cast{rb7Teleport: {self, 1000000}}
 	at := func(when string, x, y int) {
@@ -621,6 +622,7 @@ func rb7Leader(privateID int32, privateSkills map[npc.SkillType]modelskill.ID) [
 func TestRaidPrivateArcherRunsFromACloseHit(t *testing.T) {
 	t.Parallel()
 	w := bootRaid7(t, raidBoot{}, rb7Leader(rb7ArcherID, nil)...)
+	needsDrivenClock(t, w.srv)
 	w.draws.set(1)
 	boss := w.spawn(t, rb7Type5ID, 400, 0)
 	archer := privatesOf(t, boss, 2)[0]
