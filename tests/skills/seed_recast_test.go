@@ -59,12 +59,7 @@ func TestSeedRecastGrowsPowerSeenByCastConditions(t *testing.T) {
 	// let finish before the next one goes out.
 	castOpens := func(id int32) bool {
 		t.Helper()
-		started := castStarts(t, c, id)
-		if started {
-			srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
-			drainUntilQuiet(t, c)
-		}
-		return started
+		return castStartsToEnd(t, srv, c, objID, id)
 	}
 	power := func() (p, effects int) {
 		onPlayerQueue(t, srv, objID, func(pc *player.Character) {
@@ -93,6 +88,19 @@ func TestSeedRecastGrowsPowerSeenByCastConditions(t *testing.T) {
 			t.Fatalf("after seed cast %d: power-5 gate opened at power %d", recast+1, want.power)
 		}
 	}
+}
+
+// castStartsToEnd is castStarts that, when the cast started, lets it finish
+// so the caster is free for the next request: one sent while a cast is under
+// way is refused with ActionFailed.
+func castStartsToEnd(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID, id int32) bool {
+	t.Helper()
+	started := castStarts(t, c, id)
+	if started {
+		srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
+		drainUntilQuiet(t, c)
+	}
+	return started
 }
 
 // castStarts sends a cast of id and reports whether it started (its

@@ -93,7 +93,7 @@ func TestCastConditionsReadServerNightAndPlayerZone(t *testing.T) {
 				{"inside a far zone", inFarZone, false},
 				{"outside a far zone", outsideFar, true},
 			} {
-				if got := castStarts(t, c, tc.id); got != tc.want {
+				if got := castStartsToEnd(t, srv, c, objID, tc.id); got != tc.want {
 					t.Errorf("%s: cast started = %v, want %v", tc.name, got, tc.want)
 				}
 			}

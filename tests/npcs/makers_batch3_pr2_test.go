@@ -157,12 +157,32 @@ func TestTyrannosaurusMakerCallsSailren(t *testing.T) {
 		t.Helper()
 		send("1001")
 		w.srv.Advance(t, time.Millisecond)
+		// A condition-based wait costs no time on the driven clock, where
+		// the NPC is already there; on the real pool its frames and the
+		// script events can land after the fixed spans.
+		var frames [][]byte
+		w.srv.AdvanceUntil(t, step+", the NPC shown", func() bool {
+			frames = append(frames, drainFrames(t, w.c)...)
+			return len(mw.inWorld(tyrannosaurusID)) == 1 && len(shown(frames)) >= 1
+		})
 		count(step, 1)
-		if got := shown(drainFrames(t, w.c)); !slices.Equal(got, []int{tyrannosaurusID}) {
+		if got := shown(frames); !slices.Equal(got, []int{tyrannosaurusID}) {
 			t.Fatalf("%s: NPCs shown = %v, want [%d]", step, got, tyrannosaurusID)
 		}
 		w.srv.Advance(t, 5000*time.Millisecond-time.Millisecond)
-		log.expect(t, step+", timer 1001", heard11049)
+		if w.srv.DrivesClock() {
+			// The timer's exact boundary is pinned on the driven clock.
+			log.expect(t, step+", timer 1001", heard11049)
+			return
+		}
+		var heard []heardEvent
+		w.srv.AdvanceUntil(t, step+", timer 1001", func() bool {
+			heard = append(heard, log.take()...)
+			return len(heard) >= 1
+		})
+		if !slices.Equal(heard, []heardEvent{heard11049}) {
+			t.Fatalf("%s, timer 1001: script events heard = %v, want %v", step, heard, heard11049)
+		}
 	}
 	// leave deletes the NPC and waits out timer 1002.
 	leave := func(step string) {
