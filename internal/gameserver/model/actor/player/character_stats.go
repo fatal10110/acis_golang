@@ -497,6 +497,51 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	return amount
 }
 
+// ReduceCP subtracts CP, clamped at zero, and returns the applied amount. A
+// dead character loses nothing. The subtraction happens under vitalsMu, so a
+// hit landing between a caller's read and this write keeps its share.
+func (c *Character) ReduceCP(amount float64) float64 {
+	if amount <= 0 {
+		return 0
+	}
+	maxCP := c.MaxCPValue()
+	defer c.SettleRegen() // after the unlock below
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	cp := c.boundedLocked(c.curCP, maxCP)
+	if c.dead.Load() || cp <= 0 {
+		return 0
+	}
+	if amount > cp {
+		amount = cp
+	}
+	c.curCP = cp - amount
+	return amount
+}
+
+// ShiftHP adds delta, which may be negative, to current HP, capped at MaxHP.
+// It is not a hit: CP, invulnerability and the hit side effects play no
+// part. The change applies under vitalsMu, so a hit landing between a
+// caller's read and this write keeps its share. A change that would leave no
+// HP writes nothing and reports true, leaving the death to the caller. A dead
+// character stays as it is and reports false. Like SetHP it leaves the
+// low-HP tutorial event to the caller's status report.
+func (c *Character) ShiftHP(delta float64) (lethal bool) {
+	maxHP := c.MaxHPValue()
+	defer c.settleRegenTask() // after the unlock below
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if c.dead.Load() {
+		return false
+	}
+	hp := c.boundedLocked(c.curHP, maxHP) + delta
+	if hp <= 0 {
+		return true
+	}
+	c.writeHPLocked(min(hp, maxHP))
+	return false
+}
+
 // hitOutcome is how one hit landed on a character's vitals.
 type hitOutcome struct {
 	// applied is false when the character was already dead.

@@ -138,6 +138,19 @@ func (h *Hostile) SetHP(value float64) {
 	}
 }
 
+// ShiftHP adds delta, which may be negative, to current HP, capped at MaxHP,
+// and offers the targeters' health bar a refresh even when the value did not
+// move. A change that would leave no HP writes nothing and reports true,
+// leaving the death to the caller. A dead NPC stays as it is and reports
+// false.
+func (h *Hostile) ShiftHP(delta float64) (lethal bool) {
+	written, lethal := h.health.Shift(delta, h.MaxHPValue())
+	if written {
+		h.BroadcastStatus()
+	}
+	return lethal
+}
+
 // SetMaxHpMp fills h's MP, then its HP, to their maxima and offers the
 // targeters' health bar one refresh. A dead NPC keeps its values and
 // reports nothing.

@@ -83,6 +83,25 @@ func (h *Health) Add(amount, max float64) float64 {
 	return amount
 }
 
+// Shift adds delta, which may be negative, to current hit points, capped at
+// max, under the same lock a hit takes, so neither change erases the other.
+// A change that would leave no hit points writes nothing and reports lethal,
+// leaving the death to the caller. A dead actor stays as it is and reports
+// neither written nor lethal.
+func (h *Health) Shift(delta, max float64) (written, lethal bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.current == nil || *h.current <= 0 {
+		return false, false
+	}
+	hp := *h.current + delta
+	if hp <= 0 {
+		return false, true
+	}
+	*h.current = min(hp, max)
+	return true, false
+}
+
 // WhileAlive runs fn under h's lock when the actor is alive, and reports
 // whether it ran. A write to another resource made inside fn cannot land
 // after a killing blow: Damage zeroes HP under the same lock, and only

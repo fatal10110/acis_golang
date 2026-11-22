@@ -586,6 +586,28 @@ func (a *Actor) SetHP(value float64) {
 	a.BroadcastStatus()
 }
 
+// ShiftHP adds delta, which may be negative, to current HP, capped at MaxHP,
+// and republishes a's vitals even when the value did not move. A change that
+// would leave no HP writes nothing and reports true, leaving the death to
+// the caller. A dead summon stays as it is and reports false.
+func (a *Actor) ShiftHP(delta float64) (lethal bool) {
+	maxHP := a.MaxHPValue()
+	a.vitals.mu.Lock()
+	if a.dead {
+		a.vitals.mu.Unlock()
+		return false
+	}
+	hp := a.vitals.hp + delta
+	if hp <= 0 {
+		a.vitals.mu.Unlock()
+		return true
+	}
+	a.vitals.hp = min(hp, maxHP)
+	a.vitals.mu.Unlock()
+	a.BroadcastStatus()
+	return false
+}
+
 // PublishHP hands send a's current HP when the players targeting a must be
 // sent it, under the health-bar lock (creature.HPBar.Publish). Callers
 // invoke it only when at least one player is targeting a, so an unwatched
