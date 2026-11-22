@@ -34,6 +34,9 @@ func (cancelHandler) Use(cast Cast) {
 	dischargeSpiritshot(cast)
 }
 
+// cancelOne rolls each eligible effect of target against the cast's rate; the
+// roll comes from the caster's combat random source (see landingRoll), so a
+// pinned caster decides every strip.
 func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRate int) {
 	vuln := target.CancelVulnerability(skillType)
 
@@ -68,7 +71,7 @@ func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRat
 		}
 
 		rate := formulas.CancelSuccessRate(e.Period(), diffLevel, float64(cast.Skill.Power), vuln, minRate, maxRate)
-		if formulas.CancelSucceeds(rate, rnd.Get(100)) {
+		if formulas.CancelSucceeds(rate, landingRoll(cast.Caster)) {
 			list.Remove(e)
 		}
 
