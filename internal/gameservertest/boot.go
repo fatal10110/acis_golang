@@ -2231,7 +2231,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		worldObjects, doors = bootDoors(t, o.doors, ids, state)
 	}
 	boats := bootBoats(t, o.boats, ids, state)
-	derbyTrack := bootDerbyTrack(t, o.derby, db, ids, state, o.zones)
+	derbyTrack := bootDerbyTrack(t, o.derby, db, ids, state, o.zones, o.log)
 	levels := o.levels
 	if levels == nil {
 		synthetic := make(map[int]player.Level, 85)

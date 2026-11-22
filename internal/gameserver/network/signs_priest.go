@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -14,9 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 )
-
-// signsPriestTimeout bounds the insert of a new Seven Signs sign-up's row.
-const signsPriestTimeout = 10 * time.Second
 
 // sevenSignsBypass runs a Seven Signs priest's or Mammon NPC's
 // "SevenSigns <n> ..." command for live at f: its messages, then its page,
@@ -31,9 +27,7 @@ func (l *GameClientLink) sevenSignsBypass(live *livePlayer, f *npc.Folk, command
 		return true
 	}
 	classLevel, _ := player.ClassLevel(live.ClassID())
-	ctx, cancel := context.WithTimeout(context.Background(), signsPriestTimeout)
-	defer cancel()
-	reply := l.signsPriest.Command(ctx, signspriest.Talker{
+	reply := l.signsPriest.Command(signspriest.Talker{
 		ObjectID:   live.ObjectID(),
 		Inventory:  live.Inventory(),
 		ClassLevel: classLevel,
@@ -43,13 +37,18 @@ func (l *GameClientLink) sevenSignsBypass(live *livePlayer, f *npc.Folk, command
 	if reply.Aborted {
 		return false
 	}
-	if reply.SignUpErr != nil {
-		l.log.Error().Err(reply.SignUpErr).Int32("object_id", live.ObjectID()).Msg("seven signs: insert sign-up")
-	}
 	if reply.Save {
-		state, itemInstances, taken := l.sevenSigns, l.belongings.itemInstances, reply.Taken
+		state, itemInstances, taken, signUp, log := l.sevenSigns, l.belongings.itemInstances, reply.Taken, reply.SignUp, l.log
 		l.queueRowWrite(live.ObjectID(), "seven signs: save after the priests' dialog", func(ctx context.Context, objectID int32) error {
-			// The stacks the command took from are written first, and a
+			// A new sign-up's row is inserted first, so the save below has
+			// a row to update. Its failure leaves the sign-up in memory and
+			// is only logged.
+			if signUp != nil {
+				if err := state.InsertPlayer(ctx, *signUp); err != nil {
+					log.Error().Err(err).Int32("object_id", objectID).Msg("seven signs: insert sign-up")
+				}
+			}
+			// The stacks the command took from are written next, and a
 			// failure leaves the row to the next full save: the row never
 			// lands ahead of the items that paid for it.
 			if itemInstances != nil {

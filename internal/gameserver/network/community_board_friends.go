@@ -14,19 +14,34 @@ import (
 // answers with.
 const friendsCleared = "You have cleared your friends list."
 
-// boardContacts looks up the characters a friends board page lists. Names
-// are read once per page.
+// boardContacts names the characters a friends board page lists, from
+// names read once per page (withNames).
 type boardContacts struct {
 	link  *GameClientLink
 	names map[int32]string
 }
 
-func (l *GameClientLink) boardContacts(ids ...[]int32) boardContacts {
-	var all []int32
-	for _, list := range ids {
-		all = append(all, list...)
+// withNames runs fn on live's queue with the stored names of ids. The names
+// are read off the queue, on the connection goroutine of the request
+// running (deferLookup); fn follows whatever that request deferred before.
+func (l *GameClientLink) withNames(live *livePlayer, ids []int32, fn func(names map[int32]string)) {
+	if len(ids) == 0 || l.characters == nil {
+		live.afterLookups(func() { fn(nil) })
+		return
 	}
-	return boardContacts{link: l, names: l.characterNames(context.Background(), all)}
+	live.deferLookup(func(ctx context.Context) {
+		names := l.characterNames(ctx, ids)
+		onLive(live, func() { fn(names) })
+	})
+}
+
+// sendFriendListTo sends to the FriendList of to's friends, their names
+// read off live's queue (withNames).
+func (l *GameClientLink) sendFriendListTo(live, to *livePlayer) {
+	ids := l.friendIDs(to.ObjectID())
+	l.withNames(live, ids, func(names map[int32]string) {
+		to.SendFrame(serverpackets.FrameFriendList(l.friendEntries(ids, names)))
+	})
 }
 
 func (c boardContacts) Name(id int32) (string, bool) {
@@ -99,37 +114,41 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 		l.showFriendList(live, false)
 	case "delall":
 		friends := l.relations.FriendIDs(live.ObjectID())
-		names := l.characterNames(context.Background(), friends)
-		for _, friendID := range friends {
-			if l.relations.RemoveFriend(live.ObjectID(), friendID) {
-				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, names[friendID]))
+		l.withNames(live, friends, func(names map[int32]string) {
+			for _, friendID := range friends {
+				if l.relations.RemoveFriend(live.ObjectID(), friendID) {
+					live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, names[friendID]))
+				}
 			}
-		}
-		session.friends.Clear()
-		l.showFriendList(live, false)
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, friendsCleared))
-		live.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(context.Background(), live.ObjectID())))
+			session.friends.Clear()
+			l.showFriendList(live, false)
+			live.afterLookups(func() {
+				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, friendsCleared))
+			})
+			l.sendFriendListTo(live, live)
+		})
 	case "delconfirm":
 		l.showFriendList(live, true)
 	case "del":
 		picked := session.friends.IDs()
-		names := l.characterNames(context.Background(), picked)
-		for _, friendID := range picked {
-			// An online friend is the one told: by the time live's own
-			// removal runs the two are no longer friends.
-			if friend, online := l.livePlayerByID(friendID); online {
-				if l.relations.RemoveFriend(friendID, live.ObjectID()) {
-					friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.CharacterName()))
+		l.withNames(live, picked, func(names map[int32]string) {
+			for _, friendID := range picked {
+				// An online friend is the one told: by the time live's own
+				// removal runs the two are no longer friends.
+				if friend, online := l.livePlayerByID(friendID); online {
+					if l.relations.RemoveFriend(friendID, live.ObjectID()) {
+						friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.CharacterName()))
+					}
+					l.sendFriendListTo(live, friend)
 				}
-				friend.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(context.Background(), friendID)))
+				if l.relations.RemoveFriend(live.ObjectID(), friendID) {
+					live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, names[friendID]))
+				}
 			}
-			if l.relations.RemoveFriend(live.ObjectID(), friendID) {
-				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, names[friendID]))
-			}
-		}
-		session.friends.Clear()
-		l.showFriendList(live, false)
-		live.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(context.Background(), live.ObjectID())))
+			session.friends.Clear()
+			l.showFriendList(live, false)
+			l.sendFriendListTo(live, live)
+		})
 	case "mail":
 		if !session.friends.Empty() {
 			l.showFriendMail(live)
@@ -148,25 +167,28 @@ func (l *GameClientLink) boardBlockAction(live *livePlayer, action string, id in
 		session.blocks.Remove(id)
 	case "delall":
 		l.unblockAll(live, l.relations.BlockedIDs(live.ObjectID()))
-		session.blocks.Clear()
+		return
 	case "delconfirm":
 		confirm = true
 	case "del":
 		l.unblockAll(live, session.blocks.IDs())
-		session.blocks.Clear()
+		return
 	}
 	l.showBlockList(live, confirm)
 }
 
 // unblockAll takes ids off live's block list, telling live of each one
-// that was on it.
+// that was on it, then clears the board's picks and shows the block list.
 func (l *GameClientLink) unblockAll(live *livePlayer, ids []int32) {
-	names := l.characterNames(context.Background(), ids)
-	for _, id := range ids {
-		if l.relations.Unblock(live.ObjectID(), id) {
-			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1RemovedFromYourIgnoreList, names[id]))
+	l.withNames(live, ids, func(names map[int32]string) {
+		for _, id := range ids {
+			if l.relations.Unblock(live.ObjectID(), id) {
+				live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1RemovedFromYourIgnoreList, names[id]))
+			}
 		}
-	}
+		live.board.blocks.Clear()
+		l.showBlockList(live, false)
+	})
 }
 
 // boardFriendsWrite submits the friends mail form: mail (recipients, and
@@ -179,8 +201,7 @@ func (l *GameClientLink) boardFriendsWrite(live *livePlayer, args [5]string) {
 	if l.board.mail == nil {
 		return
 	}
-	l.sendMail(live, args[1], args[3], args[4])
-	l.showFriendList(live, false)
+	l.sendMail(live, args[1], args[3], args[4], func() { l.showFriendList(live, false) })
 }
 
 func (l *GameClientLink) showFriendList(live *livePlayer, confirm bool) {
@@ -190,7 +211,9 @@ func (l *GameClientLink) showFriendList(live *livePlayer, confirm bool) {
 	}
 	friends := l.relations.FriendIDs(live.ObjectID())
 	picked := live.board.friends.IDs()
-	l.sendBoard(live, bbs.RenderFriendList(page, friends, picked, l.boardContacts(friends, picked), confirm))
+	l.withNames(live, append(append([]int32(nil), friends...), picked...), func(names map[int32]string) {
+		l.sendBoard(live, bbs.RenderFriendList(page, friends, picked, boardContacts{link: l, names: names}, confirm))
+	})
 }
 
 func (l *GameClientLink) showBlockList(live *livePlayer, confirm bool) {
@@ -200,7 +223,9 @@ func (l *GameClientLink) showBlockList(live *livePlayer, confirm bool) {
 	}
 	blocked := l.relations.BlockedIDs(live.ObjectID())
 	picked := live.board.blocks.IDs()
-	l.sendBoard(live, bbs.RenderBlockList(page, blocked, picked, l.boardContacts(blocked, picked), confirm))
+	l.withNames(live, append(append([]int32(nil), blocked...), picked...), func(names map[int32]string) {
+		l.sendBoard(live, bbs.RenderBlockList(page, blocked, picked, boardContacts{link: l, names: names}, confirm))
+	})
 }
 
 func (l *GameClientLink) showFriendMail(live *livePlayer) {
@@ -209,5 +234,7 @@ func (l *GameClientLink) showFriendMail(live *livePlayer) {
 		return
 	}
 	picked := live.board.friends.IDs()
-	l.sendBoard(live, bbs.RenderFriendMail(page, picked, l.boardContacts(picked)))
+	l.withNames(live, picked, func(names map[int32]string) {
+		l.sendBoard(live, bbs.RenderFriendMail(page, picked, boardContacts{link: l, names: names}))
+	})
 }

@@ -256,19 +256,30 @@ func (t *Track) Stakes() [Lanes]int64 {
 	return t.bets
 }
 
-// PlaceBet adds amount to lane's stake and stores the lane's new total. A
+// PlaceBet adds amount to lane's stake, in memory; SaveBet stores it. A
 // lane outside 1 to 8 is refused.
 func (t *Track) PlaceBet(lane int, amount int64) {
+	if lane < 1 || lane > Lanes {
+		return
+	}
+	t.mu.Lock()
+	t.bets[lane-1] += amount
+	t.mu.Unlock()
+}
+
+// SaveBet stores lane's current total stake under ctx. The total is read
+// as the store is made, in turn with the race's own stores, so the stored
+// total never falls behind a later one however the saves interleave.
+func (t *Track) SaveBet(ctx context.Context, lane int) {
 	if lane < 1 || lane > Lanes {
 		return
 	}
 	t.saveMu.Lock()
 	defer t.saveMu.Unlock()
 	t.mu.Lock()
-	t.bets[lane-1] += amount
 	bet := Bet{Lane: lane, Amount: t.bets[lane-1]}
 	t.mu.Unlock()
-	t.persist(context.Background(), "save derby bet", func(ctx context.Context) error { return t.store.SaveBet(ctx, bet) })
+	t.persist(ctx, "save derby bet", func(ctx context.Context) error { return t.store.SaveBet(ctx, bet) })
 }
 
 // Tick runs one second of the race countdown: a new race with its

@@ -103,7 +103,13 @@ func classTemplates() gameservertest.Option {
 // seeded by the statements of seed.
 func bootPriestWorld(t *testing.T, held map[int32]int32, seed ...string) *folkWorld {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	return bootPriestWorldWith(t, held, nil, seed...)
+}
+
+// bootPriestWorldWith is bootPriestWorld with extra boot options.
+func bootPriestWorldWith(t *testing.T, held map[int32]int32, extra []gameservertest.Option, seed ...string) *folkWorld {
+	t.Helper()
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Talker", playerLevel, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithHTMLPages(priestPages()),
@@ -111,7 +117,7 @@ func bootPriestWorld(t *testing.T, held map[int32]int32, seed ...string) *folkWo
 		classTemplates(),
 		gameservertest.WithClanSeed(seedStatements(t, seed...)),
 		noBypassReuse,
-	)
+	}, extra...)...)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
 	for _, id := range slices.Sorted(maps.Keys(held)) {
 		srv.GiveItem(t, w.player, id, held[id])
@@ -296,7 +302,7 @@ func TestSignsPriestParticipationGates(t *testing.T) {
 // tells whether the talker can pay; joining the Dawn gives up a Certificate
 // of Approval, else 50 000 adena, silently, and a talker with neither is
 // refused; the Dusk is free. A sign-up says whom the talker joined and for
-// which seal, opens the cabal's page and is stored at once.
+// which seal, opens the cabal's page and is stored with the save it queues.
 func TestSignsPriestSignUp(t *testing.T) {
 	t.Parallel()
 	w := bootPriestWorld(t, map[int32]int32{item.AdenaID: 60000, certificateOfApproval: 1},
