@@ -66,7 +66,7 @@ func (n hallSiegeNotices) FlagPvP(field *zone.Siege, hallID, ownerID int32) {
 		}
 	}
 	for _, a := range field.Occupants() {
-		za, ok := a.(*liveZoneActor)
+		za, ok := a.(*playerZones)
 		if !ok || banished[a] {
 			continue
 		}

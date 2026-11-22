@@ -151,8 +151,8 @@ func TestRaiseDeathPenaltyLevelExemptsPvPAndSiegeZones(t *testing.T) {
 		name string
 		set  func(*Character)
 	}{
-		{name: "pvp", set: func(c *Character) { c.SetInPvPZone(true) }},
-		{name: "siege", set: func(c *Character) { c.SetInSiegeZone(true) }},
+		{name: "pvp", set: func(c *Character) { inZones(c, zoneStub{pvp: true}) }},
+		{name: "siege", set: func(c *Character) { inZones(c, zoneStub{siege: true}) }},
 	}
 
 	for _, tt := range tests {
@@ -173,12 +173,12 @@ func TestInPeaceZoneTracksLiveZoneMembership(t *testing.T) {
 		t.Fatal("InPeaceZone() = true before entering a peace zone")
 	}
 
-	c.SetInPeaceZone(true)
+	inZones(c, zoneStub{peace: true})
 	if !c.InPeaceZone() {
 		t.Fatal("InPeaceZone() = false after entering a peace zone")
 	}
 
-	c.SetInPeaceZone(false)
+	inZones(c, zoneStub{})
 	if c.InPeaceZone() {
 		t.Fatal("InPeaceZone() = true after leaving a peace zone")
 	}

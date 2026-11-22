@@ -80,9 +80,7 @@ func policyPair(t *testing.T, g policyGraph, cs, ts policySide) (*Character, *Ch
 		}
 		c.KarmaPoints = s.karma
 		c.pvpFlag = s.flag
-		c.SetInPvPZone(s.zones.pvp)
-		c.SetInSiegeZone(s.zones.siege)
-		c.SetInPeaceZone(s.zones.peace)
+		inZones(c, zoneStub{pvp: s.zones.pvp, siege: s.zones.siege, peace: s.zones.peace})
 		if s.blessed {
 			e, err := effect.New(effect.Skill{ID: 1323, Level: 1}, modelskill.EffectTemplate{Name: "ProtectionBlessing", Time: 30})
 			if err != nil {

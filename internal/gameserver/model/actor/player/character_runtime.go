@@ -53,74 +53,87 @@ type ZoneQuery interface {
 	MotherTreeBonus(x, y, z int) (hp, mp int, ok bool)
 }
 
-// SetInPvPZone records the live zone engine's current PvP membership.
-func (c *Character) SetInPvPZone(inside bool) {
-	c.insidePvPZone.Store(inside)
+// ZoneStatus answers which zones the character stands in. The character's
+// zone flag ledger implements it, so every answer is the ledger's own.
+type ZoneStatus interface {
+	InPvPZone() bool
+	InPeaceZone() bool
+	InSiegeZone() bool
+	// NoSummonFriendZone reports a zone that blocks SUMMON_FRIEND and
+	// SUMMON_PARTY.
+	NoSummonFriendZone() bool
+	// InDangerArea reports a damage or effect zone.
+	InDangerArea() bool
+	InWater() bool
+	InBossZone() bool
+	// InClanHallZone reports any clan's clan hall grounds.
+	InClanHallZone() bool
+	// InCastleZone reports a castle's grounds.
+	InCastleZone() bool
+	// InMotherTreeZone reports a Mother Tree zone whose race restriction
+	// admits the character.
+	InMotherTreeZone() bool
+}
+
+// zoneStatusRef boxes a ZoneStatus for atomic replacement.
+type zoneStatusRef struct{ ZoneStatus }
+
+// SetZoneStatus makes s the source of the character's zone answers; until
+// it is set the character stands in no zone.
+func (c *Character) SetZoneStatus(s ZoneStatus) {
+	c.zoneStatus.Store(&zoneStatusRef{s})
+}
+
+// zonesNow returns the character's zone answers, nil before SetZoneStatus.
+func (c *Character) zonesNow() ZoneStatus {
+	if r := c.zoneStatus.Load(); r != nil {
+		return r.ZoneStatus
+	}
+	return nil
 }
 
 // InPvPZone reports whether the character is currently in a PvP zone.
 func (c *Character) InPvPZone() bool {
-	return c.insidePvPZone.Load()
-}
-
-// SetInPeaceZone records the live zone engine's current peace membership.
-func (c *Character) SetInPeaceZone(inside bool) {
-	c.insidePeaceZone.Store(inside)
+	z := c.zonesNow()
+	return z != nil && z.InPvPZone()
 }
 
 // InPeaceZone reports whether the character is currently in a peace zone.
 func (c *Character) InPeaceZone() bool {
-	return c.insidePeaceZone.Load()
-}
-
-// SetInSiegeZone records the live zone engine's current siege membership.
-func (c *Character) SetInSiegeZone(inside bool) {
-	c.insideSiegeZone.Store(inside)
+	z := c.zonesNow()
+	return z != nil && z.InPeaceZone()
 }
 
 // InSiegeZone reports whether the character is currently in a siege zone.
 func (c *Character) InSiegeZone() bool {
-	return c.insideSiegeZone.Load()
-}
-
-// SetInNoSummonFriendZone records the live zone engine's current
-// NoSummonFriend membership (zone.FlagNoSummonFriend), the same way
-// SetInPvPZone/SetInSiegeZone track their flags.
-func (c *Character) SetInNoSummonFriendZone(inside bool) {
-	c.insideNoSummonFriendZone.Store(inside)
+	z := c.zonesNow()
+	return z != nil && z.InSiegeZone()
 }
 
 // NoSummonFriendZone reports whether the character currently stands inside
 // a zone that blocks SUMMON_FRIEND/SUMMON_PARTY (a no-summon-friend zone).
 func (c *Character) NoSummonFriendZone() bool {
-	return c.insideNoSummonFriendZone.Load()
-}
-
-// SetInDangerArea records the live zone engine's current danger-zone
-// membership (zone.FlagDanger).
-func (c *Character) SetInDangerArea(inside bool) {
-	c.insideDangerArea.Store(inside)
+	z := c.zonesNow()
+	return z != nil && z.NoSummonFriendZone()
 }
 
 // InDangerArea reports whether the character stands in a damage or effect
-// zone. It takes no lock, so status packets built under any other lock can
-// read it.
+// zone. It takes no character lock, so status packets built under any
+// other lock can read it.
 func (c *Character) InDangerArea() bool {
-	return c.insideDangerArea.Load()
-}
-
-// SetInWater records the live zone engine's current water membership, which
-// switches the move speed to the swim speed.
-func (c *Character) SetInWater(inside bool) {
-	if c.insideWater.Swap(inside) != inside {
-		c.refreshMoveSpeed()
-	}
+	z := c.zonesNow()
+	return z != nil && z.InDangerArea()
 }
 
 // InWater reports whether the character currently stands in a water zone.
 func (c *Character) InWater() bool {
-	return c.insideWater.Load()
+	z := c.zonesNow()
+	return z != nil && z.InWater()
 }
+
+// WaterChanged switches the move speed to the swim speed or back after the
+// character entered or left the water.
+func (c *Character) WaterChanged() { c.refreshMoveSpeed() }
 
 // SetSwampMoveBonus records the move bonus, in percent, of the swamp the
 // character stands in, or 0 outside any swamp.

@@ -13,20 +13,12 @@ import (
 // to wyverns before it is taken off its mount.
 const wyvernGraceDelay = 5 * time.Second
 
-// wireNoLandingZones gives the no-landing zones of ix their forced
-// dismount of wyvern riders.
-func (l *GameClientLink) wireNoLandingZones(ix *zone.Index) {
-	for _, z := range zone.OfKind[*zone.NoLanding](ix) {
-		z.DismountTimer = l.wyvernDismountTimer
-	}
-}
-
 // siegeDismountTimer is wyvernDismountTimer for a battlefield under
 // siege. A player thrown off the battlefield as its siege starts is out
 // before the battlefield turns on, so it is neither warned nor counted
 // down.
 func (l *GameClientLink) siegeDismountTimer(a zone.Actor, entering bool) {
-	if za, ok := a.(*liveZoneActor); ok && l.siegeBanished(za.live) {
+	if za, ok := a.(*playerZones); ok && l.siegeBanished(za.live) {
 		return
 	}
 	l.wyvernDismountTimer(a, entering)
@@ -41,7 +33,7 @@ func (l *GameClientLink) siegeDismountTimer(a zone.Actor, entering bool) {
 // is armed and stopped on the rider's queue, in the order the zones ran
 // them.
 func (l *GameClientLink) wyvernDismountTimer(a zone.Actor, entering bool) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}

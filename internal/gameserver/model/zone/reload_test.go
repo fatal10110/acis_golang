@@ -26,7 +26,7 @@ func TestReloadMovesMembersWithoutExitRules(t *testing.T) {
 	field := NewSiege(1, testCuboid(t, 0, 1000, 0, 1000))
 	field.SetActive(true)
 	var exits int
-	field.Unsummon = func(Actor) { exits++ }
+	wire(&fxStub{siegeUnsummon: func(Actor) { exits++ }}, field)
 	water := NewWater(2, testCuboid(t, 0, 1000, 0, 1000))
 	ix.Add(field)
 	ix.Add(water)

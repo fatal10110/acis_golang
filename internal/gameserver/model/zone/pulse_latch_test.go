@@ -19,20 +19,20 @@ func TestPulseLatchHandsOverToARacingEntry(t *testing.T) {
 	damage.CastleID = 1
 	damage.Armed = true
 	siege := true
-	damage.SiegeActive = func() bool { return siege }
+	fx := &fxStub{siegeRunning: func() bool { return siege }}
+	wire(fx, effect, damage)
 
 	for _, tc := range []struct {
 		name    string
 		k       Kind
-		start   *func()
 		stopped func() bool
 	}{
-		{"effect", effect, &effect.StartPulse, effect.PulseStopped},
-		{"damage", damage, &damage.StartPulse, damage.PulseStopped},
+		{"effect", effect, effect.PulseStopped},
+		{"damage", damage, damage.PulseStopped},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			starts := 0
-			*tc.start = func() { starts++ }
+			fx.startPulse = func(Kind) { starts++ }
 			a := &memberStub{id: 1, class: ClassPlayer, at: location.Location{X: 10, Y: 10}}
 			b := &memberStub{id: 2, class: ClassPlayer, at: location.Location{X: 20, Y: 20}}
 			Revalidate(tc.k, a)
@@ -64,7 +64,7 @@ func TestPulseLatchHandsOverToARacingEntry(t *testing.T) {
 
 	// A dormant damage zone frees the latch even with occupants inside.
 	starts := 0
-	damage.StartPulse = func() { starts++ }
+	fx.startPulse = func(Kind) { starts++ }
 	a := &memberStub{id: 1, class: ClassPlayer, at: location.Location{X: 10, Y: 10}}
 	Revalidate(damage, a)
 	siege = false

@@ -34,7 +34,7 @@ func TestReportDeathDropPvPZone(t *testing.T) {
 			setRules(c, func(r *Rules) {
 				r.DeathDrop = DeathDropRules{Karma: karma, Monster: monster, KarmaPKLimit: 5, GMDrops: true, Kept: []int32{57}}
 			})
-			c.SetInPvPZone(tt.inPvP)
+			inZones(c, zoneStub{pvp: tt.inPvP})
 			rec := recordEvents(c)
 
 			var killer attackable.Combatant = deathPenaltyKiller{}

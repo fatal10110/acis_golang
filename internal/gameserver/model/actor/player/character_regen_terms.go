@@ -16,18 +16,11 @@ func (c *Character) postureRegenMultiplier() float64 {
 	}
 }
 
-// SetInMotherTreeZone records the live zone engine's current Mother Tree
-// zone membership (zone.FlagMotherTree): inside a zone whose race
-// restriction admits c.
-func (c *Character) SetInMotherTreeZone(inside bool) {
-	c.insideMotherTreeZone.Store(inside)
-}
-
 // motherTreeRegenBonus is the flat HP and MP regeneration bonus of the
 // first Mother Tree zone holding c's position, while c stands in one that
 // admits it; 0 otherwise.
 func (c *Character) motherTreeRegenBonus() (hp, mp float64) {
-	if !c.insideMotherTreeZone.Load() || c.zones == nil {
+	if z := c.zonesNow(); z == nil || !z.InMotherTreeZone() || c.zones == nil {
 		return 0, 0
 	}
 	x, y, z := c.Position()

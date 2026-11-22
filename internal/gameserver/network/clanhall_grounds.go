@@ -82,7 +82,7 @@ func (g clanHallGrounds) BanishForeigners(hallID, clanID int32) {
 // a siegable hall's battlefield as banishOffBattlefield takes it. A hall
 // without a banish point leaves the player where it is.
 func (l *GameClientLink) banishFromClanHall(hallID int32, a zone.Actor) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}

@@ -34,9 +34,9 @@ func TestNotePvPAttackZoneExemptionFollowsTheHitCreature(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			attacker := &Character{ID: 1}
-			attacker.SetInPvPZone(true)
+			inZones(attacker, zoneStub{pvp: true})
 			owner := &Character{ID: 2}
-			owner.SetInPvPZone(tt.ownerInPvP)
+			inZones(owner, zoneStub{pvp: tt.ownerInPvP})
 			var target attackable.Combatant = owner
 			if tt.hitSummon {
 				target = zonedSummon{summonKiller: summonKiller{owner: owner}, inPvP: tt.hitInPvP}

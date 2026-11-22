@@ -78,7 +78,7 @@ func TestReloadPlayerMoveBeforeTheRebase(t *testing.T) {
 	ix := NewIndex()
 	oldArena := NewArena(1, testCuboid(t, 0, 1000, 0, 1000))
 	var oldNotices int
-	oldArena.CombatNotice = func(Actor, bool) { oldNotices++ }
+	wire(&fxStub{arenaNotice: func(Actor, bool) { oldNotices++ }}, oldArena)
 	ix.Add(oldArena)
 	p := &ledgerStub{id: 1, class: ClassPlayer, at: location.Location{X: 500, Y: 500}}
 	ix.Revalidate(p)
@@ -86,11 +86,11 @@ func TestReloadPlayerMoveBeforeTheRebase(t *testing.T) {
 	next := NewIndex()
 	arena := NewArena(2, testCuboid(t, 0, 1000, 0, 1000))
 	var entered int
-	arena.CombatNotice = func(_ Actor, in bool) {
+	wire(&fxStub{arenaNotice: func(_ Actor, in bool) {
 		if in {
 			entered++
 		}
-	}
+	}}, arena)
 	next.Add(arena)
 	old := ix.Swap(next)
 

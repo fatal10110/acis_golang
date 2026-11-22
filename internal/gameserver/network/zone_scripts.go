@@ -17,7 +17,7 @@ func (l *GameClientLink) wireScriptZones(ix *zone.Index) {
 			continue
 		}
 		k.Core().OnEnter(func(a zone.Actor) {
-			if p, ok := a.(*liveZoneActor); ok {
+			if p, ok := a.(*playerZones); ok {
 				p.noteScriptZone(id)
 			}
 		})

@@ -155,7 +155,7 @@ func TestDamagePulseHurtsOccupantsAtAFixedRate(t *testing.T) {
 	in := sim.NewInline(time.Unix(0, 0))
 	victim := &creature{id: 1, vuln: 50}
 	corpse := &creature{id: 2, dead: true}
-	Wire(ix, Config{Queue: in.NewQueue("pulses"), Objects: objects{1: victim, 2: corpse}})
+	wire(ix, nil, Config{Queue: in.NewQueue("pulses"), Objects: objects{1: victim, 2: corpse}})
 
 	a := &occupant{id: 1, class: zone.ClassPlayer}
 	b := &occupant{id: 2, class: zone.ClassPlayer}
@@ -196,14 +196,13 @@ func TestDamagePulseStopsForADormantCastleTrap(t *testing.T) {
 	z := zone.NewDamage(1, box(t))
 	z.CastleID, z.HPDamage, z.InitialDelay, z.ReuseDelay = 5, 10, 0, time.Second
 	var siege bool
-	z.SiegeActive = func() bool { return siege }
 	z.Armed = true
 	ix := zone.NewIndex()
 	ix.Add(z)
 	in := sim.NewInline(time.Unix(0, 0))
 	victim := &creature{id: 1}
 	var tripped []int
-	Wire(ix, Config{
+	wire(ix, func() bool { return siege }, Config{
 		Queue: in.NewQueue("pulses"), Objects: objects{1: victim},
 		TrapTripped: func(castleID int) { tripped = append(tripped, castleID) },
 	})
@@ -295,7 +294,7 @@ func TestEffectPulseLandsSkillsOnTheTargetScope(t *testing.T) {
 		rolls = append(rolls[1:], r)
 		return r
 	}
-	Wire(ix, Config{
+	wire(ix, nil, Config{
 		Queue: in.NewQueue("pulses"), Objects: objects{1: monster, 2: player},
 		Skills: skills{
 			{ID: 4644, Level: 2}: {ID: 4644, Level: 2},

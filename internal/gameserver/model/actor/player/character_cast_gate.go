@@ -57,9 +57,8 @@ func (c *Character) StrifeForbidsSummoning() bool {
 	return c.seals != nil && c.seals.StrifeForbidsSummoning(c.ObjectID())
 }
 
-// SetInCastleZone records the live zone engine's current castle zone
-// membership (zone.FlagCastle).
-func (c *Character) SetInCastleZone(inside bool) { c.insideCastleZone.Store(inside) }
-
 // InCastleZone reports whether the character stands in a castle's grounds.
-func (c *Character) InCastleZone() bool { return c.insideCastleZone.Load() }
+func (c *Character) InCastleZone() bool {
+	z := c.zonesNow()
+	return z != nil && z.InCastleZone()
+}

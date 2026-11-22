@@ -108,10 +108,12 @@ func (ix *Index) Rebase(a Actor, held location.Location, onGrid bool) {
 
 // Reload moves a onto the zones ix holds now (Rebase), those of the region
 // holding it. A creature off the grid or mid-teleport enters none until it
-// lands.
-func (m *Member) Reload(ix *Index, a Actor) {
+// lands; Reload reports whether a entered the zones.
+func (m *Member) Reload(ix *Index, a Actor) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.steps = 0
-	ix.Rebase(a, m.held, m.onGrid && !teleporting(a))
+	onGrid := m.onGrid && !teleporting(a)
+	ix.Rebase(a, m.held, onGrid)
+	return onGrid
 }

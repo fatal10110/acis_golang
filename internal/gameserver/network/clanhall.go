@@ -15,22 +15,11 @@ import (
 
 var _ clanhall.Treasury = (*GameClientLink)(nil)
 
-// wireClanHallZones has every clan hall's grounds show its decorations to
-// a player entering them, and throw a player out to a banish point of the
-// hall.
-func (l *GameClientLink) wireClanHallZones(ix *zone.Index) {
-	for _, hall := range zone.OfKind[*zone.ClanHall](ix) {
-		hallID := int32(hall.ResidenceID)
-		hall.ShowInterior = func(a zone.Actor) { l.showClanHallInterior(hallID, a) }
-		hall.Banish = func(a zone.Actor) { l.banishFromClanHall(hallID, a) }
-	}
-}
-
 // showClanHallInterior sends the decorations of hall hallID to a, a player
 // entering its grounds, ahead of the compass update the same zone check
 // sends. A hall the hall data does not know shows nothing.
 func (l *GameClientLink) showClanHallInterior(hallID int32, a zone.Actor) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}
@@ -180,7 +169,7 @@ func (l *GameClientLink) hallOccupants(hallID int32) []zone.Actor {
 	}
 	var players []zone.Actor
 	for _, a := range grounds.Occupants() {
-		if _, ok := a.(*liveZoneActor); ok {
+		if _, ok := a.(*playerZones); ok {
 			players = append(players, a)
 		}
 	}

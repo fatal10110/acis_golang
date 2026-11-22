@@ -102,7 +102,7 @@ func TestSiegeStopReleasesOnlyItsOwnHolds(t *testing.T) {
 func TestSiegeSwitchTellsEachChangeOnce(t *testing.T) {
 	siege := NewSiege(1, testCuboid(t, -100, 100, -100, 100))
 	var notices []bool
-	siege.CombatNotice = func(_ Actor, entering bool) { notices = append(notices, entering) }
+	wire(&fxStub{siegeNotice: func(_ Actor, entering bool) { notices = append(notices, entering) }}, siege)
 	a := &memberStub{id: 1, class: ClassPlayer}
 	Revalidate(siege, a)
 
@@ -122,7 +122,7 @@ func TestOlympiadSwitchInterleavings(t *testing.T) {
 	t.Run("start between admit and entry", func(t *testing.T) {
 		stadium := NewOlympiad(1, testCuboid(t, -100, 100, -100, 100))
 		var running atomic.Bool
-		stadium.BattleStarted = running.Load
+		wire(&fxStub{fighting: running.Load}, stadium)
 		stadium.OnEnter(func(Actor) {
 			running.Store(true)
 			stadium.UpdateCombatStatus()
@@ -139,7 +139,7 @@ func TestOlympiadSwitchInterleavings(t *testing.T) {
 		stadium := NewOlympiad(1, testCuboid(t, -100, 100, -100, 100))
 		var running atomic.Bool
 		running.Store(!start)
-		stadium.BattleStarted = running.Load
+		wire(&fxStub{fighting: running.Load}, stadium)
 		a := &racingStub{memberStub: memberStub{id: 1, class: ClassPlayer}}
 		Revalidate(stadium, a)
 		a.beforeReplay = func() {

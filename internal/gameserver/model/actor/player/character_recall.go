@@ -5,16 +5,11 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// SetInBossZone records the live zone engine's current boss-zone
-// membership (zone.FlagBoss).
-func (c *Character) SetInBossZone(inside bool) {
-	c.insideBossZone.Store(inside)
-}
-
 // InBossZone reports whether the character currently stands in a boss
 // zone.
 func (c *Character) InBossZone() bool {
-	return c.insideBossZone.Load()
+	z := c.zonesNow()
+	return z != nil && z.InBossZone()
 }
 
 // Riding reports whether the character rides a strider.

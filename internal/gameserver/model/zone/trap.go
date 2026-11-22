@@ -23,9 +23,6 @@ type Trap struct {
 	// crosses the zone, and on the damage pulse's queue; a writer added
 	// later must switch this to atomic.Bool (or equivalent) first.
 	Armed bool
-	// SiegeActive reports whether the linked castle's siege is running;
-	// nil reads as not running. The game server wires it at boot.
-	SiegeActive func() bool
 }
 
 // TrapOf returns k's castle trap, nil when k is no trap zone.
@@ -40,11 +37,11 @@ func TrapOf(k Kind) *Trap {
 }
 
 // dormant reports whether the trap's effect is currently suppressed.
-func (t *Trap) dormant() bool {
+func (t *Trap) dormant(fx Effects) bool {
 	if t.CastleID <= 0 {
 		return false
 	}
-	return !t.Armed || t.SiegeActive == nil || !t.SiegeActive()
+	return !t.Armed || !fx.CastleSiegeRunning(t.CastleID)
 }
 
 // Damage is a trap that periodically hurts the playables standing inside
@@ -57,13 +54,6 @@ type Damage struct {
 	// InitialDelay and ReuseDelay time the damage pulse.
 	InitialDelay time.Duration
 	ReuseDelay   time.Duration
-
-	// StartPulse begins the periodic damage task; nil leaves the zone
-	// harmless. The zone fires it at most once until PulseStopped resets
-	// the latch. Hook implementations must tolerate overlapping calls when
-	// a task resets the latch before its previous StartPulse invocation
-	// returns.
-	StartPulse func()
 
 	pulsing atomic.Bool
 }
@@ -89,11 +79,11 @@ func (z *Damage) enter(a Actor) {
 	if z.HPDamage > 0 {
 		// A dormant castle trap does nothing at all - not even the danger
 		// marker below.
-		if z.dormant() {
+		if z.dormant(z.effects()) {
 			return
 		}
-		if z.pulsing.CompareAndSwap(false, true) && z.StartPulse != nil {
-			z.StartPulse()
+		if z.pulsing.CompareAndSwap(false, true) {
+			z.effects().StartPulse(z)
 		}
 	}
 	enterDanger(a)
@@ -141,7 +131,7 @@ func exitDanger(a Actor) {
 // Live reports whether the damage pulse keeps running: the zone deals
 // damage and is not a dormant castle trap. The damage task stops once this
 // is false.
-func (z *Damage) Live() bool { return z.HPDamage > 0 && !z.dormant() }
+func (z *Damage) Live() bool { return z.HPDamage > 0 && !z.dormant(z.effects()) }
 
 // PulseStopped resets the pulse latch; the damage task calls it when it
 // shuts itself down, so the next entry can start a fresh pulse. It reports
@@ -183,7 +173,7 @@ func (z *Swamp) Core() *Zone { return &z.Zone }
 func (z *Swamp) affects(Actor) bool { return true }
 
 func (z *Swamp) enter(a Actor) {
-	if z.dormant() {
+	if z.dormant(z.effects()) {
 		return
 	}
 	a.ZoneFlags().Set(FlagSwamp, true)

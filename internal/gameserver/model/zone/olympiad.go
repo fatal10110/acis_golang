@@ -6,20 +6,6 @@ package zone
 type Olympiad struct {
 	Zone
 	Spawns
-
-	// BattleStarted reports whether a match is currently fighting in this
-	// stadium; nil reads as no match.
-	BattleStarted func() bool
-	// CombatNotice tells a player they entered or left the active ring
-	// (leaving also closes the match scoreboard); nil tells nothing.
-	CombatNotice func(a Actor, entering bool)
-	// SendMatchInfo shows an entering player the running match's state;
-	// nil shows nothing.
-	SendMatchInfo func(a Actor)
-	// ExpelUninvited unsummons and teleports out an entering player-side
-	// actor whose controlling player is neither participant, observer nor
-	// game master; nil expels no one.
-	ExpelUninvited func(a Actor)
 }
 
 // NewOlympiad builds a stadium zone.
@@ -30,7 +16,7 @@ func (z *Olympiad) Core() *Zone { return &z.Zone }
 
 func (z *Olympiad) affects(Actor) bool { return true }
 
-func (z *Olympiad) battleRunning() bool { return z.BattleStarted != nil && z.BattleStarted() }
+func (z *Olympiad) battleRunning() bool { return z.effects().StadiumFighting(z) }
 
 // setRingHolds raises (on) or releases the open combat a fighting stadium
 // keeps everyone inside in.
@@ -41,18 +27,14 @@ func (z *Olympiad) enter(a Actor) {
 	a.ZoneFlags().Set(FlagNoRestart, true)
 
 	if z.battleRunning() && z.raise(a) && a.Class() == ClassPlayer {
-		if z.CombatNotice != nil {
-			z.CombatNotice(a, true)
-		}
-		if z.SendMatchInfo != nil {
-			z.SendMatchInfo(a)
-		}
+		z.effects().StadiumNotice(z, a, true)
+		z.effects().StadiumMatchInfo(z, a)
 	}
 
 	// Anything player-controlled answers to a player who must be allowed
 	// to be here; the tournament system makes the call.
-	if a.Class().Playable() && z.ExpelUninvited != nil {
-		z.ExpelUninvited(a)
+	if a.Class().Playable() {
+		z.effects().StadiumExpel(z, a)
 	}
 }
 
@@ -85,8 +67,8 @@ func (z *Olympiad) exit(a Actor) {
 	if !released {
 		setRingHolds(a, false)
 	}
-	if a.Class() == ClassPlayer && z.CombatNotice != nil {
-		z.CombatNotice(a, false)
+	if a.Class() == ClassPlayer {
+		z.effects().StadiumNotice(z, a, false)
 	}
 }
 
@@ -106,8 +88,8 @@ func (z *Olympiad) UpdateCombatStatus() {
 // replay brings a's ring combat in line with whether the fight runs now.
 func (z *Olympiad) replay(a Actor) {
 	if z.battleRunning() {
-		if z.raise(a) && a.Class() == ClassPlayer && z.CombatNotice != nil {
-			z.CombatNotice(a, true)
+		if z.raise(a) && a.Class() == ClassPlayer {
+			z.effects().StadiumNotice(z, a, true)
 		}
 		return
 	}
@@ -115,7 +97,7 @@ func (z *Olympiad) replay(a Actor) {
 	z.switchOffLocked(a, setRingHolds)
 	_, inside := z.occupants[a.ObjectID()]
 	z.mu.Unlock()
-	if inside && a.Class() == ClassPlayer && z.CombatNotice != nil {
-		z.CombatNotice(a, false)
+	if inside && a.Class() == ClassPlayer {
+		z.effects().StadiumNotice(z, a, false)
 	}
 }

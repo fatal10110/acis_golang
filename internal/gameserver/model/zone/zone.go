@@ -90,6 +90,9 @@ type Owned interface {
 type Zone struct {
 	id   int
 	form Form
+	// fx is what the zone's rules act through; set by Index.Wire before
+	// the zone is shared.
+	fx Effects
 
 	mu            sync.RWMutex
 	occupants     map[int32]Actor
@@ -231,8 +234,8 @@ type membership interface {
 
 // replayOn runs fn, a switch's replay of a zone's rules on occupant a,
 // under a's zone membership when a has one, so the replay neither
-// interleaves with a's own entry or exit nor runs the zone's hooks out of
-// order with them. No zone lock may be held.
+// interleaves with a's own entry or exit nor runs the zone's effects out
+// of order with them. No zone lock may be held.
 func replayOn(a Actor, fn func()) {
 	if m, ok := a.(membership); ok {
 		m.ReplayZoneRules(fn)

@@ -103,29 +103,11 @@ func (l *GameClientLink) stadiumZone(id int) (*zone.Olympiad, bool) {
 	return zs[id], true
 }
 
-// wireStadiumZones gives the stadium zones of ix their match: whether its
-// fight runs, the combat notices, the match window of a player walking in
-// and the expulsion of anyone who has no business there.
-func (l *GameClientLink) wireStadiumZones(ix *zone.Index) {
-	for i, z := range orderedStadiums(ix.All()) {
-		z.BattleStarted = func() bool {
-			if l.olympiad == nil {
-				return false
-			}
-			s, ok := l.olympiad.Stadium(i)
-			return ok && s.BattleStarted()
-		}
-		z.CombatNotice = stadiumCombatNotice
-		z.SendMatchInfo = func(a zone.Actor) { l.sendStadiumMatchInfo(i, a) }
-		z.ExpelUninvited = l.expelFromStadium
-	}
-}
-
 // stadiumCombatNotice tells a player it entered or left a fighting
 // stadium; leaving also closes its match window. The notice goes through
 // the player's queue, behind what the stadium's match already sent it.
 func stadiumCombatNotice(a zone.Actor, entering bool) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}
@@ -144,7 +126,7 @@ func stadiumCombatNotice(a zone.Actor, entering bool) {
 // fight runs both competitors' gauges, each followed by that competitor's
 // effect icon pass, through the player's queue behind its combat notice.
 func (l *GameClientLink) sendStadiumMatchInfo(id int, a zone.Actor) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok || l.olympiad == nil {
 		return
 	}
@@ -173,7 +155,7 @@ func (l *GameClientLink) sendStadiumMatchInfo(id int, a zone.Actor) {
 // competitor or an observer.
 func (l *GameClientLink) expelFromStadium(a zone.Actor) {
 	var owner *livePlayer
-	if za, ok := a.(*liveZoneActor); ok {
+	if za, ok := a.(*playerZones); ok {
 		owner = za.live
 	} else if s, ok := l.zoneSummon(a); ok {
 		owner, _ = liveSummonOwner(s)
@@ -273,7 +255,7 @@ func (a olympiadArena) stadiumPlayers(id int) []*livePlayer {
 	}
 	var out []*livePlayer
 	for _, occ := range z.Occupants() {
-		if za, ok := occ.(*liveZoneActor); ok {
+		if za, ok := occ.(*playerZones); ok {
 			out = append(out, za.live)
 		}
 	}

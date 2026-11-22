@@ -24,20 +24,8 @@ func (l *GameClientLink) wireZones(ix *zone.Index) {
 	if ix == nil {
 		return
 	}
-	for _, boss := range zone.OfKind[*zone.Boss](ix) {
-		boss.Eject = func(a zone.Actor) { l.ejectBossPlayer(boss, a) }
-	}
-	l.wireZoneOccupantHooks(ix)
 	l.wireScriptZones(ix)
-	l.wireClanHallZones(ix)
-	l.wireCastleZones(ix)
-	l.wireCastleTeleportZones(ix)
-	l.wireSiegeZones(ix)
-	l.wireNoLandingZones(ix)
-	wireMotherTreeZones(ix)
-	wireArenaZones(ix)
-	l.wireStadiumZones(ix)
-	l.wireZonePulses(ix)
+	ix.Wire(l.newZoneEffects(ix))
 }
 
 // reloadZones reads the zones anew and puts every creature in the new ones:
@@ -127,25 +115,4 @@ func (p *livePlayer) ReloadZones() {
 		return
 	}
 	p.zoneActor.reload(p.link.zones)
-}
-
-func (a *liveZoneActor) reload(ix *zone.Index) {
-	defer a.fireScriptZones()
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
-	a.mu.Lock()
-	a.steps = 0
-	onGrid := !a.offGrid && !a.live.Teleporting()
-	ix.Rebase(a, a.held, onGrid)
-	a.syncFlags()
-	a.keepBreath()
-	if !onGrid {
-		a.mu.Unlock()
-		return
-	}
-	code, changed, flagPvP := a.compassUpdate()
-	leftBattlefield := a.takeLeftBattlefield()
-	a.mu.Unlock()
-	a.flagLeftBattlefield(leftBattlefield)
-	a.sendCompass(code, changed, flagPvP)
 }

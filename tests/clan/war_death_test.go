@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -157,7 +159,7 @@ func TestClanWarDeath(t *testing.T) {
 			}
 			if tt.inArena {
 				founder := onlineCharacter(t, w.srv, w.leaderID)
-				onPlayerQueue(t, w.srv, w.leaderID, func() { founder.SetInPvPZone(true) })
+				onPlayerQueue(t, w.srv, w.leaderID, func() { holdZone(founder, zone.FlagPvP) })
 			}
 
 			killPlayer(t, w, victimID, killerID)
