@@ -86,8 +86,7 @@ func (s *hostileSink) Emit(ev event.Event) {
 		at := location.Location{X: x, Y: y, Z: z}
 		s.broadcast(func() wire.Frame { return frames.Stop(h.ObjectID(), at, h.Heading()) })
 	case event.Status:
-		attrs := npcStatusAttributes(e.Attrs)
-		s.broadcast(func() wire.Frame { return frames.Status(h.ObjectID(), attrs) })
+		s.broadcast(func() wire.Frame { return frames.Status(h.ObjectID(), npcStatusAttributes(e.Attrs)) })
 	case event.HPChanged:
 		s.broadcastHP()
 	case event.AbnormalEffectChanged:
@@ -331,7 +330,7 @@ func (l *GameClientLink) landAura(source world.Tracked, e event.AuraPulse) {
 	})
 	for _, live := range players {
 		if _, affected := live.Character.EffectList().ActiveBySkillID(e.SkillID); !affected {
-			zonePulseEffects{}.Land(live, *def)
+			zonePulseEffects{}.Land(live, def)
 		}
 	}
 }

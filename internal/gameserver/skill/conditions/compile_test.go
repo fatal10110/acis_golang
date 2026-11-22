@@ -444,24 +444,24 @@ func TestEvaluateSkillReportsFirstFailingClause(t *testing.T) {
 	def := modelskill.Definition{Conditions: []modelskill.ConditionClause{first, second}}
 
 	caster := source{&player{creature: creature{level: 40}}}
-	if _, ok := EvaluateSkill(def, caster, source{&npc{id: 29045}}); !ok {
+	if _, ok := EvaluateSkill(&def, caster, source{&npc{id: 29045}}); !ok {
 		t.Fatal("both clauses hold, EvaluateSkill refused")
 	}
-	if failed, ok := EvaluateSkill(def, caster, source{&npc{id: 1}}); ok || failed.MessageID != 2 {
+	if failed, ok := EvaluateSkill(&def, caster, source{&npc{id: 1}}); ok || failed.MessageID != 2 {
 		t.Fatalf("wrong target: got (%+v, %v), want the second clause refused", failed, ok)
 	}
-	if failed, ok := EvaluateSkill(def, source{&player{}}, nil); ok || failed.MessageID != 1 {
+	if failed, ok := EvaluateSkill(&def, source{&player{}}, nil); ok || failed.MessageID != 1 {
 		t.Fatalf("low level: got (%+v, %v), want the first clause refused", failed, ok)
 	}
 
 	broken := modelskill.Definition{Conditions: []modelskill.ConditionClause{{Root: leaf("player", map[string]string{"level": "forty"}), MessageID: 3}}}
-	if failed, ok := EvaluateSkill(broken, caster, nil); ok || failed.MessageID != 3 {
+	if failed, ok := EvaluateSkill(&broken, caster, nil); ok || failed.MessageID != 3 {
 		t.Fatalf("uncompilable clause: got (%+v, %v), want it refused", failed, ok)
 	}
-	if _, ok := EvaluateSkill(def, nil, nil); ok {
+	if _, ok := EvaluateSkill(&def, nil, nil); ok {
 		t.Fatal("nil caster passed a skill with conditions, want refused")
 	}
-	if _, ok := EvaluateSkill(modelskill.Definition{}, nil, nil); !ok {
+	if _, ok := EvaluateSkill(&modelskill.Definition{}, nil, nil); !ok {
 		t.Fatal("skill with no conditions refused")
 	}
 }
@@ -533,7 +533,7 @@ func TestGameConditionReadsOnlyNight(t *testing.T) {
 		}
 		clause := modelskill.ConditionClause{Root: node, MessageID: 4}
 		def := modelskill.Definition{Conditions: []modelskill.ConditionClause{clause}}
-		if failed, ok := EvaluateSkill(def, source{&player{}}, nil); ok || failed.MessageID != 0 {
+		if failed, ok := EvaluateSkill(&def, source{&player{}}, nil); ok || failed.MessageID != 0 {
 			t.Errorf("<game %v>: got (%+v, %v), want the cast refused with no feedback", attrs, failed, ok)
 		}
 	}

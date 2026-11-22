@@ -66,7 +66,7 @@ func (l *GameClientLink) castItemSkills(live *livePlayer, inv *itemcontainer.Inv
 	}()
 	for _, def := range defs {
 		if itemGate {
-			if failed, ok := conditions.EvaluateSkill(*def, live.Character, live.Target()); !ok {
+			if failed, ok := conditions.EvaluateSkill(def, live.Character, live.Target()); !ok {
 				sendSkillConditionFailure(live, failed, def.ID)
 				return
 			}

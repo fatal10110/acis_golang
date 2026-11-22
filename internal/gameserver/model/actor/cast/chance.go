@@ -348,7 +348,7 @@ func (p *ChanceProcs) castChanceSkill(owner chanceOwner, ownHit bool, def *model
 		return
 	}
 	if caster, ok := owner.(conditions.Source); ok {
-		if clause, ok := conditions.EvaluateSkill(*def, caster, target); !ok {
+		if clause, ok := conditions.EvaluateSkill(def, caster, target); !ok {
 			p.deliver(owner, ownHit, func(handlerskill.MessageSink) EffectResult {
 				return EffectResult{Messages: []any{ChanceConditionFailed{Skill: def, Clause: clause}}}
 			})

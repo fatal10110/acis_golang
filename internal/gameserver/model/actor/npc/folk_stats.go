@@ -92,11 +92,7 @@ func (f *Folk) AttachStatFuncs(fns []effect.Mod) {
 
 // StatFuncsAttached shows observers the stats fns changed.
 func (f *Folk) StatFuncsAttached(fns []effect.Mod) {
-	stats := make([]stat.Stat, len(fns))
-	for i, fn := range fns {
-		stats[i] = fn.Stat
-	}
-	f.broadcastModifiedStats(stats)
+	f.broadcastModifiedStats(modStats(fns))
 }
 
 // RemoveStatsByOwner drops every stat func owner added. A stripped owner

@@ -50,10 +50,10 @@ func TestConditionActorRidingFollowsMountType(t *testing.T) {
 			if got := actor.IsFlying(); got != tc.flying {
 				t.Fatalf("IsFlying() = %v, want %v", got, tc.flying)
 			}
-			if _, ok := conditions.EvaluateSkill(ridingRequired, c, nil); ok != tc.passRiding {
+			if _, ok := conditions.EvaluateSkill(&ridingRequired, c, nil); ok != tc.passRiding {
 				t.Fatalf(`riding="true" passes = %v, want %v`, ok, tc.passRiding)
 			}
-			if _, ok := conditions.EvaluateSkill(onFoot, c, nil); ok != tc.passOnFoot {
+			if _, ok := conditions.EvaluateSkill(&onFoot, c, nil); ok != tc.passOnFoot {
 				t.Fatalf(`riding="false" passes = %v, want %v`, ok, tc.passOnFoot)
 			}
 
@@ -66,10 +66,10 @@ func TestConditionActorRidingFollowsMountType(t *testing.T) {
 			if c.ConditionActor().IsRiding() || c.ConditionActor().IsFlying() {
 				t.Fatal("riding or flying after the dismount")
 			}
-			if _, ok := conditions.EvaluateSkill(ridingRequired, c, nil); ok {
+			if _, ok := conditions.EvaluateSkill(&ridingRequired, c, nil); ok {
 				t.Fatal(`riding="true" passes after the dismount`)
 			}
-			if _, ok := conditions.EvaluateSkill(onFoot, c, nil); !ok {
+			if _, ok := conditions.EvaluateSkill(&onFoot, c, nil); !ok {
 				t.Fatal(`riding="false" fails after the dismount`)
 			}
 		})

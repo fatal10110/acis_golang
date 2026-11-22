@@ -91,9 +91,9 @@ func (s skills) Definition(ref modelskill.Ref) (*modelskill.Definition, bool) {
 // conditions of the skill ids it holds.
 type effects struct{ refuse map[modelskill.ID]bool }
 
-func (e effects) Conditions(_ Target, def modelskill.Definition) bool { return !e.refuse[def.ID] }
+func (e effects) Conditions(_ Target, def *modelskill.Definition) bool { return !e.refuse[def.ID] }
 
-func (effects) Land(t Target, def modelskill.Definition) {
+func (effects) Land(t Target, def *modelskill.Definition) {
 	c := t.(*creature)
 	c.mu.Lock()
 	defer c.mu.Unlock()

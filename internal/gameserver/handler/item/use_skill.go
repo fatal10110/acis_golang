@@ -180,7 +180,7 @@ func UseAll(req UseRequest) []UseResult {
 		if !ok {
 			continue
 		}
-		if failed, ok := conditions.EvaluateSkill(*def, req.Caster, req.Target); !ok {
+		if failed, ok := conditions.EvaluateSkill(def, req.Caster, req.Target); !ok {
 			return append(results, UseResult{Outcome: ConditionRejected, Skill: def, Condition: failed})
 		}
 

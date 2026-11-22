@@ -69,7 +69,7 @@ type zonePulseEffects struct{}
 
 // Conditions evaluates def's conditions with target as caster and target,
 // telling a player the failed condition's message.
-func (zonePulseEffects) Conditions(target zonepulse.Target, def modelskill.Definition) bool {
+func (zonePulseEffects) Conditions(target zonepulse.Target, def *modelskill.Definition) bool {
 	source, _ := target.(conditions.Source)
 	clause, ok := conditions.EvaluateSkill(def, source, target)
 	if !ok {
@@ -82,7 +82,7 @@ func (zonePulseEffects) Conditions(target zonepulse.Target, def modelskill.Defin
 
 // Land lands def's effects on target, telling a player of each effect it
 // resisted.
-func (zonePulseEffects) Land(target zonepulse.Target, def modelskill.Definition) {
+func (zonePulseEffects) Land(target zonepulse.Target, def *modelskill.Definition) {
 	effector, ok := target.(effect.Actor)
 	if !ok {
 		return
@@ -91,7 +91,7 @@ func (zonePulseEffects) Land(target zonepulse.Target, def modelskill.Definition)
 	if !ok {
 		return
 	}
-	resisted := skillhandler.LandEffects(effector, effected, def)
+	resisted := skillhandler.LandEffects(effector, effected, *def)
 	live, isPlayer := target.(*livePlayer)
 	if !isPlayer {
 		return
