@@ -40,21 +40,25 @@ const (
 // rare toggleObject write (a door opening/closing), against a read volume of
 // every CanMove/CanSee/pathfind cell step. It's held behind an atomic
 // pointer so steady-state reads are a single atomic load plus a plain map
-// read, no lock: toggleObject clones-and-swaps the map when it introduces a
-// block the map doesn't have yet, and mutates an already-present block's
-// *dynamic.Block in place, under that block's own internal lock, without
-// touching the map at all. dynamicBlocksMu only serializes concurrent
-// writers against each other; no read path ever acquires it.
+// read, no lock. toggleObject clones-and-swaps the map only when it
+// introduces a block the map has never held; entries are never deleted, so
+// each block key costs one clone in its lifetime and a door that keeps
+// opening and closing never copies the map. An already-present block's
+// *dynamic.Block is mutated in place, under that block's own internal lock.
+// dynamicBlocksMu only serializes concurrent writers against each other; no
+// read path ever acquires it.
 //
-// dynamicMask gates that map. Any live door makes dynamicBlocks non-empty,
-// so without the gate every cell step in the world would pay a hash lookup
-// to discover it has no overlay. One bit per block of a region answers that
-// question instead; the map is touched only where a bit is set. Region
-// bitmaps are allocated lazily on a region's first door (regions with no
-// door keep a nil pointer) and published by clone-and-swap, the same
-// discipline as dynamicBlocks; once allocated, a bitmap is never freed even
-// after its region's last door closes, at 8 KB per region and ~1.4 MB for
-// the whole tile grid, well inside the issue's budget.
+// dynamicMask gates that map and is the authority on which blocks carry a
+// live overlay: a bit is set while its block holds at least one object, and
+// a block whose last object left keeps its map entry with its bit cleared.
+// Any live door makes dynamicBlocks non-empty, so without the gate every
+// cell step in the world would pay a hash lookup to discover it has no
+// overlay; one bit per block of a region answers that question instead.
+// Region bitmaps are allocated lazily on a region's first door (regions with
+// no door keep a nil pointer), never replaced or freed afterward (8 KB per
+// region, ~1.4 MB for the whole tile grid), and their bits flip in place
+// with atomic word operations. A bit is set only after its block is
+// published in dynamicBlocks, so a reader that sees the bit finds the entry.
 type Engine struct {
 	regionsMu sync.Mutex
 	regions   [regionTilesX][regionTilesY]*block.Region
