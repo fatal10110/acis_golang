@@ -221,8 +221,8 @@ func TestImmobilizedPetRestoresFollowModeFromBeforeTheBuff(t *testing.T) {
 // owner's Servitor Empowerment (ImobilePetBuff) on a following pet, then has
 // the pet use Wild Defense (ImobileBuff on itself) while it holds. The first
 // lock drops follow mode; the second records that follow mode is already off.
-// Ending either buff restores that recorded mode, so the pet stays idle and
-// does not walk after its owner, and ending the other one keeps it off.
+// The pet stays immobilized until the last lock ends (#5084), then restores
+// that recorded mode, so it stays idle and does not walk after its owner.
 func TestStackedImmobilizingBuffsRestoreFollowModeFromTheLastLock(t *testing.T) {
 	t.Parallel()
 	h, petActor := bootFollowingPet(t)
@@ -239,6 +239,9 @@ func TestStackedImmobilizingBuffsRestoreFollowModeFromTheLastLock(t *testing.T) 
 	}
 
 	removePetEffect(t, petActor, empowerment)
+	if !petActor.Immobilized() {
+		t.Fatal("pet immobilized after the first buff ended = false, want true (Wild Defense still holds; #5084)")
+	}
 	if petActor.FollowActive() {
 		t.Fatal("follow mode after the first buff ended = on, want off (the second lock recorded it off)")
 	}
@@ -248,6 +251,9 @@ func TestStackedImmobilizingBuffsRestoreFollowModeFromTheLastLock(t *testing.T) 
 	h.requirePetStaysPut(t, petActor, "pet after the first of two stacked buffs ended")
 
 	removePetEffect(t, petActor, wildDefense)
+	if petActor.Immobilized() {
+		t.Fatal("pet immobilized after both buffs ended = true, want false")
+	}
 	if petActor.FollowActive() {
 		t.Fatal("follow mode after both buffs ended = on, want off")
 	}
