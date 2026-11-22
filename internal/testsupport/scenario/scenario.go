@@ -15,8 +15,9 @@
 //	                                          Script.Now and game tick read) starts at that time of day (UTC) on
 //	                                          2026-01-01, so a script reading the minute finds a known one; without it
 //	                                          the clock starts at the wall time of the run
-//	driven                                    optional: the scenario pins a timer's deadline to the millisecond, which the
-//	                                          wall clock of a real-pool pass does not meet; that pass skips it
+//	driven                                    optional: the scenario pins a timer's deadline to the millisecond or to a
+//	                                          fraction of a second (the wall clock also counts the run's own work
+//	                                          between steps), which a real-pool pass does not meet; that pass skips it
 //	character <name> <level>                  the character the client plays, with the experience its level starts at
 //	class <class id>                          optional: the character's class, and so its race (default 0, a human
 //	                                          fighter); every class then has a template with the fixture's

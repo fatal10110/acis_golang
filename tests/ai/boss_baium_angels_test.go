@@ -263,6 +263,7 @@ func TestBaiumArchangelAnswersAHit(t *testing.T) {
 // archangel leaves the world at its next check.
 func TestBaiumArchangelsLeaveWithBaium(t *testing.T) {
 	w := bootBaium(t, "116033;17447;10107;0")
+	needsDrivenClock(t, w.srv)
 	w.advance(t, 5*time.Second)
 	boss := soleBaiumNPC(t, w, baiumID).(*npc.Hostile)
 	archangelsByIndex(t, w)

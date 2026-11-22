@@ -34,6 +34,7 @@ func (w *zakenWorld) zakenSendFar(t *testing.T, c attackable.Combatant, at locat
 func TestZakenMassTeleportLeavesAFarMark(t *testing.T) {
 	t.Parallel()
 	w := bootZaken(t, zakenBoot{})
+	needsDrivenClock(t, w.srv)
 	h := w.zaken(t)
 	w.settle(t)
 	mate := (&ind1World{warriorWorld: w.warriorWorld}).joinCharacter(t, "mate", "Mate")

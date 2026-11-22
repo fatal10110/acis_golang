@@ -460,6 +460,7 @@ func TestLV3WizardPrivateBlastsThenDies(t *testing.T) {
 func TestLV3RangerSwitchesItsArrowModes(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual7(t, raidBoot{}, ind7bTemplate(ind7bRangerID), warriorTemplate(ind7MasterID, nil))
+	needsDrivenClock(t, w.srv)
 	me := w.player.ObjectID()
 	master := w.spawn(t, ind7MasterID, 600, 0)
 	ranger := w.raise(t, master, ind7bRangerID, 300, 0, script.Params{P1: me, P2: me, P3: master.ObjectID()})

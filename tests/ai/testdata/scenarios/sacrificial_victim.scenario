@@ -2,6 +2,7 @@
 # makes it play its social action 1 on the AI tick ten seconds later and, five seconds after that, leave the
 # Ritual Sacrifice (22145) where it stood and leave the world; the sacrifice, standing out of
 # the character's sight as the line's own, is a fresh one the script spawns.
+driven
 character Hunter 20
 script script.ai.individual.DefaultNpc
 script script.ai.individual.SacrificialVictim

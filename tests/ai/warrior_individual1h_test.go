@@ -128,6 +128,7 @@ func plantTemplate(id int32, prob int) *npc.Template {
 func TestPrimevalPlantDebuffsAroundItEvery15Seconds(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual1h(t, plantTemplate(plantID, 30))
+	needsDrivenClock(t, w.srv)
 	n := w.spawn(t, plantID, 300, 0)
 	w.srv.InstallNPCCastSeam(t, n, modelskill.NewTable([]modelskill.Definition{ind1Skill(ind1hDebuffID, 0, true)}))
 	w.draws.set(30)
