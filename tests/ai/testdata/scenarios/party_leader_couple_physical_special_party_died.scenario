@@ -19,9 +19,11 @@ hit near 10
   desires near attack(player)=125.49425287356321
 jump nearpriv 350 0 0
 kill nearpriv
+  S SystemMessage id=95 1:0 1:0
   desires near attack(player)=1000 cast(near,4065,move)=1000000 cast(near,4341,move)=1000000
 hit far 10
   desires far attack(player)=125.49425287356321
 jump farpriv 300 900 0
 kill farpriv
+  S SystemMessage id=95 1:0 1:0
   desires far attack(player)=22479.494252873563

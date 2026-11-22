@@ -54,6 +54,12 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// An object live does not know is refused as an off-grid one is, so the
+	// click discloses neither its position nor its HP (#4993).
+	if !l.knownToClicker(live, target) {
+		l.announceTargetCleared(live, live.TakeTarget())
+		return
+	}
 	if _, ok := target.(*boat.Boat); ok {
 		// A click on a boat, plain or forced, does nothing at all: a boat is
 		// never selected, and silence is the expected answer.
@@ -921,6 +927,28 @@ func (l *GameClientLink) selectable(live *livePlayer, target world.Tracked) bool
 		return false
 	}
 	return true
+}
+
+// knownToClicker reports whether live may click target: live itself, its own
+// summon (whose whereabouts its pet window already shows), an object in
+// live's known list, or a player of live's own party wherever it is. An
+// object off the grid is known to nobody.
+func (l *GameClientLink) knownToClicker(live *livePlayer, target world.Tracked) bool {
+	if target.ObjectID() == live.ObjectID() {
+		return true
+	}
+	if pet, ok := target.(*summon.Actor); ok && pet.ShownAsOwnedBy(live.ObjectID()) {
+		return true
+	}
+	if c, ok := target.(attackable.Combatant); ok {
+		if live.Knows(c) {
+			return true
+		}
+	} else if world.Knows(live, target) {
+		return true
+	}
+	mate, isPlayer := target.(*livePlayer)
+	return isPlayer && l.parties != nil && l.parties.SameParty(live.ObjectID(), mate.ObjectID())
 }
 
 // clearLiveTarget drops live's attack intention, then clears its selection.

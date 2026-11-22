@@ -25,20 +25,28 @@ action mimyu
   S ActionFailed
 bypass npc_{mimyu}_Quest
   S ActionFailed
+  S DeleteObject obj=mimyu
+  S ActionFailed
   at mimyu 110385 41605 -4672
 jump mimyu 10 0 0
+action mimyu
 action mimyu
   S ActionFailed
   S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
   S ActionFailed
 bypass npc_{mimyu}_Quest
+  S ActionFailed
+  S DeleteObject obj=mimyu
   S ActionFailed
   at mimyu 109806 40834 -4670
 jump mimyu 10 0 0
 action mimyu
+action mimyu
   S ActionFailed
   S NpcHtmlMessage obj=mimyu item=0 page=default/30747.htm
   S ActionFailed
 bypass npc_{mimyu}_Quest
+  S ActionFailed
+  S DeleteObject obj=mimyu
   S ActionFailed
   at mimyu 108930 41595 -4673
