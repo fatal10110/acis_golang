@@ -56,17 +56,15 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundAccept)
 		s.GiveItems(p, orderOfGosta, 1)
 	case strings.EqualFold(e.Name, "30969-02a.htm"):
-		lizardFangs := p.ItemCount(lizardFang)
+		lizardFangs := s.TakeAllItems(p, lizardFang)
 		if lizardFangs > 0 {
 			htmltext = "30969-02.htm"
-			s.TakeItems(p, lizardFang, -1)
 			s.RewardItems(p, 57, lizardFangs*20+bonus(lizardFangs))
 		}
 	case strings.EqualFold(e.Name, "30969-03a.htm"):
-		barrels := p.ItemCount(barrelOfLeague)
+		barrels := s.TakeAllItems(p, barrelOfLeague)
 		if barrels > 0 {
 			htmltext = "30969-03.htm"
-			s.TakeItems(p, barrelOfLeague, -1)
 			s.RewardItems(p, billOfIasonHeine, barrels)
 			s.RewardItems(p, 57, barrels*20+bonus(barrels))
 			// Heine sends the character to Roman, who exchanges the bills.

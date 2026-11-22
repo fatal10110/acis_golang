@@ -66,14 +66,11 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30125-02.htm"
 		}
 	case questlog.StatusStarted:
-		feathers := p.ItemCount(harpyFeather)
-		venom := p.ItemCount(medusaVenom)
-		teeth := p.ItemCount(wyrmTooth)
+		feathers := s.TakeAllItems(p, harpyFeather)
+		venom := s.TakeAllItems(p, medusaVenom)
+		teeth := s.TakeAllItems(p, wyrmTooth)
 		if feathers+venom+teeth > 0 {
 			htmltext = "30125-05.htm"
-			s.TakeItems(p, harpyFeather, -1)
-			s.TakeItems(p, medusaVenom, -1)
-			s.TakeItems(p, wyrmTooth, -1)
 			reward := feathers*78 + venom*88 + teeth*92
 			if feathers+venom+teeth > 10 {
 				reward += 3100

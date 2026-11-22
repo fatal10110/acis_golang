@@ -135,15 +135,11 @@ func onTalk(s *script.Script, e script.Talk) string {
 	case questlog.StatusStarted:
 		switch e.NPC.NpcID() {
 		case randolf:
-			if !p.HasItem(pirateTreasureChest) {
+			if chests := s.TakeAllItems(p, pirateTreasureChest); chests == 0 {
 				htmltext = "30095-03.htm"
 			} else {
 				htmltext = "30095-05.htm"
-
-				reward := p.ItemCount(pirateTreasureChest) * 400
-
-				s.TakeItems(p, pirateTreasureChest, -1)
-				s.RewardItems(p, adena, reward+19800)
+				s.RewardItems(p, adena, chests*400+19800)
 			}
 		case collob:
 			htmltext = "30092-01.htm"

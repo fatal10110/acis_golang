@@ -124,9 +124,7 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "08.htm"
 		} else {
 			htmltext = "09.htm"
-			count := p.ItemCount(ancientScroll)
-			s.TakeItems(p, ancientScroll, -1)
-			s.RewardItems(p, blankScroll, count)
+			s.RewardItems(p, blankScroll, s.TakeAllItems(p, ancientScroll))
 		}
 	}
 	return htmltext

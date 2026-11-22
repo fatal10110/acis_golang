@@ -101,10 +101,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			htmltext = "30971-02.htm"
 		}
 	case strings.EqualFold(e.Name, "30971-03.htm"):
-		if p.HasItem(uselessBonePieces) {
-			amount := p.ItemCount(uselessBonePieces) * 104
-			s.TakeItems(p, uselessBonePieces, -1)
-			s.RewardItems(p, 57, amount)
+		if bones := s.TakeAllItems(p, uselessBonePieces); bones > 0 {
+			s.RewardItems(p, 57, bones*104)
 		} else {
 			htmltext = "30971-02a.htm"
 		}
@@ -143,8 +141,7 @@ func onTalk(s *script.Script, e script.Talk) string {
 				htmltext = "30970-08.htm"
 			default:
 				// Shared part of cond 6 and 7.
-				amount := p.ItemCount(uselessBonePieces) * 70
-				s.TakeItems(p, uselessBonePieces, -1)
+				amount := s.TakeAllItems(p, uselessBonePieces) * 70
 				if cond == 7 {
 					// The scared little girl.
 					htmltext = "30970-10.htm"

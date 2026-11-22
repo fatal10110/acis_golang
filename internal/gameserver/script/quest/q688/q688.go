@@ -49,16 +49,13 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(e.Player, script.SoundAccept)
 	case strings.EqualFold(e.Name, "32105-08.htm"):
-		count := e.Player.ItemCount(dinosaurFangNecklace)
-		if count > 0 {
-			s.TakeItems(e.Player, dinosaurFangNecklace, -1)
+		if count := s.TakeAllItems(e.Player, dinosaurFangNecklace); count > 0 {
 			s.RewardItems(e.Player, 57, count*3000)
 		}
 		s.PlaySound(e.Player, script.SoundFinish)
 		st.Exit(true)
 	case strings.EqualFold(e.Name, "32105-06.htm"):
-		count := e.Player.ItemCount(dinosaurFangNecklace)
-		s.TakeItems(e.Player, dinosaurFangNecklace, -1)
+		count := s.TakeAllItems(e.Player, dinosaurFangNecklace)
 		s.RewardItems(e.Player, 57, count*3000)
 	case strings.EqualFold(e.Name, "32105-07.htm"):
 		count := e.Player.ItemCount(dinosaurFangNecklace)

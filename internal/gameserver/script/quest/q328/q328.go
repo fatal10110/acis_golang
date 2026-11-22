@@ -79,17 +79,14 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30436-02.htm"
 		}
 	case questlog.StatusStarted:
-		carcasses := p.ItemCount(monsterEyeCarcass)
-		lenses := p.ItemCount(monsterEyeLens)
-		gizzards := p.ItemCount(basiliskGizzard)
+		carcasses := s.TakeAllItems(p, monsterEyeCarcass)
+		lenses := s.TakeAllItems(p, monsterEyeLens)
+		gizzards := s.TakeAllItems(p, basiliskGizzard)
 		all := carcasses + lenses + gizzards
 		if all == 0 {
 			htmltext = "30436-04.htm"
 		} else {
 			htmltext = "30436-05.htm"
-			s.TakeItems(p, monsterEyeCarcass, -1)
-			s.TakeItems(p, monsterEyeLens, -1)
-			s.TakeItems(p, basiliskGizzard, -1)
 			bonus := int32(0)
 			if all >= 10 {
 				bonus = 618

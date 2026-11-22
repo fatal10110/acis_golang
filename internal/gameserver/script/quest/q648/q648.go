@@ -127,11 +127,9 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(2)
 		s.PlaySound(p, script.SoundAccept)
 	case strings.EqualFold(e.Name, "32020-14.htm"), strings.EqualFold(e.Name, "32020-15.htm"):
-		black := p.ItemCount(blackIceCrystal)
-		silver := p.ItemCount(silverIceCrystal)
+		black := s.TakeAllItems(p, blackIceCrystal)
+		silver := s.TakeAllItems(p, silverIceCrystal)
 		if silver+black > 0 {
-			s.TakeItems(p, blackIceCrystal, -1)
-			s.TakeItems(p, silverIceCrystal, -1)
 			s.RewardItems(p, 57, silver*300+black*1200)
 		} else {
 			htmltext = "32020-16a.htm"

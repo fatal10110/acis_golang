@@ -74,6 +74,14 @@ func (s *Script) TakeHeldItems(p *Player, itemID, count int32) int32 {
 	return int32(p.character().TakeHeldScriptItems(itemID, int(count)))
 }
 
+// TakeAllItems takes every unit of itemID p holds, as TakeItems with a
+// negative count does, and returns how many it took. A turn-in pays from
+// this count rather than from an earlier ItemCount, so a unit that lands
+// between the two is paid for, never taken for nothing (#5172).
+func (s *Script) TakeAllItems(p *Player, itemID int32) int32 {
+	return s.TakeHeldItems(p, itemID, -1)
+}
+
 // AddItems gives p count units of itemID as GiveItems does, with the chat
 // line of items picked up.
 func (s *Script) AddItems(p *Player, itemID, count int32) {

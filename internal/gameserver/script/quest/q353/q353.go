@@ -65,12 +65,11 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "31044-02.htm"
 		}
 	case questlog.StatusStarted:
-		stones := p.ItemCount(stone)
+		stones := s.TakeAllItems(p, stone)
 		if stones == 0 {
 			htmltext = "31044-05.htm"
 		} else {
 			htmltext = "31044-06.htm"
-			s.TakeItems(p, stone, -1)
 			s.RewardItems(p, 57, 2500+230*stones)
 		}
 	}

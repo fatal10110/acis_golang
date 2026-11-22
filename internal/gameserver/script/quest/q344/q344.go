@@ -83,11 +83,9 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(true)
 	case strings.EqualFold(e.Name, "30754-06.htm"):
-		if !p.HasItem(articleDeadHero) {
+		if amount := s.TakeAllItems(p, articleDeadHero); amount == 0 {
 			htmltext = "30754-06a.htm"
 		} else {
-			amount := p.ItemCount(articleDeadHero)
-			s.TakeItems(p, articleDeadHero, -1)
 			s.GiveItems(p, 57, amount*60)
 			// The special item: the chance grows with the articles handed in.
 			if int32(s.Rnd(1000)) < min(10, max(1, amount/10)) {

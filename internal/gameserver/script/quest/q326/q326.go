@@ -69,14 +69,11 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30435-02.htm"
 		}
 	case questlog.StatusStarted:
-		redBadges := p.ItemCount(redCrossBadge)
-		blueBadges := p.ItemCount(blueCrossBadge)
-		blackBadges := p.ItemCount(blackCrossBadge)
+		redBadges := s.TakeAllItems(p, redCrossBadge)
+		blueBadges := s.TakeAllItems(p, blueCrossBadge)
+		blackBadges := s.TakeAllItems(p, blackCrossBadge)
 		badgesSum := redBadges + blueBadges + blackBadges
 		if badgesSum > 0 {
-			s.TakeItems(p, redCrossBadge, -1)
-			s.TakeItems(p, blueCrossBadge, -1)
-			s.TakeItems(p, blackCrossBadge, -1)
 			bonus := int32(0)
 			if badgesSum >= 10 {
 				bonus = 4320
