@@ -165,7 +165,13 @@ func AddItems(inv *itemcontainer.Inventory, tmpl *item.Template, count, enchant 
 	if tmpl.Stackable {
 		instances = 1
 	}
-	added := make([]*item.Instance, 0, instances)
+	// CheckAdd bounds count; the capacity is bounded again here so no
+	// caller sizes an allocation by an unchecked count.
+	capacity := instances
+	if capacity > MaxEditInstances {
+		capacity = MaxEditInstances
+	}
+	added := make([]*item.Instance, 0, capacity)
 	for range instances {
 		inst, err := inv.AddCreated(tmpl.ID, count, nextID)
 		if err != nil {
