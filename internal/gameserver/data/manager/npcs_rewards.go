@@ -223,7 +223,7 @@ func (d *deathRewards) rollDrops(s *KillRewardSettings, receiver attackable.Comb
 		autoLootItems = s.AutoLootRaid
 	}
 
-	NewKillReward(d.droppingCategories(), d.hostile.SpoilPool(), levelMultiplier, d.raid, s.Rates, autoLootItems, s.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).
+	NewKillReward(d.droppingCategories(), d.hostile.ExistingSpoilPool(), levelMultiplier, d.raid, s.Rates, autoLootItems, s.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).
 		LogTo(d.hostile.Logger(), d.tmpl.ID).
 		From(d.hostile).
 		MultipleItemDrop(s.MultipleItemDrop).
@@ -235,7 +235,7 @@ func (d *deathRewards) rollDrops(s *KillRewardSettings, receiver attackable.Comb
 // them, except that a seed other than an alternative one blocks the
 // ordinary item drops (currency, spoil and herbs still roll).
 func (d *deathRewards) droppingCategories() []item.DropCategory {
-	if !d.hostile.SeedState().BlocksDrops() {
+	if !d.hostile.SeedBlocksDrops() {
 		return d.categories
 	}
 	kept := make([]item.DropCategory, 0, len(d.categories))

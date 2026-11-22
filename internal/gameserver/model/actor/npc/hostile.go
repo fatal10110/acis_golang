@@ -120,8 +120,8 @@ type Hostile struct {
 	attackedByMu sync.Mutex
 	attackedBy   map[int32]attackable.Combatant
 
-	// partyLinks is the NPC's master, privates and escort points.
-	partyLinks
+	// escortLinks are the NPC's escort points, made once it is in a party.
+	escortLinks
 
 	// inWater reports whether a location lies in a water zone; nil means
 	// none does. Set before the NPC is published.
@@ -163,10 +163,10 @@ type Hostile struct {
 	// cast is the live cast controller; see SetCastController.
 	cast atomic.Pointer[CastControl]
 
-	spoil          item.SpoilPool
-	seed           SeedState
+	// loot is this life's spoil, seed and over-hit state, nil until a
+	// skill first writes one of them (ensureLoot).
+	loot           atomic.Pointer[lifeLoot]
 	absorb         absorbers
-	overhit        overhitState
 	corpseDeadline time.Time
 
 	health creature.Health
@@ -312,7 +312,6 @@ func newHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 		currentSpiritshots: currentSpiritshots,
 	}
 	h.zones = newZoneMember(h)
-	h.initSeedState()
 	// Raid and grand bosses are raid-related from construction; minions
 	// are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())

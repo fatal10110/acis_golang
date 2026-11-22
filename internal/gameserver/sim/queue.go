@@ -44,9 +44,9 @@ type Queue struct {
 	running *slot
 
 	mu        sync.Mutex
-	tasks     []func() // pending tasks; Pool only, Inline keeps one global FIFO
-	scheduled bool     // Pool only: q is in the run queue or being drained
-	backlog   bool     // Pool only: pending tasks crossed highWater and have not dropped back below it
+	tasks     fifo[func()] // pending tasks; Pool only, Inline keeps one global FIFO
+	scheduled bool         // Pool only: q is in the run queue or being drained
+	backlog   bool         // Pool only: pending tasks crossed highWater and have not dropped back below it
 	closed    bool
 	accepted  uint64 // tasks and timer expiries the executor took from q, ever
 	// timers heads the list of armed timers and tickers, linked through

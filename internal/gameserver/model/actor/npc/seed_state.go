@@ -45,17 +45,17 @@ const (
 	strongCropBaseOffset = 4301
 )
 
-// initSeedState records the owner data a harvest's crop count reads.
-func (h *Hostile) initSeedState() {
-	tmpl := h.Instance.Template
-	h.seed.ownerLevel = tmpl.Level
-	h.seed.cropBase = 1
+// seedOwnerData returns the owner data a harvest's crop count reads: the
+// template level and its strong-type crop multiplier.
+func seedOwnerData(tmpl *Template) (level, cropBase int) {
+	cropBase = 1
 	for _, p := range tmpl.Passives {
 		if id := int(p.ID); id >= strongCropFirstSkill && id <= strongCropLastSkill {
-			h.seed.cropBase = id - strongCropBaseOffset
+			cropBase = id - strongCropBaseOffset
 			break
 		}
 	}
+	return tmpl.Level, cropBase
 }
 
 // Seedable reports whether this NPC's template takes manor seeds.
