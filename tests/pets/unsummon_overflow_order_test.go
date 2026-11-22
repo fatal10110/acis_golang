@@ -12,7 +12,7 @@ import (
 // land on the floor.
 //
 // transferPetInventory walks petInventory.Items() and, per item, either
-// transfers it to the owner or drops it once ValidateCapacity(1) fails. The
+// transfers it to the owner or drops it once the owner has no slot for it. The
 // reference walks _items — container order — and makes the same per-item
 // decision (PetInventory.deleteMe), so the pet's most recently received item
 // is the one that survives a full owner inventory.

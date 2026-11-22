@@ -41,6 +41,12 @@ const (
 	// GiveStackFull means the receiver's stack of the item would pass the
 	// item count limit with the moved units added, so nothing moves.
 	GiveStackFull
+	// GiveOwnerTooHeavy means the owner cannot carry the weight of the
+	// units taken back from the pet (#5088).
+	GiveOwnerTooHeavy
+	// GiveOwnerSlotsFull means the owner has no free slot for an item taken
+	// back from the pet that does not merge into a stack it holds (#5088).
+	GiveOwnerSlotsFull
 )
 
 // UseFailure is the non-mutating reason a pet-use-item request failed.
@@ -207,8 +213,12 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 // the transfer, so a failed transfer leaves the pet's equip state untouched.
 // The reported WasWorn, read before the transfer, drives the PET_TOOK_OFF_S1
 // notification. GiveStackFull reports an owner stack that cannot take the
-// count; any other failure is GiveNoop.
+// count, GiveOwnerTooHeavy an owner that cannot carry its weight and
+// GiveOwnerSlotsFull one with no slot for it; any other failure is GiveNoop.
 func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, GiveFailure, error) {
+	if failure := checkTakeBack(petInv, playerInv, objectID, count); failure != GiveOK {
+		return TransferResult{}, failure, nil
+	}
 	wasWorn := false
 	itemID := int32(0)
 	if petInv != nil {
@@ -366,6 +376,27 @@ func checkTransfer(from, to *itemcontainer.Inventory, objectID int32, count int)
 	}
 	if !stackFits(to, inst.TemplateID, tmpl, count) {
 		return GiveStackFull
+	}
+	return GiveOK
+}
+
+// checkTakeBack runs checkTransfer, then checks that the owner can hold
+// what it takes back from its pet (#5088): the weight of the units, then a
+// slot unless they merge into a stack the owner already holds.
+func checkTakeBack(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) GiveFailure {
+	if failure := checkTransfer(petInv, playerInv, objectID, count); failure != GiveOK {
+		return failure
+	}
+	inst := petInv.ItemByObjectID(objectID)
+	tmpl, ok := petInv.Templates().Get(inst.TemplateID)
+	if !ok {
+		return GiveNoop
+	}
+	if !playerInv.ValidateWeight(int(tmpl.Weight) * count) {
+		return GiveOwnerTooHeavy
+	}
+	if !playerInv.ValidateCapacity(playerInv.SlotsNeededFor(inst, tmpl)) {
+		return GiveOwnerSlotsFull
 	}
 	return GiveOK
 }

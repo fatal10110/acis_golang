@@ -248,6 +248,14 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 		// count limit: the pet keeps every unit and the drag is refused.
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
+	case petitem.GiveOwnerTooHeavy:
+		// The owner's own limits refuse the take-back as they refuse any
+		// other item it would receive (#5088); the pet keeps the item.
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWeightLimitExceeded))
+		return
+	case petitem.GiveOwnerSlotsFull:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
+		return
 	default:
 		// A drag out of the pet's window is not an action click, so a
 		// take-back that moves nothing leaves no client action pending.
