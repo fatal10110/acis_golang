@@ -81,5 +81,5 @@ func readFuncStat(a *attrValues) string {
 		a.fail(err)
 		return ""
 	}
-	return name
+	return intern(name)
 }

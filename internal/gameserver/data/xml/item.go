@@ -254,7 +254,7 @@ func newItemTemplate(kind string, vals map[string]string) (*item.Template, error
 		tpl.Armor = item.NewArmorDetail(attrEnumDefault(a, "armor_type", item.ParseArmorType, item.ArmorNone), tpl.Slot)
 	case item.KindEtcItem:
 		tpl.EtcItem = item.NewEtcItemDetail(attrEnumDefault(a, "etcitem_type", item.ParseEtcItemType, item.EtcItemNone),
-			a.strDefault("handler", ""),
+			intern(a.strDefault("handler", "")),
 			a.int32Default("shared_reuse_group", -1),
 			a.int32Default("reuse_delay", 0),
 			tpl.DefaultAction)
