@@ -47,7 +47,7 @@ func TestQueryIDRoundTrip(t *testing.T) {
 			t.Errorf("ParseQuery(%q): %v", q.ID(), err)
 			continue
 		}
-		if got != q {
+		if !reflect.DeepEqual(got, q) {
 			t.Errorf("ParseQuery(%q) = %#v, want %#v", q.ID(), got, q)
 		}
 	}

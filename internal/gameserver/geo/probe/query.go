@@ -1,14 +1,18 @@
 package probe
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/datadiff"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -21,26 +25,48 @@ const (
 	LineOfSight   Category = "los"
 	Path          Category = "path"
 	ValidLocation Category = "validlocation"
+	// Walk is a player's straight walk replayed as a chain of position
+	// updates over static geodata. It needs speeds and step durations a
+	// random sample cannot invent, so only an ID names one and Random never
+	// generates it.
+	Walk Category = "walk"
 )
 
-// categories lists every Category, in the fixed order Random cycles
-// through to spread a generated sample evenly across kinds.
+// categories lists every Category Random generates, in the fixed order it
+// cycles through to spread a generated sample evenly across kinds.
 var categories = [...]Category{Height, CanMove, LineOfSight, Path, ValidLocation}
 
 // Query is one geodata question: a single point for Height, or a from/to
-// pair for the others.
+// pair for the others. A Walk also carries the speeds and step durations of
+// the chain.
 type Query struct {
 	Category Category
 	From     location.Location
 	To       location.Location // zero for Height
+
+	// Speed and StartSpeed are a Walk's speeds: the first five updates
+	// advance at StartSpeed, the rest at Speed.
+	Speed, StartSpeed float64
+	// Steps is the duration each of a Walk's position updates stands for,
+	// in whole milliseconds.
+	Steps []time.Duration
 }
 
 // ID renders q as the canonical string used as a datadiff.Record ID:
-// "<category>:x,y,z" for Height, "<category>:x,y,z->x,y,z" otherwise.
-// ParseQuery reverses it.
+// "<category>:x,y,z" for Height, "<category>:x,y,z->x,y,z" otherwise, and
+// "walk:x,y,z->x,y,z;speed=S;start=S0;steps=d1,d2,..." for Walk, the step
+// durations in milliseconds. ParseQuery reverses it.
 func (q Query) ID() string {
-	if q.Category == Height {
+	switch q.Category {
+	case Height:
 		return fmt.Sprintf("%s:%s", q.Category, formatPoint(q.From))
+	case Walk:
+		steps := make([]string, len(q.Steps))
+		for i, d := range q.Steps {
+			steps[i] = strconv.FormatInt(d.Milliseconds(), 10)
+		}
+		return fmt.Sprintf("%s:%s->%s;speed=%s;start=%s;steps=%s", q.Category, formatPoint(q.From), formatPoint(q.To),
+			strconv.FormatFloat(q.Speed, 'g', -1, 64), strconv.FormatFloat(q.StartSpeed, 'g', -1, 64), strings.Join(steps, ","))
 	}
 	return fmt.Sprintf("%s:%s->%s", q.Category, formatPoint(q.From), formatPoint(q.To))
 }
@@ -58,6 +84,14 @@ func ParseQuery(id string) (Query, error) {
 			return Query{}, fmt.Errorf("probe: query id %q: %w", id, err)
 		}
 		return Query{Category: Height, From: from}, nil
+	}
+
+	if Category(category) == Walk {
+		q, err := parseWalk(rest)
+		if err != nil {
+			return Query{}, fmt.Errorf("probe: query id %q: %w", id, err)
+		}
+		return q, nil
 	}
 
 	fromStr, toStr, ok := strings.Cut(rest, "->")
@@ -79,6 +113,76 @@ func ParseQuery(id string) (Query, error) {
 	default:
 		return Query{}, fmt.Errorf("probe: query id %q: unknown category %q", id, category)
 	}
+}
+
+// parseWalk parses the part of a Walk ID after "walk:".
+func parseWalk(rest string) (Query, error) {
+	fields := strings.Split(rest, ";")
+	fromStr, toStr, ok := strings.Cut(fields[0], "->")
+	if !ok {
+		return Query{}, errors.New(`missing "->" separator`)
+	}
+	from, err := parsePoint(fromStr)
+	if err != nil {
+		return Query{}, err
+	}
+	to, err := parsePoint(toStr)
+	if err != nil {
+		return Query{}, err
+	}
+
+	q := Query{Category: Walk, From: from, To: to}
+	var haveSpeed, haveStart, haveSteps bool
+	for _, field := range fields[1:] {
+		key, value, _ := strings.Cut(field, "=")
+		switch key {
+		case "speed":
+			q.Speed, err = parseSpeed(value)
+			haveSpeed = true
+		case "start":
+			q.StartSpeed, err = parseSpeed(value)
+			haveStart = true
+		case "steps":
+			q.Steps, err = parseSteps(value)
+			haveSteps = true
+		default:
+			err = fmt.Errorf("unknown walk field %q", field)
+		}
+		if err != nil {
+			return Query{}, err
+		}
+	}
+	if !haveSpeed || !haveStart || !haveSteps {
+		return Query{}, errors.New("walk needs speed, start and steps fields")
+	}
+	return q, nil
+}
+
+func parseSpeed(s string) (float64, error) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("speed %q: %w", s, err)
+	}
+	if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, fmt.Errorf("speed %q: want a finite non-negative number", s)
+	}
+	return v, nil
+}
+
+func parseSteps(s string) ([]time.Duration, error) {
+	parts := strings.Split(s, ",")
+	steps := make([]time.Duration, len(parts))
+	for i, p := range parts {
+		ms, err := strconv.ParseInt(p, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("step %q: %w", p, err)
+		}
+		if ms <= 0 {
+			return nil, fmt.Errorf("step %q: want a positive number of milliseconds", p)
+		}
+		steps[i] = time.Duration(ms) * time.Millisecond
+	}
+	return steps, nil
 }
 
 func formatPoint(l location.Location) string {
@@ -104,7 +208,7 @@ func parsePoint(s string) (location.Location, error) {
 	return location.Location{X: coords[0], Y: coords[1], Z: coords[2]}, nil
 }
 
-// Evaluate runs q against e (and f, for Path) and returns the result as a
+// Evaluate runs q against e (and f, for Path and Walk) and returns the result as a
 // datadiff.Record: q.ID() as the ID, and the answer as its fields, so two
 // evaluations of the same query — this engine's and a captured one — diff as plain text
 // via datadiff.Compare.
@@ -129,6 +233,18 @@ func Evaluate(e *engine.Engine, f *pathfind.Finder, q Query) datadiff.Record {
 			fields["cost"] = strconv.Itoa(cost)
 			fields["points"] = formatPath(path)
 		}
+	case Walk:
+		// The walk is the movement update's own stepping, straight with no
+		// path-finding, over the static geodata alone (no doors).
+		out, err := move.WalkSteps(move.NewGeo(e, f), q.From, q.To, q.Speed, q.StartSpeed, q.Steps)
+		if err != nil {
+			fields["error"] = err.Error()
+			break
+		}
+		fields["stop"] = formatPoint(out.Stop)
+		fields["reached"] = strconv.FormatBool(out.Reached)
+		fields["blocked"] = strconv.FormatBool(out.Blocked)
+		fields["points"] = formatPath(out.Points)
 	}
 	return datadiff.Record{ID: q.ID(), Fields: fields}
 }
