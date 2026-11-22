@@ -128,7 +128,7 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestBBSWrite, clientpackets.DecodeRequestBBSWrite, whenLiveDeferring((*GameClientLink).requestBBSWrite))
 	register(reg, clientpackets.OpcodeSendBypassBuildCmd, clientpackets.DecodeSendBypassBuildCmd, whenLive((*GameClientLink).sendBypassBuildCmd))
 	register(reg, clientpackets.OpcodeRequestGmList, noPayload, whenLiveNoBody((*GameClientLink).requestGmList))
-	register(reg, clientpackets.OpcodeRequestGMCommand, clientpackets.DecodeRequestGMCommand, whenLive((*GameClientLink).requestGMCommand))
+	register(reg, clientpackets.OpcodeRequestGMCommand, clientpackets.DecodeRequestGMCommand, whenLiveDeferring((*GameClientLink).requestGMCommand))
 	register(reg, clientpackets.OpcodeRequestPetition, clientpackets.DecodeRequestPetition, whenLive((*GameClientLink).requestPetition))
 	register(reg, clientpackets.OpcodeRequestPetitionCancel, noPayload, whenLiveNoBody((*GameClientLink).requestPetitionCancel))
 	register(reg, clientpackets.OpcodePetitionVote, clientpackets.DecodePetitionVote, whenLive((*GameClientLink).petitionVote))

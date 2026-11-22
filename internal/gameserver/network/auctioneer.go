@@ -65,6 +65,12 @@ func (l *GameClientLink) auctioneerBypass(live *livePlayer, f *npc.Folk, command
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotParticipateInAuction))
 		return
 	}
+	// The pages, the bid and the sale read the clan warehouse's adena, so a
+	// warehouse no one has used yet is read off the queue first and the
+	// command answered then.
+	if !l.clanWarehouseReady(live, cl.ID(), func() { l.auctioneerBypass(live, f, command) }) {
+		return
+	}
 	switch strings.ToLower(actual) {
 	case "bid":
 		l.placeHallBid(live, cl, tokens)
@@ -508,12 +514,11 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoOfferingsOwnOrMadeBidFor))
 }
 
-// clanAdena is the adena in the warehouse of the clan clanID, 0 when it
-// cannot be read.
+// clanAdena is the adena in the warehouse of the clan clanID, which
+// auctioneerBypass found in memory, 0 when its clan was dissolved since.
 func (l *GameClientLink) clanAdena(clanID int32) int {
-	wh, err := l.clanWarehouse(clanID)
-	if err != nil {
-		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("auction: restore clan warehouse")
+	wh := l.clanWarehouses.restored(clanID)
+	if wh == nil {
 		return 0
 	}
 	return wh.Adena()

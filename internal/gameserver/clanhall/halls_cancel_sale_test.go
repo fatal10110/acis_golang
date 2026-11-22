@@ -97,3 +97,5 @@ func TestCancelSaleRefundsAndTellsBidders(t *testing.T) {
 		t.Fatalf("hall after the cancel = %+v, want Sellers owning it, no sale, no end, no bids", v)
 	}
 }
+
+func (b *refundBank) RestoreWarehouse(int32) {}
