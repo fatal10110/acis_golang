@@ -74,6 +74,9 @@ func TestDebufferLevelPenalizesDrops(t *testing.T) {
 		c.Send(encodeRequestMagicSkillUse(debuffID, false, false))
 		readCastStartFrames(t, c, debufferID, debuffID, 1, 500, 0, monster.ObjectID())
 		srv.AdvanceUntil(t, "debuff hit", func() bool { return monster.HighestAttackerLevel(1) == 10 })
+		// The next cast is answered with ActionFailed while this one still
+		// runs, which on the real pool trails the hit.
+		srv.AdvanceUntil(t, "debuff cast end", func() bool { return !srv.PlayerCastingNow(t, debufferID) })
 		drainUntilQuiet(t, c)
 		if got := monster.HighestAttackerLevel(1); got != 10 {
 			t.Fatalf("highest attacker level after debuff = %d, want 10", got)

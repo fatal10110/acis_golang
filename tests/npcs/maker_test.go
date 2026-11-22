@@ -308,8 +308,23 @@ func TestDefaultMakerScriptEvents(t *testing.T) {
 	if got := w.inWorld(makerGroupID); len(got) != 0 {
 		t.Fatalf("group NPCs before the delay = %d, want 0", len(got))
 	}
-	w.srv.Advance(t, 2*time.Second)
-	if got := shown(drainFrames(t, c)); !slices.Equal(got, repeatID(makerGroupID, 3)) {
+	var frames [][]byte
+	if w.srv.DrivesClock() {
+		// The delay's exact boundary is pinned on the driven clock; on the
+		// wall clock a loaded runner can sleep past it.
+		w.srv.Advance(t, 2*time.Second-time.Millisecond)
+		if got := w.inWorld(makerGroupID); len(got) != 0 {
+			t.Fatalf("group NPCs just before the delay = %d, want 0", len(got))
+		}
+		w.srv.Advance(t, time.Millisecond)
+		frames = drainFrames(t, c)
+	} else {
+		w.srv.AdvanceUntil(t, "the three NPCs spawned and shown", func() bool {
+			frames = append(frames, drainFrames(t, c)...)
+			return len(w.inWorld(makerGroupID)) == 3 && len(shown(frames)) >= 3
+		})
+	}
+	if got := shown(frames); !slices.Equal(got, repeatID(makerGroupID, 3)) {
 		t.Fatalf("NPCs shown after 1001 = %v, want three of %d", got, makerGroupID)
 	}
 
