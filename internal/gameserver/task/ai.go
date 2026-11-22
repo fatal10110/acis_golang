@@ -48,14 +48,21 @@ type AI struct {
 	state *world.State
 	log   zerolog.Logger
 
-	*activeRegistry[int32, AIActor]
+	*activeRegistry[int32, *aiEntry]
+}
+
+// aiEntry is one registered actor and the cycle Tick posts to its queue,
+// built once at Add so a tick makes no closure per actor.
+type aiEntry struct {
+	actor AIActor
+	cycle func()
 }
 
 // NewAI returns an empty active-AI registry. A nil state treats every actor
 // as active. When state is non-nil, registered actors must already be
 // spawned into it; off-grid actors are not ticked.
 func NewAI(state *world.State, log zerolog.Logger) *AI {
-	return &AI{state: state, log: log, activeRegistry: newActiveRegistry[int32, AIActor]()}
+	return &AI{state: state, log: log, activeRegistry: newActiveRegistry[int32, *aiEntry]()}
 }
 
 // Start launches the fixed one-second AI task.
@@ -69,7 +76,14 @@ func (a *AI) Add(actor AIActor) {
 	if actor == nil {
 		return
 	}
-	a.add(actor.ObjectID(), actor)
+	e := &aiEntry{actor: actor}
+	e.cycle = func() {
+		actor.Tick()
+		if err := actor.TickThink(); err != nil {
+			a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")
+		}
+	}
+	a.add(actor.ObjectID(), e)
 }
 
 // Remove unregisters actor from recurring AI ticks. It leaves a different
@@ -79,7 +93,7 @@ func (a *AI) Remove(actor AIActor) {
 	if actor == nil {
 		return
 	}
-	a.remove(actor.ObjectID(), actor)
+	a.removeMatch(actor.ObjectID(), func(e *aiEntry) bool { return e.actor == actor })
 }
 
 // Tick runs one AI cycle, on each actor's queue, for every registered actor
@@ -94,7 +108,8 @@ func (a *AI) Tick() error {
 	defer a.endTick()
 	defer a.releaseSnapshot()
 
-	for _, actor := range a.snapshot() {
+	for _, e := range a.snapshot() {
+		actor := e.actor
 		if latched, ok := actor.(aiSleepLatched); ok {
 			if latched.AISleeping() {
 				continue
@@ -102,12 +117,7 @@ func (a *AI) Tick() error {
 		} else if !canWorkInRegion(a.state, actor) {
 			continue
 		}
-		actor.Queue().Post(func() {
-			actor.Tick()
-			if err := actor.TickThink(); err != nil {
-				a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")
-			}
-		})
+		actor.Queue().Post(e.cycle)
 	}
 	return nil
 }

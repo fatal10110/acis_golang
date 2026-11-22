@@ -11,10 +11,10 @@ import (
 // finalize funcs, its live position, facing, movement, HP, MP and effects
 // for the conditions. It is never a conditions.PlayerActor, so a
 // player-only condition fails on it.
-type folkStatActor struct {
-	templateStatActor
-	f *Folk
-}
+//
+// It holds only f, so passing it as an interface boxes no copy: a stat read
+// allocates nothing.
+type folkStatActor struct{ f *Folk }
 
 var (
 	_ stat.Actor       = folkStatActor{}
@@ -30,8 +30,23 @@ func (f *Folk) ConditionActor() conditions.Actor {
 }
 
 func (f *Folk) statActor() folkStatActor {
-	return folkStatActor{templateStatActor: templateStatActor{t: f.Instance.Template}, f: f}
+	return folkStatActor{f: f}
 }
+
+// template is the template attribute view the finalize funcs read.
+func (a folkStatActor) template() templateStatActor {
+	return templateStatActor{t: a.f.Instance.Template}
+}
+
+func (a folkStatActor) STR() int          { return a.template().STR() }
+func (a folkStatActor) CON() int          { return a.template().CON() }
+func (a folkStatActor) DEX() int          { return a.template().DEX() }
+func (a folkStatActor) INT() int          { return a.template().INT() }
+func (a folkStatActor) WIT() int          { return a.template().WIT() }
+func (a folkStatActor) MEN() int          { return a.template().MEN() }
+func (a folkStatActor) Level() int        { return a.template().Level() }
+func (a folkStatActor) LevelMod() float64 { return a.template().LevelMod() }
+func (a folkStatActor) IsSummon() bool    { return false }
 
 func (a folkStatActor) HPRatio() float64 {
 	maxHP := a.f.MaxHPValue()

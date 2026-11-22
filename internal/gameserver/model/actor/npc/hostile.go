@@ -194,6 +194,9 @@ type Hostile struct {
 	enchantEffect atomic.Int32
 	// lastAttacker is the last creature that damaged this NPC in this life.
 	lastAttacker atomic.Pointer[attackerRef]
+	// scriptHandle is the script engine's handle on this NPC, opaque here;
+	// see ScriptHandle.
+	scriptHandle atomic.Value
 
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests

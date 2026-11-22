@@ -37,7 +37,13 @@ func (a *Attackable) AddCastDesire(target attackable.Combatant, ref skill.Ref, w
 	if final == nil {
 		return
 	}
-	a.Desires().AddOrUpdate(&Desire{
+	// A repeated request only raises the queued desire's weight, so it is
+	// folded in place before a new desire is built.
+	desires := a.Desires()
+	if desires.mergeCast(final, ref, weight) {
+		return
+	}
+	desires.AddOrUpdate(&Desire{
 		Kind:         IntentionCast,
 		FinalTarget:  final,
 		Skill:        ref,

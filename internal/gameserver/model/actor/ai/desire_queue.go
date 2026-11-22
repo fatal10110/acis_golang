@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // maxDesires bounds how many concurrent candidate Desires a DesireQueue can
@@ -50,6 +51,23 @@ func (q *DesireQueue) AddOrUpdate(desire *Desire) {
 		return
 	}
 	q.desires = append(q.desires, desire)
+}
+
+// mergeCast folds weight into every queued cast Desire aimed at final with
+// ref, as AddOrUpdate folds an Equal cast desire, and reports whether one
+// was queued. Nothing is added when none was.
+func (q *DesireQueue) mergeCast(final attackable.Combatant, ref skill.Ref, weight float64) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	merged := false
+	for _, d := range q.desires {
+		if d.Kind == IntentionCast && d.Skill == ref && sameCombatant(d.FinalTarget, final) {
+			d.addWeight(weight)
+			merged = true
+		}
+	}
+	return merged
 }
 
 // Peek returns the queued Desire with the highest weight. ok is false if

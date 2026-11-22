@@ -211,37 +211,47 @@ type CastController interface {
 }
 
 type intention struct {
-	kind   Intention
 	target attackable.Combatant
 	// object is a summon interact intention's target, a world object that
 	// is no creature.
 	object world.Tracked
 	skill  skill.Ref
+	// loc is a walk's destination, or where a flee started.
+	loc location.Location
+	// route is a route walk's route name.
+	route string
+	// heading is the facing of a standing walk destination (see standing).
+	heading int32
+	// timer is a wander's chain period in seconds, or a social's hold in
+	// milliseconds.
+	timer int32
+	// distance is how far a flee runs from its start.
+	distance int32
+	// itemObjectID is a pick-up's item, or a social's animation id.
+	itemObjectID int32
+	kind         Intention
 	// ctrl is a summon cast's CTRL (forced-use) modifier.
 	ctrl bool
 	// shift is a summon command's SHIFT (hold) modifier: the summon does not
 	// walk to the target.
 	shift bool
-	// loc is a walk's destination, or where a flee started.
-	loc location.Location
-	// standing and heading mark a walk's destination as a creature's
-	// position or spawn point (Desire.Standing).
+	// standing marks a walk's destination as a creature's position or spawn
+	// point, faced at heading (Desire.Standing).
 	standing bool
-	heading  int
-	// timer is a wander's chain period in seconds, or a social's hold in
-	// milliseconds.
-	timer int
-	// distance is how far a flee runs from its start.
-	distance int
-	// itemObjectID is a pick-up's item, or a social's animation id.
-	itemObjectID int32
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
 	// walking marks a summon pick-up whose walk to its item is under way.
 	walking bool
-	// route is a route walk's route name.
-	route string
+}
+
+// pendingIntentions are an Attackable's attack latch and queued next
+// intention. Most actors never set either, so the pair is made on the first
+// set of a non-idle intention and kept for the loop's life; a nil pair reads
+// as both unset.
+type pendingIntentions struct {
+	latched intention
+	next    intention
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
@@ -249,7 +259,7 @@ type intention struct {
 // One AI loop owns the current and next intentions. Threat and hate tables,
 // and the attack desire queue, are internally synchronized so combat code
 // can raise hate while the loop reads target selection. mu guards
-// current/next/step: the AI task posts Think and Tick to the NPC's queue,
+// current/pending/step: the AI task posts Think and Tick to the NPC's queue,
 // where the movement and attack hooks also run, but the first attack desire
 // against an actor with no most-hated target calls RunAI from the
 // attacker's queue (thinkIfNoMostHated) so the reaction does not wait for
@@ -289,7 +299,9 @@ type Attackable struct {
 
 	mu      sync.Mutex
 	current intention
-	next    intention
+	// pending holds the queued next intention and the attack latch (see
+	// pendingIntentions), nil until one is first set.
+	pending *pendingIntentions
 	step    int
 	// territory is the actor's out-of-territory state, kept across its
 	// lives: whether its last arrival was outside its territory, and the
@@ -334,13 +346,12 @@ type Attackable struct {
 	// the first wander step walks immediately and a later promotion starts
 	// the wander chain instead.
 	lastDesire Intention
-	// latched is the one-pass attack latch. An attack promoted while the
-	// last executed desire was idle or wander is latched, and the next
+	// The one-pass attack latch lives in pending. An attack promoted while
+	// the last executed desire was idle or wander is latched, and the next
 	// promotion pass takes it instead of the queue's heaviest desire, even
 	// after its desire left the queue; that pass clears it again. While it
 	// is set the empty-queue idle waits. kind is IntentionIdle when unset.
 	// A respawn builds a new loop, so it starts unset.
-	latched intention
 	// topDesireTarget is the final target of the desire desire selection
 	// last took up, nil for a desire with none. Only the periodic cycle's
 	// empty-queue idle clears it; the event idle and a desire leaving the
@@ -849,10 +860,11 @@ func (a *Attackable) SetTopDesireTarget(target attackable.Combatant) {
 func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.next.kind == IntentionIdle {
+	next := a.nextIntention()
+	if next.kind == IntentionIdle {
 		return IntentionIdle, nil, false
 	}
-	return a.next.kind, a.next.target, true
+	return next.kind, next.target, true
 }
 
 // thinkMode selects which entry point a think pass serves.
@@ -941,7 +953,7 @@ func (a *Attackable) CleanupForSpawn() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.desires.Load().Clear()
-	a.latched = intention{}
+	a.setLatched(intention{})
 	a.leaveRoute()
 	a.topDesireTarget = nil
 	a.socialHold = time.Time{}
@@ -1092,7 +1104,7 @@ func (a *Attackable) selectionHeld() bool {
 	}
 	return a.desires.Load().anyMatch(func(d *Desire) bool {
 		return d.Kind == IntentionFlee && sameCombatant(d.FinalTarget, a.current.target) &&
-			d.Location == a.current.loc && d.Distance == a.current.distance
+			d.Location == a.current.loc && d.Distance == int(a.current.distance)
 	})
 }
 
@@ -1237,7 +1249,40 @@ func (a *Attackable) inHitAnimation() bool {
 
 // hasLatch reports whether a latched attack waits for the next pass.
 func (a *Attackable) hasLatch() bool {
-	return a.latched.kind != IntentionIdle
+	return a.pending != nil && a.pending.latched.kind != IntentionIdle
+}
+
+// nextIntention returns the queued next intention, kind IntentionIdle for
+// none.
+func (a *Attackable) nextIntention() intention {
+	if a.pending == nil {
+		return intention{}
+	}
+	return a.pending.next
+}
+
+// setLatched sets the attack latch; an idle i clears it.
+func (a *Attackable) setLatched(i intention) {
+	if p := a.pendingFor(i); p != nil {
+		p.latched = i
+	}
+}
+
+// setNext sets the queued next intention; an idle i clears it.
+func (a *Attackable) setNext(i intention) {
+	if p := a.pendingFor(i); p != nil {
+		p.next = i
+	}
+}
+
+// pendingFor returns the pending pair a set of i writes to, making it for a
+// non-idle i; nil when the pair is unmade and i is idle, so the set changes
+// nothing.
+func (a *Attackable) pendingFor(i intention) *pendingIntentions {
+	if a.pending == nil && i.kind != IntentionIdle {
+		a.pending = &pendingIntentions{}
+	}
+	return a.pending
 }
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
@@ -1266,13 +1311,13 @@ func (a *Attackable) promoteNext() bool {
 		a.leaveRoute()
 	}
 	if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
-		a.latched = next
+		a.setLatched(next)
 	} else {
-		a.latched = intention{}
+		a.setLatched(intention{})
 	}
 	if !a.current.same(next) {
 		a.move.CancelFollow()
-		a.next = intention{}
+		a.setNext(intention{})
 	}
 	a.lastKind = a.current.kind
 	a.setCurrent(next)
@@ -1292,7 +1337,7 @@ func (i intention) same(o intention) bool {
 // heaviest desire's kind is not promotable.
 func (a *Attackable) nextToDo() (next intention, ok bool) {
 	if a.hasLatch() {
-		return a.latched, true
+		return a.pending.latched, true
 	}
 	desire, ok := a.desires.Load().Peek()
 	if !ok {
@@ -1306,17 +1351,17 @@ func (a *Attackable) nextToDo() (next intention, ok bool) {
 	case IntentionFollow:
 		next = intention{kind: IntentionFollow, target: desire.FinalTarget}
 	case IntentionWander:
-		next = intention{kind: IntentionWander, timer: desire.Timer}
+		next = intention{kind: IntentionWander, timer: int32(desire.Timer)}
 	case IntentionNothing:
-		next = intention{kind: IntentionNothing, timer: desire.Timer}
+		next = intention{kind: IntentionNothing, timer: int32(desire.Timer)}
 	case IntentionFlee:
-		next = intention{kind: IntentionFlee, target: desire.FinalTarget, loc: desire.Location, distance: desire.Distance}
+		next = intention{kind: IntentionFlee, target: desire.FinalTarget, loc: desire.Location, distance: int32(desire.Distance)}
 	case IntentionSocial:
-		next = intention{kind: IntentionSocial, itemObjectID: desire.ItemObjectID, timer: desire.Timer}
+		next = intention{kind: IntentionSocial, itemObjectID: desire.ItemObjectID, timer: int32(desire.Timer)}
 	case IntentionPickUp:
 		next = intention{kind: IntentionPickUp, itemObjectID: desire.ItemObjectID}
 	case IntentionMoveTo:
-		next = intention{kind: IntentionMoveTo, loc: desire.Location, standing: desire.Standing, heading: desire.Heading}
+		next = intention{kind: IntentionMoveTo, loc: desire.Location, standing: desire.Standing, heading: int32(desire.Heading)}
 	case IntentionMoveRoute:
 		next = intention{kind: IntentionMoveRoute, route: desire.RouteName}
 	default:
@@ -1520,7 +1565,7 @@ func (a *Attackable) thinkAttack() error {
 		return nil
 	}
 	if attack.BowCoolingDown() || attack.AttackingNow() {
-		a.next = a.current
+		a.setNext(a.current)
 		return nil
 	}
 
@@ -1590,7 +1635,7 @@ func (a *Attackable) thinkCast() error {
 // bare point already still walks there: a zero-length move that arrives on
 // the next move tick.
 func (a *Attackable) thinkMoveTo() {
-	if a.current.standing && a.standsOn(a.current.loc, a.current.heading) {
+	if a.current.standing && a.standsOn(a.current.loc, int(a.current.heading)) {
 		a.atHookPoint(HookMoveFinished)
 		a.clearCurrentDesire()
 		return
@@ -1677,7 +1722,7 @@ func (a *Attackable) thinkFlee() {
 	}
 	a.actor.ForceRunStance()
 	tx, ty, _ := target.Position()
-	_, _ = a.move.MoveToLocation(from.FleeFrom(tx, ty, distance))
+	_, _ = a.move.MoveToLocation(from.FleeFrom(tx, ty, int(distance)))
 }
 
 // thinkSocial is the social step: the desire leaves the queue, and an actor
