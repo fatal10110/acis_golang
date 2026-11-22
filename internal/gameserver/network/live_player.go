@@ -152,7 +152,7 @@ type livePlayer struct {
 	handlerPanicked bool
 	log             zerolog.Logger
 
-	zoneActor      *liveZoneActor
+	zoneActor      *playerZones
 	visibilitySend func(wire.Frame) bool
 	// kick closes this player's client connection (ServerClose then close),
 	// set once at attach time. It is the server-initiated eviction path a

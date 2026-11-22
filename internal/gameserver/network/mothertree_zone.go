@@ -17,7 +17,7 @@ func wireMotherTreeZones(ix *zone.Index) {
 // as the crossing happens: on a spawn, at the spawn's place in its frames,
 // and on a walk, ahead of the compass update the revalidation sends next.
 func sendZoneMessage(a zone.Actor, id int) {
-	if za, ok := a.(*liveZoneActor); ok {
+	if za, ok := a.(*playerZones); ok {
 		za.live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
 }

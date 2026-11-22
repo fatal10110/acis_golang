@@ -132,7 +132,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.combat.pvpFlags.Remove(live.Character, false)
 	}
 	if l.zones != nil && live.zoneActor != nil {
-		live.zoneActor.removeFrom(l.zones)
+		live.zoneActor.remove(l.zones)
 	}
 	if l.world != nil {
 		// A living summon leaves with its owner; a corpse stays until it

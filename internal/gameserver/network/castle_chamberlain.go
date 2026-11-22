@@ -659,7 +659,7 @@ func (l *GameClientLink) banishFromCastleGrounds(c *castle.Castle) {
 // the zone lock the banishment ran under is released. A castle without a
 // banish point leaves the player where it is.
 func (l *GameClientLink) banishFromCastle(castleID int, a zone.Actor) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}

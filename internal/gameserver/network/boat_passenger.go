@@ -441,17 +441,16 @@ func (l *GameClientLink) oustPassenger(live *livePlayer, oust location.Location)
 // passengers in: a peace zone's hold, and summoning friends barred, kept
 // apart from the zones' own holds, so a zone reload keeps them. The
 // compass follows on the next zone revalidation, as specified.
-func (a *liveZoneActor) holdBoatPeace(on bool) {
+func (a *playerZones) holdBoatPeace(on bool) {
 	if a == nil {
 		return
 	}
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.flags.Hold(zone.FlagPeace, on)
-	a.flags.Hold(zone.FlagNoSummonFriend, on)
-	a.syncFlags()
+	a.Member.ReplayZoneRules(func() {
+		a.ZoneFlags().Hold(zone.FlagPeace, on)
+		a.ZoneFlags().Hold(zone.FlagNoSummonFriend, on)
+	})
 }
 
 // arriveAtBoatEntrance ends live's walk: a walk on or toward a boat is

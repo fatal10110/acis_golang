@@ -593,7 +593,8 @@ func TestMovementSpeedMultiplierInWaterAndSwamp(t *testing.T) {
 	dex := statbonus.DEXBonus[tmpl.DEX]
 	closeTo := func(got float32, want float64) bool { return math.Abs(float64(got)-want) < 1e-5 }
 
-	c.SetInWater(true)
+	inZones(c, zoneStub{water: true})
+	c.WaterChanged()
 	if got, want := c.MoveSpeed(), 50*dex; !nearSpeed(got, want) {
 		t.Fatalf("MoveSpeed() in water = %v, want the swim speed %v", got, want)
 	}
@@ -605,7 +606,8 @@ func TestMovementSpeedMultiplierInWaterAndSwamp(t *testing.T) {
 		t.Fatalf("walking multiplier in water = %v, want %v", got, want)
 	}
 
-	c.SetInWater(false)
+	inZones(c, zoneStub{})
+	c.WaterChanged()
 	c.SetRunning(true)
 	c.SetSwampMoveBonus(-80)
 	if got, want := c.RunSpeed(), 120*0.2*dex; !nearSpeed(got, want) {
@@ -617,11 +619,13 @@ func TestMovementSpeedMultiplierInWaterAndSwamp(t *testing.T) {
 	if got, want := c.MovementSpeedMultiplier(), 0.2*dex; !closeTo(got, want) {
 		t.Fatalf("running multiplier in a -80 swamp = %v, want %v", got, want)
 	}
-	c.SetInWater(true)
+	inZones(c, zoneStub{water: true})
+	c.WaterChanged()
 	if got, want := c.MovementSpeedMultiplier(), 50*0.2*dex/120; !closeTo(got, want) {
 		t.Fatalf("running multiplier swimming in a -80 swamp = %v, want %v", got, want)
 	}
-	c.SetInWater(false)
+	inZones(c, zoneStub{})
+	c.WaterChanged()
 	c.SetSwampMoveBonus(0)
 	if got := c.MovementSpeedMultiplier(); !closeTo(got, dex) {
 		t.Fatalf("multiplier after leaving the swamp = %v, want DEX bonus %v", got, dex)

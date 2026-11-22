@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"bytes"
 	"fmt"
 	"testing"
@@ -238,10 +239,10 @@ func summonedGateCases() []struct {
 		{"rooted", addRoot, nameMessage(serverpackets.SystemMessageS1EngagedInCombatCannotBeSummoned, summonTargetName)},
 		{"olympiad", func(t *testing.T, pc *player.Character) { pc.SetOlympiadMode(true) }, plainMessage(serverpackets.SystemMessageCannotSummonOlympiadPlayers)},
 		{"mounted", func(t *testing.T, pc *player.Character) { pc.Mount(summonStriderNPCID, 0) }, plainMessage(serverpackets.SystemMessageTargetInSummonBlockingArea)},
-		{"no-summon zone", func(t *testing.T, pc *player.Character) { pc.SetInNoSummonFriendZone(true) }, nameMessage(serverpackets.SystemMessageS1InSummonBlockingArea, summonTargetName)},
+		{"no-summon zone", func(t *testing.T, pc *player.Character) { holdZone(pc, zone.FlagNoSummonFriend) }, nameMessage(serverpackets.SystemMessageS1InSummonBlockingArea, summonTargetName)},
 		{
 			// Rooted and in a no-summon zone: the earlier check answers.
-			"order", func(t *testing.T, pc *player.Character) { pc.SetInCombat(true); pc.SetInNoSummonFriendZone(true) },
+			"order", func(t *testing.T, pc *player.Character) { pc.SetInCombat(true); holdZone(pc, zone.FlagNoSummonFriend) },
 			nameMessage(serverpackets.SystemMessageS1EngagedInCombatCannotBeSummoned, summonTargetName),
 		},
 	}
@@ -262,7 +263,7 @@ func TestSummonFriendCastStartRefusal(t *testing.T) {
 	}
 	cases := []tc{
 		{name: "self target", self: true, want: plainMessage(serverpackets.SystemMessageCannotUseOnYourself)},
-		{name: "caster in no-summon zone", casterSetup: func(t *testing.T, pc *player.Character) { pc.SetInNoSummonFriendZone(true) }, want: plainMessage(serverpackets.SystemMessageCannotSummonFromLocation)},
+		{name: "caster in no-summon zone", casterSetup: func(t *testing.T, pc *player.Character) { holdZone(pc, zone.FlagNoSummonFriend) }, want: plainMessage(serverpackets.SystemMessageCannotSummonFromLocation)},
 		{name: "caster in olympiad", casterSetup: func(t *testing.T, pc *player.Character) { pc.SetOlympiadMode(true) }, want: plainMessage(serverpackets.SystemMessageCannotSummonFromLocation)},
 		{name: "caster mounted", casterSetup: func(t *testing.T, pc *player.Character) { pc.Mount(summonStriderNPCID, 0) }},
 	}
@@ -456,8 +457,8 @@ func TestSummonFriendAcceptGates(t *testing.T) {
 		{name: "caster rooted", caster: addRoot, want: about(serverpackets.SystemMessageS1EngagedInCombatCannotBeSummoned)},
 		{name: "caster in olympiad", caster: func(t *testing.T, pc *player.Character) { pc.SetOlympiadMode(true) }, want: plainMessage(serverpackets.SystemMessageCannotSummonOlympiadPlayers)},
 		{name: "caster mounted", caster: func(t *testing.T, pc *player.Character) { pc.Mount(summonStriderNPCID, 0) }, want: plainMessage(serverpackets.SystemMessageTargetInSummonBlockingArea)},
-		{name: "caster in no-summon zone", caster: func(t *testing.T, pc *player.Character) { pc.SetInNoSummonFriendZone(true) }, want: about(serverpackets.SystemMessageS1InSummonBlockingArea)},
-		{name: "answerer in no-summon zone", other: func(t *testing.T, pc *player.Character) { pc.SetInNoSummonFriendZone(true) }, want: plainMessage(serverpackets.SystemMessageCannotSummonFromLocation)},
+		{name: "caster in no-summon zone", caster: func(t *testing.T, pc *player.Character) { holdZone(pc, zone.FlagNoSummonFriend) }, want: about(serverpackets.SystemMessageS1InSummonBlockingArea)},
+		{name: "answerer in no-summon zone", other: func(t *testing.T, pc *player.Character) { holdZone(pc, zone.FlagNoSummonFriend) }, want: plainMessage(serverpackets.SystemMessageCannotSummonFromLocation)},
 		{name: "answerer in olympiad", other: func(t *testing.T, pc *player.Character) { pc.SetOlympiadMode(true) }, want: plainMessage(serverpackets.SystemMessageCannotSummonFromLocation)},
 		{
 			name: "answerer short of the item",

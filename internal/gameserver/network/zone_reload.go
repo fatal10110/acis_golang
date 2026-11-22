@@ -128,24 +128,3 @@ func (p *livePlayer) ReloadZones() {
 	}
 	p.zoneActor.reload(p.link.zones)
 }
-
-func (a *liveZoneActor) reload(ix *zone.Index) {
-	defer a.fireScriptZones()
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
-	a.mu.Lock()
-	a.steps = 0
-	onGrid := !a.offGrid && !a.live.Teleporting()
-	ix.Rebase(a, a.held, onGrid)
-	a.syncFlags()
-	a.keepBreath()
-	if !onGrid {
-		a.mu.Unlock()
-		return
-	}
-	code, changed, flagPvP := a.compassUpdate()
-	leftBattlefield := a.takeLeftBattlefield()
-	a.mu.Unlock()
-	a.flagLeftBattlefield(leftBattlefield)
-	a.sendCompass(code, changed, flagPvP)
-}

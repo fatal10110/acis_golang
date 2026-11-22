@@ -25,9 +25,9 @@ import (
 )
 
 var (
-	_ zone.Swimmer           = (*liveZoneActor)(nil)
-	_ zone.Wader             = (*liveZoneActor)(nil)
-	_ zone.Endangered        = (*liveZoneActor)(nil)
+	_ zone.Swimmer           = (*playerZones)(nil)
+	_ zone.Wader             = (*playerZones)(nil)
+	_ zone.Endangered        = (*playerZones)(nil)
 	_ task.WaterEffects      = (*TaskEffects)(nil)
 	_ task.ShadowItemEffects = (*TaskEffects)(nil)
 	_ task.AutosaveEffects   = (*TaskEffects)(nil)
@@ -37,53 +37,39 @@ var (
 // independent from the disconnect-time save budget.
 const autosaveSaveTimeout = 5 * time.Second
 
-// liveZoneActor adapts a live player to the zone package without changing
-// Character's world.Position method signature.
+// playerZones is a live player's zone membership: the zone.Member every
+// creature keeps, whose ledger the character reads its zones from, plus
+// what only a player's zones do: the compass zone, the breath countdown,
+// the move speed in water, the pvp flag of a player leaving a battlefield
+// under siege, and the scripts its zone entries reach.
 //
-// mu serializes zone revalidation for this player. Movement revalidates on
-// the player's own queue, but logout removes it from the zones on the
-// detach path.
-//
-// offGrid is set from a teleport's grid leave until the Appearing rejoin,
-// and for good once logout has removed the player from its zones. The
-// player holds no zone meanwhile, so neither position updates nor a zone
-// reload may enter any.
-//
-// steps counts the movement steps since the zones were last revalidated: a
-// step revalidates them only every zoneStepsPerRevalidation steps, while
-// spawning, a teleport landing, a move's end or stop and a region change
-// revalidate them at once and restart the count. While the player is
-// teleporting the count still runs but no zone is revalidated, as a
-// teleport stops the player's move before it leaves the grid.
-//
-// held is a point of the region holding the player, whose zones a
-// revalidation checks: its position when it last entered the grid or moved
-// through the world. An instant teleport leaves it, so the player keeps the
-// zones of its old region until its next position update.
-type liveZoneActor struct {
-	// deliveryMu keeps compass sends in the same order as zone transitions.
-	// mu protects the zone state and is released before sending a frame.
-	deliveryMu  sync.Mutex
+// mu serializes every zone pass on the player (each position report, the
+// grid leave and rejoin of a teleport, logout, a zone reload, and a zone
+// replaying its rules on the player) with the frames the pass sends, so
+// compass updates go out in the order of the zone transitions. The zone
+// rules a pass runs write the fields below; they only ever run inside one
+// of these passes, so mu guards them too. The Member's own lock, which the
+// rules run under, is released before a pass sends its frames.
+type playerZones struct {
+	zone.Member
+	live *livePlayer
+
 	mu          sync.Mutex
-	live        *livePlayer
-	flags       zone.Flags
-	offGrid     bool
-	steps       int
-	held        location.Location
 	lastCompass int32
-	// leftBattlefield is set, under mu, by the exit rule of a battlefield
-	// under siege. The revalidation that ran it applies the pvp flag once
-	// mu is released, still under deliveryMu, so the flag's UserInfo goes
-	// out before that revalidation's compass update.
+	// inWater is the water state the move speed was last set for.
+	inWater bool
+	// leftBattlefield is set by the exit rule of a battlefield under siege.
+	// The pass that ran it applies the pvp flag before its compass update,
+	// so the flag's UserInfo goes out first.
 	leftBattlefield bool
-	// leftWater is set, under mu, when a water zone's exit reports the
-	// player out of the water. The pass that ran it may still enter another
-	// water zone, so the breath countdown stops only if the player ends the
-	// pass out of the water (keepBreath, #4954).
+	// leftWater is set when a water zone's exit reports the player out of
+	// the water. The pass that ran it may still enter another water zone,
+	// so the breath countdown stops only if the player ends the pass out of
+	// the water (keepBreath, #4954).
 	leftWater bool
-	// scriptZones are the zones a script reacts to that a revalidation just
-	// entered, collected under mu. The revalidation hands them to scripts
-	// once it has released both locks (fireScriptZones).
+	// scriptZones are the zones a script reacts to that a pass just
+	// entered. The pass hands them to scripts once it has released mu
+	// (fireScriptZones).
 	scriptZones []int32
 	// scripts are the scripts zone entries reach; nil reaches none.
 	scripts zoneScripts
@@ -97,20 +83,28 @@ type liveZoneActor struct {
 	spawnRules []func()
 }
 
+// newPlayerZones gives live its zone membership; the character reads its
+// zones from the membership's ledger from then on.
+func newPlayerZones(live *livePlayer, scripts zoneScripts) *playerZones {
+	a := &playerZones{live: live, scripts: scripts}
+	live.SetZoneStatus(a.ZoneFlags())
+	return a
+}
+
 // zoneScripts is what a player's zone entries ask of the script registry.
 type zoneScripts interface {
 	ZoneEntered(zoneID int32, c attackable.Combatant)
 }
 
-// noteScriptZone records, under mu, that the revalidation running entered
-// the zone zoneID, which a script reacts to.
-func (a *liveZoneActor) noteScriptZone(zoneID int32) {
+// noteScriptZone records that the pass running entered the zone zoneID,
+// which a script reacts to.
+func (a *playerZones) noteScriptZone(zoneID int32) {
 	a.scriptZones = append(a.scriptZones, zoneID)
 }
 
-// fireScriptZones hands the script zones the last revalidations entered to
-// their scripts, in entry order, with no zone lock held.
-func (a *liveZoneActor) fireScriptZones() {
+// fireScriptZones hands the script zones the last passes entered to their
+// scripts, in entry order, with no zone lock held.
+func (a *playerZones) fireScriptZones() {
 	a.mu.Lock()
 	ids := a.scriptZones
 	a.scriptZones = nil
@@ -123,48 +117,46 @@ func (a *liveZoneActor) fireScriptZones() {
 	}
 }
 
-// zoneStepsPerRevalidation is how many movement steps pass per zone
-// revalidation.
-const zoneStepsPerRevalidation = 5
-
 // zoneRevalidation is why a player's position changed, which decides when
 // its zones are revalidated.
 type zoneRevalidation uint8
 
 const (
-	// revalidateStep is a movement step: it revalidates on every
-	// zoneStepsPerRevalidation-th step.
+	// revalidateStep is a movement step (zone.Member.Step).
 	revalidateStep zoneRevalidation = iota
-	// revalidateForce is a position update that revalidates at once.
+	// revalidateForce is a position update that revalidates at once
+	// (zone.Member.Moved).
 	revalidateForce
-	// revalidatePlaced is a position set outside movement (a forced
-	// flight's landing): it revalidates only when it changes region, and
-	// does not count as a step.
+	// revalidatePlaced is a position set outside movement, a forced
+	// flight's landing (zone.Member.Place).
 	revalidatePlaced
-	// revalidateStop is a move's stop where the player stands: it
-	// revalidates at once against the zones of the region holding the
-	// player, without moving it to the region of its position.
+	// revalidateStop is a move's stop where the player stands
+	// (zone.Member.Settle).
 	revalidateStop
 )
 
-func (a *liveZoneActor) ObjectID() int32             { return a.live.ObjectID() }
-func (a *liveZoneActor) Position() location.Location { return a.live.CurrentLocation() }
-func (a *liveZoneActor) ZoneFlags() *zone.Flags      { return &a.flags }
-func (a *liveZoneActor) Class() zone.Class           { return zone.ClassPlayer }
-func (a *liveZoneActor) GM() bool                    { return a.live.accessLevel().IsGM }
-func (a *liveZoneActor) Online() bool                { return !a.live.detached() }
-func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
-func (a *liveZoneActor) ClanID() int32               { return a.live.Character.ClanID() }
-func (a *liveZoneActor) SiegeState() int32           { return a.live.Character.SiegeState() }
+func (a *playerZones) ObjectID() int32             { return a.live.ObjectID() }
+func (a *playerZones) Position() location.Location { return a.live.CurrentLocation() }
+func (a *playerZones) Class() zone.Class           { return zone.ClassPlayer }
+func (a *playerZones) GM() bool                    { return a.live.accessLevel().IsGM }
+func (a *playerZones) Online() bool                { return !a.live.detached() }
+func (a *playerZones) Race() player.Race           { return a.live.Character.Race }
+func (a *playerZones) ClanID() int32               { return a.live.Character.ClanID() }
+func (a *playerZones) SiegeState() int32           { return a.live.Character.SiegeState() }
+
+// Teleporting reports a teleport in progress: it keeps the step count but
+// revalidates no zone, so the move it stops does not enter the zones of a
+// position the player is leaving.
+func (a *playerZones) Teleporting() bool { return a.live.Teleporting() }
 
 // revalidateSpawn enters the player into the zones it spawns in, on its
 // own queue, then runs the zone rules that entry asked of it (zoneRule)
 // with no zone lock held.
-func (a *liveZoneActor) revalidateSpawn(ix *zone.Index) {
+func (a *playerZones) revalidateSpawn(ix *zone.Index) {
 	a.spawnMu.Lock()
 	a.spawning = true
 	a.spawnMu.Unlock()
-	a.revalidate(ix)
+	a.enter(ix)
 	a.spawnMu.Lock()
 	rules := a.spawnRules
 	a.spawning, a.spawnRules = false, nil
@@ -190,222 +182,162 @@ func zoneRule(live *livePlayer, fn func()) bool {
 	return postLive(live, fn)
 }
 
-func (a *liveZoneActor) revalidate(ix *zone.Index) {
+// enter puts the player on the grid, at a spawn or once its client has
+// appeared after a teleport, entering the zones at its position. A player
+// that logged out enters none.
+func (a *playerZones) enter(ix *zone.Index) {
 	defer a.fireScriptZones()
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
-	if a.offGrid {
-		a.mu.Unlock()
+	defer a.mu.Unlock()
+	if !a.Enter(ix, a) {
 		return
 	}
-	a.steps = 0
-	a.held = a.Position()
-	if ix != nil {
-		ix.Revalidate(a)
-	}
-	a.syncFlags()
-	a.keepBreath()
-	code, changed, flagPvP := a.compassUpdate()
-	leftBattlefield := a.takeLeftBattlefield()
-	a.mu.Unlock()
-	a.flagLeftBattlefield(leftBattlefield)
-	a.sendCompass(code, changed, flagPvP)
+	a.settle()
+	a.finishPass()
 }
 
 // revalidateMove revalidates the player's zones after its position changed
-// for reason. A position update that leaves the region holding the player
-// revalidates the zones of both regions at once and restarts the step
-// count; a step then counts toward the next revalidation.
-func (a *liveZoneActor) revalidateMove(ix *zone.Index, reason zoneRevalidation) {
+// for reason. A player off the grid enters no zone.
+func (a *playerZones) revalidateMove(ix *zone.Index, reason zoneRevalidation) {
 	defer a.fireScriptZones()
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
-	a.mu.Lock()
-	if a.offGrid {
-		a.mu.Unlock()
-		return
-	}
-	// A teleport in progress keeps the count but revalidates no zone: the
-	// move it stops must not enter the zones of a position it is leaving.
-	teleporting := a.live.Teleporting()
-	regionChanged := false
-	if reason != revalidateStop {
-		pos := a.Position()
-		if world.RegionKey(a.held.X, a.held.Y) != world.RegionKey(pos.X, pos.Y) {
-			regionChanged = true
-			a.steps = 0
-			if ix != nil && !teleporting {
-				ix.RevalidateMove(a, a.held)
-			}
-		}
-		a.held = pos
-	}
-	switch reason {
-	case revalidateForce, revalidateStop:
-		a.steps = 0
-		if !regionChanged && ix != nil && !teleporting {
-			ix.RevalidateIn(a, a.held)
-		}
-	case revalidateStep:
-		a.steps++
-		if a.steps >= zoneStepsPerRevalidation {
-			a.steps = 0
-			if ix != nil && !teleporting {
-				ix.RevalidateIn(a, a.held)
-			}
-		}
-	}
-	a.syncFlags()
-	a.keepBreath()
-	code, changed, flagPvP := a.compassUpdate()
-	leftBattlefield := a.takeLeftBattlefield()
-	a.mu.Unlock()
-	a.flagLeftBattlefield(leftBattlefield)
-	a.sendCompass(code, changed, flagPvP)
-}
-
-func (a *liveZoneActor) removeFrom(ix *zone.Index) {
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	// Off the grid for good: a zone reload that still lists the departing
-	// player (its world snapshot predates the despawn) must not admit it
-	// into the reloaded zones, where it would outlive its session.
-	a.offGrid = true
-	ix.RemoveFrom(a, a.held.X, a.held.Y)
-	a.syncFlags()
-	a.keepBreath()
-	// A player logging out is no longer tracked for the pvp flag, so
-	// leaving a battlefield on the way out does not flag it.
+	var onGrid bool
+	switch reason {
+	case revalidateStep:
+		onGrid = a.Step(ix, a)
+	case revalidateForce:
+		onGrid = a.Moved(ix, a)
+	case revalidatePlaced:
+		onGrid = a.Place(ix, a)
+	case revalidateStop:
+		onGrid = a.Settle(ix, a)
+	}
+	if !onGrid {
+		return
+	}
+	a.settle()
+	a.finishPass()
+}
+
+// remove takes the player off the grid for good as it logs out. A player
+// logging out is no longer tracked for the pvp flag, so leaving a
+// battlefield on the way out does not flag it.
+func (a *playerZones) remove(ix *zone.Index) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.Remove(ix, a)
+	a.settle()
 	a.leftBattlefield = false
 }
 
 // leave takes the player off the grid for a teleport: it exits every zone
-// of the region holding it, and enters none until rejoin.
-func (a *liveZoneActor) leave(ix *zone.Index) {
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
+// of the region holding it, and enters none until enter.
+func (a *playerZones) leave(ix *zone.Index) {
 	a.mu.Lock()
-	a.offGrid = true
-	if ix != nil {
-		ix.RemoveFrom(a, a.held.X, a.held.Y)
-	}
-	a.syncFlags()
-	a.keepBreath()
-	leftBattlefield := a.takeLeftBattlefield()
-	a.mu.Unlock()
-	a.flagLeftBattlefield(leftBattlefield)
+	defer a.mu.Unlock()
+	a.Leave(ix, a)
+	a.settle()
+	a.flagLeftBattlefield()
 }
 
-// rejoin puts the player back on the grid once its client has appeared,
-// entering the zones at its current position.
-func (a *liveZoneActor) rejoin(ix *zone.Index) {
+// reload moves the player off the zones a reload swapped out and into the
+// reloaded zones of the region holding it (zone.Member.Reload), sending
+// its compass zone when it changed. A player off the grid or mid-teleport
+// enters none and is sent nothing.
+func (a *playerZones) reload(ix *zone.Index) {
 	defer a.fireScriptZones()
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
-	a.offGrid = false
-	a.steps = 0
-	a.held = a.Position()
-	if ix != nil {
-		ix.Revalidate(a)
-	}
-	a.syncFlags()
-	a.keepBreath()
-	code, changed, flagPvP := a.compassUpdate()
-	leftBattlefield := a.takeLeftBattlefield()
-	a.mu.Unlock()
-	a.flagLeftBattlefield(leftBattlefield)
-	a.sendCompass(code, changed, flagPvP)
-}
-
-// takeLeftBattlefield reports and clears whether the revalidation just run
-// left a battlefield under siege. mu must be held.
-func (a *liveZoneActor) takeLeftBattlefield() bool {
-	left := a.leftBattlefield
-	a.leftBattlefield = false
-	return left
-}
-
-// flagLeftBattlefield puts a player that left a battlefield under siege on the
-// normal pvp flag timer, flagging it when it is not. It runs with deliveryMu
-// held and mu released, before the compass update of the same revalidation.
-func (a *liveZoneActor) flagLeftBattlefield(left bool) {
-	if left {
-		a.live.Emit(event.PvPFlagged{})
+	defer a.mu.Unlock()
+	onGrid := a.Reload(ix, a)
+	a.settle()
+	if onGrid {
+		a.finishPass()
 	}
 }
 
 // ReplayZoneRules runs fn, a battlefield or stadium switching its rules
-// replaying them on the player, under the player's zone locks as a
-// revalidation would, then mirrors the flags it changed onto the character.
-// The compass is left for the player's next revalidation.
-func (a *liveZoneActor) ReplayZoneRules(fn func()) {
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
+// replaying them on the player, as a pass would. The compass is left for
+// the player's next pass.
+func (a *playerZones) ReplayZoneRules(fn func()) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	fn()
-	a.syncFlags()
+	a.Member.ReplayZoneRules(fn)
+	a.settle()
+}
+
+// settle brings what the player keeps beside its ledger in line with it
+// after a pass: the move speed in or out of the water, the swamp move
+// bonus outside any swamp, and the breath countdown. mu is held.
+func (a *playerZones) settle() {
+	a.applyWater()
+	if !a.ZoneFlags().Has(zone.FlagSwamp) {
+		a.live.SetSwampMoveBonus(0)
+	}
 	a.keepBreath()
 }
 
-func (a *liveZoneActor) syncFlags() {
-	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
-	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
-	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
-	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
-	a.live.SetInBossZone(a.flags.Has(zone.FlagBoss))
-	a.live.SetInClanHallZone(a.flags.Has(zone.FlagClanHall))
-	a.live.SetInMotherTreeZone(a.flags.Has(zone.FlagMotherTree))
-	a.live.SetInCastleZone(a.flags.Has(zone.FlagCastle))
-	a.live.SetInWater(a.flags.Has(zone.FlagWater))
-	a.live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
-	if !a.flags.Has(zone.FlagSwamp) {
-		a.live.SetSwampMoveBonus(0)
+// applyWater switches the move speed to the swim speed or back when the
+// ledger's water state changed since it was last applied. mu is held.
+func (a *playerZones) applyWater() {
+	if in := a.ZoneFlags().Has(zone.FlagWater); in != a.inWater {
+		a.inWater = in
+		a.live.WaterChanged()
 	}
 }
 
-func (a *liveZoneActor) compassUpdate() (code int32, changed, flagPvP bool) {
+// finishPass ends a pass that leaves the player on the grid: the pvp flag
+// of a battlefield it left, then its compass zone when that changed. mu is
+// held.
+func (a *playerZones) finishPass() {
+	a.flagLeftBattlefield()
+	a.sendCompass()
+}
+
+// flagLeftBattlefield puts a player whose pass left a battlefield under
+// siege on the normal pvp flag timer, flagging it when it is not. mu is
+// held.
+func (a *playerZones) flagLeftBattlefield() {
+	if a.leftBattlefield {
+		a.leftBattlefield = false
+		a.live.Emit(event.PvPFlagged{})
+	}
+}
+
+// sendCompass sends the player its compass zone when it changed since the
+// last one sent; dropping from a siege zone to a general one updates its
+// pvp status first. mu is held.
+func (a *playerZones) sendCompass() {
+	flags := a.ZoneFlags()
+	var code int32
 	switch {
-	case a.flags.Has(zone.FlagSiege):
+	case flags.Has(zone.FlagSiege):
 		code = serverpackets.CompassSiegeZone
-	case a.flags.Has(zone.FlagPvP):
+	case flags.Has(zone.FlagPvP):
 		code = serverpackets.CompassPvPZone
 	case a.live.Character.In7sDungeon():
 		code = serverpackets.CompassSevenSignsZone
-	case a.flags.Has(zone.FlagPeace):
+	case flags.Has(zone.FlagPeace):
 		code = serverpackets.CompassPeaceZone
 	default:
 		code = serverpackets.CompassGeneralZone
 	}
 	if code == a.lastCompass {
-		return code, false, false
-	}
-	flagPvP = a.lastCompass == serverpackets.CompassSiegeZone && code == serverpackets.CompassGeneralZone
-	a.lastCompass = code
-	return code, true, flagPvP
-}
-
-func (a *liveZoneActor) sendCompass(code int32, changed, flagPvP bool) {
-	if !changed {
 		return
 	}
+	flagPvP := a.lastCompass == serverpackets.CompassSiegeZone && code == serverpackets.CompassGeneralZone
+	a.lastCompass = code
 	if flagPvP {
 		a.live.Character.UpdatePvPStatus()
 	}
 	a.live.SendFrame(serverpackets.FrameExSetCompassZoneCode(code))
 }
 
-func (a *liveZoneActor) sendCurrentCompass() {
-	a.deliveryMu.Lock()
-	defer a.deliveryMu.Unlock()
+// sendCurrentCompass sends the player its compass zone when it changed.
+func (a *playerZones) sendCurrentCompass() {
 	a.mu.Lock()
-	code, changed, flagPvP := a.compassUpdate()
-	a.mu.Unlock()
-	a.sendCompass(code, changed, flagPvP)
+	defer a.mu.Unlock()
+	a.sendCompass()
 }
 
 // TaskEffects routes periodic task effects to their current live player.
@@ -594,9 +526,9 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 // boundary: its appearance is rebroadcast (swim stance and speed), and with
 // AllowWater its breath countdown starts, or stops once the pass ends out of
 // the water (keepBreath).
-func (a *liveZoneActor) SwimStateChanged(swimming bool) {
+func (a *playerZones) SwimStateChanged(swimming bool) {
 	live := a.live
-	live.SetInWater(a.flags.Has(zone.FlagWater))
+	a.applyWater()
 	if live.Live != nil {
 		live.Move().SetSwimming(swimming)
 	}
@@ -633,7 +565,7 @@ func breathTime(live *livePlayer) time.Duration {
 // zone to another keeps it running, whichever zone it saw first (#4954). A
 // teleport handles the countdown itself. It runs under mu and deliveryMu,
 // as the zone callbacks do.
-func (a *liveZoneActor) keepBreath() {
+func (a *playerZones) keepBreath() {
 	left := a.leftWater
 	a.leftWater = false
 	live := a.live
@@ -653,19 +585,18 @@ func (a *liveZoneActor) keepBreath() {
 // DangerStateChanged is the player's reaction to entering a damage or
 // effect zone, or leaving the last one: its own status window shows the
 // danger flag.
-func (a *liveZoneActor) DangerStateChanged() {
+func (a *playerZones) DangerStateChanged() {
 	live := a.live
-	live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 }
 
 // SwampStateChanged is the player's reaction to crossing a swamp boundary:
 // the move bonus of the first swamp at its position applies while any swamp
 // holds it, and its appearance is rebroadcast with the new speed.
-func (a *liveZoneActor) SwampStateChanged(z *zone.Swamp) {
+func (a *playerZones) SwampStateChanged(z *zone.Swamp) {
 	live := a.live
 	bonus := 0
-	if a.flags.Has(zone.FlagSwamp) {
+	if a.ZoneFlags().Has(zone.FlagSwamp) {
 		bonus = z.MoveBonus
 		if l := live.link; l != nil && l.zones != nil {
 			pos := a.Position()
@@ -681,7 +612,7 @@ func (a *liveZoneActor) SwampStateChanged(z *zone.Swamp) {
 }
 
 func (l *GameClientLink) ejectBossPlayer(boss *zone.Boss, actor zone.Actor) {
-	a, ok := actor.(*liveZoneActor)
+	a, ok := actor.(*playerZones)
 	if !ok {
 		return
 	}
@@ -727,7 +658,7 @@ func (l *GameClientLink) rejoinZones(live *livePlayer) {
 	if live.zoneActor == nil {
 		return
 	}
-	live.zoneActor.rejoin(l.zones)
+	live.zoneActor.enter(l.zones)
 }
 
 func (e *TaskEffects) deliver(actorID int32, frame wire.Frame) {

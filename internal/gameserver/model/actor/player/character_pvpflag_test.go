@@ -77,8 +77,8 @@ func TestNotePvPHitFromAttackerFlagsInnocentVictimHit(t *testing.T) {
 func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}
-	attacker.SetInPvPZone(true)
-	victim.SetInPvPZone(true)
+	inZones(attacker, zoneStub{pvp: true})
+	inZones(victim, zoneStub{pvp: true})
 	rec := recordEvents(attacker)
 
 	victim.notePvPHitFromAttacker(attacker, victim.InPvPZone(), false)

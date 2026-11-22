@@ -231,7 +231,7 @@ func (l *GameClientLink) siegeBanished(live *livePlayer) bool {
 // player thrown off the battlefield as its siege starts hears neither: it
 // is teleported out before the battlefield turns on.
 func (l *GameClientLink) siegeCombatNotice(a zone.Actor, entering bool) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok || l.siegeBanished(za.live) {
 		return
 	}
@@ -248,7 +248,7 @@ func (l *GameClientLink) siegeCombatNotice(a zone.Actor, entering bool) {
 // broadcasts, so the revalidation that ran this rule applies the flag once
 // that lock is released, ahead of its compass update.
 func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok || l.siegeBanished(za.live) {
 		return
 	}
@@ -264,7 +264,7 @@ func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
 // off by the time the teleport runs.
 func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 	return func(a zone.Actor) {
-		za, ok := a.(*liveZoneActor)
+		za, ok := a.(*playerZones)
 		if !ok {
 			return
 		}

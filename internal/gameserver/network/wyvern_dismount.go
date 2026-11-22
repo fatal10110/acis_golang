@@ -26,7 +26,7 @@ func (l *GameClientLink) wireNoLandingZones(ix *zone.Index) {
 // before the battlefield turns on, so it is neither warned nor counted
 // down.
 func (l *GameClientLink) siegeDismountTimer(a zone.Actor, entering bool) {
-	if za, ok := a.(*liveZoneActor); ok && l.siegeBanished(za.live) {
+	if za, ok := a.(*playerZones); ok && l.siegeBanished(za.live) {
 		return
 	}
 	l.wyvernDismountTimer(a, entering)
@@ -41,7 +41,7 @@ func (l *GameClientLink) siegeDismountTimer(a zone.Actor, entering bool) {
 // is armed and stopped on the rider's queue, in the order the zones ran
 // them.
 func (l *GameClientLink) wyvernDismountTimer(a zone.Actor, entering bool) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}

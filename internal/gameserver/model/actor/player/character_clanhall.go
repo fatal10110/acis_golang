@@ -9,16 +9,11 @@ type HallFunctions interface {
 	Level(hallID int32, funcType int) int
 }
 
-// SetInClanHallZone records the live zone engine's current clan hall zone
-// membership (zone.FlagClanHall).
-func (c *Character) SetInClanHallZone(inside bool) {
-	c.insideClanHallZone.Store(inside)
-}
-
 // InClanHallZone reports whether the character stands in a clan hall's
 // grounds, any clan's.
 func (c *Character) InClanHallZone() bool {
-	return c.insideClanHallZone.Load()
+	z := c.zonesNow()
+	return z != nil && z.InClanHallZone()
 }
 
 // clanHallRegenMultiplier is what the recovery function of type funcType

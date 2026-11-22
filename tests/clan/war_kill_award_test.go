@@ -1,6 +1,7 @@
 package clan
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"slices"
 	"testing"
 
@@ -110,5 +111,5 @@ func setInPvPZone(t *testing.T, w *clanWorld, id int32, inside bool) {
 		return
 	}
 	c := onlineCharacter(t, w.srv, id)
-	onPlayerQueue(t, w.srv, id, func() { c.SetInPvPZone(true) })
+	onPlayerQueue(t, w.srv, id, func() { holdZone(c, zone.FlagPvP) })
 }

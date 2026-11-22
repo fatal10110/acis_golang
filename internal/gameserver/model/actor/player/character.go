@@ -240,17 +240,8 @@ type Character struct {
 	mounts                   MountBodies
 	mountData                MountDataSource
 	mountFeed                mountFeedState
-	insidePvPZone            atomic.Bool
-	insidePeaceZone          atomic.Bool
-	insideSiegeZone          atomic.Bool
+	zoneStatus               atomic.Pointer[zoneStatusRef]
 	siegeState               atomic.Int32
-	insideNoSummonFriendZone atomic.Bool
-	insideBossZone           atomic.Bool
-	insideClanHallZone       atomic.Bool
-	insideMotherTreeZone     atomic.Bool
-	insideCastleZone         atomic.Bool
-	insideDangerArea         atomic.Bool
-	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32
 	abnormalEffectMask       atomic.Int32
 	weightPenalty            int

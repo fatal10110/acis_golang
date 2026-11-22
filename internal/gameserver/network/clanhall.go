@@ -30,7 +30,7 @@ func (l *GameClientLink) wireClanHallZones(ix *zone.Index) {
 // entering its grounds, ahead of the compass update the same zone check
 // sends. A hall the hall data does not know shows nothing.
 func (l *GameClientLink) showClanHallInterior(hallID int32, a zone.Actor) {
-	za, ok := a.(*liveZoneActor)
+	za, ok := a.(*playerZones)
 	if !ok {
 		return
 	}
@@ -180,7 +180,7 @@ func (l *GameClientLink) hallOccupants(hallID int32) []zone.Actor {
 	}
 	var players []zone.Actor
 	for _, a := range grounds.Occupants() {
-		if _, ok := a.(*liveZoneActor); ok {
+		if _, ok := a.(*playerZones); ok {
 			players = append(players, a)
 		}
 	}

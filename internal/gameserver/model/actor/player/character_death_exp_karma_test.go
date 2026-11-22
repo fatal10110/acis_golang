@@ -211,8 +211,7 @@ func TestApplyDeathExpKarmaLossDelevelDisabledIsNoOp(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	setRules(c, func(r *Rules) { r.AllowDelevel = false })
 	c.ExpBeforeDeath = 1800
-	c.SetInPvPZone(true)
-	c.SetInSiegeZone(true)
+	inZones(c, zoneStub{pvp: true, siege: true})
 	giveCharmOfCourage(t, c)
 	killer := &Character{ID: 2}
 
@@ -257,8 +256,7 @@ func TestApplyDeathExpKarmaLossLuckySkillBelowTenIsNoOp(t *testing.T) {
 	c.CharLevel = 9
 	c.SetSkillLevel(int(modelskill.LuckySkillID), 1)
 	c.ExpBeforeDeath = 1800
-	c.SetInPvPZone(true)
-	c.SetInSiegeZone(true)
+	inZones(c, zoneStub{pvp: true, siege: true})
 	giveCharmOfCourage(t, c)
 	killer := &Character{ID: 2}
 
@@ -276,8 +274,7 @@ func TestApplyDeathExpKarmaLossLuckySkillBelowTenIsNoOp(t *testing.T) {
 func TestApplyDeathExpKarmaLossSiegeCharmSparesNonPlayableKill(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	c.ExpBeforeDeath = 1800
-	c.SetInPvPZone(true)
-	c.SetInSiegeZone(true)
+	inZones(c, zoneStub{pvp: true, siege: true})
 	giveCharmOfCourage(t, c)
 	rec := recordEvents(c)
 
@@ -346,7 +343,7 @@ func TestApplyDeathExpKarmaLossLuckySkillAtTenApplies(t *testing.T) {
 func TestApplyDeathExpKarmaLossSiegeZoneHalvesPercent(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	c.KarmaPoints = 0 // isolate the siege-zone quarter from the karma-rate multiplier.
-	c.SetInSiegeZone(true)
+	inZones(c, zoneStub{siege: true})
 	killer := &Character{ID: 2}
 
 	c.applyDeathExpKarmaLoss(killer)
