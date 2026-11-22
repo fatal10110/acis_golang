@@ -2,11 +2,14 @@
 # docker-compose.yml builds it for the loginserver and gameserver services;
 # see docs/ops/docker.md.
 #
-# The image holds binaries only. Config (config/*.properties, hexid.txt) and
-# the datapack (data/xml, data/html, data/geodata, data/crests,
-# serverNames.xml) are mounted at run time under /opt/acis, the same
-# config/ + data/ layout the reference server runs from, so every flag
-# default (config/server.properties, -data-root .) resolves unchanged.
+# The image holds the binaries, plus the compose config bundle: a default
+# config set in /usr/local/share/acis/config and acis-init, which the
+# compose init service runs to fill an empty config directory from it. The
+# live config (config/*.properties, hexid.txt) and the datapack (data/xml,
+# data/html, data/geodata, data/crests, serverNames.xml) are mounted at run
+# time under /opt/acis, the same config/ + data/ layout the reference server
+# runs from, so every flag default (config/server.properties, -data-root .)
+# resolves unchanged.
 
 ARG GO_VERSION=1.26
 
@@ -26,6 +29,8 @@ RUN apk add --no-cache tzdata ca-certificates \
 	&& mkdir -p /opt/acis/config /opt/acis/data /opt/acis/log /opt/acis/cache \
 	&& chown 1000:1000 /opt/acis/cache
 COPY --from=build /out/ /usr/local/bin/
+COPY ops/docker/config/ /usr/local/share/acis/config/
+COPY --chmod=0755 ops/docker/acis-init.sh /usr/local/bin/acis-init
 WORKDIR /opt/acis
 # docker-compose.yml runs the servers as the host user that owns the mounted
 # config, datapack and log directories; this is only the bare-run default.

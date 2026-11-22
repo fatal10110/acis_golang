@@ -5,6 +5,9 @@
 # Usage, from anywhere in the checkout:
 #   ops/docker/init-config.sh [reference-config-dir]
 #
+# Optional: without it, the compose init service fills an empty config
+# directory from the config bundle the image carries (ops/docker/config).
+#
 # Copies the reference server's config/ (default ../aCis_gameserver/config)
 # to ACIS_CONFIG_DIR (default ./config), then rewrites only the keys that
 # differ inside the compose network:
@@ -75,5 +78,5 @@ mkdir -p "$logdir/loginserver" "$logdir/gameserver" "$cachedir" "$datapack/data/
 
 echo "init-config: wrote $dst (database db, login link loginserver, advertised host $public_host)"
 if [ ! -f "$dst/hexid.txt" ]; then
-	echo "init-config: next, register the game server to create $dst/hexid.txt (docs/ops/docker.md)"
+	echo "init-config: docker compose --profile servers up registers the game server and writes $dst/hexid.txt"
 fi
