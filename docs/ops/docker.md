@@ -119,7 +119,9 @@ directories, and does this:
 The script also creates `log/loginserver`, `log/gameserver`, `cache` and the datapack's `data/crests`. It
 refuses to run when `config/server.properties` already exists, so it never undoes your edits. To
 change a value later, edit `config/*.properties` (or set the variable the init service reads) and
-restart the stack with `docker compose --profile servers up -d`.
+run `docker compose --profile servers up -d --force-recreate`: `init` runs again, then both servers
+restart and read the new values. A plain `up -d` leaves running servers alone, because their compose
+configuration did not change.
 
 ### Registering by hand
 
