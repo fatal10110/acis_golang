@@ -343,7 +343,13 @@ func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemco
 	}
 	for _, inst := range petInventory.Items() {
 		state := inst.Snapshot()
-		if !owner.ValidateCapacity(1) {
+		// A returning stack that merges into one the owner holds needs no
+		// free slot (#5089).
+		slots := 1
+		if tmpl, ok := owner.Templates().Get(state.TemplateID); ok {
+			slots = owner.SlotsNeededFor(inst, tmpl)
+		}
+		if !owner.ValidateCapacity(slots) {
 			l.dropPetItem(actor, petInventory, state.ObjectID, state.Count)
 			continue
 		}
