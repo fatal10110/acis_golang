@@ -514,7 +514,7 @@ const (
 func ind7bDebuffs() []modelskill.Definition {
 	defs := []modelskill.Definition{ind1Skill(ind7bSongDebuff1, 600, false), ind1Skill(ind7bSongDebuff2, 600, false), ind1Skill(ind7bSongDebuff3, 600, false)}
 	withEffect := func(d modelskill.Definition, id int) modelskill.Definition {
-		extra := d.Extra()
+		extra := *d.Extra()
 		extra.EffectID = id
 		return d.WithExtra(extra)
 	}

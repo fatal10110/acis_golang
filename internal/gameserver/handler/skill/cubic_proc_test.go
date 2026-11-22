@@ -186,7 +186,7 @@ func TestCubicMagicFailureGapUsesSkillMagicLevel(t *testing.T) {
 func TestCubicMdamEffectsLandAfterTheDamageReport(t *testing.T) {
 	target := newCubicProcTarget()
 	def := stormStrike
-	extra := def.Extra()
+	extra := *def.Extra()
 	def.IgnoreResists, extra.EffectPower = true, 100
 	def = def.WithExtra(extra)
 	def.Effects = []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, EffectPower: -1}}

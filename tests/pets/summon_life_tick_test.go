@@ -240,7 +240,7 @@ func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 func TestServitorLeavesWhenItsLifetimeRunsOut(t *testing.T) {
 	t.Parallel()
 	def := lifetimeServitorSkill()
-	extra := def.Extra()
+	extra := *def.Extra()
 	extra.SummonTotalLifeTime, extra.ItemConsumeIDOT, extra.ItemConsumeCountOT, extra.ItemConsumeSteps = 2000, 0, 0, 0
 	def = def.WithExtra(extra)
 	o := bootLifetimeServitorOwner(t, def)

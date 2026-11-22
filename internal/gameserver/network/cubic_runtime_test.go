@@ -124,7 +124,7 @@ func cubicOwnerOnClock(t *testing.T, link *GameClientLink, id int32, lifetime ti
 	live := newTestLivePlayer(t, id, &testsupport.FrameCapture{})
 	live.Character.Live.SetQueue(in.NewQueue("owner"))
 	def := cubicRuntimeDef(cubic.Storm)
-	extra := def.Extra()
+	extra := *def.Extra()
 	extra.SummonTotalLifeTime = int(lifetime / time.Millisecond)
 	def = def.WithExtra(extra)
 	live.Character.AddOrRefreshCubic(cubic.Storm, false)

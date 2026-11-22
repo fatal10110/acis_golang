@@ -123,7 +123,7 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			// (L2Skill.getWeaponDependancy).
 			name: "weapon not held",
 			tune: func(d *modelskill.Definition) {
-				extra := d.Extra()
+				extra := *d.Extra()
 				extra.WeaponsAllowed = "DAGGER"
 				*d = d.WithExtra(extra)
 			},
@@ -135,7 +135,7 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			// CreatureCast.canCast checks sight before the weapon.
 			name: "sight before weapon",
 			tune: func(d *modelskill.Definition) {
-				extra := d.Extra()
+				extra := *d.Extra()
 				extra.WeaponsAllowed = "DAGGER"
 				*d = d.WithExtra(extra)
 			},
@@ -148,7 +148,7 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			// The weapon is checked before PlayableCast's skill conditions.
 			name: "weapon before skill condition",
 			tune: func(d *modelskill.Definition) {
-				extra := d.Extra()
+				extra := *d.Extra()
 				extra.WeaponsAllowed = "DAGGER"
 				*d = d.WithExtra(extra)
 				d.Conditions = []modelskill.ConditionClause{{
@@ -206,7 +206,7 @@ func TestArmedPetCastNeedsAllowedWeapon(t *testing.T) {
 			t.Parallel()
 			strike := wolfStrike()
 			strike.MPInitialConsume = 5
-			extra := strike.Extra()
+			extra := *strike.Extra()
 			extra.WeaponsAllowed = tc.allowed
 			strike = strike.WithExtra(extra)
 			catalog := item.NewTable(append(gameservertest.ItemTemplates().All(), petWeaponTemplate()))

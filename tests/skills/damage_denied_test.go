@@ -123,7 +123,7 @@ func TestDamageDeniedChargeDamReportsZeroDamage(t *testing.T) {
 func TestDamageDeniedBlowReportsItsDamageButLeavesHP(t *testing.T) {
 	t.Parallel()
 	def := deniedStrike("BLOW")
-	extra := def.Extra()
+	extra := *def.Extra()
 	def.Power, extra.BaseLandRate = 100, 1
 	def = def.WithExtra(extra)
 	d := bootDeniedCaster(t, def)

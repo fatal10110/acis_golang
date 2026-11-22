@@ -15,7 +15,8 @@ func TestDefinitionSize(t *testing.T) {
 }
 
 // TestDefinitionExtraZeroAndCopy requires a Definition without an Extra to
-// read the zero Extra, and WithExtra to leave its receiver as it was.
+// read the zero Extra, WithExtra to leave its receiver as it was, and a copy
+// of the read Extra to be independent of the Definition.
 func TestDefinitionExtraZeroAndCopy(t *testing.T) {
 	var bare Definition
 	if got := bare.Extra(); got.NpcID != 0 || got.SelfEffects != nil || got.TeleCoords != nil {
@@ -25,7 +26,10 @@ func TestDefinitionExtraZeroAndCopy(t *testing.T) {
 	if with.Extra().NpcID != 9 || bare.Extra().NpcID != 0 {
 		t.Fatalf("WithExtra NpcID: copy %d, receiver %d; want 9, 0", with.Extra().NpcID, bare.Extra().NpcID)
 	}
-	read := with.Extra()
+	if first, second := with.Extra(), with.Extra(); first != second {
+		t.Fatal("Extra() copies the stored Extra on every read")
+	}
+	read := *with.Extra()
 	read.NpcID = 11
 	if with.Extra().NpcID != 9 {
 		t.Fatalf("writing the Extra() copy changed the Definition: NpcID = %d, want 9", with.Extra().NpcID)

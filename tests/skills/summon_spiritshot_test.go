@@ -90,7 +90,7 @@ func TestServitorSummonSpendsSpiritshotOnlyWhenSpawned(t *testing.T) {
 		SummonTotalLifeTime: 1_200_000,
 	})
 	missing := servitor
-	extra := missing.Extra()
+	extra := *missing.Extra()
 	missing.ID, extra.NpcID = shotNoTemplateSkill, shotServitorNpcID+1
 	missing = missing.WithExtra(extra)
 	srv := gameservertest.Boot(t,

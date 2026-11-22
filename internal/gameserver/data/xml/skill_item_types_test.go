@@ -23,13 +23,13 @@ func TestShippedItemSkillTypeAttrs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
 	}
-	get := func(id skill.ID, level int) skill.Definition {
+	get := func(id skill.ID, level int) *skill.Definition {
 		t.Helper()
 		def, ok := table.Get(id, level)
 		if !ok {
 			t.Fatalf("skill %d level %d missing", id, level)
 		}
-		return *def
+		return def
 	}
 
 	for _, tt := range []struct {

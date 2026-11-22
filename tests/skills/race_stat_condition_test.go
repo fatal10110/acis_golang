@@ -31,7 +31,7 @@ func TestRaceAndSkillStatConditionsGateCast(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			def := shippedSkill(t, 139, 1)
-			extra := def.Extra()
+			extra := *def.Extra()
 			extra.Stat = tt.stat
 			def = def.WithExtra(extra)
 			def.Conditions = []modelskill.ConditionClause{{Root: tt.root, MessageID: serverpackets.SystemMessageS1CannotBeUsed, AddName: true}}

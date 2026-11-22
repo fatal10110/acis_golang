@@ -379,7 +379,7 @@ func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, block forElemen
 				return err
 			}
 			if eff.Self {
-				extra := def.Extra()
+				extra := *def.Extra()
 				extra.SelfEffects = append(extra.SelfEffects, eff)
 				*def = def.WithExtra(extra)
 			} else {

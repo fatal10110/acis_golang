@@ -177,7 +177,7 @@ func TestDrainGates(t *testing.T) {
 	t.Run("corpse drain feeds the caster only", func(t *testing.T) {
 		caster, target, def := drainFixture()
 		target.dead = true
-		extra := def.Extra()
+		extra := *def.Extra()
 		def.Target, extra.AbsorbPart, extra.AbsorbAbs = modelskill.TargetCorpseMob, 0, 260
 		def = def.WithExtra(extra)
 		def.Effects = []modelskill.EffectTemplate{{Name: "Debuff", Time: 9}}

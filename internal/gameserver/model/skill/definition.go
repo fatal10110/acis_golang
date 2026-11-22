@@ -268,13 +268,19 @@ type Extra struct {
 	SelfEffects []EffectTemplate
 }
 
-// Extra returns a copy of d's type-specific attributes; the zero Extra when
-// d carries none.
-func (d Definition) Extra() Extra {
+// noExtra is what Extra returns for a Definition built without
+// type-specific attributes.
+var noExtra Extra
+
+// Extra returns d's type-specific attributes, or a zero Extra when d carries
+// none. The result is shared with every level holding equal attributes and
+// must be treated as read-only: to change a value, copy it (*d.Extra()) and
+// pass the copy to WithExtra.
+func (d *Definition) Extra() *Extra {
 	if d.extra == nil {
-		return Extra{}
+		return &noExtra
 	}
-	return *d.extra
+	return d.extra
 }
 
 // WithExtra returns a copy of d carrying e as its type-specific attributes.

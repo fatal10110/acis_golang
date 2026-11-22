@@ -141,7 +141,7 @@ func TestChargeSkillMovesItsCaster(t *testing.T) {
 			if tt.targetOne {
 				def.Target, def.Radius, def.CastRange = modelskill.TargetOne, 0, 900
 			}
-			extra := def.Extra()
+			extra := *def.Extra()
 			def.Flight, extra.FlyRadius = tt.flight, flyRadius
 			def = def.WithExtra(extra)
 			srv, caster, cast := bootRealDamageCaster(t, def)

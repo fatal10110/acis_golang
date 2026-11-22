@@ -64,7 +64,7 @@ func TestPlayerRangedCastNeedsLineOfSight(t *testing.T) {
 		{
 			name: "sight before weapon",
 			tune: func(d *modelskill.Definition) {
-				extra := d.Extra()
+				extra := *d.Extra()
 				extra.WeaponsAllowed = "BOW"
 				*d = d.WithExtra(extra)
 			},

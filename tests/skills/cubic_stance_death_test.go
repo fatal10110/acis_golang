@@ -29,7 +29,7 @@ func bootStanceCubicSummoner(t *testing.T, nowMS *atomic.Int64) (*gameservertest
 	defs := cubicSummonSkills(900*time.Second, 900*time.Second)
 	for i := range defs {
 		if defs[i].ID == summonStormCubicSkill {
-			extra := defs[i].Extra()
+			extra := *defs[i].Extra()
 			extra.CubicActivationChance = 100
 			defs[i] = defs[i].WithExtra(extra)
 		}
