@@ -382,7 +382,9 @@ func TestAdminJail(t *testing.T) {
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("ban chat Player")), "Player is already jailed, and can't receive another punishment.")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("unban chat Player")), "Player isn't currently chat banned.")
 
-	exchange(t, gm, encodeAction(userID))
+	// Player is far in jail, out of gm's known list: a click would be
+	// refused (#4993), so gm targets it by name.
+	exchange(t, gm, encodeBuildCmd("target Player"))
 	assertTexts(t, messages(exchange(t, gm, encodeBuildCmd("unjail"))), "Player has been unjailed.")
 	frames = settle(t, user)
 	pages = only(frames, serverpackets.OpcodeNpcHtmlMessage)
