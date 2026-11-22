@@ -97,12 +97,12 @@ func (a SummonActor) ActingPlayerInOlympiad() bool {
 
 // SkillConditions evaluates def's <cond> clauses with the player as caster.
 func (a PlayerActor) SkillConditions(target Target, def *modelskill.Definition) (modelskill.ConditionClause, bool) {
-	return conditions.EvaluateSkill(*def, a.Character, target)
+	return conditions.EvaluateSkill(def, a.Character, target)
 }
 
 // SkillConditions evaluates def's <cond> clauses with the summon as caster.
 func (a SummonActor) SkillConditions(target Target, def *modelskill.Definition) (modelskill.ConditionClause, bool) {
-	return conditions.EvaluateSkill(*def, a.Summon, target)
+	return conditions.EvaluateSkill(def, a.Summon, target)
 }
 
 // WeaponAllowed reports whether a creature holding the item types in held

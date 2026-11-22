@@ -53,9 +53,9 @@ type Damageable interface {
 type Effects interface {
 	// Conditions reports whether def's conditions hold for target using it
 	// on itself, telling target why not when they do not.
-	Conditions(target Target, def modelskill.Definition) bool
+	Conditions(target Target, def *modelskill.Definition) bool
 	// Land lands def's effects on target, as both effector and effected.
-	Land(target Target, def modelskill.Definition)
+	Land(target Target, def *modelskill.Definition)
 }
 
 // Config is what the pulses act through.
@@ -239,17 +239,19 @@ func effectTick(cfg *Config, z *zone.Effect) bool {
 }
 
 // landSkills lands each of z's skills on t whose conditions t meets and
-// none of whose effects t already holds.
+// none of whose effects t already holds. The conditions are tested first
+// even though holding is the cheaper test: a failed condition tells a
+// player why, held effect or not.
 func landSkills(cfg *Config, z *zone.Effect, t Target) {
 	for _, ref := range z.Skills {
 		def, ok := cfg.Skills.Definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: ref.Level})
 		if !ok {
 			continue
 		}
-		if !cfg.Effects.Conditions(t, *def) || holds(t, ref.ID) {
+		if !cfg.Effects.Conditions(t, def) || holds(t, ref.ID) {
 			continue
 		}
-		cfg.Effects.Land(t, *def)
+		cfg.Effects.Land(t, def)
 	}
 }
 

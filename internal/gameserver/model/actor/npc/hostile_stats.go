@@ -74,11 +74,17 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 }
 
 func (h *Hostile) broadcastModifiedStats(fns []effect.Mod) {
-	stats := make([]stat.Stat, len(fns))
-	for i, fn := range fns {
-		stats[i] = fn.Stat
+	h.broadcastModifiedStatsFor(modStats(fns))
+}
+
+// modStats returns the stats fns change, in order. Its array lives in the
+// caller's frame for the usual handful of funcs an effect attaches.
+func modStats(fns []effect.Mod) []stat.Stat {
+	stats := make([]stat.Stat, 0, 8)
+	for _, fn := range fns {
+		stats = append(stats, fn.Stat)
 	}
-	h.broadcastModifiedStatsFor(stats)
+	return stats
 }
 
 func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {

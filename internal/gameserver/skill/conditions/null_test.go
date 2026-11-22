@@ -151,7 +151,7 @@ func TestEvaluateSkillNullClause(t *testing.T) {
 		def := modelskill.Definition{Conditions: []modelskill.ConditionClause{
 			{Root: root, MessageID: 113, AddName: true, Message: "m"},
 		}}
-		return EvaluateSkill(def, caster, nil)
+		return EvaluateSkill(&def, caster, nil)
 	}
 
 	for _, root := range []modelskill.Condition{gameChance, {}, leaf("not", nil, gameChance), leaf("and", nil, playerLevel("1"), leaf("not", nil, gameChance))} {
@@ -180,7 +180,7 @@ func TestEvaluateSkillNullClause(t *testing.T) {
 		{Root: playerLevel("50"), MessageID: 7},
 		{Root: gameChance},
 	}}
-	if failed, ok := EvaluateSkill(def, caster, nil); ok || failed.MessageID != 7 {
+	if failed, ok := EvaluateSkill(&def, caster, nil); ok || failed.MessageID != 7 {
 		t.Errorf("failing clause before a null one: got (%+v, %v), want the first refused", failed, ok)
 	}
 }

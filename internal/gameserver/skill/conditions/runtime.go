@@ -30,7 +30,7 @@ func ActorOf(v any) Actor {
 // test aborts (its root holds no condition, or the test reached a <not>
 // around one, see Evaluate) rejects with no feedback: only its Root is
 // reported.
-func EvaluateSkill(def modelskill.Definition, caster Source, target any) (modelskill.ConditionClause, bool) {
+func EvaluateSkill(def *modelskill.Definition, caster Source, target any) (modelskill.ConditionClause, bool) {
 	if len(def.Conditions) == 0 {
 		return modelskill.ConditionClause{}, true
 	}

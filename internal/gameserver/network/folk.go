@@ -175,8 +175,7 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.HPChanged:
 		sendHPToWatchers(s.world.KnownPlayers(f), f.ObjectID(), f.PublishHP)
 	case event.Status:
-		attrs := npcStatusAttributes(e.Attrs)
-		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
+		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), npcStatusAttributes(e.Attrs)) })
 	case event.Attack:
 		s.broadcast(func() wire.Frame { return frames.Attack(e) })
 	case event.Attacked, event.AttackStanceRequested:

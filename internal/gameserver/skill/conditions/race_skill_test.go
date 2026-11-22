@@ -73,7 +73,7 @@ func TestEvaluateSkillTestsTheDefinitionStat(t *testing.T) {
 		{"", false},
 	} {
 		def := modelskill.Definition{Conditions: []modelskill.ConditionClause{clause}}.WithExtra(modelskill.Extra{Stat: tt.stat})
-		if _, ok := EvaluateSkill(def, caster, nil); ok != tt.want {
+		if _, ok := EvaluateSkill(&def, caster, nil); ok != tt.want {
 			t.Errorf("stat %q: EvaluateSkill ok = %v, want %v", tt.stat, ok, tt.want)
 		}
 	}
