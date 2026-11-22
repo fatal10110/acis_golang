@@ -293,7 +293,12 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
-	if f, ok := obj.(*npc.Folk); ok {
+	// Once p's session ended, its client reads nothing more: the connection
+	// is sealed behind its last frame, gone or closing. Its despawn makes it
+	// forget everything around it, so in a crowd it skips building and
+	// encrypting a frame per object that would only be dropped.
+	shown := !p.sessionEnded.Load()
+	if f, ok := obj.(*npc.Folk); ok && shown {
 		p.hideDerbyRunners(f)
 	}
 	if o, ok := obj.(*summon.Actor); ok {
@@ -302,7 +307,7 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 		}
 	}
 	p.forgetTarget(obj)
-	if !rendersObject(obj) {
+	if !shown || !rendersObject(obj) {
 		return
 	}
 	seated := false
