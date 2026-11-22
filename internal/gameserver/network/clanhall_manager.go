@@ -258,6 +258,9 @@ func (d hallDialog) clanWarehouse(withdraw bool) {
 		d.live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse))
 		return
 	}
+	if !d.l.clanWarehouseReady(d.live, d.cl.ID(), func() { d.clanWarehouse(withdraw) }) {
+		return
+	}
 	wh, ok := d.l.activateClanWarehouse(d.live, d.cl)
 	if !ok {
 		return

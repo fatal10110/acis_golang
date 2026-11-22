@@ -35,7 +35,8 @@ func (l *GameClientLink) requestGMCommand(gm *livePlayer, req clientpackets.Requ
 		if req.Command != gmViewWarehouse {
 			return
 		}
-		if cl, found := l.clanService().Table().ByName(req.TargetName); found {
+		cl, found := l.clanService().Table().ByName(req.TargetName)
+		if found && l.clanWarehouseReady(gm, cl.ID(), func() { l.requestGMCommand(gm, req) }) {
 			l.sendGMClanWarehouseView(gm, cl)
 		}
 		return
@@ -85,9 +86,8 @@ func (l *GameClientLink) sendGMView(gm, target *livePlayer, command int32) {
 // its leader's name. A warehouse that cannot be read is logged and the
 // client released.
 func (l *GameClientLink) sendGMClanWarehouseView(gm *livePlayer, cl *clan.Clan) {
-	wh, err := l.clanWarehouse(cl.ID())
-	if err != nil {
-		l.log.Error().Err(err).Int32("clan_id", cl.ID()).Msg("gm view: restore clan warehouse")
+	wh := l.clanWarehouses.restored(cl.ID())
+	if wh == nil {
 		gm.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

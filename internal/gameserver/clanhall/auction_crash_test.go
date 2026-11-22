@@ -371,3 +371,5 @@ func TestAuctionSaleCancelSurvivesACrashAnywhere(t *testing.T) {
 		t.Fatalf("rivals settle with %d adena, want 4700: 3000 bid, 2700 back", got[crashRivals])
 	}
 }
+
+func (b *crashBank) RestoreWarehouse(int32) {}

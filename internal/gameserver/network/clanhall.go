@@ -42,6 +42,15 @@ func (l *GameClientLink) showClanHallInterior(hallID int32, a zone.Actor) {
 
 var _ clanhall.Bank = (*GameClientLink)(nil)
 
+// RestoreWarehouse reads the warehouse of the clan clanID into memory when
+// no member has opened it yet. A failed read is logged and left for
+// TakeAdena to meet again.
+func (l *GameClientLink) RestoreWarehouse(clanID int32) {
+	if _, err := l.clanWarehouse(clanID); err != nil {
+		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("clan hall: restore clan warehouse ahead of a fee")
+	}
+}
+
 // TakeAdena destroys adena from the warehouse of the clan clanID,
 // restoring it first when no member opened it, and reports false, with
 // nothing taken, when it holds less or cannot be read. It also returns the

@@ -17,19 +17,28 @@ import (
 const clanWarehouseRestoreTimeout = 5 * time.Second
 
 // clanWarehouseBook holds each clan's warehouse, restored from its rows the
-// first time a member opens it and shared by every member's session from
-// then on. mu guards byClan; each entry's own mu serializes its restore, so
-// two members opening it at once restore it once. Item moves in and out of
-// a warehouse are serialized by the item operation that names the clan id
-// (task.ItemInstances.BeginOperation), not by the queue of any one member.
+// first time it is used and shared by every member's session from then on.
+// mu guards byClan. Each entry's restoring serializes its read, so two
+// members opening it at once read it once, and its mu guards the warehouse
+// itself: a lookup of a restored warehouse never waits on a read. Item moves
+// in and out of a warehouse are serialized by the item operation that names
+// the clan id (task.ItemInstances.BeginOperation), not by the queue of any
+// one member.
 type clanWarehouseBook struct {
 	mu     sync.Mutex
 	byClan map[int32]*clanWarehouseEntry
 }
 
 type clanWarehouseEntry struct {
-	mu sync.Mutex
-	wh *itemcontainer.Container
+	restoring sync.Mutex
+	mu        sync.Mutex
+	wh        *itemcontainer.Container
+}
+
+func (e *clanWarehouseEntry) warehouse() *itemcontainer.Container {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.wh
 }
 
 func (b *clanWarehouseBook) entry(clanID int32) *clanWarehouseEntry {
@@ -63,9 +72,21 @@ func (b *clanWarehouseBook) holds(clanID int32, store invops.Store) bool {
 	if e == nil {
 		return false
 	}
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.wh != nil && invops.Store(e.wh) == store
+	wh := e.warehouse()
+	return wh != nil && invops.Store(wh) == store
+}
+
+// restored returns the warehouse of the clan clanID when it is in memory,
+// nil when no one has used it yet or its clan was dissolved. It never reads
+// the database.
+func (b *clanWarehouseBook) restored(clanID int32) *itemcontainer.Container {
+	b.mu.Lock()
+	e := b.byClan[clanID]
+	b.mu.Unlock()
+	if e == nil {
+		return nil
+	}
+	return e.warehouse()
 }
 
 // storeStillOpen reports whether live's active store may still take items
@@ -86,18 +107,27 @@ func (l *GameClientLink) storeStillOpen(live *livePlayer, active activeStore) bo
 }
 
 // clanWarehouse returns the warehouse of the clan clanID, restoring it
-// from its CLANWH rows on first use. A failed read is not kept: the next
-// opening reads again.
+// from its CLANWH rows on first use, for a server task: the manor's crops,
+// a dissolution, a clan hall's fee or refund. A player's request never
+// calls it on its queue; it waits for the read off the queue instead
+// (clanWarehouseReady).
 func (l *GameClientLink) clanWarehouse(clanID int32) (*itemcontainer.Container, error) {
+	return l.restoreClanWarehouse(context.Background(), clanID)
+}
+
+// restoreClanWarehouse returns the warehouse of the clan clanID, reading
+// its CLANWH rows under ctx when no one has used it yet. A failed read is
+// not kept: the next use reads again.
+func (l *GameClientLink) restoreClanWarehouse(ctx context.Context, clanID int32) (*itemcontainer.Container, error) {
 	e := l.clanWarehouses.entry(clanID)
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.wh != nil {
-		return e.wh, nil
+	e.restoring.Lock()
+	defer e.restoring.Unlock()
+	if wh := e.warehouse(); wh != nil {
+		return wh, nil
 	}
 	wh := itemcontainer.NewContainerWithPersister(clanID, item.LocationClanWarehouse, l.itemTemplates, l.itemPersister(clanID))
 	if l.belongings.items != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), clanWarehouseRestoreTimeout)
+		ctx, cancel := context.WithTimeout(ctx, clanWarehouseRestoreTimeout)
 		defer cancel()
 		rows, err := l.belongings.items.ListByOwner(ctx, clanID)
 		if err != nil {
@@ -105,18 +135,46 @@ func (l *GameClientLink) clanWarehouse(clanID int32) (*itemcontainer.Container, 
 		}
 		wh.Restore(l.restoreRows(clanID, rows, func(loc item.Location) bool { return loc == item.LocationClanWarehouse }))
 	}
+	e.mu.Lock()
 	e.wh = wh
+	e.mu.Unlock()
 	return wh, nil
 }
 
-// activateClanWarehouse makes the warehouse of live's clan cl the active
-// store, limited to the configured clan warehouse size, or reports false
-// when it cannot be read.
+// clanWarehouseReady reports whether the warehouse of the clan clanID is
+// in memory, for the request running on live's queue to use it there. When
+// no one has used it yet, its rows are read first on the connection
+// goroutine, under the connection's context and off the queue
+// (deferLookup), and then rerun answers the request on live's queue,
+// checking its gates again; a read that fails is logged and the client
+// released. Only a request that may defer lookups may call it.
+func (l *GameClientLink) clanWarehouseReady(live *livePlayer, clanID int32, rerun func()) bool {
+	sim.AssertOwner(live.Queue())
+	if l.clanWarehouses.restored(clanID) != nil {
+		return true
+	}
+	live.deferLookup(func(ctx context.Context) {
+		_, err := l.restoreClanWarehouse(ctx, clanID)
+		onLive(live, func() {
+			if err != nil {
+				l.log.Error().Err(err).Int32("clan_id", clanID).Msg("warehouse: restore clan warehouse")
+				live.SendFrame(serverpackets.FrameActionFailed())
+				return
+			}
+			rerun()
+		})
+	})
+	return false
+}
+
+// activateClanWarehouse makes the warehouse of live's clan cl, which
+// clanWarehouseReady found in memory, the active store, limited to the
+// configured clan warehouse size, or reports false when it is gone: its
+// clan was dissolved meanwhile.
 func (l *GameClientLink) activateClanWarehouse(live *livePlayer, cl *clan.Clan) (*itemcontainer.Container, bool) {
 	sim.AssertOwner(live.Queue())
-	wh, err := l.clanWarehouse(cl.ID())
-	if err != nil {
-		l.log.Error().Err(err).Int32("clan_id", cl.ID()).Msg("warehouse: restore clan warehouse")
+	wh := l.clanWarehouses.restored(cl.ID())
+	if wh == nil {
 		return nil, false
 	}
 	limit := l.playerConfig().StorageSlots.ClanWarehouseSlots()
@@ -137,6 +195,9 @@ func (l *GameClientLink) clanWarehouseBypass(live *livePlayer, withdraw bool) {
 		return
 	case clan.WarehouseLevelTooLow:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse))
+		return
+	}
+	if !l.clanWarehouseReady(live, cl.ID(), func() { l.clanWarehouseBypass(live, withdraw) }) {
 		return
 	}
 	wh, ok := l.activateClanWarehouse(live, cl)
