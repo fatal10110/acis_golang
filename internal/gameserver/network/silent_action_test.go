@@ -162,10 +162,11 @@ import (
 // registers no pending client action; tests/character, tests/party and
 // tests/clan assert those silences.
 //
-// RequestQuestAbort is absent where the reference is silent: a quest id the
-// player has no state of, or a state that is not started. The client sends
-// it once the player confirmed the abort and waits on no answer;
-// tests/quest asserts those silences.
+// RequestQuestAbort is absent where the reference is silent: a positive
+// quest id the player has no state of, or a state that is not started. The
+// client sends it once the player confirmed the abort and waits on no
+// answer; tests/quest asserts those silences. An id of 0 or below answers
+// ActionFailed (#5093).
 //
 // The four tutorial requests are absent where the reference is silent: a
 // player with no tutorial quest state. The tutorial window and its question

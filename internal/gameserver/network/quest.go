@@ -57,10 +57,16 @@ type questJournals interface {
 }
 
 // abortQuest answers RequestQuestAbort: the first quest of live's journal
-// with the quest id is exited as repeatable. An id live has no quest of
-// answers nothing on purpose; the client sends the request once
-// the player confirmed the abort, and waits on no answer.
+// with the quest id is exited as repeatable. An id of 0 or below names no
+// quest, only scripts such as the tutorial that keep a journal state, so it
+// is refused with ActionFailed and changes nothing (#5093). A positive id
+// live has no quest of answers nothing on purpose; the client sends the
+// request once the player confirmed the abort, and waits on no answer.
 func (l *GameClientLink) abortQuest(live *livePlayer, questID int32) {
+	if questID <= 0 {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	if l.journals == nil {
 		return
 	}

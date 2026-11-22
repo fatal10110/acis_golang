@@ -297,9 +297,11 @@ func TestJournalWritesSurviveRelog(t *testing.T) {
 
 // TestQuestAbortExitsByID aborts quests from the quest window. The request
 // names a quest id: the first state of that id in the journal is exited as
-// repeatable, so its rows go and a real quest's window is sent. An id with
-// no state, or a state that is not started, answers nothing; a script that
-// is not a real quest is aborted by its id too, silently.
+// repeatable, so its rows go and a real quest's window is sent. A positive
+// id with no state, or a state that is not started, answers nothing. An id
+// of 0 or below names no quest (#5093): it answers ActionFailed and leaves
+// the state of a script that is not a real quest, here the teleporter's of
+// id -1, untouched.
 func TestQuestAbortExitsByID(t *testing.T) {
 	t.Parallel()
 	srv, objID := bootJournal(t)
@@ -315,24 +317,28 @@ func TestQuestAbortExitsByID(t *testing.T) {
 	enterWorld(t, srv)
 	c := srv.Client
 
-	for _, id := range []int32{9, 2, 0} {
+	for _, id := range []int32{9, 2} {
 		c.Send(encodeRequestQuestAbort(id))
 		if lines := sentLines(t, srv); len(lines) != 0 {
 			t.Fatalf("abort %d answered %q", id, lines)
 		}
+	}
+	c.Send(encodeRequestQuestAbort(0))
+	if got := sentLines(t, srv); !slices.Equal(got, []string{"S ActionFailed"}) {
+		t.Fatalf("abort 0 packets = %q, want ActionFailed", got)
 	}
 	c.Send(encodeRequestQuestAbort(1))
 	if got := sentLines(t, srv); !slices.Equal(got, []string{"S QuestList 3:0x80000001"}) {
 		t.Fatalf("abort 1 packets = %q", got)
 	}
 	c.Send(encodeRequestQuestAbort(-1))
-	if lines := sentLines(t, srv); len(lines) != 0 {
-		t.Fatalf("abort -1 answered %q", lines)
+	if got := sentLines(t, srv); !slices.Equal(got, []string{"S ActionFailed"}) {
+		t.Fatalf("abort -1 packets = %q, want ActionFailed", got)
 	}
 	srv.FlushPersistence(t)
 	for quest, want := range map[string]map[string]string{
 		q001:                       {},
-		noblesse:                   {},
+		noblesse:                   {"<state>": "STARTED", "<cond>": "1"},
 		"Q002_WhatWomenWant":       {"<state>": "CREATED"},
 		"Q003_WillTheSealBeBroken": {"<state>": "STARTED", "<cond>": "1"},
 	} {
@@ -342,6 +348,9 @@ func TestQuestAbortExitsByID(t *testing.T) {
 	}
 	if srv.QuestVars(t, objID, q001) != nil {
 		t.Fatal("aborted quest still in the journal")
+	}
+	if srv.QuestVars(t, objID, noblesse) == nil {
+		t.Fatal("abort of id -1 dropped the teleporter's state")
 	}
 }
 
