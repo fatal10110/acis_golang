@@ -24,20 +24,8 @@ func (l *GameClientLink) wireZones(ix *zone.Index) {
 	if ix == nil {
 		return
 	}
-	for _, boss := range zone.OfKind[*zone.Boss](ix) {
-		boss.Eject = func(a zone.Actor) { l.ejectBossPlayer(boss, a) }
-	}
-	l.wireZoneOccupantHooks(ix)
 	l.wireScriptZones(ix)
-	l.wireClanHallZones(ix)
-	l.wireCastleZones(ix)
-	l.wireCastleTeleportZones(ix)
-	l.wireSiegeZones(ix)
-	l.wireNoLandingZones(ix)
-	wireMotherTreeZones(ix)
-	wireArenaZones(ix)
-	l.wireStadiumZones(ix)
-	l.wireZonePulses(ix)
+	ix.Wire(l.newZoneEffects(ix))
 }
 
 // reloadZones reads the zones anew and puts every creature in the new ones:

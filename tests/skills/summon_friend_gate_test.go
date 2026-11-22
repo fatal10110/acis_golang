@@ -1,11 +1,12 @@
 package skills
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"bytes"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"

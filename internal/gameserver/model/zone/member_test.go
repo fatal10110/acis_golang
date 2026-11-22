@@ -226,7 +226,7 @@ func TestNPCPeaceFromZoneMembership(t *testing.T) {
 func TestSummonCombatFlagsFromZoneMembership(t *testing.T) {
 	cuboid := func(x int) Form { return testCuboid(t, x, x+1000, 0, 1000) }
 	stadium := NewOlympiad(7, cuboid(12000))
-	stadium.BattleStarted = func() bool { return true }
+	wire(&fxStub{fighting: func() bool { return true }}, stadium)
 	activeSiege := &Siege{Zone: newZone(3, cuboid(4000))}
 	activeSiege.SetActive(true)
 	peacefulSiege := &Siege{Zone: newZone(5, cuboid(8000))}

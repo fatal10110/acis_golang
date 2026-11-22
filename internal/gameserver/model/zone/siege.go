@@ -13,23 +13,6 @@ type Siege struct {
 	// battlefield belongs to; -1 when unset.
 	ResidenceID int
 
-	// CombatNotice tells a player they entered or left the combat zone;
-	// nil until the messaging layer wires it.
-	CombatNotice func(a Actor, entering bool)
-	// DismountTimer starts (entering true) or cancels (entering false)
-	// the forced-dismount countdown for a flying player; nil until the
-	// mount system wires it.
-	DismountTimer func(a Actor, entering bool)
-	// FlagPvP puts a leaving player on the timed pvp flag; nil until the
-	// pvp system wires it.
-	FlagPvP func(a Actor)
-	// Unsummon dismisses a siege-bound summon that leaves or loses its
-	// battlefield; nil until the summon system wires it.
-	Unsummon func(a Actor)
-	// Banish teleports a player to their town respawn when thrown off the
-	// battlefield; nil until the teleport system wires it.
-	Banish func(a Actor)
-
 	active atomic.Bool
 }
 
@@ -78,12 +61,8 @@ func (z *Siege) combatEntered(a Actor) {
 	if a.Class() != ClassPlayer {
 		return
 	}
-	if z.CombatNotice != nil {
-		z.CombatNotice(a, true)
-	}
-	if z.DismountTimer != nil {
-		z.DismountTimer(a, true)
-	}
+	z.effects().SiegeNotice(z, a, true)
+	z.effects().SiegeDismount(z, a, true)
 }
 
 func (z *Siege) exit(a Actor) {
@@ -98,20 +77,12 @@ func (z *Siege) exit(a Actor) {
 	switch a.Class() {
 	case ClassPlayer:
 		if active {
-			if z.CombatNotice != nil {
-				z.CombatNotice(a, false)
-			}
-			if z.DismountTimer != nil {
-				z.DismountTimer(a, false)
-			}
-			if z.FlagPvP != nil {
-				z.FlagPvP(a)
-			}
+			z.effects().SiegeNotice(z, a, false)
+			z.effects().SiegeDismount(z, a, false)
+			z.effects().SiegeFlagPvP(z, a)
 		}
 	case ClassSummon:
-		if z.Unsummon != nil {
-			z.Unsummon(a)
-		}
+		z.effects().SiegeUnsummon(z, a)
 	}
 }
 
@@ -149,29 +120,20 @@ func (z *Siege) replay(a Actor) {
 	}
 	switch a.Class() {
 	case ClassPlayer:
-		if z.CombatNotice != nil {
-			z.CombatNotice(a, false)
-		}
-		if z.DismountTimer != nil {
-			z.DismountTimer(a, false)
-		}
+		z.effects().SiegeNotice(z, a, false)
+		z.effects().SiegeDismount(z, a, false)
 	case ClassSummon:
-		if z.Unsummon != nil {
-			z.Unsummon(a)
-		}
+		z.effects().SiegeUnsummon(z, a)
 	}
 }
 
 // BanishForeigners throws every player not belonging to clanID out of the
-// battlefield, via the Banish hook.
+// battlefield, through its effects.
 func (z *Siege) BanishForeigners(clanID int32) {
-	if z.Banish == nil {
-		return
-	}
 	for _, a := range z.playersInside(func(a Actor) bool {
 		p, ok := a.(Player)
 		return ok && p.ClanID() != clanID
 	}) {
-		z.Banish(a)
+		z.effects().SiegeBanish(z, a)
 	}
 }

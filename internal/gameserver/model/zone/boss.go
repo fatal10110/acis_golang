@@ -19,20 +19,6 @@ type Boss struct {
 	// the player's town respawn instead.
 	OustLoc location.Location
 
-	// Eject teleports a rejected player out (to OustLoc when set, town
-	// respawn otherwise).
-	Eject func(a Actor)
-	// Unsummon dismisses a summon whose owner has no entry permission;
-	// nil until the summon system wires it.
-	Unsummon func(a Actor)
-	// RecallRaids sends every raid-related monster inside back to its
-	// spawn once the last playable leaves; nil until the AI system wires
-	// it.
-	RecallRaids func()
-	// RecallNPC sends one departing monster home if it is raid-related;
-	// nil until the AI system wires it.
-	RecallNPC func(a Actor)
-
 	// now is the clock used for deadlines; test seam, defaults to
 	// time.Now.
 	now func() time.Time
@@ -76,9 +62,7 @@ func (z *Boss) enter(a Actor) {
 		if z.consumeEntry(a.ObjectID()) {
 			return
 		}
-		if z.Eject != nil {
-			z.Eject(a)
-		}
+		z.effects().BossEject(z, a)
 	case ClassSummon:
 		o, ok := a.(Owned)
 		if !ok {
@@ -91,9 +75,7 @@ func (z *Boss) enter(a Actor) {
 		if z.isAllowed(owner.ObjectID()) || owner.GM() || z.InvadeWindow == 0 {
 			return
 		}
-		if z.Unsummon != nil {
-			z.Unsummon(a)
-		}
+		z.effects().BossUnsummon(z, a)
 	}
 }
 
@@ -133,11 +115,11 @@ func (z *Boss) exit(a Actor) {
 
 		// Once the last playable is gone, send lingering raid monsters
 		// home.
-		if z.hasOccupants() && !z.hasPlayableInside() && z.RecallRaids != nil {
-			z.RecallRaids()
+		if z.hasOccupants() && !z.hasPlayableInside() {
+			z.effects().BossRecallRaids(z)
 		}
-	} else if z.RecallNPC != nil {
-		z.RecallNPC(a)
+	} else {
+		z.effects().BossRecallNPC(z, a)
 	}
 }
 

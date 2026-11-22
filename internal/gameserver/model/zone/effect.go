@@ -82,13 +82,6 @@ type Effect struct {
 	// Target picks which occupant families the pulse touches.
 	Target TargetScope
 
-	// StartPulse begins the periodic effect task; nil leaves the zone
-	// harmless. The zone fires it at most once until PulseStopped
-	// resets the latch. Hook implementations must tolerate overlapping
-	// calls when a task resets the latch before its previous StartPulse
-	// invocation returns.
-	StartPulse func()
-
 	enabled atomic.Bool
 	pulsing atomic.Bool
 }
@@ -139,8 +132,8 @@ func (z *Effect) Core() *Zone { return &z.Zone }
 func (z *Effect) affects(a Actor) bool { return z.Target.Matches(a.Class()) }
 
 func (z *Effect) enter(a Actor) {
-	if z.pulsing.CompareAndSwap(false, true) && z.StartPulse != nil {
-		z.StartPulse()
+	if z.pulsing.CompareAndSwap(false, true) {
+		z.effects().StartPulse(z)
 	}
 	enterDanger(a)
 }

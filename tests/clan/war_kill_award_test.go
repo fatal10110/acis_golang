@@ -1,9 +1,10 @@
 package clan
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"slices"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"

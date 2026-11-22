@@ -72,13 +72,19 @@ type Config struct {
 	Roll func(n int) int
 }
 
-// Wire gives every effect and damage zone of ix its pulse. A zone whose
+// Pulses are the periodic tasks of the effect and damage zones of one
+// zone index, each started by its zone (Start).
+type Pulses struct {
+	byZone map[zone.Kind]*pulse
+}
+
+// New builds the pulse of every effect and damage zone of ix. A zone whose
 // reuse delay is not positive never pulses: it schedules no pulse task.
-// Call it once at boot, before any actor enters a
-// zone.
-func Wire(ix *zone.Index, cfg Config) {
+// Build it before any actor enters a zone of ix.
+func New(ix *zone.Index, cfg Config) *Pulses {
+	ps := &Pulses{byZone: map[zone.Kind]*pulse{}}
 	if ix == nil || cfg.Queue == nil || cfg.Objects == nil {
-		return
+		return ps
 	}
 	if cfg.Roll == nil {
 		cfg.Roll = rnd.Get
@@ -97,10 +103,10 @@ func Wire(ix *zone.Index, cfg Config) {
 				}
 			}
 		}
-		z.StartPulse = p.start
+		ps.byZone[z] = p
 	}
 	if cfg.Skills == nil || cfg.Effects == nil {
-		return
+		return ps
 	}
 	for _, z := range zone.OfKind[*zone.Effect](ix) {
 		if z.ReuseDelay <= 0 {
@@ -108,7 +114,19 @@ func Wire(ix *zone.Index, cfg Config) {
 		}
 		p := &pulse{cfg: &cfg, initial: z.InitialDelay, reuse: z.ReuseDelay, stopped: z.PulseStopped}
 		p.tick = func() bool { return effectTick(&cfg, z) }
-		z.StartPulse = p.start
+		ps.byZone[z] = p
+	}
+	return ps
+}
+
+// Start begins z's periodic task, when z pulses; its zone fires it
+// (zone.Effects.StartPulse). A nil Pulses runs none.
+func (ps *Pulses) Start(z zone.Kind) {
+	if ps == nil {
+		return
+	}
+	if p, ok := ps.byZone[z]; ok {
+		p.start()
 	}
 }
 
@@ -128,8 +146,8 @@ type pulse struct {
 	ticker *sim.Ticker
 }
 
-// start is the zone's StartPulse hook. It runs inside the zone's entry
-// rules, so the task is scheduled from the pulse queue.
+// start begins the task. It runs inside the zone's entry rules, so the
+// task is scheduled from the pulse queue.
 func (p *pulse) start() { p.cfg.Queue.Post(p.schedule) }
 
 // schedule arms the task: its first pulse after the initial delay.

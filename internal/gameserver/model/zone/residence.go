@@ -11,9 +11,6 @@ type Castle struct {
 	Zone
 	// ResidenceID is the castle this zone belongs to.
 	ResidenceID int
-	// Banish teleports a player to the castle's banish spawn; nil until
-	// the castle system wires it.
-	Banish func(a Actor)
 }
 
 // NewCastle builds a castle zone; the loader sets ResidenceID from the
@@ -28,16 +25,13 @@ func (z *Castle) enter(a Actor)      { a.ZoneFlags().Set(FlagCastle, true) }
 func (z *Castle) exit(a Actor)       { a.ZoneFlags().Set(FlagCastle, false) }
 
 // BanishForeigners throws every player not belonging to clanID out of the
-// zone, via the Banish hook.
+// zone, through its effects.
 func (z *Castle) BanishForeigners(clanID int32) {
-	if z.Banish == nil {
-		return
-	}
 	for _, a := range z.playersInside(func(a Actor) bool {
 		p, ok := a.(Player)
 		return ok && p.ClanID() != clanID
 	}) {
-		z.Banish(a)
+		z.effects().CastleBanish(z, a)
 	}
 }
 
@@ -46,12 +40,6 @@ type ClanHall struct {
 	Zone
 	// ResidenceID is the clan hall this zone belongs to.
 	ResidenceID int
-	// ShowInterior sends the hall's decoration state to an entering
-	// player; nil until the clan hall system wires it.
-	ShowInterior func(a Actor)
-	// Banish teleports a player to the hall's banish spawn; nil until the
-	// clan hall system wires it.
-	Banish func(a Actor)
 }
 
 // NewClanHall builds a clan hall zone; the loader sets ResidenceID from the
@@ -66,9 +54,7 @@ func (z *ClanHall) affects(Actor) bool { return true }
 func (z *ClanHall) enter(a Actor) {
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagClanHall, true)
-		if z.ShowInterior != nil {
-			z.ShowInterior(a)
-		}
+		z.effects().ShowHallInterior(z, a)
 	}
 }
 
@@ -79,16 +65,13 @@ func (z *ClanHall) exit(a Actor) {
 }
 
 // BanishForeigners throws every player not belonging to clanID out of the
-// zone, via the Banish hook.
+// zone, through its effects.
 func (z *ClanHall) BanishForeigners(clanID int32) {
-	if z.Banish == nil {
-		return
-	}
 	for _, a := range z.playersInside(func(a Actor) bool {
 		p, ok := a.(Player)
 		return ok && p.ClanID() != clanID
 	}) {
-		z.Banish(a)
+		z.effects().HallBanish(z, a)
 	}
 }
 
@@ -104,9 +87,6 @@ type CastleTeleport struct {
 	ExitMinX, ExitMaxX int
 	ExitMinY, ExitMaxY int
 	ExitZ              int
-	// Eject teleports a player to the picked exit point; nil until the
-	// teleport system wires it.
-	Eject func(a Actor, to location.Location)
 }
 
 // NewCastleTeleport builds a mass-gatekeeper zone; the loader sets the
@@ -124,18 +104,15 @@ func (z *CastleTeleport) enter(a Actor)      { a.ZoneFlags().Set(FlagNoSummonFri
 func (z *CastleTeleport) exit(a Actor)       { a.ZoneFlags().Set(FlagNoSummonFriend, false) }
 
 // OustAll flushes every player inside to a random point of the exit box,
-// via the Eject hook.
+// through its effects.
 func (z *CastleTeleport) OustAll() {
-	if z.Eject == nil {
-		return
-	}
 	for _, a := range z.playersInside(nil) {
 		to := location.Location{
 			X: randBetween(z.ExitMinX, z.ExitMaxX),
 			Y: randBetween(z.ExitMinY, z.ExitMaxY),
 			Z: z.ExitZ,
 		}
-		z.Eject(a, to)
+		z.effects().TeleportRoomEject(z, a, to)
 	}
 }
 

@@ -227,26 +227,26 @@ type Character struct {
 	world     *world.State
 	// worldHandle is the object the world registers c under when c is
 	// embedded in one; nil means c itself. See SetWorldHandle.
-	worldHandle              world.Tracked
-	los                      LineOfSight
-	zones                    ZoneQuery
-	social                   SocialGraph
-	hallFunctions            HallFunctions
-	sieges                   SiegeGround
-	seals                    SealRules
-	partyLoot                PartyLoot
-	tutorial                 TutorialEvents
-	deaths                   DeathEvents
-	mounts                   MountBodies
-	mountData                MountDataSource
-	mountFeed                mountFeedState
-	zoneStatus               atomic.Pointer[zoneStatusRef]
-	siegeState               atomic.Int32
-	swampMoveBonus           atomic.Int32
-	abnormalEffectMask       atomic.Int32
-	weightPenalty            int
-	roll                     func(int) int
-	floatRoll                func(float64) float64
+	worldHandle        world.Tracked
+	los                LineOfSight
+	zones              ZoneQuery
+	social             SocialGraph
+	hallFunctions      HallFunctions
+	sieges             SiegeGround
+	seals              SealRules
+	partyLoot          PartyLoot
+	tutorial           TutorialEvents
+	deaths             DeathEvents
+	mounts             MountBodies
+	mountData          MountDataSource
+	mountFeed          mountFeedState
+	zoneStatus         atomic.Pointer[zoneStatusRef]
+	siegeState         atomic.Int32
+	swampMoveBonus     atomic.Int32
+	abnormalEffectMask atomic.Int32
+	weightPenalty      int
+	roll               func(int) int
+	floatRoll          func(float64) float64
 
 	dead atomic.Bool
 

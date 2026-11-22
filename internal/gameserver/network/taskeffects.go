@@ -563,8 +563,8 @@ func breathTime(live *livePlayer) time.Duration {
 // runs on, and a dead one is never tracked. A player a water exit of the
 // pass left out of the water stops it; one the pass handed from one water
 // zone to another keeps it running, whichever zone it saw first (#4954). A
-// teleport handles the countdown itself. It runs under mu and deliveryMu,
-// as the zone callbacks do.
+// teleport handles the countdown itself. It runs under mu, as the zone
+// callbacks do.
 func (a *playerZones) keepBreath() {
 	left := a.leftWater
 	a.leftWater = false

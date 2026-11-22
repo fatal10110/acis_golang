@@ -15,27 +15,16 @@ import (
 // systemMessageTrapDeviceTripped is A_TRAP_DEVICE_HAS_BEEN_TRIPPED.
 const systemMessageTrapDeviceTripped = 714
 
-// wireZonePulses gives the effect and damage zones their periodic tasks,
-// run on a queue of their own, and the castle traps their siege: a castle
-// trap is live only while its castle's siege is in progress.
-func (l *GameClientLink) wireZonePulses(ix *zone.Index) {
+// zonePulsesOf builds the periodic tasks of the effect and damage zones of
+// ix, run on a queue of their own. A link without a world runs none.
+func (l *GameClientLink) zonePulsesOf(ix *zone.Index) *zonepulse.Pulses {
 	if l.world == nil {
-		return
-	}
-	for _, z := range zone.OfKind[*zone.Damage](ix) {
-		if z.CastleID > 0 {
-			z.SiegeActive = l.castleSiegeInProgress(z.CastleID)
-		}
-	}
-	for _, z := range zone.OfKind[*zone.Swamp](ix) {
-		if z.CastleID > 0 {
-			z.SiegeActive = l.castleSiegeInProgress(z.CastleID)
-		}
+		return nil
 	}
 	if l.zonePulses == nil {
 		l.zonePulses = l.queues.NewQueue("zone-pulses")
 	}
-	zonepulse.Wire(ix, zonepulse.Config{
+	return zonepulse.New(ix, zonepulse.Config{
 		Queue:       l.zonePulses,
 		Objects:     l.world,
 		Skills:      l.skills,
@@ -44,16 +33,15 @@ func (l *GameClientLink) wireZonePulses(ix *zone.Index) {
 	})
 }
 
-// castleSiegeInProgress reports, each time it is asked, whether the siege
-// of castleID is in progress.
-func (l *GameClientLink) castleSiegeInProgress(castleID int) func() bool {
-	return func() bool {
-		if l.sieges == nil {
-			return false
-		}
-		s, ok := l.sieges.Get(castleID)
-		return ok && s.InProgress()
+// castleSiegeRunning reports, each time it is asked, whether the siege of
+// castleID is in progress: a castle trap is live only then. A link without
+// a world arms no trap.
+func (l *GameClientLink) castleSiegeRunning(castleID int) bool {
+	if l.world == nil || l.sieges == nil {
+		return false
 	}
+	s, ok := l.sieges.Get(castleID)
+	return ok && s.InProgress()
 }
 
 // trapTripped tells the defenders of castleID's siege that one of its traps

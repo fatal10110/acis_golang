@@ -17,32 +17,6 @@ func (p *livePlayer) ZonePlayer() (zone.Player, bool) {
 	return p.zoneActor, true
 }
 
-// wireZoneOccupantHooks gives the zone rules that act on NPC and summon
-// occupants their effects: a boss lair sends a raid NPC that leaves it, or
-// every raid NPC once the last playable leaves, back home, and dismisses a
-// summon whose owner may not enter; a siege battlefield dismisses a siege
-// summon that leaves it or outlasts the siege.
-//
-// A zone rule runs while the occupant's zone membership is locked, so each
-// effect is posted to the occupant's own queue rather than run in place.
-func (l *GameClientLink) wireZoneOccupantHooks(ix *zone.Index) {
-	if l.world == nil {
-		return
-	}
-	for _, boss := range zone.OfKind[*zone.Boss](ix) {
-		boss.Unsummon = l.unsummonZoneOccupant
-		boss.RecallNPC = l.recallRaidOccupant
-		boss.RecallRaids = func() {
-			for _, a := range boss.Occupants() {
-				l.recallRaidOccupant(a)
-			}
-		}
-	}
-	for _, siege := range zone.OfKind[*zone.Siege](ix) {
-		siege.Unsummon = l.unsummonSiegeOccupant
-	}
-}
-
 // recallRaidOccupant sends a, when it is a raid-related NPC, back to its spawn.
 // A raid NPC that leaves the lair by teleport is not sent: it is judged at its
 // old position while the teleport keeps it from moving, so it only heads home

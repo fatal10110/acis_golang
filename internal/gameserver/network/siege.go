@@ -207,19 +207,6 @@ func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool 
 	return true
 }
 
-// wireSiegeZones gives the castle battlefields their effects on players:
-// the combat zone notices, the forced dismount of a wyvern rider on a
-// battlefield under siege, the pvp flag of a player leaving one, and the
-// town teleport of a player thrown off one.
-func (l *GameClientLink) wireSiegeZones(ix *zone.Index) {
-	for _, field := range zone.OfKind[*zone.Siege](ix) {
-		field.CombatNotice = l.siegeCombatNotice
-		field.DismountTimer = l.siegeDismountTimer
-		field.FlagPvP = l.siegeFlagPvP
-		field.Banish = l.siegeBanisher(field)
-	}
-}
-
 // siegeBanished reports whether live is being thrown off a battlefield as
 // its siege starts.
 func (l *GameClientLink) siegeBanished(live *livePlayer) bool {
@@ -255,26 +242,24 @@ func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
 	za.leftBattlefield = true
 }
 
-// siegeBanisher teleports a player thrown off field to its town restart point,
+// banishFromSiege teleports a, a player thrown off field, to its town restart point,
 // on the player's own queue, so after the siege has taken its next step. Its
 // outcome is that of a teleport made in place: thrown off as the siege starts,
 // before field turns on, the player gets no combat notice or flag; thrown off
 // while field is on, at the end of the siege or as the castle changes hands, it
 // leaves a battlefield under siege and is flagged, even when field has turned
 // off by the time the teleport runs.
-func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
-	return func(a zone.Actor) {
-		za, ok := a.(*playerZones)
-		if !ok {
-			return
-		}
-		live := za.live
-		l.banishOffBattlefield(live, field, func() {
-			if dest, ok := l.restartDestination(live); ok {
-				l.teleportLivePlayer(live, dest, restartTeleportOffset)
-			}
-		})
+func (l *GameClientLink) banishFromSiege(field *zone.Siege, a zone.Actor) {
+	za, ok := a.(*playerZones)
+	if !ok {
+		return
 	}
+	live := za.live
+	l.banishOffBattlefield(live, field, func() {
+		if dest, ok := l.restartDestination(live); ok {
+			l.teleportLivePlayer(live, dest, restartTeleportOffset)
+		}
+	})
 }
 
 // banishOffBattlefield runs teleport, live's banishment, on live's queue.

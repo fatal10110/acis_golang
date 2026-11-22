@@ -4,7 +4,7 @@ package player
 // character stands in the zones its fields name.
 type zoneStub struct {
 	pvp, peace, siege, noSummonFriend, danger, water bool
-	boss, clanHall, castle, motherTree                bool
+	boss, clanHall, castle, motherTree               bool
 }
 
 func (s *zoneStub) InPvPZone() bool          { return s.pvp }

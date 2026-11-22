@@ -630,15 +630,6 @@ func (d chamberlainDialog) trapsConfirmUpgrade(val string, rest []string) bool {
 	return !aborted
 }
 
-// wireCastleZones has every castle's grounds throw a player out to a
-// banish point of the castle.
-func (l *GameClientLink) wireCastleZones(ix *zone.Index) {
-	for _, grounds := range zone.OfKind[*zone.Castle](ix) {
-		castleID := grounds.ResidenceID
-		grounds.Banish = func(a zone.Actor) { l.banishFromCastle(castleID, a) }
-	}
-}
-
 // banishFromCastleGrounds throws every player who is not a member of the
 // clan owning c out of its grounds: the castle zones naming it.
 func (l *GameClientLink) banishFromCastleGrounds(c *castle.Castle) {

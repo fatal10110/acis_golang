@@ -4,9 +4,6 @@ package zone
 // karma) and friend summoning is blocked.
 type Arena struct {
 	Zone
-	// CombatNotice tells a player they entered or left a combat zone; nil
-	// until the messaging layer wires it.
-	CombatNotice func(a Actor, entering bool)
 }
 
 // NewArena builds an arena zone.
@@ -18,8 +15,8 @@ func (z *Arena) Core() *Zone { return &z.Zone }
 func (z *Arena) affects(Actor) bool { return true }
 
 func (z *Arena) enter(a Actor) {
-	if a.Class() == ClassPlayer && z.CombatNotice != nil {
-		z.CombatNotice(a, true)
+	if a.Class() == ClassPlayer {
+		z.effects().ArenaNotice(z, a, true)
 	}
 	a.ZoneFlags().Set(FlagPvP, true)
 	a.ZoneFlags().Set(FlagNoSummonFriend, true)
@@ -28,8 +25,8 @@ func (z *Arena) enter(a Actor) {
 func (z *Arena) exit(a Actor) {
 	a.ZoneFlags().Set(FlagPvP, false)
 	a.ZoneFlags().Set(FlagNoSummonFriend, false)
-	if a.Class() == ClassPlayer && z.CombatNotice != nil {
-		z.CombatNotice(a, false)
+	if a.Class() == ClassPlayer {
+		z.effects().ArenaNotice(z, a, false)
 	}
 }
 
@@ -132,10 +129,6 @@ func (z *Jail) exit(a Actor) {
 // NoLanding forbids wyvern landing; riders who linger get dismounted.
 type NoLanding struct {
 	Zone
-	// DismountTimer starts (entering true) or cancels (entering false) the
-	// forced-dismount countdown for a mounted player; nil until the mount
-	// system wires it.
-	DismountTimer func(a Actor, entering bool)
 }
 
 // NewNoLanding builds a no-landing zone.
@@ -149,18 +142,14 @@ func (z *NoLanding) affects(Actor) bool { return true }
 func (z *NoLanding) enter(a Actor) {
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagNoLanding, true)
-		if z.DismountTimer != nil {
-			z.DismountTimer(a, true)
-		}
+		z.effects().NoLandingDismount(z, a, true)
 	}
 }
 
 func (z *NoLanding) exit(a Actor) {
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagNoLanding, false)
-		if z.DismountTimer != nil {
-			z.DismountTimer(a, false)
-		}
+		z.effects().NoLandingDismount(z, a, false)
 	}
 }
 
@@ -322,9 +311,6 @@ type MotherTree struct {
 	MPBonus int
 	// AffectedRace limits the zone to one race ordinal; -1 affects all.
 	AffectedRace int
-	// Notify delivers a system message to a player; nil until the
-	// messaging layer wires it.
-	Notify func(a Actor, messageID int)
 }
 
 // NewMotherTree builds a silent regeneration zone affecting every race,
@@ -349,8 +335,8 @@ func (z *MotherTree) affects(a Actor) bool {
 func (z *MotherTree) enter(a Actor) {
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagMotherTree, true)
-		if z.EnterMessage != 0 && z.Notify != nil {
-			z.Notify(a, z.EnterMessage)
+		if z.EnterMessage != 0 {
+			z.effects().MotherTreeNotice(z, a, z.EnterMessage)
 		}
 	}
 }
@@ -358,8 +344,8 @@ func (z *MotherTree) enter(a Actor) {
 func (z *MotherTree) exit(a Actor) {
 	if a.Class() == ClassPlayer {
 		a.ZoneFlags().Set(FlagMotherTree, false)
-		if z.LeaveMessage != 0 && z.Notify != nil {
-			z.Notify(a, z.LeaveMessage)
+		if z.LeaveMessage != 0 {
+			z.effects().MotherTreeNotice(z, a, z.LeaveMessage)
 		}
 	}
 }

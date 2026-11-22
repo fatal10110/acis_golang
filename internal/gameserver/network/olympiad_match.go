@@ -103,24 +103,6 @@ func (l *GameClientLink) stadiumZone(id int) (*zone.Olympiad, bool) {
 	return zs[id], true
 }
 
-// wireStadiumZones gives the stadium zones of ix their match: whether its
-// fight runs, the combat notices, the match window of a player walking in
-// and the expulsion of anyone who has no business there.
-func (l *GameClientLink) wireStadiumZones(ix *zone.Index) {
-	for i, z := range orderedStadiums(ix.All()) {
-		z.BattleStarted = func() bool {
-			if l.olympiad == nil {
-				return false
-			}
-			s, ok := l.olympiad.Stadium(i)
-			return ok && s.BattleStarted()
-		}
-		z.CombatNotice = stadiumCombatNotice
-		z.SendMatchInfo = func(a zone.Actor) { l.sendStadiumMatchInfo(i, a) }
-		z.ExpelUninvited = l.expelFromStadium
-	}
-}
-
 // stadiumCombatNotice tells a player it entered or left a fighting
 // stadium; leaving also closes its match window. The notice goes through
 // the player's queue, behind what the stadium's match already sent it.

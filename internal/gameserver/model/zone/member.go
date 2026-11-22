@@ -33,13 +33,14 @@ const StepsPerRevalidation = 5
 // Place moves it to the region of its position.
 //
 // Between Leave and the next Enter no position change enters a zone; the
-// position reports return false meanwhile. A creature mid-teleport (one whose Actor reports Teleporting) counts its
-// steps but revalidates nothing.
+// position reports return false meanwhile. A creature mid-teleport (one
+// whose Actor reports Teleporting) counts its steps but revalidates
+// nothing.
 //
 // mu serializes revalidation: movement reports from the creature's own
 // queue, while a despawn or a teleport may come from another. The zone
-// rules run with mu held, so a zone hook must not change this creature's
-// membership synchronously.
+// rules and their Effects run with mu held, so an effect must not change
+// this creature's membership synchronously.
 type Member struct {
 	mu     sync.Mutex
 	flags  Flags

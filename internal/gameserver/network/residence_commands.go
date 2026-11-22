@@ -176,25 +176,21 @@ func (l *GameClientLink) oustCastleDefenders(f *npc.Folk, c *castle.Castle) {
 	}
 }
 
-// wireCastleTeleportZones has each mass teleport room of ix send the
-// players it ousts to the point picked for them.
-func (l *GameClientLink) wireCastleTeleportZones(ix *zone.Index) {
-	for _, room := range zone.OfKind[*zone.CastleTeleport](ix) {
-		room.Eject = func(a zone.Actor, to location.Location) {
-			za, ok := a.(*playerZones)
-			if !ok {
-				return
-			}
-			live := za.live
-			// The oust walks the room under its lock; the teleport runs on
-			// the player's own queue after it.
-			postLive(live, func() {
-				if !live.detached() {
-					l.teleportLivePlayer(live, to, 0)
-				}
-			})
-		}
+// ejectFromTeleportRoom sends a, a player a mass teleport room ousts, to
+// to, the point picked for it.
+func (l *GameClientLink) ejectFromTeleportRoom(a zone.Actor, to location.Location) {
+	za, ok := a.(*playerZones)
+	if !ok {
+		return
 	}
+	live := za.live
+	// The oust walks the room under its lock; the teleport runs on the
+	// player's own queue after it.
+	postLive(live, func() {
+		if !live.detached() {
+			l.teleportLivePlayer(live, to, 0)
+		}
+	})
 }
 
 // mercenaryHire opens the untaxed buy window of the mercenary buylist reply
