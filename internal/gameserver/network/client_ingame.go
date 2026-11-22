@@ -414,8 +414,8 @@ func (l *GameClientLink) handleRequestBypassToServer(ctx context.Context, cs *co
 	}
 	// The lookups the command deferred run here, off the queue; see
 	// deferLookup.
-	for _, lookup := range lookups {
-		lookup(ctx)
+	if live != nil {
+		live.runLookups(ctx, lookups)
 	}
 	l.finishPendingClassChange(live)
 	return nil

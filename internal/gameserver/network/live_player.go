@@ -221,7 +221,7 @@ type livePlayer struct {
 	// on p's queue while the connection goroutine waits in onLive and taken
 	// by that goroutine once the wait returns; see finishPendingClassChange.
 	pendingClassChange *classChange
-	// pendingLookups are the steps the running bypass left for its
+	// pendingLookups are the steps the running request left for its
 	// connection goroutine to make off p's queue, in order; set on p's
 	// queue and taken there before the queued part returns. See
 	// deferLookup.
@@ -468,8 +468,10 @@ func onLive(live *livePlayer, fn func()) bool {
 // database would hold a pool worker. lookup posts what it read back to p's
 // queue itself (onLive). The loop reads no next frame until it has run.
 //
-// Only work a bypass request runs may defer a lookup: that request takes
-// them (takeLookups).
+// Only work a request that takes them may defer a lookup: a bypass, or a
+// request registered through whenLiveDeferring (takeLookups). A lookup's
+// own continuation may defer more; they run before the lookups deferred
+// after it (runLookups).
 func (p *livePlayer) deferLookup(lookup func(context.Context)) {
 	sim.AssertOwner(p.Queue())
 	p.pendingLookups = append(p.pendingLookups, lookup)
@@ -487,12 +489,25 @@ func (p *livePlayer) afterLookups(fn func()) {
 	p.pendingLookups = append(p.pendingLookups, func(context.Context) { onLive(p, fn) })
 }
 
-// takeLookups takes the lookups the running bypass deferred, in order.
+// takeLookups takes the lookups the running request deferred, in order.
 func (p *livePlayer) takeLookups() []func(context.Context) {
 	sim.AssertOwner(p.Queue())
 	lookups := p.pendingLookups
 	p.pendingLookups = nil
 	return lookups
+}
+
+// runLookups runs lookups, which p's running request deferred, here on its
+// connection goroutine under ctx. The lookups a continuation defers run
+// next, ahead of the ones deferred before it, so that what they send keeps
+// the order of a single pass on the queue.
+func (p *livePlayer) runLookups(ctx context.Context, lookups []func(context.Context)) {
+	for len(lookups) > 0 {
+		lookups[0](ctx)
+		var more []func(context.Context)
+		onLive(p, func() { more = p.takeLookups() })
+		lookups = append(more, lookups[1:]...)
+	}
 }
 
 // Stop aborts everything p is doing, as abortAll does, then drops its

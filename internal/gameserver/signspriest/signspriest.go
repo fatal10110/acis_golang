@@ -10,7 +10,6 @@
 package signspriest
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
@@ -134,9 +133,11 @@ type Reply struct {
 	// written lazily, so a save writes them first: a crash must never keep a
 	// contribution while handing back the stones it was paid with.
 	Taken []*item.Instance
-	// SignUpErr is the failed insert of a new sign-up's row: the sign-up
-	// holds in memory regardless, and the error is only to be logged.
-	SignUpErr error
+	// SignUp is the row of a player who signed up for the first time,
+	// for the caller to insert (sevensigns InsertPlayer) ahead of the save
+	// Save asks for. A failed insert leaves the sign-up in memory regardless
+	// and is only to be logged.
+	SignUp *sevensigns.PlayerRow
 	// Aborted stops the handling outright, as a malformed command does:
 	// nothing more is sent, not even the dispatcher's ActionFailed.
 	Aborted bool
@@ -145,8 +146,8 @@ type Reply struct {
 // Command runs "SevenSigns <n> ..." for t at the NPC npcObjectID. dawn is set
 // for a Priest of Dawn, whose pages carry the dawn suffix where any other
 // NPC's carry the dusk one.
-func (s *Service) Command(ctx context.Context, t Talker, npcObjectID int32, dawn bool, command string) Reply {
-	h := handler{s: s, t: t, side: "dusk", ctx: ctx}
+func (s *Service) Command(t Talker, npcObjectID int32, dawn bool, command string) Reply {
+	h := handler{s: s, t: t, side: "dusk"}
 	if dawn {
 		h.side = "dawn"
 	}
@@ -212,7 +213,6 @@ func (s *Service) Command(ctx context.Context, t Talker, npcObjectID int32, dawn
 type handler struct {
 	s      *Service
 	t      Talker
-	ctx    context.Context
 	side   string
 	tokens []string
 	next   int
@@ -338,10 +338,12 @@ func (h *handler) signUp() Reply {
 			return chat("signs_33_dawn_no.htm")
 		}
 	}
-	h.reply.SignUpErr = h.s.state.SetPlayerInfo(h.ctx, h.t.ObjectID, cabal, seal)
-	// A new sign-up's row is inserted at once, but a changed one lives in
-	// memory until the next save, which a periodic save (#172) would bring
-	// within minutes.
+	if row, inserted := h.s.state.SignUp(h.t.ObjectID, cabal, seal); inserted {
+		h.reply.SignUp = &row
+	}
+	// A new sign-up's row is inserted with the save Save asks for, but a
+	// changed one lives in memory until the next save, which a periodic
+	// save (#172) would bring within minutes.
 	h.reply.Save = true
 	h.notice(Joined{Cabal: cabal})
 	h.notice(SealChosen{Seal: seal})
