@@ -11,7 +11,8 @@ import (
 // identity feeds the client-facing dialog and the requesterId anti-spoof
 // check, its position the eventual teleport, and its state the accept
 // path's re-validation: the teleport re-runs the summoner and summoned
-// checks at accept time.
+// checks at accept time, and a request whose caster has left the world is
+// dropped.
 type SummonFriendRequester interface {
 	ObjectID() int32
 	CharacterName() string
@@ -25,6 +26,7 @@ type SummonFriendRequester interface {
 	Mounted() bool
 	ObserverMode() bool
 	NoSummonFriendZone() bool
+	SessionDetached() bool
 }
 
 // TeleportTo moves the character to (x, y, z), scattered within radius. It
@@ -66,24 +68,39 @@ func (c *Character) ConsumeItem(itemID, count int) bool {
 }
 
 // TeleportRequest is summonFriendRequester's entry point
-// (handler/skill/summon.go): a second concurrent request from a different
-// requester is refused (the caller sends S1_ALREADY_SUMMONED and skips this
-// target), while every other call — including the plain
-// SUMMON_FRIEND/SUMMON_PARTY path's post-teleport `nil` call — records the
-// request unconditionally.
+// (handler/skill/summon.go): while a live request is pending a second one is
+// refused (the caller sends S1_ALREADY_SUMMONED and skips this target),
+// while every other call records the request. A request whose confirm
+// dialog has lapsed or whose caster has left the world no longer counts as
+// pending (#5062).
 func (c *Character) TeleportRequest(caster SummonFriendRequester, skill modelskill.Definition) bool {
+	now := c.Now()
 	c.summonFriendMu.Lock()
 	defer c.summonFriendMu.Unlock()
-	if c.summonRequester != nil && caster != nil {
+	if caster != nil && c.summonPendingLocked(now) {
 		return false
 	}
 	c.summonRequester = caster
 	c.summonSkill = skill
 	c.summonRequesterID = 0
+	c.summonDeadline = time.Time{}
 	if caster != nil {
 		c.summonRequesterID = caster.ObjectID()
 	}
 	return true
+}
+
+// summonPendingLocked reports whether the recorded request is still live at
+// now: recorded, its confirm dialog not lapsed and its caster still in the
+// world. summonFriendMu must be held.
+func (c *Character) summonPendingLocked(now time.Time) bool {
+	switch {
+	case c.summonRequester == nil:
+		return false
+	case !c.summonDeadline.IsZero() && !now.Before(c.summonDeadline):
+		return false
+	}
+	return !c.summonRequester.SessionDetached()
 }
 
 // ClearTeleportRequest resets pending summon-confirm state, as a
@@ -92,51 +109,69 @@ func (c *Character) TeleportRequest(caster SummonFriendRequester, skill modelski
 func (c *Character) ClearTeleportRequest() {
 	c.summonFriendMu.Lock()
 	defer c.summonFriendMu.Unlock()
+	c.clearSummonLocked()
+}
+
+func (c *Character) clearSummonLocked() {
 	c.summonRequester = nil
 	c.summonRequesterID = 0
 	c.summonSkill = modelskill.Definition{}
+	c.summonDeadline = time.Time{}
 }
 
 // ConfirmSummon is summonFriendRequester's entry point for skill 1403: it
-// sends the accept/decline dialog to
-// this character. The pending request TeleportRequest already recorded
-// stays in place until TeleportAnswer resolves it or another cast
-// overwrites/clears it — there is no server-side timeout (the timeout
-// argument is a client-UI-only countdown, the dialog's time parameter).
+// sends the accept/decline dialog to this character. The request
+// TeleportRequest recorded for caster lapses once the dialog's timeout has
+// passed (#5062); until then TeleportAnswer resolves it or another cast
+// overwrites or clears it.
 func (c *Character) ConfirmSummon(caster SummonFriendRequester, skill modelskill.Definition, timeout time.Duration) {
 	if caster == nil {
 		return
 	}
+	deadline := c.Now().Add(timeout)
+	c.summonFriendMu.Lock()
+	if c.summonRequester != nil && c.summonRequesterID == caster.ObjectID() {
+		c.summonDeadline = deadline
+	}
+	c.summonFriendMu.Unlock()
 	x, y, z := caster.Position()
 	c.emit(event.SummonConfirmRequested{CasterName: caster.CharacterName(), CasterID: caster.ObjectID(), X: x, Y: y, Z: z, Timeout: timeout})
 }
 
 // TeleportAnswer handles the client's DlgAnswer response to ConfirmSummon:
 // pending state is cleared unconditionally, and the summon only completes on
-// accept (answer == 1) with requesterID matching the stored requester's
-// object id. The accept path runs SummonTo's full re-check, since there is
-// no server-side timeout on the pending request and either side's
-// eligibility may have changed while the dialog sat open. It returns the
-// refusal to tell c, the answering player.
+// accept (answer == 1) of a still-live request with requesterID matching
+// the stored requester's object id. Either side's eligibility may have
+// changed while the dialog sat open, so the accept runs SummonTo's full
+// re-check, which also re-runs the summoned player's checks on c, refused
+// silently (#5062). It returns the refusal to tell c, the answering player.
 func (c *Character) TeleportAnswer(answer, requesterID int32) SummonRefusal {
+	now := c.Now()
 	c.summonFriendMu.Lock()
 	requester := c.summonRequester
 	storedID := c.summonRequesterID
 	skill := c.summonSkill
-	c.summonRequester = nil
-	c.summonRequesterID = 0
-	c.summonSkill = modelskill.Definition{}
+	live := c.summonPendingLocked(now)
+	c.clearSummonLocked()
 	c.summonFriendMu.Unlock()
 
-	if requester == nil || answer != 1 || storedID != requesterID {
+	if !live || answer != 1 || storedID != requesterID {
 		return SummonRefusal{}
 	}
 	return c.summonTo(requester, skill, c.TeleportOnQueue)
 }
 
+// summonedBusy reports whether the summoned player's own state keeps it
+// from being pulled: dead, trading or running a store, rooted or fighting,
+// or signed up for the festival.
+func summonedBusy(p SummonFriendRequester) bool {
+	return p.AlikeDead() || p.Operating() || p.Rooted() || p.InCombat() || p.FestivalParticipant()
+}
+
 // SummonTo moves c to caster for caster's summon-friend skill. The summon
 // re-runs both gates with the roles swapped, c as the summoner and caster as
-// the summoned, then takes the skill's consume item from c, naming it to c
+// the summoned, after refusing silently a c whose own state bars a summoned
+// player (summonedBusy), then takes the skill's consume item from c, naming it to c
 // ahead of the teleport; the returned
 // refusal is told to c. It may be called from any queue: the teleport runs
 // on c's own queue.
@@ -147,6 +182,11 @@ func (c *Character) SummonTo(caster SummonFriendRequester, skill modelskill.Defi
 func (c *Character) summonTo(caster SummonFriendRequester, skill modelskill.Definition, teleport func(x, y, z, radius int)) SummonRefusal {
 	if r := SummonerRefusal(c); r.Refused() {
 		return r
+	}
+	// c's own summoned-side state: the direct paths checked it on c just
+	// before, the accept path checks it here once the dialog was open.
+	if summonedBusy(c) {
+		return SummonRefusal{Reason: SummonRefusedSilently}
 	}
 	if r := SummonedRefusal(c, caster); r.Refused() {
 		return r

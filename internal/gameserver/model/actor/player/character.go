@@ -286,11 +286,13 @@ type Character struct {
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
 	// teleport-confirm request state, which the caster's queue records
-	// (TeleportRequest): the summoning target and skill.
+	// (TeleportRequest): the summoning target and skill, and the moment a
+	// confirm dialog's request lapses (zero for one that does not).
 	summonFriendMu    sync.Mutex
 	summonRequester   SummonFriendRequester
 	summonRequesterID int32
 	summonSkill       modelskill.Definition
+	summonDeadline    time.Time
 
 	// statMu guards statCalcs slot creation; each slot's own Calculator
 	// then guards its own Mods independently, so a warm read only ever
