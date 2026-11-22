@@ -43,6 +43,16 @@ Choose server ID `1` unless the database already reserves another ID. Then insta
 mv 'hexid(server 1).txt' ../aCis_gameserver/config/hexid.txt
 ```
 
+Or register without prompts, writing the file in place; a rerun over the same registration changes
+nothing:
+
+```bash
+go run ./cmd/gsregister \
+  -config ../aCis_gameserver/config/loginserver.properties \
+  -names ../aCis_datapack/data/serverNames.xml \
+  -register 1 -out ../aCis_gameserver/config/hexid.txt
+```
+
 ## Start Loginserver
 
 ```bash

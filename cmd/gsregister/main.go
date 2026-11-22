@@ -2,6 +2,9 @@
 // database. It assigns a server id from the known name list, generates the
 // server's auth key, persists the registration, and writes the hexid file
 // the game server presents when linking to the login server.
+//
+// It prompts for commands on stdin, or, with -register, registers one server
+// id and writes its hexid file to -out without prompting.
 package main
 
 import (
@@ -33,6 +36,8 @@ const noNamesMsg = "No server names available, be sure 'serverNames.xml' is in t
 func main() {
 	configPath := flag.String("config", "config/loginserver.properties", "login server properties file (Database URL/Login/Password keys)")
 	namesPath := flag.String("names", "serverNames.xml", "server id/name list file")
+	registerID := flag.Int("register", 0, "register this server id without prompting and exit; a rerun with the same registration changes nothing")
+	outPath := flag.String("out", "config/hexid.txt", "hexid file -register writes or checks")
 	flag.Parse()
 
 	props, err := config.LoadFile(*configPath)
@@ -60,7 +65,13 @@ func main() {
 		names = &manager.ServerNames{}
 	}
 
-	if err := run(context.Background(), os.Stdin, os.Stdout, names, sql.NewGameServerStore(pool), "."); err != nil {
+	store := sql.NewGameServerStore(pool)
+	if *registerID != 0 {
+		err = register(context.Background(), os.Stdout, names, store, *registerID, *outPath, time.Now())
+	} else {
+		err = run(context.Background(), os.Stdin, os.Stdout, names, store, ".")
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
