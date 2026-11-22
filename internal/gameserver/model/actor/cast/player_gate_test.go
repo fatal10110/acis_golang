@@ -206,7 +206,7 @@ func (s swingState) AttackingNow() bool { return bool(s) }
 // A cubic summon is never refused by it.
 func TestServitorSummonMidSwingAnswersCannotSummonInCombat(t *testing.T) {
 	_, ch := newGatePlayer(t)
-	servitor := modelskill.Definition{ID: 1111, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: "SUMMON", NpcID: 12600}
+	servitor := modelskill.Definition{ID: 1111, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: 12600})
 	cubic := servitor
 	cubic.ID, cubic.IsCubic = 10, true
 	for _, tt := range []struct {

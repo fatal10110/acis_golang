@@ -39,11 +39,20 @@ func TestSignetPointSpawnsWalkingThenTakesItsRunStance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			def := modelskill.Definition{
-				ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-				HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-				SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-				Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 10}},
-			}
+				ID:            454,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetSelf,
+				HitTime:       500,
+				ReuseDelay:    60_000,
+				StaticHitTime: true,
+				StaticReuse:   true,
+				SkillType:     "SIGNET",
+				Radius:        180,
+				Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 10}},
+			}.WithExtra(modelskill.Extra{
+				EffectNpcID: 13018,
+			})
 			srv := gameservertest.Boot(t,
 				gameservertest.WithCharacter("Mage", 5, 0),
 				gameservertest.WithWantChars(1),

@@ -127,7 +127,9 @@ func TestReturnedBuffedPetClearsItsIconsForTheParty(t *testing.T) {
 func TestBuffedServitorLifetimeEndsWithTrailingEmptyIcons(t *testing.T) {
 	t.Parallel()
 	def := lifetimeServitorSkill()
-	def.SummonTotalLifeTime, def.ItemConsumeIDOT, def.ItemConsumeCountOT, def.ItemConsumeSteps = 2000, 0, 0, 0
+	extra := *def.Extra()
+	extra.SummonTotalLifeTime, extra.ItemConsumeIDOT, extra.ItemConsumeCountOT, extra.ItemConsumeSteps = 2000, 0, 0, 0
+	def = def.WithExtra(extra)
 	o := bootLifetimeServitorOwner(t, def)
 	servitor := o.summonServitor(t)
 	o.buffServitor(t, servitor)

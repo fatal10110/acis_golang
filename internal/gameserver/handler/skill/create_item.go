@@ -35,14 +35,14 @@ func (h createItemHandler) Use(cast Cast) {
 		return
 	}
 	def := cast.Skill
-	if len(def.CreateItemIDs) == 0 || def.CreateItemCount == 0 {
+	if len(def.Extra().CreateItemIDs) == 0 || def.Extra().CreateItemCount == 0 {
 		cast.record(PreparedForReuseMessage{SkillID: def.ID, Level: def.Level})
 		return
 	}
 	// No extra count can be drawn below 1: such a skill creates nothing.
-	if def.CreateItemRandomCount < 1 {
+	if def.Extra().CreateItemRandomCount < 1 {
 		return
 	}
-	itemID := def.CreateItemIDs[rnd.Get(len(def.CreateItemIDs))]
-	caster.AddCreatedItem(itemID, def.CreateItemCount+rnd.Get(def.CreateItemRandomCount), h.ids.NextID)
+	itemID := def.Extra().CreateItemIDs[rnd.Get(len(def.Extra().CreateItemIDs))]
+	caster.AddCreatedItem(itemID, def.Extra().CreateItemCount+rnd.Get(def.Extra().CreateItemRandomCount), h.ids.NextID)
 }

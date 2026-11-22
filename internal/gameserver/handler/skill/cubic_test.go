@@ -14,7 +14,7 @@ func TestCubicHandlerAddsToSelfWhenSingleTarget(t *testing.T) {
 
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm)},
+		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true}.WithExtra(modelskill.Extra{NpcID: int(cubic.Storm)}),
 		Targets: []Actor{caster},
 	})
 
@@ -38,7 +38,7 @@ func TestCubicHandlerDelegatesServitorBranch(t *testing.T) {
 
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: false, NpcID: 14848},
+		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: false}.WithExtra(modelskill.Extra{NpcID: 14848}),
 		Targets: []Actor{caster},
 	})
 
@@ -49,7 +49,7 @@ func TestCubicHandlerDelegatesServitorBranch(t *testing.T) {
 		t.Fatalf("caster cubics = %v, want none", got)
 	}
 	requests := event.Of[event.ServitorSummonRequested](rec)
-	if len(requests) != 1 || requests[0].Skill.NpcID != 14848 {
+	if len(requests) != 1 || requests[0].Skill.Extra().NpcID != 14848 {
 		t.Fatalf("servitor summon requests = %+v, want one for npc 14848", requests)
 	}
 }
@@ -60,7 +60,7 @@ func TestCubicHandlerMassCubicMarksOthersGivenByOther(t *testing.T) {
 
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm)},
+		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true}.WithExtra(modelskill.Extra{NpcID: int(cubic.Storm)}),
 		Targets: []Actor{caster, other},
 	})
 
@@ -92,7 +92,7 @@ func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 
 	if !registry.Use(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Vampiric)},
+		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true}.WithExtra(modelskill.Extra{NpcID: int(cubic.Vampiric)}),
 		Targets: []Actor{caster},
 	}) {
 		t.Fatal("Use() returned false for SUMMON")

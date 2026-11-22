@@ -460,7 +460,7 @@ func (w *rainbowWorld) buffAndSummon(t *testing.T, id int32) *player.Character {
 		}
 		e.Effector, e.Effected = c, c
 		c.EffectList().Add(e)
-		c.SummonServitor(skill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: rainbowServitor, SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(skill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(skill.Extra{NpcID: rainbowServitor, SummonTotalLifeTime: 1_200_000}))
 	})
 	w.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {
 		_, ok := w.srv.State.Summon(id)

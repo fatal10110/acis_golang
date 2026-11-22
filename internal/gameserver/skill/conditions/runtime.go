@@ -41,7 +41,7 @@ func EvaluateSkill(def modelskill.Definition, caster Source, target any) (models
 		if err != nil || effector == nil {
 			return clause, false
 		}
-		held, aborted := Evaluate(cond, effector, effected, SkillOf(def.Stat))
+		held, aborted := Evaluate(cond, effector, effected, SkillOf(def.Extra().Stat))
 		if aborted {
 			return modelskill.ConditionClause{Root: clause.Root}, false
 		}

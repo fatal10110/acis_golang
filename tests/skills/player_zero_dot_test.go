@@ -15,11 +15,23 @@ import (
 // (DamOverTime val="0").
 func zeroDOTDebuff() modelskill.Definition {
 	return modelskill.Definition{
-		ID: feedbackStrikeSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, EffectPower: 100, IgnoreResists: true,
-		Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 0, Count: 9, Time: 1}},
-	}
+		ID:            feedbackStrikeSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetOne,
+		CastRange:     900,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "DEBUFF",
+		Debuff:        true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 0, Count: 9, Time: 1}},
+	}.WithExtra(modelskill.Extra{
+		EffectType:  "DEBUFF",
+		EffectPower: 100,
+	})
 }
 
 // TestZeroDamageDOTTickWakesAndStandsPlayer lands a zero-damage

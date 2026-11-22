@@ -29,7 +29,9 @@ func bootStanceCubicSummoner(t *testing.T, nowMS *atomic.Int64) (*gameservertest
 	defs := cubicSummonSkills(900*time.Second, 900*time.Second)
 	for i := range defs {
 		if defs[i].ID == summonStormCubicSkill {
-			defs[i].CubicActivationChance = 100
+			extra := *defs[i].Extra()
+			extra.CubicActivationChance = 100
+			defs[i] = defs[i].WithExtra(extra)
 		}
 	}
 	defs = append(defs, modelskill.Definition{ID: stormCubicFireSkill, Level: 1, SkillType: "DUMMY"})

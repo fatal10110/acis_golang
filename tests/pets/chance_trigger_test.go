@@ -31,11 +31,20 @@ func TestPetChanceTriggerProcsWhenPetIsHit(t *testing.T) {
 			ID: summonCreatureID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON_CREATURE", StaticHitTime: true, StaticReuse: true,
 		},
-		{
-			ID: petMirageTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true, EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
-		},
+		modelskill.Definition{
+			ID:            petMirageTriggered,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		}),
 	}), gamesql.NewCharacterSkillStore(db))
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithSkills(skills),

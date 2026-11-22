@@ -19,13 +19,22 @@ func TestDamageOverTimeTicksAtExactDueInstants(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			CastRange: 900, HitTime: 0, StaticHitTime: true,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-			EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 3, Time: 1}},
-		}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+			ID:            skillID,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			CastRange:     900,
+			HitTime:       0,
+			StaticHitTime: true,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 3, Time: 1}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		})})),
 	)
 	if !srv.DrivesClock() {
 		t.Skip("one-millisecond due instants need the driven clock")

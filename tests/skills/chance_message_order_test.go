@@ -35,11 +35,18 @@ func procKillingSkill(t *testing.T, triggered modelskill.Definition) procKillFra
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: procOrderPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-				SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: -1,
-				TriggeredID: int(triggered.ID), TriggeredLevel: triggered.Level,
-			},
+			modelskill.Definition{
+				ID:         procOrderPassive,
+				Level:      1,
+				Activation: modelskill.ActivationPassive,
+				Target:     modelskill.TargetSelf,
+				SkillType:  "BUFF",
+			}.WithExtra(modelskill.Extra{
+				ChanceType:       "ON_HIT",
+				ActivationChance: -1,
+				TriggeredID:      int(triggered.ID),
+				TriggeredLevel:   triggered.Level,
+			}),
 			triggered,
 		})),
 	)

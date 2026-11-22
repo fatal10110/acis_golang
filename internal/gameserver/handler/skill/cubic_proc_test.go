@@ -186,7 +186,9 @@ func TestCubicMagicFailureGapUsesSkillMagicLevel(t *testing.T) {
 func TestCubicMdamEffectsLandAfterTheDamageReport(t *testing.T) {
 	target := newCubicProcTarget()
 	def := stormStrike
-	def.IgnoreResists, def.EffectPower = true, 100
+	extra := *def.Extra()
+	def.IgnoreResists, extra.EffectPower = true, 100
+	def = def.WithExtra(extra)
 	def.Effects = []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, EffectPower: -1}}
 	useCubic(t, newCubicProcOwner(), target, def, 0)
 	if !slices.Equal(target.hitLog, []string{"cast break", "hp -567 with 1 effects"}) {
@@ -257,7 +259,7 @@ func TestCubicAggDamageProvokesNPC(t *testing.T) {
 	target := newCubicProcTarget()
 	target.attackable = true
 	target.level = 20
-	def := modelskill.Definition{ID: 5115, Level: 1, SkillType: "AGGDAMAGE", Power: 80, IgnoreResists: true, EffectPower: 100}
+	def := modelskill.Definition{ID: 5115, Level: 1, SkillType: "AGGDAMAGE", Power: 80, IgnoreResists: true}.WithExtra(modelskill.Extra{EffectPower: 100})
 	useCubic(t, newCubicProcOwner(), target, def, 0)
 	if !slices.Equal(target.aggression, []int{444}) { // from the Java probe
 		t.Fatalf("aggression = %v, want [444]", target.aggression)
@@ -273,7 +275,7 @@ func TestCubicDrainFeedsOwnerFromFullDamage(t *testing.T) {
 	target := newCubicProcTarget()
 	target.isPlayer = true
 	target.cp, target.maxCP = 5000, 5000
-	def := modelskill.Definition{ID: 4050, Level: 7, SkillType: "DRAIN", Power: 5221, Magic: true, MagicLevel: 72, Offensive: true, AbsorbAbs: 15, AbsorbPart: 0.4}
+	def := modelskill.Definition{ID: 4050, Level: 7, SkillType: "DRAIN", Power: 5221, Magic: true, MagicLevel: 72, Offensive: true}.WithExtra(modelskill.Extra{AbsorbAbs: 15, AbsorbPart: 0.4})
 	result := useCubic(t, owner, target, def, 0)
 
 	const damage = 1234 // int(91 / 385 * 5221)

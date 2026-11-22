@@ -123,9 +123,15 @@ func bootOps(t *testing.T) *opsWorld {
 		},
 	}
 	def := modelskill.Definition{
-		ID: opsSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "TELEPORT", HitTime: 500, TeleCoords: &opsSkillDest,
-	}
+		ID:         opsSkillID,
+		Level:      1,
+		Activation: modelskill.ActivationActive,
+		Target:     modelskill.TargetSelf,
+		SkillType:  "TELEPORT",
+		HitTime:    500,
+	}.WithExtra(modelskill.Extra{
+		TeleCoords: &opsSkillDest,
+	})
 	db := sqltest.SharedDB(t)
 	table := modelskill.NewTable([]modelskill.Definition{def})
 	srv := gameservertest.Boot(t,

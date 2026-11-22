@@ -56,7 +56,7 @@ func (a SummonActor) MPInitialCost(d *modelskill.Definition) int {
 func (a SummonActor) MPCost(d *modelskill.Definition) int {
 	mp := d.MPConsume
 	if d.Dance && a.Summon != nil {
-		mp += a.Summon.EffectList().DanceCount() * d.NextDanceCost
+		mp += a.Summon.EffectList().DanceCount() * d.Extra().NextDanceCost
 	}
 	return a.scaleMP(d, mp)
 }

@@ -38,7 +38,7 @@ func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRat
 	vuln := target.CancelVulnerability(skillType)
 
 	diffLevel := cast.Skill.MagicLevel - target.Level()
-	count := cast.Skill.MaxNegatedEffects
+	count := cast.Skill.Extra().MaxNegatedEffects
 
 	list := target.EffectList()
 	effects := list.All()

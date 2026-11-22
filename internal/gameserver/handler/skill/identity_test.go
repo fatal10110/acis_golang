@@ -80,7 +80,7 @@ func TestCubicMassCastClassifiesRecipientsByObjectID(t *testing.T) {
 
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm)},
+		Skill:   modelskill.Definition{SkillType: "SUMMON", IsCubic: true}.WithExtra(modelskill.Extra{NpcID: int(cubic.Storm)}),
 		Targets: []Actor{casterView, other},
 	})
 

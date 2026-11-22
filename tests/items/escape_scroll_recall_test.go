@@ -43,8 +43,8 @@ func TestEscapeScrollRecallsToTown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load shipped skills: %v", err)
 	}
-	if def.ID != 2013 || def.SkillType != "RECALL" || def.HitTime != 20000 || def.TeleCoords != nil {
-		t.Fatalf("shipped 2013 = id %d type %q hit %d teleCoords %v, want RECALL with a 20000 hit and no teleCoords", def.ID, def.SkillType, def.HitTime, def.TeleCoords)
+	if def.ID != 2013 || def.SkillType != "RECALL" || def.HitTime != 20000 || def.Extra().TeleCoords != nil {
+		t.Fatalf("shipped 2013 = id %d type %q hit %d teleCoords %v, want RECALL with a 20000 hit and no teleCoords", def.ID, def.SkillType, def.HitTime, def.Extra().TeleCoords)
 	}
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{def}), gamesql.NewCharacterSkillStore(db))

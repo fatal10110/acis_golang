@@ -124,10 +124,20 @@ func TestTutorialLowHPFollowsTheWritersStatus(t *testing.T) {
 	realDamage.Power = 1
 	balanceLife := selfSkill("BALANCE_LIFE")
 	drain := modelskill.Definition{
-		ID: lowHPSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		Offensive: true, HitTime: 500, StaticHitTime: true, StaticReuse: true, CastRange: 600,
-		SkillType: "DRAIN", Power: 10, AbsorbAbs: 1,
-	}
+		ID:            lowHPSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetOne,
+		Offensive:     true,
+		HitTime:       500,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		CastRange:     600,
+		SkillType:     "DRAIN",
+		Power:         10,
+	}.WithExtra(modelskill.Extra{
+		AbsorbAbs: 1,
+	})
 	cases := []struct {
 		name string
 		def  modelskill.Definition

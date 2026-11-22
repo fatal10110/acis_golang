@@ -22,11 +22,21 @@ const (
 // groundPointSignet is a ground-targeted SIGNET with the given cast range.
 func groundPointSignet(id int32, castRange int) modelskill.Definition {
 	return modelskill.Definition{
-		ID: modelskill.ID(id), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
-		CastRange: castRange, HitTime: 1000, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET", EffectNpcID: groundPointNpcID, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 10}},
-	}
+		ID:            modelskill.ID(id),
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetGround,
+		CastRange:     castRange,
+		HitTime:       1000,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET",
+		Radius:        180,
+		Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 10}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: groundPointNpcID,
+	})
 }
 
 // bootGroundPointCaster boots an in-world Mage who knows defs and returns

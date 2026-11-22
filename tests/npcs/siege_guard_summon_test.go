@@ -26,11 +26,20 @@ const (
 func siegeServitorOptions(t *testing.T) []gameservertest.Option {
 	t.Helper()
 	db := sqltest.SharedDB(t)
-	defs := modelskill.NewTable([]modelskill.Definition{{
-		ID: siegeServitorSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: siegeServitorNPCID, SummonTotalLifeTime: 1_200_000,
-		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
-	}})
+	defs := modelskill.NewTable([]modelskill.Definition{modelskill.Definition{
+		ID:            siegeServitorSkillID,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		HitTime:       0,
+		StaticReuse:   true,
+		ReuseDelay:    0,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               siegeServitorNPCID,
+		SummonTotalLifeTime: 1_200_000,
+	})})
 	return []gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), defs, gamesql.NewCharacterSkillStore(db))),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{{

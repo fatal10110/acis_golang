@@ -696,11 +696,11 @@ func (c *Controller) Hit() error {
 
 	// Force/Soul charges apply at the hit timer: after the MP/HP consume
 	// above and before the caller's Hooks.Hit applies the skill's effects.
-	if def.NumCharges > 0 {
-		if def.MaxCharges > 0 {
-			c.actor.IncreaseCharges(def.NumCharges, def.MaxCharges)
+	if def.Extra().NumCharges > 0 {
+		if def.Extra().MaxCharges > 0 {
+			c.actor.IncreaseCharges(def.Extra().NumCharges, def.Extra().MaxCharges)
 		} else {
-			c.actor.DecreaseCharges(def.NumCharges)
+			c.actor.DecreaseCharges(def.Extra().NumCharges)
 		}
 	}
 	return nil
@@ -946,8 +946,8 @@ func (c *Controller) SkillOnCooldown(def *modelskill.Definition) bool {
 // when one is configured.
 func ReuseKey(def *modelskill.Definition) int32 {
 	ref := modelskill.Ref{ID: def.ID, Level: def.Level}
-	if def.SharedReuse != nil {
-		ref = *def.SharedReuse
+	if def.Extra().SharedReuse != nil {
+		ref = *def.Extra().SharedReuse
 	}
 	return int32(ref.ID)*modelskill.KeyLevels + int32(ref.Level)
 }

@@ -162,7 +162,7 @@ func TestPdamReportsTargetsInOrder(t *testing.T) {
 	}
 	result, _ = registry.UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 100},
+		Skill:   modelskill.Definition{SkillType: "PDAM"}.WithExtra(modelskill.Extra{LethalChance2: 100}),
 		Targets: []Actor{failed, lethal},
 	})
 	if len(result.Messages) != 2 {

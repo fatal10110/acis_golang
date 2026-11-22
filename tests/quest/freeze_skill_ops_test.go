@@ -26,9 +26,17 @@ func freezeSkills() gameservertest.Option {
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "freeze_probe", StackOrder: 1}},
 		},
 		modelskill.Definition{
-			ID: freezeMagicID, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "MDAM", Magic: true, Element: modelskill.ElementFire, EffectID: 4072, Power: 50,
-		},
+			ID:         freezeMagicID,
+			Level:      2,
+			Activation: modelskill.ActivationActive,
+			Target:     modelskill.TargetOne,
+			SkillType:  "MDAM",
+			Magic:      true,
+			Element:    modelskill.ElementFire,
+			Power:      50,
+		}.WithExtra(modelskill.Extra{
+			EffectID: 4072,
+		}),
 	)
 }
 

@@ -42,7 +42,7 @@ func (h fusionHandler) start(caster Creature, target effect.Actor, castSkill mod
 	if list == nil {
 		return
 	}
-	triggeredID := modelskill.ID(castSkill.TriggeredID)
+	triggeredID := modelskill.ID(castSkill.Extra().TriggeredID)
 	if e := firstEffectByID(list, triggeredID); e != nil {
 		maxLevel := h.defs.MaxLevel(triggeredID)
 		e.IncreaseEffect(list, maxLevel, func(level int) {
@@ -50,7 +50,7 @@ func (h fusionHandler) start(caster Creature, target effect.Actor, castSkill mod
 		})
 		return
 	}
-	h.applyTriggered(caster, target, triggeredID, castSkill.TriggeredLevel)
+	h.applyTriggered(caster, target, triggeredID, castSkill.Extra().TriggeredLevel)
 }
 
 // StartFusion lands castSkill's force on effected as its FUSION channel
@@ -81,7 +81,7 @@ func DecreaseFusion(defs Definitions, caster Creature, effected attackable.Comba
 		return
 	}
 	list := target.EffectList()
-	triggeredID := modelskill.ID(castSkill.TriggeredID)
+	triggeredID := modelskill.ID(castSkill.Extra().TriggeredID)
 	e := firstEffectByID(list, triggeredID)
 	if e == nil {
 		return

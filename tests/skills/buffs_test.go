@@ -67,12 +67,18 @@ func TestDebuffThatFailsToLandSendsAttackFailed(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+			modelskill.Definition{
+				ID:            5,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetSelf,
+				SkillType:     "DEBUFF",
+				Debuff:        true,
 				IgnoreResists: true,
 				Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
-			},
+			}.WithExtra(modelskill.Extra{
+				EffectType: "DEBUFF",
+			}),
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -142,13 +148,22 @@ func bootOneShotDebuff(t *testing.T, skillID modelskill.ID) (*gameservertest.Ser
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-				CastRange: 900, HitTime: 0, StaticHitTime: true,
-				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				EffectPower: 100, IgnoreResists: true,
-				Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
-			},
+			modelskill.Definition{
+				ID:            skillID,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetOne,
+				CastRange:     900,
+				HitTime:       0,
+				StaticHitTime: true,
+				SkillType:     "DEBUFF",
+				Debuff:        true,
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+			}.WithExtra(modelskill.Extra{
+				EffectType:  "DEBUFF",
+				EffectPower: 100,
+			}),
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -192,13 +207,21 @@ func TestStunBlocksCastingAndMovement(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: 20, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-				HitTime: 0, StaticHitTime: true,
-				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				EffectPower: 100, IgnoreResists: true,
-				Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 30}},
-			},
+			modelskill.Definition{
+				ID:            20,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetSelf,
+				HitTime:       0,
+				StaticHitTime: true,
+				SkillType:     "DEBUFF",
+				Debuff:        true,
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "Stun", Time: 30}},
+			}.WithExtra(modelskill.Extra{
+				EffectType:  "DEBUFF",
+				EffectPower: 100,
+			}),
 			{
 				ID: 21, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 				HitTime: 0, StaticHitTime: true, StaticReuse: true, SkillType: "DUMMY",
@@ -449,12 +472,21 @@ func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
 func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 	t.Parallel()
 	blocker := modelskill.Definition{
-		ID: 301, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 0, StaticHitTime: true, StaticReuse: true,
-		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-		EffectPower: 100, IgnoreResists: true,
-		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
-	}
+		ID:            301,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       0,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "DEBUFF",
+		Debuff:        true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
+	}.WithExtra(modelskill.Extra{
+		EffectType:  "DEBUFF",
+		EffectPower: 100,
+	})
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -498,12 +530,21 @@ func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
 	t.Parallel()
 	blocker := modelskill.Definition{
-		ID: 302, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 0, StaticHitTime: true, StaticReuse: true,
-		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-		EffectPower: 100, IgnoreResists: true,
-		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 2, Icon: true, StackType: "speed_up", StackOrder: 100}},
-	}
+		ID:            302,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       0,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "DEBUFF",
+		Debuff:        true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 2, Icon: true, StackType: "speed_up", StackOrder: 100}},
+	}.WithExtra(modelskill.Extra{
+		EffectType:  "DEBUFF",
+		EffectPower: 100,
+	})
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -544,12 +585,21 @@ func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
 func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
 	t.Parallel()
 	blocker := modelskill.Definition{
-		ID: 306, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 0, StaticHitTime: true, StaticReuse: true,
-		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-		EffectPower: 100, IgnoreResists: true,
-		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
-	}
+		ID:            306,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       0,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "DEBUFF",
+		Debuff:        true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
+	}.WithExtra(modelskill.Extra{
+		EffectType:  "DEBUFF",
+		EffectPower: 100,
+	})
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

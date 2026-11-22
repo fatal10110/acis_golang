@@ -29,7 +29,7 @@ func TestSchemeBufferCleanupRefreshesSummonWindow(t *testing.T) {
 	}})))
 	buffer.Restore([]schemebuffer.Row{{OwnerID: w.player, Name: "Pet", Skills: "1035,1036"}}, zerolog.Nop())
 	w.onPlayer(t, func(pc *player.Character) {
-		pc.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: servitorNpcID, SummonTotalLifeTime: 1_200_000})
+		pc.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: servitorNpcID, SummonTotalLifeTime: 1_200_000}))
 	})
 	var servitor *summon.Actor
 	w.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {

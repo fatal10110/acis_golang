@@ -311,10 +311,17 @@ func TestPKSkillKillEndsWithTheKillerFlagged(t *testing.T) {
 func TestPKProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage(t *testing.T) {
 	t.Parallel()
 	s := bootPKKillScene(t, modelskill.Definition{
-		ID: 43, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-		SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: -1,
-		TriggeredID: 42, TriggeredLevel: 1,
-	})
+		ID:         43,
+		Level:      1,
+		Activation: modelskill.ActivationPassive,
+		Target:     modelskill.TargetSelf,
+		SkillType:  "BUFF",
+	}.WithExtra(modelskill.Extra{
+		ChanceType:       "ON_HIT",
+		ActivationChance: -1,
+		TriggeredID:      42,
+		TriggeredLevel:   1,
+	}))
 	// Every swing hits, so the scenario never waits on a lucky roll.
 	s.setRollSource(func(int) int { return 0 })
 	onPlayerQueue(t, s.srv, s.victimID, func(pc *player.Character) {
@@ -385,10 +392,17 @@ func TestPKOnAttackedProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage(t *test
 	t.Parallel()
 	const summonKillKarma = 60
 	s := bootPKKillSceneKarma(t, summonKillKarma, nil, modelskill.Definition{
-		ID: 44, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-		SkillType: "BUFF", ChanceType: "ON_ATTACKED", ActivationChance: -1,
-		TriggeredID: 42, TriggeredLevel: 1,
-	})
+		ID:         44,
+		Level:      1,
+		Activation: modelskill.ActivationPassive,
+		Target:     modelskill.TargetSelf,
+		SkillType:  "BUFF",
+	}.WithExtra(modelskill.Extra{
+		ChanceType:       "ON_ATTACKED",
+		ActivationChance: -1,
+		TriggeredID:      42,
+		TriggeredLevel:   1,
+	}))
 	if s.karma() != summonKillKarma || s.killer.PvPFlagState() == task.PvPFlagNone {
 		t.Fatal("killer must start with the summon kill's karma and flagged")
 	}

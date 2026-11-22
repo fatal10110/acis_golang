@@ -43,10 +43,21 @@ const (
 // a cast range the scene's door is always in.
 func assaultSkill() modelskill.Definition {
 	return modelskill.Definition{
-		ID: modelskill.ID(assaultSkillID), Level: 1, Activation: modelskill.ActivationActive,
-		Target: modelskill.TargetOne, SkillType: "STRIDER_SIEGE_ASSAULT", Power: 15005, SoulShotBoost: 2, BaseCritRate: 15,
-		CastRange: 900, EffectRange: 1000, HitTime: assaultHit, CoolTime: 720, ReuseDelay: 5000,
-	}
+		ID:           modelskill.ID(assaultSkillID),
+		Level:        1,
+		Activation:   modelskill.ActivationActive,
+		Target:       modelskill.TargetOne,
+		SkillType:    "STRIDER_SIEGE_ASSAULT",
+		Power:        15005,
+		BaseCritRate: 15,
+		CastRange:    900,
+		EffectRange:  1000,
+		HitTime:      assaultHit,
+		CoolTime:     720,
+		ReuseDelay:   5000,
+	}.WithExtra(modelskill.Extra{
+		SoulShotBoost: 2,
+	})
 }
 
 // assaultSetup is the Caster's standing when it casts.

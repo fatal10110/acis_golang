@@ -65,7 +65,7 @@ func (recallHandler) Use(cast Cast) {
 			continue
 		}
 		traveler.SetIn7sDungeon(false)
-		switch at := cast.Skill.TeleCoords; {
+		switch at := cast.Skill.Extra().TeleCoords; {
 		case at != nil && self:
 			traveler.TeleportOnQueue(at.X, at.Y, at.Z, recallScatter)
 		case at != nil:

@@ -37,16 +37,24 @@ func TestEffectAttachConditionGatesItsCreation(t *testing.T) {
 			srv := gameservertest.Boot(t,
 				gameservertest.WithCharacter("Newbie", 5, 0),
 				gameservertest.WithWantChars(1),
-				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
-					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-					HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-					SkillType: "BUFF", Stat: tc.stat,
+				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{modelskill.Definition{
+					ID:            skillID,
+					Level:         1,
+					Activation:    modelskill.ActivationActive,
+					Target:        modelskill.TargetSelf,
+					HitTime:       500,
+					ReuseDelay:    60_000,
+					StaticHitTime: true,
+					StaticReuse:   true,
+					SkillType:     "BUFF",
 					Effects: []modelskill.EffectTemplate{{
 						Name: "Buff", Time: 60, Icon: true, StackType: "max_hp_up", StackOrder: 1,
 						AttachCondition: &modelskill.ConditionClause{Root: skillStatCond},
 						Funcs:           []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 100}},
 					}},
-				}})),
+				}.WithExtra(modelskill.Extra{
+					Stat: tc.stat,
+				})})),
 			)
 			c, objID := srv.Client, srv.SoleObjectID(t)
 			seedKnownSkill(t, srv, objID, skillID, 1)
@@ -106,13 +114,18 @@ func TestPassiveForConditionTestsOwningSkill(t *testing.T) {
 	t.Parallel()
 	passive := func(stat string) modelskill.Definition {
 		return modelskill.Definition{
-			ID: 211, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-			SkillType: "BUFF", Stat: stat,
+			ID:         211,
+			Level:      1,
+			Activation: modelskill.ActivationPassive,
+			Target:     modelskill.TargetSelf,
+			SkillType:  "BUFF",
 			Funcs: []modelskill.FuncTemplate{{
 				Op: modelskill.FuncAdd, Stat: "maxHp", Value: 100,
 				AttachCondition: &modelskill.ConditionClause{Root: skillStatCond},
 			}},
-		}
+		}.WithExtra(modelskill.Extra{
+			Stat: stat,
+		})
 	}
 	// Each boot runs in its own subtest: one test's boots share its account.
 	maxHP := map[string]int{}
@@ -151,10 +164,21 @@ func TestFuncConditionTestsCalculationSkill(t *testing.T) {
 		// account.
 		t.Run("stat "+stat, func(t *testing.T) {
 			srv, objID, mAtk := bootPassiveHolder(t, passive, modelskill.Definition{
-				ID: orderSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-				SkillType: "MDAM", Power: 10, Magic: true, Stat: stat,
-			})
+				ID:            orderSkill,
+				Level:         1,
+				Activation:    modelskill.ActivationActive,
+				Target:        modelskill.TargetOne,
+				CastRange:     900,
+				HitTime:       500,
+				ReuseDelay:    60_000,
+				StaticHitTime: true,
+				StaticReuse:   true,
+				SkillType:     "MDAM",
+				Power:         10,
+				Magic:         true,
+			}.WithExtra(modelskill.Extra{
+				Stat: stat,
+			}))
 			c := srv.Client
 			// An M.Def high enough, and HP deep enough, that neither strike
 			// saturates or kills.

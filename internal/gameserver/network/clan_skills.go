@@ -26,7 +26,7 @@ func (l *GameClientLink) clanSkillMinClass(sk clan.Skill) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	return def.MinPledgeClass, true
+	return def.Extra().MinPledgeClass, true
 }
 
 // clanSkillRefs is skills as skill references.

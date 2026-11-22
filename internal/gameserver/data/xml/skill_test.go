@@ -116,7 +116,7 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 				}
 				built++
 			}
-			for _, eff := range def.SelfEffects {
+			for _, eff := range def.Extra().SelfEffects {
 				if _, err := effect.New(effect.SkillFromDefinition(def), eff); err != nil {
 					if errors.Is(err, effect.ErrUnsupportedCoreEffect) && strings.HasPrefix(eff.Name, "#") {
 						continue
@@ -263,19 +263,19 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			{1177, 1, 0, 0},
 		} {
 			d, ok := table.Get(tc.id, tc.level)
-			if !ok || d.AbsorbPart != tc.part || d.AbsorbAbs != tc.abs {
-				t.Fatalf("skill %d level %d absorb = (%v, %d) (loaded %v), want (%v, %d)", tc.id, tc.level, d.AbsorbPart, d.AbsorbAbs, ok, tc.part, tc.abs)
+			if !ok || d.Extra().AbsorbPart != tc.part || d.Extra().AbsorbAbs != tc.abs {
+				t.Fatalf("skill %d level %d absorb = (%v, %d) (loaded %v), want (%v, %d)", tc.id, tc.level, d.Extra().AbsorbPart, d.Extra().AbsorbAbs, ok, tc.part, tc.abs)
 			}
 		}
 	})
 
 	t.Run("servitor exp penalty", func(t *testing.T) {
 		// Summon Kat the Cat sets expPenalty 0.3; Power Strike sets none.
-		if d, ok := table.Get(1111, 1); !ok || d.ExpPenalty != float32(0.3) {
-			t.Fatalf("skill 1111 level 1 ExpPenalty = %v (loaded %v), want 0.3", d.ExpPenalty, ok)
+		if d, ok := table.Get(1111, 1); !ok || d.Extra().ExpPenalty != float32(0.3) {
+			t.Fatalf("skill 1111 level 1 ExpPenalty = %v (loaded %v), want 0.3", d.Extra().ExpPenalty, ok)
 		}
-		if d, ok := table.Get(3, 1); !ok || d.ExpPenalty != 0 {
-			t.Fatalf("skill 3 level 1 ExpPenalty = %v (loaded %v), want 0", d.ExpPenalty, ok)
+		if d, ok := table.Get(3, 1); !ok || d.Extra().ExpPenalty != 0 {
+			t.Fatalf("skill 3 level 1 ExpPenalty = %v (loaded %v), want 0", d.Extra().ExpPenalty, ok)
 		}
 	})
 
@@ -287,15 +287,15 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			level, countOT, steps int
 		}{{1, 0, 0}, {3, 1, 4}, {5, 1, 14}} {
 			d, ok := table.Get(1111, tc.level)
-			if !ok || d.SummonTotalLifeTime != 1200000 || d.SummonTimeLostIdle != 500 || d.SummonTimeLostActive != 1000 ||
-				d.ItemConsumeIDOT != 1458 || d.ItemConsumeCountOT != tc.countOT || d.ItemConsumeSteps != tc.steps {
+			if !ok || d.Extra().SummonTotalLifeTime != 1200000 || d.Extra().SummonTimeLostIdle != 500 || d.Extra().SummonTimeLostActive != 1000 ||
+				d.Extra().ItemConsumeIDOT != 1458 || d.Extra().ItemConsumeCountOT != tc.countOT || d.Extra().ItemConsumeSteps != tc.steps {
 				t.Fatalf("skill 1111 level %d = total %d idle %d active %d upkeep %d x%d steps %d (loaded %v), want 1200000 500 1000 1458 x%d steps %d",
-					tc.level, d.SummonTotalLifeTime, d.SummonTimeLostIdle, d.SummonTimeLostActive, d.ItemConsumeIDOT, d.ItemConsumeCountOT, d.ItemConsumeSteps, ok, tc.countOT, tc.steps)
+					tc.level, d.Extra().SummonTotalLifeTime, d.Extra().SummonTimeLostIdle, d.Extra().SummonTimeLostActive, d.Extra().ItemConsumeIDOT, d.Extra().ItemConsumeCountOT, d.Extra().ItemConsumeSteps, ok, tc.countOT, tc.steps)
 			}
 		}
 		// Power Strike sets none of them.
-		if d, ok := table.Get(3, 1); !ok || d.SummonTimeLostIdle != 0 || d.ItemConsumeIDOT != 0 || d.ItemConsumeSteps != 0 {
-			t.Fatalf("skill 3 level 1 lifetime fields = idle %d upkeep %d steps %d (loaded %v), want zero", d.SummonTimeLostIdle, d.ItemConsumeIDOT, d.ItemConsumeSteps, ok)
+		if d, ok := table.Get(3, 1); !ok || d.Extra().SummonTimeLostIdle != 0 || d.Extra().ItemConsumeIDOT != 0 || d.Extra().ItemConsumeSteps != 0 {
+			t.Fatalf("skill 3 level 1 lifetime fields = idle %d upkeep %d steps %d (loaded %v), want zero", d.Extra().SummonTimeLostIdle, d.Extra().ItemConsumeIDOT, d.Extra().ItemConsumeSteps, ok)
 		}
 	})
 
@@ -313,7 +313,7 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if d.CastRange != 40 || d.EffectRange != 400 || d.ReuseDelay != 13000 || d.HitTime != 1080 || d.CoolTime != 720 {
 			t.Fatalf("skill 3 level 1 timing = %+v", d)
 		}
-		if !d.Overhit || !d.NextActionIsAttack || d.SoulShotBoost != 2.0 {
+		if !d.Overhit || !d.NextActionIsAttack || d.Extra().SoulShotBoost != 2.0 {
 			t.Fatalf("skill 3 level 1 flags = %+v", d)
 		}
 		// PDAM defaults BaseCritRate to 0 and Offensive to true when the
@@ -441,8 +441,8 @@ func TestLoadSkillDefinitions(t *testing.T) {
 			t.Fatalf("skill 4 level 1 AggroPoints = %d, want 204", d.AggroPoints)
 		}
 		// effectNpcId is absent, so it defaults to -1.
-		if d.EffectNpcID != -1 {
-			t.Fatalf("skill 4 level 1 EffectNpcID = %d, want -1", d.EffectNpcID)
+		if d.Extra().EffectNpcID != -1 {
+			t.Fatalf("skill 4 level 1 EffectNpcID = %d, want -1", d.Extra().EffectNpcID)
 		}
 		// BUFF isn't a classified-offensive type, isn't a debuff, and
 		// doesn't target CORPSE_MOB, so Offensive defaults to false.
@@ -456,11 +456,11 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 454 level 1 not loaded")
 		}
-		if d.EffectID != 5123 || d.EffectLevel != 0 {
-			t.Fatalf("skill 454 delegation fields = effectID %d effectLevel %d, want 5123/0", d.EffectID, d.EffectLevel)
+		if d.Extra().EffectID != 5123 || d.Extra().EffectLevel != 0 {
+			t.Fatalf("skill 454 delegation fields = effectID %d effectLevel %d, want 5123/0", d.Extra().EffectID, d.Extra().EffectLevel)
 		}
-		if d.EffectNpcID != 13018 {
-			t.Fatalf("skill 454 EffectNpcID = %d, want 13018", d.EffectNpcID)
+		if d.Extra().EffectNpcID != 13018 {
+			t.Fatalf("skill 454 EffectNpcID = %d, want 13018", d.Extra().EffectNpcID)
 		}
 		referenced, ok := table.Get(5123, 1)
 		if !ok {
@@ -529,10 +529,10 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 42 level 101 not loaded")
 		}
-		if len(ench1.SelfEffects) != 1 || len(ench1.Effects) != 0 {
-			t.Fatalf("skill 42 level 101 effects = normal %+v self %+v", ench1.Effects, ench1.SelfEffects)
+		if len(ench1.Extra().SelfEffects) != 1 || len(ench1.Effects) != 0 {
+			t.Fatalf("skill 42 level 101 effects = normal %+v self %+v", ench1.Effects, ench1.Extra().SelfEffects)
 		}
-		if e := ench1.SelfEffects[0]; e.Name != "Heal" || e.Value != 3 || e.Icon || e.Time != 1 || e.Count != 1 {
+		if e := ench1.Extra().SelfEffects[0]; e.Name != "Heal" || e.Value != 3 || e.Icon || e.Time != 1 || e.Count != 1 {
 			t.Fatalf("skill 42 level 101 self effect = %+v", e)
 		}
 
@@ -540,10 +540,10 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 42 level 141 not loaded")
 		}
-		if len(ench2.SelfEffects) != 1 {
-			t.Fatalf("skill 42 level 141 SelfEffects = %+v, want 1 entry", ench2.SelfEffects)
+		if len(ench2.Extra().SelfEffects) != 1 {
+			t.Fatalf("skill 42 level 141 SelfEffects = %+v, want 1 entry", ench2.Extra().SelfEffects)
 		}
-		if e := ench2.SelfEffects[0]; e.Name != "ManaHeal" || e.Value != 1 || e.Icon {
+		if e := ench2.Extra().SelfEffects[0]; e.Name != "ManaHeal" || e.Value != 1 || e.Icon {
 			t.Fatalf("skill 42 level 141 self effect = %+v", e)
 		}
 	})
@@ -591,15 +591,15 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 10 level 1 not loaded")
 		}
-		if !cubic.IsCubic || cubic.NpcID != 1 {
-			t.Fatalf("skill 10 level 1 = isCubic=%v npcId=%d, want true/1", cubic.IsCubic, cubic.NpcID)
+		if !cubic.IsCubic || cubic.Extra().NpcID != 1 {
+			t.Fatalf("skill 10 level 1 = isCubic=%v npcId=%d, want true/1", cubic.IsCubic, cubic.Extra().NpcID)
 		}
 
 		negateStats, ok := table.Get(7003, 1)
 		if !ok {
 			t.Fatal("skill 7003 level 1 not loaded")
 		}
-		if got, want := negateStats.NegateTypes, []string{"BUFF", "DEBUFF"}; !slices.Equal(got, want) {
+		if got, want := negateStats.Extra().NegateTypes, []string{"BUFF", "DEBUFF"}; !slices.Equal(got, want) {
 			t.Fatalf("skill 7003 level 1 NegateTypes = %v, want %v", got, want)
 		}
 
@@ -607,7 +607,7 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 5102 level 1 not loaded")
 		}
-		if got, want := negateIDs.NegateIDs, []int{5106, 5107, 5108, 5098}; !slices.Equal(got, want) {
+		if got, want := negateIDs.Extra().NegateIDs, []int{5106, 5107, 5108, 5098}; !slices.Equal(got, want) {
 			t.Fatalf("skill 5102 level 1 NegateIDs = %v, want %v", got, want)
 		}
 
@@ -617,8 +617,8 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 2288 level 1 not loaded")
 		}
-		if shared.SharedReuse == nil || *shared.SharedReuse != (skill.Ref{ID: 2287, Level: 1}) {
-			t.Fatalf("skill 2288 level 1 SharedReuse = %v, want {2287 1}", shared.SharedReuse)
+		if shared.Extra().SharedReuse == nil || *shared.Extra().SharedReuse != (skill.Ref{ID: 2287, Level: 1}) {
+			t.Fatalf("skill 2288 level 1 SharedReuse = %v, want {2287 1}", shared.Extra().SharedReuse)
 		}
 
 		// flyType/element are the two non-required enums, and flyRadius is
@@ -633,8 +633,8 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		if fly.Element != skill.ElementDark {
 			t.Fatalf("skill 5015 level 1 Element = %v, want ElementDark", fly.Element)
 		}
-		if fly.FlyRadius != 400 {
-			t.Fatalf("skill 5015 level 1 FlyRadius = %d, want 400", fly.FlyRadius)
+		if fly.Extra().FlyRadius != 400 {
+			t.Fatalf("skill 5015 level 1 FlyRadius = %d, want 400", fly.Extra().FlyRadius)
 		}
 	})
 }

@@ -77,12 +77,22 @@ func TestCubicSummonSpendsSpiritshot(t *testing.T) {
 func TestServitorSummonSpendsSpiritshotOnlyWhenSpawned(t *testing.T) {
 	t.Parallel()
 	servitor := modelskill.Definition{
-		ID: shotServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		SkillType: "SUMMON", NpcID: shotServitorNpcID, SummonTotalLifeTime: 1_200_000,
-		StaticHitTime: true, HitTime: 0, ReuseDelay: 0,
-	}
+		ID:            shotServitorSkill,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		SkillType:     "SUMMON",
+		StaticHitTime: true,
+		HitTime:       0,
+		ReuseDelay:    0,
+	}.WithExtra(modelskill.Extra{
+		NpcID:               shotServitorNpcID,
+		SummonTotalLifeTime: 1_200_000,
+	})
 	missing := servitor
-	missing.ID, missing.NpcID = shotNoTemplateSkill, shotServitorNpcID+1
+	extra := *missing.Extra()
+	missing.ID, extra.NpcID = shotNoTemplateSkill, shotServitorNpcID+1
+	missing = missing.WithExtra(extra)
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 20, 0),
 		gameservertest.WithWantChars(1),

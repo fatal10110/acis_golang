@@ -54,7 +54,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def *mo
 	if live == nil {
 		return
 	}
-	lifetime := time.Duration(def.SummonTotalLifeTime) * time.Millisecond
+	lifetime := time.Duration(def.Extra().SummonTotalLifeTime) * time.Millisecond
 
 	live.cubicsMu.Lock()
 	if live.cubics == nil {
@@ -76,8 +76,8 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def *mo
 	}
 	runtime, exists := live.cubics[id]
 	if !exists {
-		interval := time.Duration(def.CubicActivationTime) * time.Second
-		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(*def), def.CubicActivationChance, interval, func() {
+		interval := time.Duration(def.Extra().CubicActivationTime) * time.Second
+		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(*def), def.Extra().CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id, runtime)

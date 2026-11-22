@@ -355,12 +355,21 @@ func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCapturedLog(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
-			{
-				ID: skillID, Level: level, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-				HitTime: 500, ReuseDelay: 45_000, StaticHitTime: true, StaticReuse: true,
-				MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+			modelskill.Definition{
+				ID:               skillID,
+				Level:            level,
+				Activation:       modelskill.ActivationActive,
+				Target:           modelskill.TargetSelf,
+				HitTime:          500,
+				ReuseDelay:       45_000,
+				StaticHitTime:    true,
+				StaticReuse:      true,
+				MPInitialConsume: 2,
+				MPConsume:        3,
+				SkillType:        "BUFF",
+			}.WithExtra(modelskill.Extra{
 				SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 30, Self: true, Icon: true}},
-			},
+			}),
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)

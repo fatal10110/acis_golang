@@ -12,8 +12,8 @@ func (d Definition) LandingPower() float64 {
 			return t.EffectPower
 		}
 	}
-	if d.EffectPower > 0 {
-		return float64(d.EffectPower)
+	if d.Extra().EffectPower > 0 {
+		return float64(d.Extra().EffectPower)
 	}
 	switch strings.ToUpper(strings.TrimSpace(d.SkillType)) {
 	case "PDAM", "MDAM":
@@ -35,8 +35,8 @@ func (d Definition) LandingEffectType() string {
 			return t.EffectType
 		}
 	}
-	if d.EffectType != "" {
-		return d.EffectType
+	if d.Extra().EffectType != "" {
+		return d.Extra().EffectType
 	}
 	switch strings.ToUpper(strings.TrimSpace(d.SkillType)) {
 	case "PDAM":

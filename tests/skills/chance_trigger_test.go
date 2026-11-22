@@ -61,27 +61,51 @@ func chanceSkills() []modelskill.Definition {
 				TriggeredID: mirageTriggered, TriggeredLevel: 1, ChanceType: "ON_ATTACKED", ActivationChance: 80,
 			}},
 		},
-		{
-			ID: mirageTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true, CastRange: 900, EffectRange: 1400,
-			EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
-		},
-		{
-			ID: onHitPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-			SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: 1,
-			TriggeredID: onHitTriggered, TriggeredLevel: 1,
-		},
+		modelskill.Definition{
+			ID:            mirageTriggered,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
+			CastRange:     900,
+			EffectRange:   1400,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		}),
+		modelskill.Definition{
+			ID:         onHitPassive,
+			Level:      1,
+			Activation: modelskill.ActivationPassive,
+			Target:     modelskill.TargetSelf,
+			SkillType:  "BUFF",
+		}.WithExtra(modelskill.Extra{
+			ChanceType:       "ON_HIT",
+			ActivationChance: 1,
+			TriggeredID:      onHitTriggered,
+			TriggeredLevel:   1,
+		}),
 		{
 			ID: onHitTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "BUFF", ReuseDelay: onHitTriggerReuse,
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "item_heal", StackOrder: 1}},
 		},
-		{
-			ID: onGoodPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-			SkillType: "BUFF", ChanceType: "ON_MAGIC_GOOD", ActivationChance: 3,
-			TriggeredID: onGoodTriggered, TriggeredLevel: 1,
-		},
+		modelskill.Definition{
+			ID:         onGoodPassive,
+			Level:      1,
+			Activation: modelskill.ActivationPassive,
+			Target:     modelskill.TargetSelf,
+			SkillType:  "BUFF",
+		}.WithExtra(modelskill.Extra{
+			ChanceType:       "ON_MAGIC_GOOD",
+			ActivationChance: 3,
+			TriggeredID:      onGoodTriggered,
+			TriggeredLevel:   1,
+		}),
 		{
 			ID: onGoodTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "BUFF",
@@ -92,36 +116,71 @@ func chanceSkills() []modelskill.Definition {
 			SkillType: "BUFF", HitTime: 500, StaticHitTime: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 1}},
 		},
-		{
-			ID: onCritPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-			SkillType: "BUFF", ChanceType: "ON_CRIT", ActivationChance: 5,
-			TriggeredID: onCritTriggered, TriggeredLevel: 1,
-		},
-		{
-			ID: onCritTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 120, Icon: true, StackType: "pd_down", StackOrder: 3}},
-		},
-		{
-			ID: onOffensivePassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-			SkillType: "BUFF", ChanceType: "ON_MAGIC_OFFENSIVE", ActivationChance: 2,
-			TriggeredID: onOffensiveTriggered, TriggeredLevel: 1,
-		},
-		{
-			ID: onOffensiveTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "speed_down", StackOrder: 1}},
-		},
-		{
-			// unlandableDebuff lands at its base chance of 20, so a landing
-			// roll of 20 or more loses.
-			ID: unlandableDebuff, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
+		modelskill.Definition{
+			ID:         onCritPassive,
+			Level:      1,
+			Activation: modelskill.ActivationPassive,
+			Target:     modelskill.TargetSelf,
+			SkillType:  "BUFF",
+		}.WithExtra(modelskill.Extra{
+			ChanceType:       "ON_CRIT",
+			ActivationChance: 5,
+			TriggeredID:      onCritTriggered,
+			TriggeredLevel:   1,
+		}),
+		modelskill.Definition{
+			ID:            onCritTriggered,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 120, Icon: true, StackType: "pd_down", StackOrder: 3}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		}),
+		modelskill.Definition{
+			ID:         onOffensivePassive,
+			Level:      1,
+			Activation: modelskill.ActivationPassive,
+			Target:     modelskill.TargetSelf,
+			SkillType:  "BUFF",
+		}.WithExtra(modelskill.Extra{
+			ChanceType:       "ON_MAGIC_OFFENSIVE",
+			ActivationChance: 2,
+			TriggeredID:      onOffensiveTriggered,
+			TriggeredLevel:   1,
+		}),
+		modelskill.Definition{
+			ID:            onOffensiveTriggered,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "speed_down", StackOrder: 1}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		}),
+		modelskill.Definition{
+			ID:            unlandableDebuff,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
 			IgnoreResists: true,
 			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "weakness", StackOrder: 1}},
-		},
+		}.WithExtra(modelskill.Extra{
+			EffectType: "DEBUFF",
+		}),
 		{
 			ID: mdamSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "MDAM", Offensive: true, Power: 1, CastRange: 900, HitTime: 500, StaticHitTime: true,
@@ -139,12 +198,20 @@ func chanceSkills() []modelskill.Definition {
 				TriggeredID: npcShieldTrigger, TriggeredLevel: 1, ChanceType: "ON_ATTACKED", ActivationChance: -1,
 			}},
 		},
-		{
-			ID: npcShieldTrigger, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			EffectPower: 100, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "shield_debuff", StackOrder: 1}},
-		},
+		modelskill.Definition{
+			ID:            npcShieldTrigger,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetOne,
+			SkillType:     "DEBUFF",
+			Debuff:        true,
+			Offensive:     true,
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "shield_debuff", StackOrder: 1}},
+		}.WithExtra(modelskill.Extra{
+			EffectType:  "DEBUFF",
+			EffectPower: 100,
+		}),
 	}
 }
 
@@ -539,14 +606,21 @@ func TestChanceSkillConditionGatesProc(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			defs := append(chanceSkills(), modelskill.Definition{
-				ID: condPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
-				SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: 5,
-				TriggeredID: onHitTriggered, TriggeredLevel: 1,
+				ID:         condPassive,
+				Level:      1,
+				Activation: modelskill.ActivationPassive,
+				Target:     modelskill.TargetSelf,
+				SkillType:  "BUFF",
 				Conditions: []modelskill.ConditionClause{{
 					Root:      modelskill.Condition{Kind: "player", Attrs: map[string]string{"hp": tc.hp}},
 					MessageID: serverpackets.SystemMessageS1CannotBeUsed, AddName: true,
 				}},
-			})
+			}.WithExtra(modelskill.Extra{
+				ChanceType:       "ON_HIT",
+				ActivationChance: 5,
+				TriggeredID:      onHitTriggered,
+				TriggeredLevel:   1,
+			}))
 			srv, c, objID := bootChanceHolderWith(t, defs, 0, condPassive)
 			px, py, pz := srv.PlayerPosition(t, objID)
 			hostile := srv.SpawnHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})

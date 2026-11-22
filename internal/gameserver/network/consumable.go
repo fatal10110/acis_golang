@@ -77,13 +77,13 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 // (network/pet_herb.go) — reaches this: a non-player instant cast has no
 // charge handling at all.
 func applyItemCastCharges(live *livePlayer, res itemhandler.UseResult) {
-	if res.Skill.NumCharges <= 0 {
+	if res.Skill.Extra().NumCharges <= 0 {
 		return
 	}
-	if res.Skill.MaxCharges > 0 {
-		live.Character.IncreaseCharges(res.Skill.NumCharges, res.Skill.MaxCharges)
+	if res.Skill.Extra().MaxCharges > 0 {
+		live.Character.IncreaseCharges(res.Skill.Extra().NumCharges, res.Skill.Extra().MaxCharges)
 	} else {
-		live.Character.DecreaseCharges(res.Skill.NumCharges)
+		live.Character.DecreaseCharges(res.Skill.Extra().NumCharges)
 	}
 }
 

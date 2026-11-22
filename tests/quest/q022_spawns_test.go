@@ -151,7 +151,7 @@ func soulWorld(t *testing.T) (*dialogWorld, *npc.Hostile) {
 func q022SummonServitor(t *testing.T, w *dialogWorld) *summon.Actor {
 	t.Helper()
 	w.srv.RunQuest(t, w.player, q022Name, func(_ *script.Quests, c *player.Character, _ *script.Script) {
-		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: deathServitorID, SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: deathServitorID, SummonTotalLifeTime: 1_200_000}))
 	})
 	var servitor *summon.Actor
 	w.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {

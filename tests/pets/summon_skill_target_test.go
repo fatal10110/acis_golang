@@ -32,11 +32,18 @@ func bootGroupTargetOwner(t *testing.T) (*servitorOwner, *summon.Actor) {
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
-		{
-			ID: groupTargetServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-			SkillType: "SUMMON", NpcID: groupTargetServitorNPCID, SummonTotalLifeTime: 1_200_000,
-			StaticHitTime: true, StaticReuse: true,
-		},
+		modelskill.Definition{
+			ID:            groupTargetServitorSkill,
+			Level:         1,
+			Activation:    modelskill.ActivationActive,
+			Target:        modelskill.TargetSelf,
+			SkillType:     "SUMMON",
+			StaticHitTime: true,
+			StaticReuse:   true,
+		}.WithExtra(modelskill.Extra{
+			NpcID:               groupTargetServitorNPCID,
+			SummonTotalLifeTime: 1_200_000,
+		}),
 		{
 			ID: groupTargetPartyHeal, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetParty,
 			Radius: 1000, SkillType: "HEAL", Power: groupTargetHealPower, StaticHitTime: true, StaticReuse: true,

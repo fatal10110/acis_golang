@@ -24,12 +24,23 @@ const (
 // its stun when it hits.
 func folkNuke(power int) modelskill.Definition {
 	return modelskill.Definition{
-		ID: folkNukeID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-		Offensive: true, SkillType: "PDAM", Power: float32(power), CastRange: folkNukeRange,
-		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		IgnoreResists: true, EffectPower: 100,
-		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}, {Name: "Stun", Time: 10}},
-	}
+		ID:            folkNukeID,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetOne,
+		Offensive:     true,
+		SkillType:     "PDAM",
+		Power:         float32(power),
+		CastRange:     folkNukeRange,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		IgnoreResists: true,
+		Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}, {Name: "Stun", Time: 10}},
+	}.WithExtra(modelskill.Extra{
+		EffectPower: 100,
+	})
 }
 
 // folkCaster boots a caster knowing def, in world, with a merchant spawned

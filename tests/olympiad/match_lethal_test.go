@@ -105,7 +105,7 @@ func TestOlympiadMatchLethalHitIdlesTheSummon(t *testing.T) {
 	m.fighting(t)
 	alpha, bravo := m.online(t, a), m.online(t, b)
 	m.onQueue(t, bravo, func() {
-		bravo.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: servitorID, SummonTotalLifeTime: 1_200_000})
+		bravo.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: servitorID, SummonTotalLifeTime: 1_200_000}))
 	})
 	var servitor *summon.Actor
 	m.srv.AdvanceUntil(t, "the servitor is in the world", func() bool {

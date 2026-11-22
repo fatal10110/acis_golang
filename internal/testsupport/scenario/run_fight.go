@@ -165,7 +165,7 @@ func (r *run) callSummon(t *testing.T, s *Summon) {
 		t.Fatalf("the character %T is not an online character", obj)
 	}
 	if !r.srv.PlayerQueue(t, r.player).Post(func() {
-		c.SummonServitor(modelskill.Definition{ID: 13, Level: 1, SkillType: "SUMMON", NpcID: int(s.ID), SummonTotalLifeTime: 1_200_000})
+		c.SummonServitor(modelskill.Definition{ID: 13, Level: 1, SkillType: "SUMMON"}.WithExtra(modelskill.Extra{NpcID: int(s.ID), SummonTotalLifeTime: 1_200_000}))
 	}) {
 		t.Fatal("the character's queue is closed")
 	}

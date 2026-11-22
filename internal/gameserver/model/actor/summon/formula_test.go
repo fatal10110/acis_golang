@@ -263,12 +263,13 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	}
 
 	success, ok := target.SkillSuccessInput(caster, modelskill.Definition{
-		SkillType:   "STUN",
+		SkillType: "STUN",
+		Magic:     true,
+		Element:   modelskill.ElementFire,
+	}.WithExtra(modelskill.Extra{
 		EffectType:  "STUN",
-		Magic:       true,
 		EffectPower: 50,
-		Element:     modelskill.ElementFire,
-	}, false, formulas.ShieldPerfect)
+	}), false, formulas.ShieldPerfect)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
@@ -451,7 +452,7 @@ func (deniedLethalCaster) CanGiveDamage() bool { return false }
 func TestActorLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
 	target := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
-	skill := modelskill.Definition{LethalChance1: 30, LethalChance2: 10, MagicLevel: 40}
+	skill := modelskill.Definition{MagicLevel: 40}.WithExtra(modelskill.Extra{LethalChance1: 30, LethalChance2: 10})
 
 	in, ok := target.LethalInput(caster, skill)
 	if !ok {
@@ -478,7 +479,7 @@ func TestActorLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 func TestActorLethalInputRejectsGuardedDamage(t *testing.T) {
 	caster := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 40, Stats: CombatStats{MaxHP: 500}})
 	target := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 45, Stats: CombatStats{MaxHP: 500}})
-	skill := modelskill.Definition{LethalChance1: 30}
+	skill := modelskill.Definition{}.WithExtra(modelskill.Extra{LethalChance1: 30})
 	target.SetInvul(true)
 	if _, ok := target.LethalInput(caster, skill); ok {
 		t.Fatal("LethalInput accepted an invulnerable summon")

@@ -23,11 +23,20 @@ import (
 func TestFrozenDuellistsSignetPointRefusesActions(t *testing.T) {
 	t.Parallel()
 	def := modelskill.Definition{
-		ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
-		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
-		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 600}},
-	}
+		ID:            454,
+		Level:         1,
+		Activation:    modelskill.ActivationActive,
+		Target:        modelskill.TargetSelf,
+		HitTime:       500,
+		ReuseDelay:    60_000,
+		StaticHitTime: true,
+		StaticReuse:   true,
+		SkillType:     "SIGNET",
+		Radius:        180,
+		Effects:       []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 600}},
+	}.WithExtra(modelskill.Extra{
+		EffectNpcID: 13018,
+	})
 	db := sqltest.SharedDB(t)
 	opts := []gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{{

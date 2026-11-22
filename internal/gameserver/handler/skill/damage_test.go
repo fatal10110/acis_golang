@@ -361,7 +361,7 @@ func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
 
 	registry.Use(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 100},
+		Skill:   modelskill.Definition{SkillType: "PDAM"}.WithExtra(modelskill.Extra{LethalChance2: 100}),
 		Targets: []Actor{target},
 	})
 	if target.hp != 1 || target.cp != 1 {
@@ -377,7 +377,7 @@ func TestPhysicalAndBlowHandlersResolveLethalHits(t *testing.T) {
 
 	registry.Use(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "BLOW", LethalChance1: 100},
+		Skill:   modelskill.Definition{SkillType: "BLOW"}.WithExtra(modelskill.Extra{LethalChance1: 100}),
 		Targets: []Actor{target},
 	})
 	if !almost(target.hp, 1423) || target.cp != 1 {
@@ -414,7 +414,7 @@ func TestBlowMissStillResolvesLethalHit(t *testing.T) {
 
 	registry.Use(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "BLOW", LethalChance2: 100},
+		Skill:   modelskill.Definition{SkillType: "BLOW"}.WithExtra(modelskill.Extra{LethalChance2: 100}),
 		Targets: []Actor{target},
 	})
 	if target.hp != 1 {

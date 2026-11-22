@@ -290,14 +290,15 @@ func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 				Caster: &bssCasterFake{},
 				Skill: modelskill.Definition{
 					SkillType:     tt.skillType,
-					EffectType:    tt.skillType,
-					EffectPower:   100,
 					IgnoreResists: true,
 					Effects: []modelskill.EffectTemplate{{
 						Name: tt.effectName,
 						Time: 10,
 					}},
-				},
+				}.WithExtra(modelskill.Extra{
+					EffectType:  tt.skillType,
+					EffectPower: 100,
+				}),
 				Targets: []Actor{target},
 			})
 
@@ -325,7 +326,7 @@ func TestCancelDebuffStripsOnlyDispellableDebuffsUpToLimit(t *testing.T) {
 	}
 
 	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "CANCEL_DEBUFF", MaxNegatedEffects: 1},
+		Skill:   modelskill.Definition{SkillType: "CANCEL_DEBUFF"}.WithExtra(modelskill.Extra{MaxNegatedEffects: 1}),
 		Targets: []Actor{target},
 	})
 
@@ -355,7 +356,7 @@ func TestNegateByIDStripsMatchingEffect(t *testing.T) {
 	target.list.Add(untouched)
 
 	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "NEGATE", NegateIDs: []int{42}},
+		Skill:   modelskill.Definition{SkillType: "NEGATE"}.WithExtra(modelskill.Extra{NegateIDs: []int{42}}),
 		Targets: []Actor{target},
 	})
 
@@ -498,11 +499,12 @@ func TestCheckSkillSuccessUsesLivePlayerShieldDefense(t *testing.T) {
 
 	skill := modelskill.Definition{
 		SkillType:     "STUN",
-		EffectType:    "STUN",
-		EffectPower:   100,
 		IgnoreResists: true,
 		Effects:       []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
-	}
+	}.WithExtra(modelskill.Extra{
+		EffectType:  "STUN",
+		EffectPower: 100,
+	})
 	tests := []struct {
 		name   string
 		target *player.Character

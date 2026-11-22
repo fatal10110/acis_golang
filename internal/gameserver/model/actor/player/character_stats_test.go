@@ -321,7 +321,7 @@ func TestCharacterLethalInputAndOutcomes(t *testing.T) {
 		{Stat: stat.LethalRate, Op: effect.OpMul, Value: 1.5},
 	})
 
-	skill := modelskill.Definition{MagicLevel: 40, LethalChance1: 30, LethalChance2: 10}
+	skill := modelskill.Definition{MagicLevel: 40}.WithExtra(modelskill.Extra{LethalChance1: 30, LethalChance2: 10})
 	in, ok := target.LethalInput(caster, skill)
 	if !ok {
 		t.Fatal("LethalInput() ok = false")

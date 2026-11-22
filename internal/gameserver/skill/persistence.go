@@ -1009,8 +1009,8 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 			continue
 		}
 		key := cast.ReuseKey(def)
-		if def.EquipDelay > 0 && !c.HasSkillReuse(key) {
-			c.AddSkillReuse(modelskill.Ref{ID: def.ID, Level: def.Level}, key, time.Duration(def.EquipDelay)*time.Millisecond)
+		if def.Extra().EquipDelay > 0 && !c.HasSkillReuse(key) {
+			c.AddSkillReuse(modelskill.Ref{ID: def.ID, Level: def.Level}, key, time.Duration(def.Extra().EquipDelay)*time.Millisecond)
 		}
 		timersChanged = true
 	}

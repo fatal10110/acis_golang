@@ -47,7 +47,7 @@ func TestDrainAbsorbMatchesReference(t *testing.T) {
 	} {
 		caster := &skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: tc.playable}
 		target := &skillTarget{fakeActor: fakeActor{objectID: 2}, isPlayer: tc.targetPlayer, cp: tc.cp, hp: tc.hp}
-		cast := Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "DRAIN", AbsorbAbs: tc.abs, AbsorbPart: tc.part}}
+		cast := Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "DRAIN"}.WithExtra(modelskill.Extra{AbsorbAbs: tc.abs, AbsorbPart: tc.part})}
 		if got := drainAbsorb(cast, target, tc.damage); math.Float64bits(got) != tc.want {
 			t.Errorf("drainAbsorb(%+v) = %v, want %v", tc, got, math.Float64frombits(tc.want))
 		}
@@ -65,7 +65,7 @@ func drainFixture() (caster, target *skillTarget, def modelskill.Definition) {
 		magicInput: formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1},
 		magicOK:    true, skillSuccessOK: true,
 	}
-	def = modelskill.Definition{ID: 1090, Level: 1, SkillType: "DRAIN", Target: modelskill.TargetOne, AbsorbPart: 0.8}
+	def = modelskill.Definition{ID: 1090, Level: 1, SkillType: "DRAIN", Target: modelskill.TargetOne}.WithExtra(modelskill.Extra{AbsorbPart: 0.8})
 	return caster, target, def
 }
 
@@ -177,7 +177,9 @@ func TestDrainGates(t *testing.T) {
 	t.Run("corpse drain feeds the caster only", func(t *testing.T) {
 		caster, target, def := drainFixture()
 		target.dead = true
-		def.Target, def.AbsorbPart, def.AbsorbAbs = modelskill.TargetCorpseMob, 0, 260
+		extra := *def.Extra()
+		def.Target, extra.AbsorbPart, extra.AbsorbAbs = modelskill.TargetCorpseMob, 0, 260
+		def = def.WithExtra(extra)
 		def.Effects = []modelskill.EffectTemplate{{Name: "Debuff", Time: 9}}
 		result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 		if caster.hp != 360 {
