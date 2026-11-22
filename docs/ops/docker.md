@@ -22,6 +22,9 @@ the binaries directly instead, see [run-servers.md](../run-servers.md).
   checkout. The repository's own `aCis_datapack/` is a test copy without geodata; do not point
   servers at it. Point compose and the init script elsewhere with `ACIS_DATAPACK_DIR` and the
   script's first argument.
+- The repository copy also holds server additions an upstream checkout lacks (listed in
+  `docs/agents/verification.md`, such as `data/xml/spawnlist/custom_classmaster.xml`). Copy them
+  into the checkout compose mounts; the deploy package already includes them.
 
 ## First start
 
