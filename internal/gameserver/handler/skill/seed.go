@@ -29,11 +29,8 @@ func (seedHandler) Use(cast Cast) {
 			continue
 		}
 
-		if e := firstEffectByID(list, cast.Skill.ID); e != nil {
-			e.IncreasePower()
-			continue
-		}
-
-		applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false)
+		list.IncreasePower(cast.Skill.ID, func() {
+			applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false)
+		})
 	}
 }
