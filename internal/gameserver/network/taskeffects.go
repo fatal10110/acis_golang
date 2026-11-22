@@ -51,6 +51,9 @@ const autosaveSaveTimeout = 5 * time.Second
 // of these passes, so mu guards them too. The Member's own lock, which the
 // rules run under, is released before a pass sends its frames.
 type playerZones struct {
+	// The promoted Enter, Leave, Remove and Reload take only the Member's
+	// lock; callers outside a pass use the mu-holding enter, leave, remove
+	// and reload instead.
 	zone.Member
 	live *livePlayer
 
