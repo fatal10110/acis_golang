@@ -47,9 +47,10 @@ const (
 	DealDone
 	// DealNotEnoughAdena refused a deal the paying side cannot afford.
 	DealNotEnoughAdena
-	// DealWeightExceeded refused a purchase the buyer cannot carry.
+	// DealWeightExceeded refused a deal the receiving side cannot carry:
+	// the buyer of a sell store, the owner of a buy store.
 	DealWeightExceeded
-	// DealSlotsFull refused a purchase the buyer has no slots for.
+	// DealSlotsFull refused a deal the receiving side has no slots for.
 	DealSlotsFull
 )
 
@@ -192,7 +193,8 @@ func (s *Store) Buy(svc *invops.Service, owner, buyer Trader, rows []PurchaseRow
 //
 // The store must be buying. Every row must name a wanted item at its wanted
 // enchant and price, for no more units than are still wanted, and the seller must hold that item at
-// that enchant free to trade. The owner must afford the total. Both
+// that enchant free to trade. The owner must afford the total and have the
+// weight allowance and free slots for the whole sale (#4961). Both
 // inventories are checked as the moves find them, so the deal moves
 // everything or nothing. A deal that would pay more than the largest int32
 // is refused. Each sold row's units come off the first buy row wanting that
@@ -208,7 +210,10 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 		return Deal{}, nil
 	}
 	templates := owner.Inv.Templates()
-	var total int64
+	var total, weight int64
+	slots := 0
+	// Stackable items need a new slot only when the owner holds none.
+	stacks := make(map[int32]struct{}, len(rows))
 	moves := make([]invops.Move, 0, len(rows))
 	moved := make([]Moved, 0, len(rows))
 	asked := make(map[int]int, len(rows))
@@ -238,6 +243,12 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 		if total > math.MaxInt32 {
 			return Deal{}, nil
 		}
+		weight += int64(row.Count) * int64(tmpl.Weight)
+		if tmpl.Stackable {
+			stacks[row.ItemID] = struct{}{}
+		} else {
+			slots += row.Count
+		}
 		perItem[row.ObjectID] += row.Count
 		moves = append(moves, invops.Move{ObjectID: row.ObjectID, Count: row.Count})
 		moved = append(moved, Moved{ItemID: row.ItemID, Count: row.Count, Enchant: row.Enchant, Stackable: tmpl.Stackable})
@@ -258,6 +269,20 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 		}
 		if adenaHeld(paying, adenaID) < total {
 			deal.Status = DealNotEnoughAdena
+			return false
+		}
+		if weight > math.MaxInt32 || !paying.ValidateWeight(int(weight)) {
+			deal.Status = DealWeightExceeded
+			return false
+		}
+		need := slots
+		for itemID := range stacks {
+			if paying.ItemByTemplateID(itemID) == nil {
+				need++
+			}
+		}
+		if !paying.ValidateCapacity(need) {
+			deal.Status = DealSlotsFull
 			return false
 		}
 		return true
