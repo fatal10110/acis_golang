@@ -176,7 +176,7 @@ func (l *GameClientLink) obtainCursedWeapon(live *livePlayer, itemID int32) {
 	live.SetKarma(cursedweapon.HolderKarma)
 	live.SetPKKills(0)
 	if l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(live, party.Expelled))
+		l.changeParty(func() []party.Notice { return l.parties.Leave(live, party.Expelled) })
 	}
 	live.EffectList().StopAllToggles()
 	l.grantCursedSkill(live, itemID, res.Stage)

@@ -128,7 +128,7 @@ func (l *GameClientLink) partyDuelSides(live, target *livePlayer) (own, other pa
 func (l *GameClientLink) prepareDuelParties(a, b []*livePlayer) {
 	for _, side := range [][]*livePlayer{a, b} {
 		if len(side) > 0 {
-			l.applyPartyNotices(l.parties.LeaveChannelSilently(side[0].ObjectID()))
+			l.changeParty(func() []party.Notice { return l.parties.LeaveChannelSilently(side[0].ObjectID()) })
 		}
 	}
 	for _, side := range [][]*livePlayer{a, b} {

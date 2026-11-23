@@ -168,13 +168,13 @@ func (l *GameClientLink) userCommandPartyInfo(live *livePlayer, _ int32) {
 // userCommandChannelDelete (/channeldelete) disbands the command channel
 // live leads. Anyone else is ignored.
 func (l *GameClientLink) userCommandChannelDelete(live *livePlayer, _ int32) {
-	l.applyPartyNotices(l.parties.DisbandChannel(live))
+	l.changeParty(func() []party.Notice { return l.parties.DisbandChannel(live) })
 }
 
 // userCommandChannelLeave (/channelleave) takes the party live leads out of
 // its command channel. Anyone else is ignored.
 func (l *GameClientLink) userCommandChannelLeave(live *livePlayer, _ int32) {
-	l.applyPartyNotices(l.parties.LeaveChannel(live))
+	l.changeParty(func() []party.Notice { return l.parties.LeaveChannel(live) })
 }
 
 // userCommandChannelListUpdate (/channellistupdate) shows live the command

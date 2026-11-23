@@ -87,7 +87,7 @@ func TestPartyLootEligible(t *testing.T) {
 	full.Inventory().SetLimiter(slotLimit(0))
 	far := newTestLivePlayer(t, 100, capture) // 9900 from the origin
 
-	eligible := partyLootEligible(1500, 20, origin)
+	eligible := partyLootEligible(1500, 20, 1, origin)
 	for _, tc := range []struct {
 		what string
 		m    *livePlayer
@@ -103,7 +103,7 @@ func TestPartyLootEligible(t *testing.T) {
 		}
 	}
 
-	if !partyLootEligible(-1, 20, origin)(far) {
+	if !partyLootEligible(-1, 20, 1, origin)(far) {
 		t.Error("a far member is passed over with an unlimited party range")
 	}
 }
