@@ -51,18 +51,35 @@ func TestQuestWindowsMatchReferenceGoldens(t *testing.T) {
 				w := bootWindowRow(t, r, 0)
 				w.offerAll(t)
 				got := w.bypass(t, w.expand(r.Str(t, "bypass")))
-				if !slices.Equal(got, r.Lines) {
-					t.Fatalf("packets:\n got %q\nwant %q", got, r.Lines)
+				lines, last := r.Lines, r.Str(t, "last")
+				if unboundWindowRows[r.ID] {
+					lines, last = unboundWindow, "0"
+				}
+				if !slices.Equal(got, lines) {
+					t.Fatalf("packets:\n got %q\nwant %q", got, lines)
 				}
 				if got, want := w.states(t), r.Str(t, "after"); got != want {
 					t.Errorf("states after = %s, want %s", got, want)
 				}
-				if got, want := w.lastRole(t), r.Str(t, "last"); got != want {
+				if got, want := w.lastRole(t), last; got != want {
 					t.Errorf("last quest NPC = %s, want %s", got, want)
 				}
 			})
 		})
 	}
+}
+
+// unboundWindowRows are the single window rows naming a quest that does
+// not talk through the NPC. The reference runs its talk hook there; #5160
+// answers them as an unknown name: the no-quest page, the hook not run and
+// the NPC not made the last quest NPC.
+var unboundWindowRows = map[string]bool{"unbound-quest": true, "unbound-quest-with-state": true}
+
+// unboundWindow is the no-quest answer of Darin to an unbound quest.
+var unboundWindow = []string{
+	`S NpcHtmlMessage obj=darin item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"`,
+	"S ActionFailed",
+	"S ActionFailed",
 }
 
 // TestQuestEventLinkMatchesReferenceGolden runs the quest event link

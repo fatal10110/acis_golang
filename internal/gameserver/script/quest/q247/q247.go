@@ -56,6 +56,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		p.TeleportTo(script.Loc{X: 143209, Y: 43968, Z: -3038}, 0)
 	// Lady of the lake.
 	case strings.EqualFold(e.Name, "31745-05.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 2 || p.Level() < 75 {
+			return ""
+		}
 		p.MakeNoble()
 		s.GiveItems(p, noblessTiara, 1)
 		s.RewardExpAndSp(p, 93836, 0)

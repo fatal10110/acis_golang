@@ -74,6 +74,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, roienLetter, 1)
 		s.GiveItems(p, directionsToRuins, 1)
 	case strings.EqualFold(e.Name, "30283-06.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 5 || !p.HasItem(brokenSwordHandle) {
+			return ""
+		}
 		s.TakeItems(p, brokenSwordHandle, 1)
 		s.GiveItems(p, swordOfSolidarity, 1)
 

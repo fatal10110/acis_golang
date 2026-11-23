@@ -79,6 +79,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			htmltext = "30164-1a.htm"
 		}
 	case strings.EqualFold(e.Name, "30838-7.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 5 {
+			return ""
+		}
 		s.GiveItems(p, dressShoesBox, 1)
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)

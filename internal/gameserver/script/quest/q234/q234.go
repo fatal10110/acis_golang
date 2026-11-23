@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -95,6 +96,24 @@ func weapons() map[int32]string {
 	}
 }
 
+// aGradeOffered reports whether the A-grade list links the weapon of the
+// item id written in digits.
+func aGradeOffered(s *script.Script, id string) bool {
+	links := strings.Split(s.HTMLText("31002-AGradeList.htm"), "selectAGrade_")
+	for _, link := range links[1:] {
+		if link[:len(link)-len(strings.TrimLeftFunc(link, unicode.IsDigit))] == id {
+			return true
+		}
+	}
+	return false
+}
+
+// choosing reports whether st is the quest in progress on cond 10, where
+// the weapon lists are offered.
+func choosing(st *script.QuestState) bool {
+	return st.Status() == questlog.StatusStarted && st.Cond() == 10
+}
+
 // The quest variables of the weapon choice.
 const (
 	varBypass   = "bypass"
@@ -154,15 +173,28 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, pipetteKnife, 1)
 	case strings.HasPrefix(e.Name, "selectBGrade_"):
-		if st.GetInt(varBypass) == 1 {
+		// #5183: only a weapon of the list, chosen on cond 10 before the
+		// choice is confirmed, is written down.
+		id, err := strconv.ParseInt(strings.TrimPrefix(e.Name, "selectBGrade_"), 10, 32)
+		if _, listed := weapons()[int32(id)]; err != nil || !listed || !choosing(st) || st.GetInt(varBypass) == 1 {
 			return ""
 		}
-		st.Set(varWeaponID, strings.ReplaceAll(e.Name, "selectBGrade_", ""))
-		htmltext = weaponPage(s, "31002-13.htm", st.GetInt(varWeaponID))
+		st.Set(varWeaponID, strconv.Itoa(int(id)))
+		htmltext = weaponPage(s, "31002-13.htm", int32(id))
 	case strings.HasPrefix(e.Name, "confirmWeapon"):
+		// #5183: only a weapon of the list chosen on cond 10 is confirmed.
+		if _, listed := weapons()[st.GetInt(varWeaponID)]; !listed || !choosing(st) {
+			return ""
+		}
 		st.Set(varBypass, strconv.Itoa(1))
 		htmltext = weaponPage(s, "31002-14.htm", st.GetInt(varWeaponID))
 	case strings.HasPrefix(e.Name, "selectAGrade_"):
+		// #5183: only an A-grade weapon the list offers, picked on cond 10.
+		id := strings.TrimPrefix(e.Name, "selectAGrade_")
+		aGrade, err := strconv.ParseInt(id, 10, 32)
+		if err != nil || !aGradeOffered(s, id) || !choosing(st) {
+			return ""
+		}
 		if st.GetInt(varBypass) != 1 {
 			htmltext = "31002-16.htm"
 			break
@@ -171,10 +203,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		if !p.HasItem(itemID) {
 			htmltext = weaponPage(s, "31002-15.htm", itemID)
 			break
-		}
-		aGrade, err := strconv.ParseInt(strings.ReplaceAll(e.Name, "selectAGrade_", ""), 10, 32)
-		if err != nil {
-			panic(err)
 		}
 		aGradeItemID := int32(aGrade)
 		htmltext = strings.ReplaceAll(s.HTMLText("31002-12.htm"), weaponNamePlaceholder, s.ItemName(aGradeItemID))

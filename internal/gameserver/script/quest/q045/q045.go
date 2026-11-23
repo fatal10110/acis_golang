@@ -86,6 +86,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, orderDocument3, 1)
 		s.GiveItems(p, purifiedMagicNecklace, 1)
 	case strings.EqualFold(e.Name, "30097-12.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 6 || !p.HasItem(purifiedMagicNecklace) {
+			return ""
+		}
 		s.TakeItems(p, markOfTraveler, -1)
 		s.TakeItems(p, purifiedMagicNecklace, 1)
 		s.RewardItems(p, scrollOfEscapeSpecial, 1)
