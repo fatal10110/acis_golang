@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
 // startLoginServer runs a real login server's game-server link acceptor
@@ -42,7 +43,7 @@ func startLoginServer(t *testing.T) (string, *manager.ServerRegistry) {
 	}
 	servers := manager.NewServerRegistry()
 	gsLink := loginserver.NewGameServerLink(servers, names, keys, manager.NewSessionStore(), manager.NewIPBanList(zerolog.Nop()),
-		nil, nil, true, nil, loginserver.NewLinkRoster(), zerolog.Nop())
+		nil, acceptRegistrations{}, true, nil, loginserver.NewLinkRoster(), zerolog.Nop())
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +53,12 @@ func startLoginServer(t *testing.T) (string, *manager.ServerRegistry) {
 	go func() { _ = gsLink.Serve(ctx, ln) }()
 	return ln.Addr().String(), servers
 }
+
+// acceptRegistrations stores every game server registration nowhere and
+// reports success, so the login server accepts the link.
+type acceptRegistrations struct{}
+
+func (acceptRegistrations) CreateGameServer(context.Context, model.GameServer) error { return nil }
 
 // syncLink waits until the login server has read everything sent on l so
 // far: it answers a session check only after the messages before it.

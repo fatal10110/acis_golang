@@ -334,7 +334,7 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
-	sessions.Put("player1", key)
+	sessions.Put("player1", key, 1)
 	c.Send(encodeAuthLogin("player1", key))
 
 	reply := c.Read()

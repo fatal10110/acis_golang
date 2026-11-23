@@ -665,7 +665,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		if l.holders == nil {
 			l.holders = make(map[string]*clientConn)
 		}
-		l.sessions.Put(c.account, c.sessionKey())
+		l.sessions.Put(c.account, c.sessionKey(), manager.NoServer)
 		l.holders[c.account] = c
 	}
 	l.authMu.Unlock()
@@ -979,6 +979,12 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		if err != nil {
 			l.log.Error().Str("account", c.account).Err(err).Msg("set last server")
 		}
+	}
+	// The play keys are good only on the server chosen here (#4655). A
+	// session already replaced by a newer login cannot be bound.
+	if !l.sessions.Bind(c.account, c.sessionKey(), serverID) {
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		return false
 	}
 	if err := c.send(serverpackets.EncodePlayOk(c.playKey1, c.playKey2)); err != nil {
 		return false

@@ -496,8 +496,9 @@ func TestAdminBanPlayer(t *testing.T) {
 
 // TestAdminBanAccount pins //ban account and //unban account
 // (AdminPunish.java:69-90, 213-224, Punishment.java:146-149) end to end: the
-// login server receives the account and level and stores them, and an
-// online account's player is disconnected.
+// login server stores the level for an account playing on this server, and
+// its player is disconnected. A change for an account not playing here is
+// ignored by the login server (#4655; the GM answer is tracked by #5480).
 func TestAdminBanAccount(t *testing.T) {
 	t.Parallel()
 	srv, _ := bootAdmin(t, adminLevel)
@@ -510,9 +511,7 @@ func TestAdminBanAccount(t *testing.T) {
 
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("ban account")), "Usage: //ban account [name].")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("ban account offline")), "Ban request sent for account offline.")
-	accountAccessLevel(t, srv, "offline", bannedAcctLevel)
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("unban account offline")), "Unban request sent for account offline.")
-	accountAccessLevel(t, srv, "offline", userLevel)
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("unban account Player")), "Player account isn't actually banned.")
 	frames := exchange(t, gm, encodeBuildCmd("unban account Admin"))
 	if len(frames) != 1 {
@@ -525,6 +524,9 @@ func TestAdminBanAccount(t *testing.T) {
 	assertTexts(t, messages(exchange(t, gm, encodeBuildCmd("ban account"))), "player2 account is banned.")
 	expectKicked(t, user)
 	accountAccessLevel(t, srv, "player2", bannedAcctLevel)
+	// The link handles requests in order, so the earlier offline ban was
+	// already decided.
+	accountAccessLevel(t, srv, "offline", userLevel)
 	leftWorld(t, srv, "Player")
 	drain(t, gm)
 

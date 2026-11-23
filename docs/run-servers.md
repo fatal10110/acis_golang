@@ -66,7 +66,7 @@ go run ./cmd/loginserver \
 
 Add `-debug-addr 127.0.0.1:6061` to serve the debug endpoints described under [Debug Endpoints](#debug-endpoints).
 
-The loginserver binds the client listener from `LoginserverHostname/LoginserverPort` and the gameserver-link listener from `LoginHostname/LoginPort`. For either host, `*` binds every address and an empty value binds `127.0.0.1` only. A `LoginserverHostname` that does not resolve logs an error and binds every address; a `LoginHostname` that does not resolve fails boot.
+The loginserver binds the client listener from `LoginserverHostname/LoginserverPort` and the gameserver-link listener from `LoginHostname/LoginPort`. For either host, `*` binds every address and an empty value binds `127.0.0.1` only. When `LoginHostname` is missing, the gameserver-link listener binds `127.0.0.1` only (a deliberate change from the reference default of `*`, #4655): a linked game server can register, validate session keys and change access levels, so set `LoginHostname = *` (as the reference `loginserver.properties` does) or a specific address only when game servers connect from another host, and firewall `LoginPort`. A `LoginserverHostname` that does not resolve logs an error and binds every address; a `LoginHostname` that does not resolve fails boot.
 
 ## Start Gameserver
 
