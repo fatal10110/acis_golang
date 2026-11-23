@@ -60,6 +60,19 @@ func twoArtifactWorld(t *testing.T) *world {
 	return w
 }
 
+// keepOwner is an engraving's seize that leaves the castle's owner as it
+// is and tells nothing.
+func keepOwner() (func(), bool) { return nil, true }
+
+// refuseSeize is an engraving's seize that fails the test: no castle may
+// change hands.
+func refuseSeize(t *testing.T) func() (func(), bool) {
+	return func() (func(), bool) {
+		t.Error("an engraving seized the castle")
+		return nil, false
+	}
+}
+
 // TestEngrave pins Castle.engrave: each engraving tells the attackers, then
 // the owner and the defenders, that the clan engraved the ruler; the
 // castle is the clan's to take only once every artifact carries its ruler,
@@ -82,7 +95,7 @@ func TestEngrave(t *testing.T) {
 		{rivals, 502, false, true},
 	}
 	for i, s := range steps {
-		if got := gludio.Engrave(w.clan(s.clan), s.artifact); got != s.taken {
+		if got := gludio.Engrave(w.clan(s.clan), s.artifact, keepOwner); got != s.taken {
 			t.Fatalf("step %d: Engrave(%#x, %d) = %v, want %v", i, s.clan, s.artifact, got, s.taken)
 		}
 		var want []string
@@ -100,7 +113,7 @@ func TestEngrave(t *testing.T) {
 func TestSiegeEndWipesEngravings(t *testing.T) {
 	w := twoArtifactWorld(t)
 	gludio := w.siege(1)
-	if gludio.Engrave(w.clan(rivals), 501) {
+	if gludio.Engrave(w.clan(rivals), 501, refuseSeize(t)) {
 		t.Fatal("one artifact took the castle")
 	}
 	gludio.End()
@@ -121,7 +134,7 @@ func TestEngraveAfterEnd(t *testing.T) {
 	gludio.End()
 	w.notes.take()
 	for _, id := range []int32{501, 502} {
-		if gludio.Engrave(w.clan(rivals), id) {
+		if gludio.Engrave(w.clan(rivals), id, refuseSeize(t)) {
 			t.Fatalf("engraving %d after the end took the castle", id)
 		}
 	}
@@ -156,5 +169,51 @@ func TestArtifactResidence(t *testing.T) {
 	}
 	if c, ok := w.castles.ByNPC(35322); ok {
 		t.Fatalf("ByNPC(artifact template) = %v; want none", c)
+	}
+}
+
+// TestEngraveSeizesBeforeEnd pins #5142: the castle changes hands under the
+// engine's lock, in the step that saw the siege under way, so an end asked
+// for meanwhile decides after it, with the new owner: the clan that took
+// the castle stays registered as its owner and the former owner leaves the
+// siege. What seize returns runs once, after the engraving was told.
+func TestEngraveSeizesBeforeEnd(t *testing.T) {
+	w := twoArtifactWorld(t)
+	gludio := w.siege(1)
+	if gludio.Engrave(w.clan(rivals), 501, refuseSeize(t)) {
+		t.Fatal("one artifact took the castle")
+	}
+	w.notes.take()
+	ended := make(chan struct{})
+	told := 0
+	taken := gludio.Engrave(w.clan(rivals), 502, func() (func(), bool) {
+		if w.e.mu.TryLock() {
+			w.e.mu.Unlock()
+			t.Error("seize ran without the engine's lock")
+		}
+		go func() {
+			defer close(ended)
+			gludio.End()
+		}()
+		if _, ok := w.castles.SetOwner(gludio.Castle(), w.clan(rivals)); !ok {
+			return nil, false
+		}
+		return func() { told++ }, true
+	})
+	<-ended
+	if !taken {
+		t.Fatal("the last artifact did not take the castle")
+	}
+	if told != 1 {
+		t.Fatalf("the seizure was told %d times, want 1", told)
+	}
+	if gludio.InProgress() {
+		t.Fatal("the siege did not end")
+	}
+	if got := gludio.Castle().OwnerID(); got != rivals {
+		t.Fatalf("Gludio owner = %#x, want rivals", got)
+	}
+	if gludio.Side(rivals) != SideOwner || gludio.Side(lords) != SideNone {
+		t.Fatalf("after the end: rivals %s, lords %s; want OWNER, none", gludio.Side(rivals), gludio.Side(lords))
 	}
 }

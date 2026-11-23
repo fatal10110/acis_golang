@@ -114,10 +114,12 @@ func (l *GameClientLink) townRestart(live *livePlayer) (location.Location, resta
 // siegeHeadquarters is where a siege HQ restart of live lands: the
 // headquarters of its clan when the clan attacks the castle siege in
 // progress at live's position, else when a clan hall siege is fought there,
-// whichever side the clan is on. False sends the restart to town.
+// whichever side the clan is on. A headquarters standing on no siege in
+// progress (headquartersInSiege) is ignored. False sends the restart to
+// town.
 func (l *GameClientLink) siegeHeadquarters(live *livePlayer) (location.Location, bool) {
 	hq, ok := l.clanHeadquarters(live)
-	if !ok {
+	if !ok || !l.headquartersInSiege(live.ClanID(), hq, false) {
 		return location.Location{}, false
 	}
 	at := live.CurrentLocation()
@@ -224,9 +226,11 @@ func (l *GameClientLink) dieOptions(live *livePlayer) serverpackets.DieOptions {
 // dieSiegeHQ reports whether the death window of live offers the siege HQ
 // restart: its clan holds a headquarters and attacks the castle siege in
 // progress at live's position or, with none there, the clan hall siege
-// fought there.
+// fought there. A headquarters standing on no siege in progress
+// (headquartersInSiege) is ignored.
 func (l *GameClientLink) dieSiegeHQ(live *livePlayer) bool {
-	if _, ok := l.clanHeadquarters(live); !ok {
+	hq, ok := l.clanHeadquarters(live)
+	if !ok || !l.headquartersInSiege(live.ClanID(), hq, false) {
 		return false
 	}
 	clanID := live.ClanID()

@@ -84,7 +84,8 @@ func (l *GameClientLink) takeCastleAfterCanCast(live *livePlayer, def modelskill
 // does anything: its castle check runs again, telling the leader a
 // refusal, then the leader's clan engraves its ruler on the artifact, and
 // the clan whose ruler every artifact of the castle then carries takes the
-// castle (setCastleOwner).
+// castle (seizeCastle) in the step that saw the siege under way, the siege
+// then turning to it.
 type takeCastleHandler struct{ l *GameClientLink }
 
 func (takeCastleHandler) Types() []string { return []string{"TAKE_CASTLE"} }
@@ -106,9 +107,9 @@ func (h takeCastleHandler) Use(c skillhandler.Cast) {
 	if !member {
 		return
 	}
-	if s.Engrave(cl, artifact.ObjectID()) {
-		// nil: the engraver hears the engraving notice already on its queue
-		// before the clan header and the music.
-		h.l.setCastleOwner(nil, s.Castle(), cl)
+	// nil: the engraver hears the engraving notice already on its queue
+	// before the clan header and the music.
+	if s.Engrave(cl, artifact.ObjectID(), func() (func(), bool) { return h.l.seizeCastle(nil, s.Castle(), cl) }) {
+		h.l.castleMidVictory(s.Castle())
 	}
 }

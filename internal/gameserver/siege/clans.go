@@ -53,6 +53,27 @@ func (e *Engine) Opposed(a, b int32) bool {
 	return false
 }
 
+// Unopposed runs join unless clans a and b stand on opposite sides of a
+// castle's siege, holding every siege's registrations still until join
+// returns, and reports whether it ran: a clan joining an alliance and an
+// ally registering on the other side cannot both pass (#5146). join runs
+// with the engine's lock held and must not call back into the sieges.
+func (e *Engine) Unopposed(a, b int32, join func()) bool {
+	if e == nil {
+		join()
+		return true
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, s := range e.order {
+		if s.oppositeLocked(a, b) {
+			return false
+		}
+	}
+	join()
+	return true
+}
+
 // StateOf is the siege state a member of clanID takes as it enters the
 // world or joins the clan: the attacker state when the clan attacks a siege
 // in progress, the defender state when it owns or defends one, the last

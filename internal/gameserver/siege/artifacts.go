@@ -9,31 +9,45 @@ import (
 // Engrave records that cl engraved the ruler on artifactID, one of the
 // besieged castle's placed artifacts: the attackers, then the owner and the
 // defenders, are told. Once every artifact of the castle carries cl's
-// ruler, all of them are wiped and Engrave reports true: the castle is cl's
-// to take. An artifact not placed for the castle records nothing and tells
-// no one.
-func (s *Siege) Engrave(cl *clan.Clan, artifactID int32) bool {
+// ruler, all of them are wiped and seize gives cl the castle, reporting
+// whether it did and returning what then tells of it (nil for nothing).
+// Engrave reports whether cl took the castle. An artifact not placed for
+// the castle records nothing and tells no one.
+//
+// The castle changes hands under the same hold that saw the siege under
+// way, so the siege's end decides wholly before the engraving, refusing
+// it, or wholly after, with the new owner (#5142). seize therefore runs
+// with the engine's lock held and must not call back into the sieges;
+// what it returns runs after the engraving was told, with the step's other
+// effects.
+func (s *Siege) Engrave(cl *clan.Clan, artifactID int32, seize func() (told func(), ok bool)) bool {
 	artifacts := s.castle.ArtifactIDs()
 	if cl == nil || !slices.Contains(artifacts, artifactID) {
 		return false
 	}
-	var fx effects
-	s.e.mu.Lock()
-	if s.status != StatusInProgress {
-		s.e.mu.Unlock()
-		return false
-	}
-	if s.engraved == nil {
-		s.engraved = map[int32]int32{}
-	}
-	s.engraved[artifactID] = cl.ID()
-	s.tellLocked(&fx, Message{ID: MsgClanEngravedRuler, Text: cl.Name()}, SideAttacker, SideDefender)
-	taken := !slices.ContainsFunc(artifacts, func(id int32) bool { return s.engraved[id] != cl.ID() })
-	if taken {
+	taken := false
+	s.runLifecycle(func(fx *effects) {
+		if s.status != StatusInProgress {
+			return
+		}
+		if s.engraved == nil {
+			s.engraved = map[int32]int32{}
+		}
+		s.engraved[artifactID] = cl.ID()
+		s.tellLocked(fx, Message{ID: MsgClanEngravedRuler, Text: cl.Name()}, SideAttacker, SideDefender)
+		if slices.ContainsFunc(artifacts, func(id int32) bool { return s.engraved[id] != cl.ID() }) {
+			return
+		}
 		clear(s.engraved)
-	}
-	s.e.mu.Unlock()
-	fx.run()
+		told, ok := seize()
+		if !ok {
+			return
+		}
+		if told != nil {
+			fx.add(told)
+		}
+		taken = true
+	})
 	return taken
 }
 
