@@ -103,6 +103,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, redBoneNecklace, -1)
 		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "30332-5.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 5 {
+			return ""
+		}
 		s.TakeItems(p, incensePouch, -1)
 		s.TakeItems(p, gemOfMaille, -1)
 		s.GiveItems(p, greenColoredLureHG, 60)

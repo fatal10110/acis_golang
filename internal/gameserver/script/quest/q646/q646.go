@@ -65,12 +65,13 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(e.Player, script.SoundAccept)
 	case script.IsDigit(e.Name):
+		// #5183: only a reward of the list, to a holder of all the dolls on cond 2.
+		choice, err := strconv.Atoi(e.Name)
+		if err != nil || choice >= len(rewards()) || st.Status() != questlog.StatusStarted || st.Cond() != 2 || e.Player.ItemCount(cursedDoll) < 180 {
+			return ""
+		}
 		htmltext = "32016-07.htm"
 		s.TakeItems(e.Player, cursedDoll, -1)
-		choice, err := strconv.Atoi(e.Name)
-		if err != nil {
-			panic(err)
-		}
 		r := rewards()[choice]
 		s.GiveItems(e.Player, r.item, r.count)
 		s.PlaySound(e.Player, script.SoundFinish)

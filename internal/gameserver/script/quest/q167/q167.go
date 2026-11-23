@@ -57,11 +57,19 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.GiveItems(p, normanLetter, 1)
 		s.RewardItems(p, 57, 2000)
 	case strings.EqualFold(e.Name, "30255-04.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 1 || !p.HasItem(carlonLetter) {
+			return ""
+		}
 		s.TakeItems(p, carlonLetter, 1)
 		s.RewardItems(p, 57, 3000)
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)
 	case strings.EqualFold(e.Name, "30210-02.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 2 || !p.HasItem(normanLetter) {
+			return ""
+		}
 		s.TakeItems(p, normanLetter, 1)
 		s.RewardItems(p, 57, 20000)
 		s.PlaySound(p, script.SoundFinish)

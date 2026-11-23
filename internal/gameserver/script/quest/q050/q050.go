@@ -50,6 +50,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(e.Player, script.SoundAccept)
 	case strings.EqualFold(e.Name, "31570-07.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || e.Player.ItemCount(essenceOfWind) < 100 {
+			return ""
+		}
 		htmltext = "31570-06.htm"
 		s.TakeItems(e.Player, essenceOfWind, -1)
 		s.RewardItems(e.Player, windFishingLure, 4)

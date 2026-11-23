@@ -249,15 +249,16 @@ func TestBlackJudgeLiftsDeathPenaltyForItsFee(t *testing.T) {
 
 // TestBlackJudgeRefusesFeesItDoesNotOffer sends the judge fee links its
 // pages never offer, from a page admitting any: a fee for a higher level
-// than the character's, an index past the fees, and malformed indexes each
-// answer nothing and leave the penalty and the adena alone.
+// than the character's, a fee for a lower level (#5183: only the fee of the
+// character's level is offered), an index past the fees, and malformed
+// indexes each answer nothing and leave the penalty and the adena alone.
 func TestBlackJudgeRefusesFeesItDoesNotOffer(t *testing.T) {
 	t.Parallel()
 	w := bootProofWorld(t, judgedPenalty, false, 1_000_000)
 	judge := w.spawnFolk(t, folkTemplate("Folk", blackJudgeID), 50)
 	w.openJudge(t, judge)
 	w.openAnyNpcPage(t)
-	for _, event := range []string{"remove_dp 0", "remove_dp 3", "remove_dp 6", "remove_dp 99999999999", "remove_dp", "remove_dp x", "remove_dp -1", "remove_dp  4"} {
+	for _, event := range []string{"remove_dp 0", "remove_dp 3", "remove_dp 5", "remove_dp 6", "remove_dp 99999999999", "remove_dp", "remove_dp x", "remove_dp -1", "remove_dp  4"} {
 		w.c.Send(encodeBypass("Quest BlackJudge " + event))
 		if got := dialogFrames(w.srv.ReadQueued(t, w.c)); len(got) != 0 {
 			t.Fatalf("%q answered %x, want nothing", event, opcodes(got))

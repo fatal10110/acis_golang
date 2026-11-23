@@ -66,6 +66,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(4)
 		s.PlaySound(e.Player, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "30533-05.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 4 {
+			return ""
+		}
 		s.GiveItems(e.Player, soeGiran, 1)
 		s.RewardItems(e.Player, markTraveler, 1)
 		s.PlaySound(e.Player, script.SoundFinish)

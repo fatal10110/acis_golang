@@ -57,6 +57,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, lilithLetter, 1)
 		s.GiveItems(p, theonDiary, 1)
 	case strings.EqualFold(e.Name, "30369-03.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || !p.HasItem(lilithLetter) {
+			return ""
+		}
 		s.TakeItems(p, lilithLetter, 1)
 		s.RewardExpAndSp(p, 3000, 0)
 		s.PlaySound(p, script.SoundFinish)

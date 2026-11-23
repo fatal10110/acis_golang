@@ -119,8 +119,13 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		return htmltext
 	}
 	p := e.Player
-	// given is the page that hands the traveller one item.
+	// given is the page that hands the traveller one item. #5183: only a
+	// traveller on cond 1 without it, as the page is offered, is handed it.
 	given := func(item int32) {
+		if st.Status() != questlog.StatusStarted || st.Cond() != 1 || p.HasItem(item) {
+			htmltext = ""
+			return
+		}
 		s.PlaySound(p, script.SoundItemGet)
 		s.GiveItems(p, item, 1)
 	}
@@ -150,6 +155,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		given(manakiaTotem)
 	// Ancestor Martankus.
 	case strings.EqualFold(e.Name, "30649-03.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 5 {
+			return ""
+		}
 		s.TakeItems(p, tamlinOrcHead, -1)
 		s.TakeItems(p, warspiritTotem, -1)
 		s.TakeItems(p, brakiRemains2, -1)

@@ -48,32 +48,33 @@ func equalityScript(t *testing.T, r *Registry, token string) *Script {
 	return nil
 }
 
-// TestQuestEqualityMatchesReferenceGolden: two behaviors are one script, two
-// scripts of one quest id are one when their names match, and any other two
-// are one only when their paths match.
-func TestQuestEqualityMatchesReferenceGolden(t *testing.T) {
+// TestQuestEventScriptIdentity: a quest event runs only through the very
+// script it names. The reference counts two scripts of one quest id with
+// the same name, or of the same class, as one, as the golden pins; it also
+// counts any two behaviors as one, which #5160 drops: a behavior bound to
+// an NPC is not another behavior named by an event.
+func TestQuestEventScriptIdentity(t *testing.T) {
 	r := equalityRegistry(t)
+	diverges := map[string]bool{"two-behaviors": true}
 	scriptcontract.Run(t, "dialog.quest_equality", func(t *testing.T, row scriptcontract.Row) {
 		a, b := equalityScript(t, r, row.Str(t, "a")), equalityScript(t, r, row.Str(t, "b"))
-		if got, want := equal(a, b), row.Bool(t, "equal"); got != want {
-			t.Fatalf("equal(%s, %s) = %v, want %v", a.path, b.path, got, want)
+		want := row.Bool(t, "equal") != diverges[row.ID]
+		if got := containsScript([]*Script{a}, b); got != want {
+			t.Fatalf("%s names %s: one script = %v, want %v", a.path, b.path, got, want)
 		}
 	})
 }
 
-// TestQuestEqualityTellsSameNamesApartByPath: two scripts named alike in
-// different directories are not one script.
-func TestQuestEqualityTellsSameNamesApartByPath(t *testing.T) {
+// TestQuestEventTellsSameNamesApart: two scripts named alike in different
+// directories are not one script.
+func TestQuestEventTellsSameNamesApart(t *testing.T) {
 	r := equalityRegistry(t)
 	a := equalityScript(t, r, "script.teleport.NoblesseTeleporter")
 	b := equalityScript(t, r, "script.feature.NoblesseTeleporter")
 	if a.Name != b.Name {
 		t.Fatalf("names %q and %q differ", a.Name, b.Name)
 	}
-	if equal(a, b) {
-		t.Fatal("same-named scripts in different directories are equal")
-	}
-	if !equal(a, a) {
-		t.Fatal("a script is not equal to itself")
+	if containsScript([]*Script{a}, b) {
+		t.Fatal("same-named scripts in different directories are one script")
 	}
 }

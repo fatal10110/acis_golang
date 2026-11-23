@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/firstclasschange"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/secondclasschange"
 )
@@ -21,8 +22,11 @@ const (
 // New returns the feature.
 func New() script.Script {
 	return script.Script{
-		Dir:   "feature",
-		Bind:  script.Bindings{script.EventTalked: slices.Concat(firstclasschange.Masters(), secondclasschange.Masters())},
+		Dir: "feature",
+		// #5160 runs a linked script only through an NPC bound to it, and
+		// every village master's page links the exchange, so it is bound
+		// to the village masters as well as to the class masters.
+		Bind:  script.Bindings{script.EventTalked: slices.Concat(firstclasschange.Masters(), secondclasschange.Masters(), clan.Masters())},
 		Hooks: script.Hooks{OnTalk: onTalk},
 	}
 }

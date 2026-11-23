@@ -232,6 +232,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, clayDough, 1)
 		s.GiveItems(p, patternOfKeyhole, 1)
 	case strings.EqualFold(e.Name, "30622-04.htm"):
+		// #5183: only the box's page of cond 8 opens it. #5139: the box
+		// opens only for the Key of Titan, as its talk asks.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 8 {
+			return ""
+		}
+		if !p.HasItem(keyOfTitan) {
+			return "30622-05.htm"
+		}
 		st.SetCond(9)
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, keyOfTitan, 1)

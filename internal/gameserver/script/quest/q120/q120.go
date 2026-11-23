@@ -80,6 +80,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, keyOfEnigma, 1)
 		s.PlaySound(p, script.SoundMiddle)
 	case is("32041-32.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 25 || !p.HasItem(wendyNecklace) {
+			return ""
+		}
 		s.TakeItems(p, wendyNecklace, 1)
 		s.GiveItems(p, earringOfBinding, 1)
 		s.PlaySound(p, script.SoundFinish)

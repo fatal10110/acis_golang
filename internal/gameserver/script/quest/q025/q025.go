@@ -163,6 +163,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(16)
 		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31522-16.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.GetInt("state") != 24 {
+			return ""
+		}
 		s.TakeItems(p, forestOfDeadmanMap, -1)
 		s.GiveItems(p, earringOfBlessing, 1)
 		s.GiveItems(p, necklaceOfBlessing, 1)
@@ -239,6 +243,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(15)
 		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31532-25.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.GetInt("state") != 23 {
+			return ""
+		}
 		s.TakeItems(p, forestOfDeadmanMap, -1)
 		s.GiveItems(p, earringOfBlessing, 1)
 		s.GiveItems(p, ringOfBlessing, 2)
