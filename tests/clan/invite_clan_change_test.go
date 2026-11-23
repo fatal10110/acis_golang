@@ -64,6 +64,46 @@ func TestInviteAcceptedAfterInviterChangedClan(t *testing.T) {
 	}
 }
 
+// TestInviteAcceptedAfterInviterLeftClan (#5105): Founder invites Recruit
+// into Knights, then dissolves Knights and founds nothing. Recruit's
+// acceptance names a clan its inviter no longer belongs to: it is refused
+// with ActionFailed, Recruit joins no clan, and its side of the invitation
+// is cleared so it can be invited again.
+func TestInviteAcceptedAfterInviterLeftClan(t *testing.T) {
+	cfg := clan.DefaultConfig()
+	cfg.DissolveDays = 0
+	w := bootClanWorld(t, 10, 0, 0, gameservertest.WithClanConfig(cfg), dissolutionPages(t), gameservertest.WithLevels(warLevels(t)))
+	knights := w.found(t, "Knights")
+
+	w.leader.Send(encodeRequestJoinPledge(w.memberID, 0))
+	if _, ok := firstOpcode(drainFrames(t, w.member), serverpackets.OpcodeAskJoinPledge); !ok {
+		t.Fatal("recruit was not asked")
+	}
+	wantDispersed(t, "founder", w.masterCommandBy(t, w.leader, "dissolve_clan"))
+	drainFrames(t, w.member)
+
+	w.member.Send(encodeRequestAnswerJoinPledge(1))
+	if got := opcodes(drainFrames(t, w.member)); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("recruit's stale acceptance = %x, want ActionFailed", got)
+	}
+	if frames := drainFrames(t, w.leader); len(frames) != 0 {
+		t.Fatalf("founder after the stale acceptance = %x, want nothing", opcodes(frames))
+	}
+	if cl, ok := w.srv.Clans.Table().MemberClan(w.memberID); ok {
+		t.Fatalf("recruit joined %q", cl.Name())
+	}
+	if _, ok := w.srv.Clans.Invites().Partner(w.memberID); ok {
+		t.Fatal("recruit's side of the refused invitation is still pending")
+	}
+	w.srv.FlushPersistence(t)
+	if got := queryInt(t, w, `SELECT COALESCE(clanid, 0) FROM characters WHERE obj_Id = ?`, w.memberID); got != 0 {
+		t.Fatalf("recruit's stored clanid = %d, want 0", got)
+	}
+	if got := queryInt(t, w, `SELECT COUNT(*) FROM characters WHERE clanid = ?`, knights); got != 0 {
+		t.Fatalf("stored Knights members = %d, want 0", got)
+	}
+}
+
 // TestInviteAcceptedAfterInviterInvitedAnother (#5105): Founder invites
 // Recruit, logs out and back in, and invites Third, which its gone login's
 // invitation no longer keeps it from. Recruit's acceptance answers an

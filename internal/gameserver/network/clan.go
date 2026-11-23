@@ -181,12 +181,11 @@ func sendJoinRefusal(to *livePlayer, cl *clan.Clan, target string, refusal clan.
 
 // requestAnswerJoinPledge answers the invitation live was sent. With no
 // invitation pending it is ignored; an acceptance whose inviter's own
-// invitation has lapsed, or whose inviter has no clan any more, is ignored
-// too and leaves live's side pending. An acceptance joins only the clan the
-// invitation named, and only for the player it was sent to: once the
-// inviter's invitation names another target, or the inviter now belongs to
-// another clan, the acceptance is refused with ActionFailed and live's side
-// cleared (#5105).
+// invitation has lapsed is ignored too and leaves live's side pending. An
+// acceptance joins only the clan the invitation named, and only for the
+// player it was sent to: once the inviter's invitation names another
+// target, or the inviter now belongs to another clan or to none, the
+// acceptance is refused with ActionFailed and live's side cleared (#5105).
 func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpackets.RequestAnswerJoinPledge) {
 	c := live.Character
 	invite, ok := l.clanService().Invites().Partner(c.ID)
@@ -207,10 +206,7 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 		return
 	}
 	cl, ok := l.clanService().Table().MemberClan(invite.RequesterID)
-	if !ok {
-		return
-	}
-	if sent.PartnerID != c.ID || sent.ClanID != cl.ID() {
+	if !ok || sent.PartnerID != c.ID || sent.ClanID != cl.ID() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		l.clanService().Invites().Answered(c.ID)
 		return
