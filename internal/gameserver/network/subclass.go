@@ -50,10 +50,13 @@ type classChange struct {
 	kind  classChangeKind
 	index int
 	// sub is the subclass an add or a replace puts in slot index.
-	sub    player.SubClass
-	folk   *npc.Folk
-	done   chan classChangeRows
-	queued bool
+	sub player.SubClass
+	// replaced is the subclass a replace takes out of slot index, put back
+	// when the replace's write fails.
+	replaced player.SubClass
+	folk     *npc.Folk
+	done     chan classChangeRows
+	queued   bool
 }
 
 // classChangeRows is what the persistence lane hands back: whether an add
@@ -274,6 +277,7 @@ func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) boo
 			return true
 		}
 	case classChangeReplace:
+		ch.replaced, _ = live.Subclass(ch.index)
 		live.RemoveSubclass(ch.index)
 		live.AddSubclass(ch.sub)
 		if ch.index == live.ClassIndex() {
@@ -326,9 +330,8 @@ func (l *GameClientLink) writeClassChange(charID int32, ch *classChange, tmpl *p
 	if ch.kind != classChangeSwitch && l.subclasses != nil {
 		var err error
 		if ch.kind == classChangeReplace {
-			err = l.subclasses.Delete(ctx, charID, ch.index)
-		}
-		if err == nil {
+			err = l.subclasses.Replace(ctx, charID, ch.sub)
+		} else {
 			err = l.subclasses.Insert(ctx, charID, ch.sub)
 		}
 		if err != nil {
@@ -344,7 +347,8 @@ func (l *GameClientLink) writeClassChange(charID int32, ch *classChange, tmpl *p
 		if ch.kind == classChangeAdd {
 			return rows
 		}
-		// The slot is gone: its subclass row must not be written back.
+		// The failed replace left the slot's stored subclass whole (#5074):
+		// the replacing one must not be written over its row.
 		kept := charState.Subclasses[:0]
 		for _, sub := range charState.Subclasses {
 			if sub.Index != ch.index {
@@ -423,7 +427,7 @@ func (l *GameClientLink) finishPendingClassChange(live *livePlayer) {
 // added or replaced is announced and the master's confirmation shown, a
 // switch is announced alone. An add whose subclass could not be written
 // takes it back and changes nothing; a replace that could not be written
-// falls back to the base class. A change whose persistence never ran, or
+// puts the replaced subclass back and falls back to the base class. A change whose persistence never ran, or
 // aborted, takes back the slot it filled and releases the lock alone.
 func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, rows classChangeRows) {
 	defer live.SendFrame(serverpackets.FrameActionFailed())
@@ -440,6 +444,12 @@ func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, 
 		if ch.kind == classChangeAdd {
 			live.UnlockClassChange()
 			return
+		}
+		// The replaced subclass is still stored whole (#5074): the slot
+		// holds it again, at the progression it was taken out with.
+		live.AddSubclass(ch.replaced)
+		if ch.index == live.ClassIndex() {
+			live.ReplaceActiveProgression(ch.replaced)
 		}
 		index = 0
 	}

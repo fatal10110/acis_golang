@@ -1046,8 +1046,8 @@ func WithClassMaster(cfg classmaster.Config) Option {
 // function may also panic, as a store or driver bug would.
 type SubclassFault func(op string, index int) error
 
-// WithSubclassFault runs fault before every character_subclasses Insert and
-// Delete a class change issues.
+// WithSubclassFault runs fault before every character_subclasses write a
+// class change issues: an add's insert, a replace's delete then insert.
 func WithSubclassFault(fault SubclassFault) Option {
 	return func(o *options) { o.subclassFault = fault }
 }
