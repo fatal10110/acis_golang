@@ -22,8 +22,8 @@ func execAll(t *testing.T, db *sql.DB, stmts ...string) {
 // TestHeroStoreHeroes pins the heroes round trip: a save inserts new heroes
 // and updates a stored one's count and flags, keeping its class and
 // message; a load joins the character's current name and clan and skips
-// heroes whose character no longer exists; resetting the era clears every
-// played flag and nothing else.
+// heroes whose character no longer exists; storing an election without a
+// hero clears every played flag and nothing else.
 func TestHeroStoreHeroes(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
@@ -54,11 +54,11 @@ func TestHeroStoreHeroes(t *testing.T) {
 		t.Fatalf("message = %q, %v; want kept", message, err)
 	}
 
-	if err := store.ResetPlayed(ctx); err != nil {
+	if err := store.StoreElection(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := store.LoadHeroes(ctx); slices.ContainsFunc(got, func(r hero.Row) bool { return r.Played }) || !got[1].Active {
-		t.Fatalf("LoadHeroes() after ResetPlayed = %+v, want no played hero, flags otherwise kept", got)
+		t.Fatalf("LoadHeroes() after an election without heroes = %+v, want no played hero, flags otherwise kept", got)
 	}
 
 	if id, found, err := store.ClanID(ctx, 101); err != nil || !found || id != 600 {
@@ -103,8 +103,9 @@ func TestHeroStoreBestNoble(t *testing.T) {
 	}
 }
 
-// TestHeroStoreItemsAndDiary pins the hero item purge, which spares a game
-// master's, and the diary insert.
+// TestHeroStoreItemsAndDiary pins an election's hero item purge, which
+// spares a game master's, along with the reset of the era and the save of
+// the elected, and the diary insert.
 func TestHeroStoreItemsAndDiary(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
@@ -114,9 +115,20 @@ func TestHeroStoreItemsAndDiary(t *testing.T) {
 		`INSERT INTO items (owner_id, object_id, item_id, count, loc, loc_data) VALUES
 			(301, 1, 6611, 1, 'PAPERDOLL', 7), (301, 2, 6842, 1, 'WAREHOUSE', 0), (301, 3, 57, 10, 'INVENTORY', 0),
 			(302, 4, 6620, 1, 'INVENTORY', 0), (303, 5, 6612, 1, 'INVENTORY', 0)`,
+		`INSERT INTO heroes (char_id, class_id, count, played, active) VALUES (302, 90, 1, 1, 1)`,
 	)
-	if err := store.DeleteHeroItems(ctx); err != nil {
+	if err := store.StoreElection(ctx, map[int32]hero.Hero{301: {ClassID: 88, Count: 1, Played: true}}); err != nil {
 		t.Fatal(err)
+	}
+	heroes, err := store.LoadHeroes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []hero.Row{
+		{ObjectID: 301, Name: "Player", ClassID: 88, Count: 1, Played: true},
+		{ObjectID: 302, Name: "Master", ClassID: 90, Count: 1, Active: true},
+	}; !slices.Equal(heroes, want) {
+		t.Fatalf("LoadHeroes() after the election = %+v, want %+v", heroes, want)
 	}
 	var left []int32
 	rows, err := db.QueryContext(ctx, "SELECT object_id FROM items ORDER BY object_id")

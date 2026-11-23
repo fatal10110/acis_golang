@@ -65,14 +65,6 @@ func (s *HeroStore) ClanID(ctx context.Context, objectID int32) (int32, bool, er
 	return clanID, true, nil
 }
 
-// ResetPlayed marks every stored hero as no longer of the running era.
-func (s *HeroStore) ResetPlayed(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx, "UPDATE heroes SET played = 0"); err != nil {
-		return fmt.Errorf("reset heroes: %w", err)
-	}
-	return nil
-}
-
 // BestNoble returns the noble of classID ranked first by points, then
 // matches, then wins, among the nobles whose character exists, with at
 // least minMatches matches and a win. Nobles tied on all three go by
@@ -99,13 +91,31 @@ func (s *HeroStore) BestNoble(ctx context.Context, classID, minMatches int) (int
 	return id, name, true, nil
 }
 
-// DeleteHeroItems deletes every hero item whose owner is not a character
-// with an access level above 0.
-func (s *HeroStore) DeleteHeroItems(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx,
-		"DELETE FROM items WHERE item_id IN ("+heroItemIDs+") AND owner_id NOT IN (SELECT obj_Id FROM characters WHERE accesslevel > 0)",
-	); err != nil {
-		return fmt.Errorf("delete hero items: %w", err)
+// StoreElection stores an election in one transaction: every stored hero
+// leaves the running era, then, unless heroes is empty, every hero item
+// whose owner is not a character with an access level above 0 is deleted
+// and heroes are saved as SaveHeroes does. A failure stores none of it.
+func (s *HeroStore) StoreElection(ctx context.Context, heroes map[int32]hero.Hero) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store election: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, "UPDATE heroes SET played = 0"); err != nil {
+		return fmt.Errorf("reset heroes: %w", err)
+	}
+	if len(heroes) > 0 {
+		if _, err := tx.ExecContext(ctx,
+			"DELETE FROM items WHERE item_id IN ("+heroItemIDs+") AND owner_id NOT IN (SELECT obj_Id FROM characters WHERE accesslevel > 0)",
+		); err != nil {
+			return fmt.Errorf("delete hero items: %w", err)
+		}
+		if err := upsertHeroes(ctx, tx, heroes); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store election: %w", err)
 	}
 	return nil
 }
@@ -118,6 +128,17 @@ func (s *HeroStore) SaveHeroes(ctx context.Context, heroes map[int32]hero.Hero) 
 		return fmt.Errorf("save heroes: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := upsertHeroes(ctx, tx, heroes); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save heroes: %w", err)
+	}
+	return nil
+}
+
+// upsertHeroes inserts each hero in tx, or updates its count and flags.
+func upsertHeroes(ctx context.Context, tx *sql.Tx, heroes map[int32]hero.Hero) error {
 	stmt, err := tx.PrepareContext(ctx,
 		"INSERT INTO heroes (char_id, class_id, count, played, active) VALUES (?,?,?,?,?) "+
 			"ON DUPLICATE KEY UPDATE count=VALUES(count),played=VALUES(played),active=VALUES(active)")
@@ -129,9 +150,6 @@ func (s *HeroStore) SaveHeroes(ctx context.Context, heroes map[int32]hero.Hero) 
 		if _, err := stmt.ExecContext(ctx, id, h.ClassID, h.Count, boolInt(h.Played), boolInt(h.Active)); err != nil {
 			return fmt.Errorf("save hero %d: %w", id, err)
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("save heroes: %w", err)
 	}
 	return nil
 }
