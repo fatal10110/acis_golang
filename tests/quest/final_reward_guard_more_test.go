@@ -1,6 +1,8 @@
 package quest
 
 import (
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,8 +15,8 @@ import (
 )
 
 // rewardSite is a final-reward event of a quest, sent through the NPC npc
-// by a player whose quest is in progress with the extra journal vars
-// (var=value) and who holds hold.
+// by a player whose quest is in progress (or in the <state> var sets)
+// with the extra journal vars (var=value) and who holds hold.
 type rewardSite struct {
 	path  string
 	npc   int
@@ -69,10 +71,13 @@ func rewardWorld(t *testing.T, site rewardSite) *dialogWorld {
 		opts = append(opts, gameservertest.WithZones(zones))
 	}
 	w := bootSeamQuest(t, 76, pages, func(srv *gameservertest.Server, objID int32) {
-		rows := []journalRow{{objID, quest, "<state>", val("STARTED")}}
+		var rows []journalRow
 		for _, v := range site.vars {
 			k, x, _ := strings.Cut(v, "=")
 			rows = append(rows, journalRow{objID, quest, k, val(x)})
+		}
+		if !slices.ContainsFunc(site.vars, func(v string) bool { return strings.HasPrefix(v, "<state>=") }) {
+			rows = append(rows, journalRow{objID, quest, "<state>", val("STARTED")})
 		}
 		insertJournal(t, srv.DB, rows...)
 		for id, n := range site.hold {
@@ -178,9 +183,10 @@ func TestFinalRewardsPayOnce(t *testing.T) {
 	}
 }
 
-// TestFinalRewardsRefuseOffState: a final reward sent on a cond its page is
-// not offered at, or without the item it takes, answers nothing and pays
-// nothing (#5183).
+// TestFinalRewardsRefuseOffState: a paying event sent on a cond or state
+// its page is not offered at, for an id its page does not list, or without
+// the item it takes (or with the item it hands out), answers nothing,
+// pays nothing and writes nothing (#5183).
 func TestFinalRewardsRefuseOffState(t *testing.T) {
 	t.Parallel()
 	sites := []rewardSite{
@@ -204,13 +210,30 @@ func TestFinalRewardsRefuseOffState(t *testing.T) {
 			pages: map[string][]string{"31002-AGradeList.htm": {"selectAGrade_80"}, "31002-12.htm": nil}, event: "selectAGrade_80", pays: 80,
 		},
 		{path: "quest.Q234_FatesWhisper", npc: 31002, vars: []string{"<cond>=9"}, pages: map[string][]string{"31002-13.htm": nil}, event: "selectBGrade_79"},
+		{path: "quest.Q234_FatesWhisper", npc: 31002, vars: []string{"<cond>=10"}, pages: map[string][]string{"31002-13.htm": nil}, event: "selectBGrade_57"},
+		{path: "quest.Q234_FatesWhisper", npc: 31002, vars: []string{"<cond>=10", "weaponId=57"}, pages: map[string][]string{"31002-14.htm": nil}, event: "confirmWeapon"},
+		{path: "quest.Q234_FatesWhisper", npc: 31002, vars: []string{"<cond>=9", "weaponId=79"}, pages: map[string][]string{"31002-14.htm": nil}, event: "confirmWeapon"},
+		{path: "quest.Q617_GatherTheFlames", npc: 31539, vars: []string{"<state>=COMPLETED", "<cond>=1"}, hold: map[int32]int32{7264: 1000}, event: "31539-05.htm"},
+		{path: "quest.Q617_GatherTheFlames", npc: 32049, vars: []string{"<state>=COMPLETED", "<cond>=1"}, hold: map[int32]int32{7264: 1200}, event: "6881", pays: 6881},
+		{path: "quest.Q233_TestOfTheWarSpirit", npc: 30630, vars: []string{"<cond>=2"}, event: "30630-04.htm", pays: 2883},
+		{path: "quest.Q233_TestOfTheWarSpirit", npc: 30507, vars: []string{"<cond>=1"}, hold: map[int32]int32{2902: 1}, event: "30507-02.htm"},
+		{path: "quest.Q233_TestOfTheWarSpirit", npc: 30030, vars: []string{"<cond>=2"}, event: "30030-04.htm", pays: 2903},
+		{path: "quest.Q233_TestOfTheWarSpirit", npc: 30682, vars: []string{"<cond>=1"}, hold: map[int32]int32{2888: 1}, event: "30682-02.htm"},
+		{path: "quest.Q233_TestOfTheWarSpirit", npc: 30515, vars: []string{"<cond>=2"}, event: "30515-02.htm", pays: 2895},
 	}
 	for _, site := range sites {
 		t.Run(strings.TrimPrefix(site.path, "quest.")+"/"+strings.Join(site.vars, ",")+"/"+site.event, func(t *testing.T) {
 			t.Parallel()
 			w := rewardWorld(t, site)
+			// A journal write rides the persistence lane: read past it.
+			w.srv.FlushPersistence(t)
+			journal := readJournal(t, w.srv.DB)
 			if got := w.sendOffered(t, site); len(got) != 0 {
 				t.Fatalf("the reward = %q, want nothing", got)
+			}
+			w.srv.FlushPersistence(t)
+			if got := readJournal(t, w.srv.DB); !reflect.DeepEqual(got, journal) {
+				t.Fatalf("journal after the refused reward = %v, want %v", got, journal)
 			}
 			if site.pays != 0 {
 				if n := w.srv.PlayerItemCount(t, w.player, site.pays); n != 0 {
