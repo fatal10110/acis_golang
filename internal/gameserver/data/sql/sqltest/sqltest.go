@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -519,7 +520,7 @@ const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
 // store-level tests that want a database no other test has touched.
 func NewDB(t *testing.T) *sql.DB {
 	t.Helper()
-	return dbtest.NewDB(t, append(append([]string(nil), schemaStmts...), seedStmts...)...)
+	return dbtest.NewDB(t, append(append(append([]string(nil), schemaStmts...), serverSchemaStmts...), seedStmts...)...)
 }
 
 // SharedDB returns tb's database from a per-test-binary pool of databases
@@ -530,7 +531,11 @@ func SharedDB(tb testing.TB) *sql.DB {
 	return pool.DB(tb)
 }
 
-var pool = dbtest.NewPool(dbtest.PoolConfig{Schema: schemaStmts, Seed: seedStmts})
+var pool = dbtest.NewPool(dbtest.PoolConfig{Schema: append(append([]string(nil), schemaStmts...), serverSchemaStmts...), Seed: seedStmts})
+
+// serverSchemaStmts are the tables the server creates itself at boot,
+// which the shipped schema, and so schemaStmts, does not carry.
+var serverSchemaStmts = []string{idfactory.RetiredIDsSchema}
 
 var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
