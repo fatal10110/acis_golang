@@ -205,6 +205,7 @@ func onTalk(s *script.Script, e script.Talk) string {
 	case questlog.StatusStarted:
 		switch e.NPC.NpcID() {
 		case alchemistMatild:
+			dropStaleWish(s, st, e.NPC, p)
 			switch {
 			case p.HasItem(alchemyText):
 				if p.HasItem(secretBook) {
@@ -515,7 +516,7 @@ func exchangeWishPotion(s *script.Script, st *script.QuestState, e script.Event,
 	if !e.Player.HasItem(wishPotion) {
 		return "30738-14.htm"
 	}
-	if st.GetInt("exchange") != 0 {
+	if st.GetInt("exchange") != 0 && wishPending(s, e.NPC, e.Player) {
 		return "30738-20.htm"
 	}
 	s.TakeItems(e.Player, wishPotion, 1)
@@ -523,6 +524,26 @@ func exchangeWishPotion(s *script.Script, st *script.QuestState, e script.Event,
 	setInt(st, "exchange", wish)
 	s.StartTimer("timer_1", e.NPC, e.Player, 3000*time.Millisecond)
 	return e.Name
+}
+
+// wishPending reports whether the lines Matild n says over p's wish are
+// still to come. The timers run on p's queue, as the talks and events do,
+// and each starts the next in its own hook until the last clears the
+// exchange latch: while p stays in the world, a set latch always has one
+// of them pending.
+func wishPending(s *script.Script, n *script.NPC, p *script.Player) bool {
+	return s.HasTimer("timer_1", n, p) || s.HasTimer("timer_2", n, p) || s.HasTimer("timer_3", n, p)
+}
+
+// dropStaleWish clears the exchange latch, and the wish it stood for, once
+// no line is left to resolve it: p left the world mid-wish and the timers
+// stopped with him. The potion stays spent and the wish pays nothing, but p
+// can wish again (#5169).
+func dropStaleWish(s *script.Script, st *script.QuestState, n *script.NPC, p *script.Player) {
+	if st.GetInt("exchange") != 0 && !wishPending(s, n, p) {
+		setInt(st, "exchange", 0)
+		setInt(st, "wish", 0)
+	}
 }
 
 // setInt sets the quest variable key to the number n.

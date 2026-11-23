@@ -182,7 +182,8 @@ type DropInfo struct {
 // at the end when anything was given: the middle sound when every rolled
 // item reached its needed units, else the item-get sound. It reports
 // whether every rolled item holds its needed units now; an item with no
-// needed units never does.
+// needed units never does, and neither does one whose roll did not fit in
+// p's inventory (#5138).
 func (s *Script) DropMultipleItems(p *Player, drops []DropInfo, typ DropType) bool {
 	c := p.character()
 	rate := s.env.Rates.Rates().Drop
@@ -198,6 +199,7 @@ func (s *Script) DropMultipleItems(p *Player, drops []DropInfo, typ DropType) bo
 				amount = d.Needed - current
 			}
 			if !c.RewardItemFits(d.ItemID, int(amount)) {
+				reached = false
 				continue
 			}
 			s.give(c, d.ItemID, amount, 0)
