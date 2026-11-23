@@ -179,6 +179,7 @@ func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
 		t.Fatal("registration failed, want success")
 	}
 
+	gs.sendPlayerInGame("player1")
 	gs.sendChangeAccessLevel(-1, "player1")
 
 	waitUntil(t, "AccessLevel = -1", func() bool {

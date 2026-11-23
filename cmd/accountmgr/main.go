@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/fatal10110/acis_golang/internal/loginserver/network/clientpackets"
 )
 
 func main() {
@@ -113,7 +114,14 @@ func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountSto
 		// The access level goes to the database as typed; a value the
 		// column cannot hold is reported as the database's error.
 		case "1":
-			addOrUpdateAccount(ctx, out, store, login, password, levelText)
+			// Credentials longer than a client can send would make an
+			// account no one can log into (#5048).
+			if len(login) > clientpackets.MaxUsernameBytes || len(password) > clientpackets.MaxPasswordBytes {
+				fmt.Fprintf(out, "The username can be at most %d bytes and the password at most %d bytes; the account was not created or updated.\n",
+					clientpackets.MaxUsernameBytes, clientpackets.MaxPasswordBytes)
+			} else {
+				addOrUpdateAccount(ctx, out, store, login, password, levelText)
+			}
 
 		case "2":
 			changeAccountLevel(ctx, out, store, login, levelText)

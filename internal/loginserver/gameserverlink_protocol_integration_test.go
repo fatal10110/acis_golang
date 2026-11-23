@@ -291,9 +291,13 @@ func (f *fakeGameServer) readKickPlayer() string {
 // is about.
 type fakeRegistrationStore struct {
 	created []model.GameServer
+	err     error // returned by every write, which then stores nothing
 }
 
 func (s *fakeRegistrationStore) CreateGameServer(_ context.Context, server model.GameServer) error {
+	if s.err != nil {
+		return s.err
+	}
 	s.created = append(s.created, server)
 	return nil
 }
@@ -650,7 +654,7 @@ func TestGameServerLinkPlayerAuthRequest(t *testing.T) {
 	}
 
 	// A stored session with matching keys must succeed, once.
-	sessions.Put("acc1", key)
+	sessions.Put("acc1", key, 1)
 	gs.sendPlayerAuthRequest("acc1", key)
 	if account, ok := gs.readPlayerAuthResponse(); account != "acc1" || !ok {
 		t.Fatalf("readPlayerAuthResponse() = %q, %v, want acc1, true", account, ok)

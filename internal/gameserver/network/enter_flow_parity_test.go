@@ -447,7 +447,7 @@ func twoClientServer(t *testing.T) (addr string, chars *gamesql.CharacterStore, 
 	t.Cleanup(func() { loginLink.Close() })
 
 	addr, chars, _, _, state = newTestGameClientLinkWithSkillsShortcutsAndLog(t, func() *LoginLink { return loginLink }, validator, nil, zerolog.Nop())
-	sessions.Put("player1", link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44})
+	sessions.Put("player1", link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}, 1)
 	return addr, chars, state
 }
 

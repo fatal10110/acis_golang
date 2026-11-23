@@ -1342,7 +1342,7 @@ func (s *Server) logIn(t *testing.T, c *testsupport.ScriptedClient, account stri
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
-	s.sessions.Put(account, key)
+	s.sessions.Put(account, key, 1)
 	c.Send(encodeAuthLogin(account, key))
 
 	readCharSelectInfo(t, c, account, wantChars)
@@ -2870,7 +2870,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
-	sessions.Put(o.account, key)
+	sessions.Put(o.account, key, 1)
 	w := wire.NewPacketWriter(clientpackets.OpcodeAuthLogin)
 	w.WriteString(o.account)
 	w.WriteInt32(key.PlayKey2)

@@ -224,7 +224,7 @@ func TestDialLoginLinkPlayerAuthRequestRoundTrip(t *testing.T) {
 	defer l.Close()
 
 	key := link.SessionKey{PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
-	sessions.Put("acc1", key)
+	sessions.Put("acc1", key, 1)
 
 	if err := l.SendPlayerAuthRequest(link.PlayerAuthRequest{
 		Account:    "acc1",

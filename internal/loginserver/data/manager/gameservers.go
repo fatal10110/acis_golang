@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"bytes"
 	"cmp"
 	"net"
 	"slices"
@@ -104,6 +105,17 @@ func (r *ServerRegistry) RegisterFirst(candidateIDs []int, hexID []byte) (Server
 		}
 	}
 	return ServerEntry{}, false
+}
+
+// Unregister removes the offline entry at id if it still carries hexID, so
+// a registration that could not be stored leaves no entry behind. An entry
+// another connection has authed in the meantime is kept.
+func (r *ServerRegistry) Unregister(id int, hexID []byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if e, ok := r.servers[id]; ok && !e.Authed && bytes.Equal(e.HexID, hexID) {
+		delete(r.servers, id)
+	}
 }
 
 // MarkOnline marks the entry at id authed with the given connection

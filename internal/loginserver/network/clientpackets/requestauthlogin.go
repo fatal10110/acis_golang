@@ -20,6 +20,13 @@ const (
 	passwordSize        = 16
 )
 
+// MaxUsernameBytes and MaxPasswordBytes are the longest login name and
+// password, in bytes, a client can send in RequestAuthLogin.
+const (
+	MaxUsernameBytes = usernameSize
+	MaxPasswordBytes = passwordSize
+)
+
 var (
 	// ErrCredentialBlockShort reports a RequestAuthLogin body too short to
 	// hold the credential block.

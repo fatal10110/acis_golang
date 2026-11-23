@@ -354,7 +354,7 @@ func TestSessionStorePutGetDelete(t *testing.T) {
 	}
 
 	key := link.SessionKey{PlayKey1: 1, PlayKey2: 2, LoginKey1: 3, LoginKey2: 4}
-	s.Put("acc1", key)
+	s.Put("acc1", key, NoServer)
 
 	got, ok := s.Get("acc1")
 	if !ok || got != key {
