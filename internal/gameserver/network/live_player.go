@@ -126,6 +126,9 @@ type livePlayer struct {
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.
 	access atomic.Pointer[admin.AccessLevel]
+	// gmOff is the restore a //gmoff window awaits; owned by p's queue. See
+	// adminGMOff.
+	gmOff *gmOffRestore
 	// remoteIP is the address the client connected from, set at attach
 	// and read-only after.
 	remoteIP string

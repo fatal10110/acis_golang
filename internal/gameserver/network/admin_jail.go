@@ -25,7 +25,8 @@ func forMinutes(minutes int32) string {
 // adminBanChat answers //ban chat: an online target, unless already
 // punished, has its chat banned for minutes, without end when not
 // positive; the offline character named name has its stored punishment
-// replaced by a chat ban.
+// replaced by a chat ban. The online check and ban are one step on the
+// target's queue, and gm is told what that step did (#5129).
 func (l *GameClientLink) adminBanChat(gm, target *livePlayer, name string, minutes int32) {
 	if target == nil {
 		if name == "" {
@@ -39,28 +40,56 @@ func (l *GameClientLink) adminBanChat(gm, target *livePlayer, name string, minut
 		l.reportOfflinePunishment(gm, name, player.PunishChat, timer, nil, name+" is chat banned"+forMinutes(minutes))
 		return
 	}
-	if kind, _ := target.Punishment(); kind != player.PunishNone {
+	banned := func() { sendText(gm, target.CharacterName()+" is chat banned"+forMinutes(minutes)) }
+	refused := func() {
+		kind, _ := target.Punishment()
 		sendText(gm, target.CharacterName()+" is already "+kind.Description()+", and can't receive another punishment.")
-		return
 	}
-	l.punishTarget(gm, target, player.PunishChat, minutes)
-	sendText(gm, target.CharacterName()+" is chat banned"+forMinutes(minutes))
+	onPlayerOr(gm, target, func() {
+		if l.punishIf(target, player.PunishNone, player.PunishChat, minutes) == player.PunishmentKept {
+			refused()
+			return
+		}
+		banned()
+	}, func() {
+		// Leaving: its punishment no longer changes, and the ban is
+		// stored after its logout saves for the next login to resume.
+		if kind, _ := target.Punishment(); kind != player.PunishNone {
+			refused()
+			return
+		}
+		l.storePunishmentOf(target.ObjectID(), player.PunishChat, player.PunishmentMillis(minutes))
+		banned()
+	})
 }
 
 // adminUnbanChat answers //unban chat: an online target's chat ban is
 // lifted; the offline character named name has its stored punishment, of
-// whatever kind, cleared.
+// whatever kind, cleared. The online check and lift are one step on the
+// target's queue, so a jail term that landed meanwhile stays (#5129).
 func (l *GameClientLink) adminUnbanChat(gm, target *livePlayer, name string) {
 	if target == nil {
 		l.reportOfflinePunishment(gm, name, player.PunishNone, 0, nil, name+"'s chat ban has been lifted.")
 		return
 	}
-	if !target.ChatBanned() {
-		sendText(gm, target.CharacterName()+" isn't currently chat banned.")
-		return
-	}
-	l.punishTarget(gm, target, player.PunishNone, 0)
-	sendText(gm, target.CharacterName()+"'s chat ban has been lifted.")
+	lifted := func() { sendText(gm, target.CharacterName()+"'s chat ban has been lifted.") }
+	kept := func() { sendText(gm, target.CharacterName()+" isn't currently chat banned.") }
+	onPlayerOr(gm, target, func() {
+		if l.punishIf(target, player.PunishChat, player.PunishNone, 0) == player.PunishmentKept {
+			kept()
+			return
+		}
+		lifted()
+	}, func() {
+		// Leaving: its punishment no longer changes, and the lift is
+		// stored after its logout saves.
+		if !target.ChatBanned() {
+			kept()
+			return
+		}
+		l.storePunishmentOf(target.ObjectID(), player.PunishNone, 0)
+		lifted()
+	})
 }
 
 // adminJail answers //jail [name [minutes]]: the named player, else the

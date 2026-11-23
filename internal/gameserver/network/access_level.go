@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -62,7 +63,11 @@ func (l *GameClientLink) applyLoadedAccessLevel(c *player.Character) {
 // reads as. The damage permission, title, colors and game-master roster
 // follow, and live and its observers are shown the change. The level and
 // title reach the character row with live's next save.
+//
+// Any change ends a //gmoff window still open, so its restore never undoes
+// a later change (#5123).
 func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
+	live.dropGMOff()
 	access := l.resolveAccessLevel(live.Character, level)
 	live.access.Store(&access)
 	live.SetCanGiveDamage(access.GiveDamage)
@@ -112,9 +117,22 @@ func (l *GameClientLink) storeAccessLevel(objectID int32, level int, title strin
 	}
 }
 
+// Range of the stored access level column (MEDIUMINT).
+const (
+	minStoredAccessLevel = -1 << 23
+	maxStoredAccessLevel = 1<<23 - 1
+)
+
+// storableAccessLevel reports whether level fits the stored access level
+// column.
+func storableAccessLevel(level int) bool {
+	return level >= minStoredAccessLevel && level <= maxStoredAccessLevel
+}
+
 // storeOfflineAccessLevel writes level as the access level of objectID, a
 // character out of the world, on its persistence lane; its title stays.
-func (l *GameClientLink) storeOfflineAccessLevel(objectID int32, level int) {
+// failed, when given, runs on the lane when the write fails (#5129).
+func (l *GameClientLink) storeOfflineAccessLevel(objectID int32, level int, failed func()) {
 	if l.accessLevels == nil {
 		return
 	}
@@ -124,25 +142,38 @@ func (l *GameClientLink) storeOfflineAccessLevel(objectID int32, level int) {
 		defer cancel()
 		if err := store.SetAccessLevelKeepingTitle(ctx, objectID, level); err != nil {
 			log.Error().Err(err).Int32("object_id", objectID).Msg("store access level")
+			if failed != nil {
+				failed()
+			}
 		}
 	}) {
 		log.Error().Int32("object_id", objectID).Msg("store access level: persistence closed")
+		if failed != nil {
+			failed()
+		}
 	}
 }
 
-// sendAccountAccessLevel asks the login server to give account level; a
-// request the link cannot send is dropped.
-func (l *GameClientLink) sendAccountAccessLevel(account string, level int32) {
-	if l.loginLink == nil {
-		return
+// errNoLoginLink is the failure of a request to the login server while no
+// link to it is up.
+var errNoLoginLink = errors.New("no login server link")
+
+// sendAccountAccessLevel asks the login server to give account level. A
+// request the link cannot send is logged and its error returned, so the
+// command that asked can say so (#5127).
+func (l *GameClientLink) sendAccountAccessLevel(account string, level int32) error {
+	var link *LoginLink
+	if l.loginLink != nil {
+		link = l.loginLink()
 	}
-	link := l.loginLink()
-	if link == nil {
-		return
+	err := errNoLoginLink
+	if link != nil {
+		err = link.SendAccessLevelChange(account, level)
 	}
-	if err := link.SendAccessLevelChange(account, level); err != nil {
-		l.log.Debug().Err(err).Str("account", account).Msg("send account access level")
+	if err != nil {
+		l.log.Error().Err(err).Str("account", account).Int32("level", level).Msg("send account access level")
 	}
+	return err
 }
 
 // trimTitle cuts title to the longest title kept.

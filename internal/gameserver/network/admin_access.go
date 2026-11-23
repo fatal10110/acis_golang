@@ -6,7 +6,9 @@ import (
 	"time"
 
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // Account access levels the ban commands send the login server.
@@ -59,10 +61,18 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 			})
 			return
 		}
+		// An offline level must fit the stored column, and a write that
+		// fails is answered (#5129).
+		if !storableAccessLevel(int(level)) {
+			sendText(gm, "Access level "+strconv.Itoa(int(level))+" is out of range; "+name+"'s access level is unaltered.")
+			return
+		}
 		found, ok := l.adminByName(name, func(target *livePlayer) {
 			l.moveToAccessLevel(gm, target, int(level), nil)
 		}, func(objectID int32) {
-			l.storeOfflineAccessLevel(objectID, int(level))
+			l.storeOfflineAccessLevel(objectID, int(level), func() {
+				sendText(gm, name+"'s access level could not be stored; it is unaltered.")
+			})
 		})
 		switch {
 		case !ok:
@@ -120,9 +130,46 @@ func (l *GameClientLink) moveToAccessLevel(gm, live *livePlayer, level int, repo
 	}
 }
 
+// gmOffRestore is the access level a //gmoff window gives back when it
+// ends, and the timer that ends it.
+type gmOffRestore struct {
+	level int
+	timer *sim.Timer
+}
+
+// dropGMOff ends p's //gmoff window, if one is open, without its restore.
+// It runs on p's queue.
+func (p *livePlayer) dropGMOff() {
+	if p.gmOff == nil {
+		return
+	}
+	if p.gmOff.timer != nil {
+		p.gmOff.timer.Stop()
+	}
+	p.gmOff = nil
+}
+
+// gmOffLeaveState gives st, the logout save of live leaving inside a //gmoff
+// window, the access level and title the window's restore would have given
+// back, so the character never stays at the user level (#5123). It runs on
+// live's queue.
+func (l *GameClientLink) gmOffLeaveState(live *livePlayer, st *player.SaveState) {
+	restore := live.gmOff
+	if restore == nil {
+		return
+	}
+	live.dropGMOff()
+	access := l.resolveAccessLevel(live.Character, restore.level)
+	st.AccessLevel = access.Level
+	if restore.level > 0 {
+		st.Title = trimTitle(access.Name)
+	}
+}
+
 // adminGMOff answers //gmoff [minutes]: gm drops to the user level and gets
-// its level back once the minutes, one by default, have passed, unless it
-// has left the game by then.
+// its level back once the minutes, one by default, have passed. Any other
+// access-level change in the window wins over the restore, and a gm leaving
+// in the window is stored at the level it gets back (#5123).
 func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 	minutes := int32(1)
 	if args := handleradmin.Args(line); len(args) > 0 {
@@ -139,11 +186,21 @@ func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 	if int64(minutes) < int64(delay/time.Minute) {
 		delay = time.Duration(minutes) * time.Minute
 	}
-	// gm's queue closes when it leaves the game, which drops the timer.
-	gm.after(delay, func() {
+	// gm's queue closes when it leaves the game, which drops the timer; its
+	// logout save stores the level instead (gmOffLeaveState).
+	restore := &gmOffRestore{level: previous}
+	gm.gmOff = restore
+	timer := gm.after(delay, func() {
+		if gm.gmOff != restore {
+			return
+		}
+		gm.gmOff = nil
 		l.setAccessLevel(gm, previous)
 		sendText(gm, "Your previous access level has been rehabilitated.")
 	})
+	if gm.gmOff == restore {
+		restore.timer = timer
+	}
 }
 
 // adminBan answers //ban account|chat|player [name [minutes]]. Without a
@@ -190,13 +247,20 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 				sendText(gm, "Usage: //ban account [name].")
 				return
 			}
-			l.sendAccountAccessLevel(name, accountBannedLevel)
+			if l.sendAccountAccessLevel(name, accountBannedLevel) != nil {
+				sendText(gm, "Ban request for account "+name+" could not be sent.")
+				return
+			}
 			sendText(gm, "Ban request sent for account "+name+".")
 			return
 		}
 		// The ban goes out from gm's goroutine: target's queue is closed once
-		// it starts leaving the world, and the ban must not depend on it.
-		l.sendAccountAccessLevel(target.AccountName(), accountBannedLevel)
+		// it starts leaving the world, and the ban must not depend on it. A
+		// ban not sent neither kicks nor reports a ban (#5127).
+		if l.sendAccountAccessLevel(target.AccountName(), accountBannedLevel) != nil {
+			sendText(gm, "Ban request for account "+target.AccountName()+" could not be sent.")
+			return
+		}
 		onPlayer(gm, target, target.kickClient)
 		sendText(gm, target.AccountName()+" account is banned.")
 	case "chat":
@@ -237,7 +301,10 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 			sendText(gm, target.CharacterName()+" account isn't actually banned.")
 			return
 		}
-		l.sendAccountAccessLevel(name, accountUnbannedLevel)
+		if l.sendAccountAccessLevel(name, accountUnbannedLevel) != nil {
+			sendText(gm, "Unban request for account "+orNull(name)+" could not be sent.")
+			return
+		}
 		sendText(gm, "Unban request sent for account "+orNull(name)+".")
 	case "chat":
 		l.adminUnbanChat(gm, target, name)
@@ -280,7 +347,7 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 			l.moveToAccessLevel(gm, target, level, nil)
 		}
 	}, func(objectID int32) {
-		l.storeOfflineAccessLevel(objectID, level)
+		l.storeOfflineAccessLevel(objectID, level, nil)
 	})
 	switch {
 	case !ok:
