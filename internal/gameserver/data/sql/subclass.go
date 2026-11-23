@@ -44,22 +44,38 @@ func (s *SubclassStore) List(ctx context.Context, charID int32) ([]player.SubCla
 
 // Insert writes sub as a new subclass row of charID.
 func (s *SubclassStore) Insert(ctx context.Context, charID int32, sub player.SubClass) error {
-	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO character_subclasses (char_obj_id, class_id, exp, sp, level, class_index) VALUES (?, ?, ?, ?, ?, ?)`,
-		charID, sub.ClassID, sub.Exp, sub.SP, sub.Level, sub.Index); err != nil {
-		return fmt.Errorf("insert subclass %d for character %d: %w", sub.Index, charID, err)
+	return insertSubclass(ctx, s.db, charID, sub)
+}
+
+// Replace puts sub in its slot of charID in place of the subclass there:
+// the slot's hennas, shortcuts, saved effects, learned skills and subclass
+// row are deleted and sub's row written, in one transaction. A failure at
+// any step leaves the old subclass whole (#5074).
+func (s *SubclassStore) Replace(ctx context.Context, charID int32, sub player.SubClass) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("replace subclass %d for character %d: begin: %w", sub.Index, charID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, table := range []string{"character_hennas", "character_shortcuts", "character_skills_save", "character_skills", "character_subclasses"} {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE char_obj_id = ? AND class_index = ?", charID, sub.Index); err != nil {
+			return fmt.Errorf("delete %s of subclass %d for character %d: %w", table, sub.Index, charID, err)
+		}
+	}
+	if err := insertSubclass(ctx, tx, charID, sub); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("replace subclass %d for character %d: commit: %w", sub.Index, charID, err)
 	}
 	return nil
 }
 
-// Delete removes everything charID keeps for class index: its hennas,
-// shortcuts, saved effects, learned skills and the subclass row itself,
-// in that order. A failure stops at the table it failed on.
-func (s *SubclassStore) Delete(ctx context.Context, charID int32, index int) error {
-	for _, table := range []string{"character_hennas", "character_shortcuts", "character_skills_save", "character_skills", "character_subclasses"} {
-		if _, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE char_obj_id = ? AND class_index = ?", charID, index); err != nil {
-			return fmt.Errorf("delete %s of subclass %d for character %d: %w", table, index, charID, err)
-		}
+func insertSubclass(ctx context.Context, db execer, charID int32, sub player.SubClass) error {
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO character_subclasses (char_obj_id, class_id, exp, sp, level, class_index) VALUES (?, ?, ?, ?, ?, ?)`,
+		charID, sub.ClassID, sub.Exp, sub.SP, sub.Level, sub.Index); err != nil {
+		return fmt.Errorf("insert subclass %d for character %d: %w", sub.Index, charID, err)
 	}
 	return nil
 }

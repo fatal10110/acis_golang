@@ -146,9 +146,14 @@ func (s faultySubclassStore) Insert(ctx context.Context, charID int32, sub playe
 	return s.SubclassStore.Insert(ctx, charID, sub)
 }
 
-func (s faultySubclassStore) Delete(ctx context.Context, charID int32, index int) error {
-	if err := s.fault("delete", index); err != nil {
+// Replace runs the "delete" fault, then the "insert" one, as the slot's
+// rows are cleared before the new row is written.
+func (s faultySubclassStore) Replace(ctx context.Context, charID int32, sub player.SubClass) error {
+	if err := s.fault("delete", sub.Index); err != nil {
 		return err
 	}
-	return s.SubclassStore.Delete(ctx, charID, index)
+	if err := s.fault("insert", sub.Index); err != nil {
+		return err
+	}
+	return s.SubclassStore.Replace(ctx, charID, sub)
 }

@@ -769,11 +769,8 @@ func TestSubclassReplaceWriteFailureRevertsToTheBaseClass(t *testing.T) {
 	if skills := skillListIDs(t, frames[firstIndex(frames, serverpackets.OpcodeSkillList)]); slices.Contains(skills, learnedSkill) {
 		t.Fatalf("base class skills = %v, want no subclass skill", skills)
 	}
-	// The slot is gone in memory.
-	w.openMenu(t)
-	if _, html := pageOf(t, w.command(t, "Subclass 2")); strings.Contains(html, "Subclass 5") {
-		t.Fatalf("change menu after the failed replace = %q, want SubClass_ChangeNo", html)
-	}
+	// The slot keeps the subclass the failed replace left stored (#5074).
+	assertChangeMenuOffersSlotOne(t, w)
 
 	// The slot's row, which the failed delete left, is not written over
 	// with the replacing class.
