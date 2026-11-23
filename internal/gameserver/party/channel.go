@@ -46,23 +46,35 @@ func (r *Registry[M]) ChannelInvite(requesterID, targetID int32) (ChannelInviteS
 	return ChannelInviteReady, tp.leader
 }
 
-// ChannelAnswerForms reports, for an accepted channel invitation, whether
-// both parties still exist (ok) and whether the answer would form a new
-// channel rather than join the requester's, which the caller must
-// authorize first.
+// ChannelAnswerForms reports, for an answered channel invitation, whether
+// it still stands (ok) and whether an acceptance would form a new channel
+// rather than join the requester's, which the caller must authorize first.
+// It stands while both parties exist, the requester still leads its party
+// and any channel that party is in, and the target still leads its own
+// party (#5106): a former leader's answer must not move a party it no
+// longer leads, nor form a channel under whoever leads now.
 func (r *Registry[M]) ChannelAnswerForms(requesterID, targetID int32) (forms, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rp, tp := r.byMember[requesterID], r.byMember[targetID]
-	if rp == nil || tp == nil {
+	if !leadersStand(rp, tp, requesterID, targetID) {
 		return false, false
 	}
 	return rp.channel == nil, true
 }
 
+// leadersStand reports whether a channel invitation from requesterID's
+// party rp to targetID's party tp still stands: both parties exist and
+// each side still leads as ChannelInvite required. Registry.mu is held.
+func leadersStand[M Member](rp, tp *group[M], requesterID, targetID int32) bool {
+	return rp != nil && tp != nil && rp.leader.ObjectID() == requesterID &&
+		(rp.channel == nil || rp.channel.leader.ObjectID() == requesterID) && tp.leader.ObjectID() == targetID
+}
+
 // JoinChannel puts target's party into requester's party's channel,
-// forming one when there is none. A target party already in a channel, or
-// the requester's own, joins nothing.
+// forming one when there is none. A target party already in a channel, the
+// requester's own, or an invitation ChannelAnswerForms no longer finds
+// standing, joins nothing.
 func (r *Registry[M]) JoinChannel(requester, target M) []Notice {
 	return r.joinChannel(requester, target, true)
 }
@@ -79,7 +91,7 @@ func (r *Registry[M]) joinChannel(requester, target M, mayForm bool) []Notice {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rp, tp := r.byMember[requester.ObjectID()], r.byMember[target.ObjectID()]
-	if rp == nil || tp == nil || rp == tp || tp.channel != nil || (rp.channel == nil && !mayForm) {
+	if !leadersStand(rp, tp, requester.ObjectID(), target.ObjectID()) || rp == tp || tp.channel != nil || (rp.channel == nil && !mayForm) {
 		return nil
 	}
 	var out notices

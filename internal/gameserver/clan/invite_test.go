@@ -15,13 +15,13 @@ func (c *fakeClock) now() time.Time { return c.at }
 func TestInviteLapses(t *testing.T) {
 	clock := &fakeClock{at: time.UnixMilli(1_800_000_000_000)}
 	b := NewInvites(clock.now)
-	if got := b.Send(InviteJoinPledge, 1, "Lead", 2, SubunitMain); got != InviteSent {
+	if got := b.Send(InviteJoinPledge, 1, "Lead", 2, 0, SubunitMain); got != InviteSent {
 		t.Fatalf("send = %v, want InviteSent", got)
 	}
-	if got := b.Send(InviteJoinPledge, 3, "Other", 2, SubunitMain); got != InviteTargetBusy {
+	if got := b.Send(InviteJoinPledge, 3, "Other", 2, 0, SubunitMain); got != InviteTargetBusy {
 		t.Fatalf("invite to a busy target = %v, want InviteTargetBusy", got)
 	}
-	if got := b.Send(InviteJoinPledge, 1, "Lead", 3, SubunitMain); got != InviteRequesterBusy {
+	if got := b.Send(InviteJoinPledge, 1, "Lead", 3, 0, SubunitMain); got != InviteRequesterBusy {
 		t.Fatalf("second invite from a busy requester = %v, want InviteRequesterBusy", got)
 	}
 
@@ -40,10 +40,10 @@ func TestInviteLapses(t *testing.T) {
 	if e, ok := b.Requested(1); ok {
 		t.Fatalf("requested at the timeout = %+v, want nothing pending", e)
 	}
-	if got := b.Send(InviteJoinPledge, 3, "Other", 2, SubunitMain); got != InviteSent {
+	if got := b.Send(InviteJoinPledge, 3, "Other", 2, 0, SubunitMain); got != InviteSent {
 		t.Fatalf("invite after the lapse = %v, want InviteSent", got)
 	}
-	if got := b.Send(InviteJoinPledge, 1, "Lead", 4, SubunitMain); got != InviteSent {
+	if got := b.Send(InviteJoinPledge, 1, "Lead", 4, 0, SubunitMain); got != InviteSent {
 		t.Fatalf("lapsed requester's new invite = %v, want InviteSent", got)
 	}
 }
@@ -54,7 +54,7 @@ func TestInviteLapses(t *testing.T) {
 func TestInviteLeftFreesRelog(t *testing.T) {
 	clock := &fakeClock{at: time.UnixMilli(1_800_000_000_000)}
 	b := NewInvites(clock.now)
-	b.Send(InviteJoinPledge, 1, "Lead", 2, SubunitMain)
+	b.Send(InviteJoinPledge, 1, "Lead", 2, 0, SubunitMain)
 	b.Left(1)
 
 	if e, ok := b.Partner(2); !ok || e.RequesterID != 1 {
@@ -63,7 +63,7 @@ func TestInviteLeftFreesRelog(t *testing.T) {
 	if e, ok := b.Requested(1); !ok || e.PartnerID != 2 {
 		t.Fatalf("requested by a requester that left = %+v, %v; want its invitation", e, ok)
 	}
-	if got := b.Send(InviteJoinPledge, 3, "Other", 1, SubunitMain); got != InviteSent {
+	if got := b.Send(InviteJoinPledge, 3, "Other", 1, 0, SubunitMain); got != InviteSent {
 		t.Fatalf("invite to the relogged id = %v, want InviteSent", got)
 	}
 
@@ -80,12 +80,12 @@ func TestInviteSendPurgesLapsedEntries(t *testing.T) {
 	clock := &fakeClock{at: time.UnixMilli(1_800_000_000_000)}
 	b := NewInvites(clock.now)
 	for id := int32(10); id < 20; id += 2 {
-		if got := b.Send(InviteJoinPledge, id, "Lead", id+1, SubunitMain); got != InviteSent {
+		if got := b.Send(InviteJoinPledge, id, "Lead", id+1, 0, SubunitMain); got != InviteSent {
 			t.Fatalf("send from %d = %v, want InviteSent", id, got)
 		}
 	}
 	clock.at = clock.at.Add(InviteTimeout)
-	if got := b.Send(InviteJoinPledge, 1, "Lead", 2, SubunitMain); got != InviteSent {
+	if got := b.Send(InviteJoinPledge, 1, "Lead", 2, 0, SubunitMain); got != InviteSent {
 		t.Fatalf("send after the lapse = %v, want InviteSent", got)
 	}
 	b.mu.Lock()

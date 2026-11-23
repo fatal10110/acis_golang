@@ -45,18 +45,23 @@ func (l *GameClientLink) requestStopPledgeWar(live *livePlayer, req clientpacket
 }
 
 // requestSurrenderPledgeWar has live's clan give up its war on the clan
-// it names: live takes a full death's experience loss, then the war ends.
+// it names: the war ends, then live takes a full death's experience loss.
+// Only the surrender that ends the war pays for it (#5106): one that finds
+// the war already ended, by another member's surrender at the same time, is
+// refused as one with no war is.
 func (l *GameClientLink) requestSurrenderPledgeWar(live *livePlayer, req clientpackets.RequestPledgeWarName) {
 	war, result := l.clanService().CheckSurrender(live.Character, req.PledgeName)
 	if result != clan.WarDone {
 		l.sendWarRefusal(live, war, result)
 		return
 	}
+	if !l.clanService().EndWar(war.Clan, war.Target, time.Now()) {
+		l.sendWarRefusal(live, war, clan.WarNotInvolved)
+		return
+	}
 	live.Character.ApplyDeathPenalty()
 	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouHaveSurrenderedToS1Clan, req.PledgeName))
-	if l.clanService().EndWar(war.Clan, war.Target, time.Now()) {
-		l.broadcastWarEnded(war)
-	}
+	l.broadcastWarEnded(war)
 }
 
 // requestReplyPledgeWar answers a war, stop or surrender proposal. No
