@@ -22,7 +22,7 @@ import (
 func serveGameServerLinkFor(t *testing.T, servers *manager.ServerRegistry, sessions *manager.SessionStore) string {
 	t.Helper()
 	namesPath := filepath.Join(t.TempDir(), "serverNames.xml")
-	if err := os.WriteFile(namesPath, []byte(`<?xml version='1.0'?><list><server id="1" name="Bartz" /></list>`), 0o644); err != nil {
+	if err := os.WriteFile(namesPath, []byte(`<?xml version='1.0'?><list><server id="1" name="Bartz" /><server id="2" name="Sieghardt" /></list>`), 0o644); err != nil {
 		t.Fatalf("write serverNames.xml: %v", err)
 	}
 	names, err := manager.LoadServerNames(namesPath)

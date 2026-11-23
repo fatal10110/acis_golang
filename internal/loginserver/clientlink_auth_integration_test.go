@@ -288,7 +288,7 @@ func TestClientLinkLoginBannedAccountRejected(t *testing.T) {
 func TestClientLinkLoginDuplicateSessionRejected(t *testing.T) {
 	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
 	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
-	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2})
+	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2}, 1)
 
 	c := dialLoginClient(t, addr)
 	c.gameGuard()

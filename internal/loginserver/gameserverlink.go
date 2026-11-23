@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rsa"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -395,8 +396,16 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 		host = c.remoteIP.String()
 	}
 
+	// A registration that cannot be stored is refused rather than accepted
+	// in memory only, where it would be lost on the next restart (#5048).
+	// No LoginServerFail reason fits a storage fault, so the link is closed
+	// without an answer.
 	if persist {
-		l.persistRegistration(ctx, id, auth.HexID, host)
+		if err := l.persistRegistration(ctx, id, auth.HexID, host); err != nil {
+			l.servers.Unregister(id, auth.HexID)
+			l.log.Error().Int("server_id", id).Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link: refuse registration that could not be stored")
+			return false
+		}
 	}
 
 	if _, ok := l.servers.MarkOnline(id, host, c.remoteIP, auth.Port, auth.MaxPlayers); !ok {
@@ -428,19 +437,16 @@ func advertisedAddress(resolved []string) string {
 	return resolved[0]
 }
 
-func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte, host string) {
+func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte, host string) error {
 	if l.registrations == nil {
-		l.log.Error().Int("server_id", id).Msg("persist gameserver registration")
-		return
+		return errors.New("no registration store")
 	}
 	// Runs on the read loop: the server awaits its AuthResponse before it
 	// may send anything else, so no request can queue behind this write,
 	// and the timeout bounds how long the answer waits on the database.
 	ctx, cancel := context.WithTimeout(ctx, loginDBTimeout)
 	defer cancel()
-	if err := l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, host)); err != nil {
-		l.log.Error().Int("server_id", id).Err(err).Msg("persist gameserver registration")
-	}
+	return l.registrations.CreateGameServer(ctx, model.NewGameServer(id, hexID, host))
 }
 
 func (l *GameServerLink) onPlayerInGame(c *gameServerConn, payload []byte) {
@@ -471,6 +477,14 @@ func (l *GameServerLink) onChangeAccessLevel(c *gameServerConn, payload []byte) 
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
+	// Only an account this server admitted with valid session keys, and not
+	// since logged out or admitted elsewhere, may have its access level
+	// changed by it; a linked server cannot promote or ban any other account,
+	// whatever names it reports online (#4655).
+	if !l.servers.AdmittedOn(c.id, cal.Account) {
+		l.log.Warn().Int("server_id", c.id).Str("account", cal.Account).Int32("level", cal.Level).Msg("change access level: ignored, account not online on this server")
+		return
+	}
 	if l.accounts == nil {
 		l.log.Error().Str("account", cal.Account).Msg("change access level: no account store")
 		return
@@ -493,8 +507,12 @@ func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) 
 	}
 
 	// Validation consumes the session atomically, so two linked servers
-	// presenting the same keys cannot both be admitted.
-	valid := l.sessions.Take(req.Account, req.SessionKey)
+	// presenting the same keys cannot both be admitted, and only the server
+	// the client chose may claim it (#4655).
+	valid := l.sessions.Claim(req.Account, req.SessionKey, c.id)
+	if valid {
+		l.servers.AdmitAccount(c.id, req.Account)
+	}
 
 	if err := c.send(link.EncodePlayerAuthResponse(req.Account, valid)); err != nil {
 		return

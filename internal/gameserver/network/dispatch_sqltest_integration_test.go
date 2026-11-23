@@ -151,7 +151,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	c = testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
-	sessions.Put("player1", key)
+	sessions.Put("player1", key, 1)
 	c.Send(encodeAuthLogin("player1", key))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)

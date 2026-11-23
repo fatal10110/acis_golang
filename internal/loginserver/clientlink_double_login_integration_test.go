@@ -199,7 +199,7 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 		l.holders = make(map[string]*clientConn)
 	}
 	l.holders["player1"] = &clientConn{conn: stalled, crypt: crypt}
-	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2})
+	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2}, 1)
 
 	// The colliding re-authentication for player1 runs concurrently; its
 	// own goroutine may wait on the stalled eviction write.
@@ -264,7 +264,7 @@ func TestClientLinkEvictionOfStalledHolderDoesNotDelayNewClient(t *testing.T) {
 	holder := &clientConn{conn: stalled, crypt: crypt}
 	l.authMu.Lock()
 	l.holders = map[string]*clientConn{"player1": holder}
-	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2})
+	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2}, 1)
 	l.authMu.Unlock()
 
 	c := dialLoginClient(t, addr)

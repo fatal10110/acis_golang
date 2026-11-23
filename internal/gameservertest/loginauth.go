@@ -94,9 +94,9 @@ func (h *LoginAnswerHold) Release() {
 }
 
 // IssueLoginSession stores key as account's session on the login server,
-// as if the account had just logged in and picked this server.
+// as if the account had just logged in and picked this server (id 1).
 func (s *Server) IssueLoginSession(account string, key link.SessionKey) {
-	s.sessions.Put(account, key)
+	s.sessions.Put(account, key, 1)
 }
 
 // DialAuthLogin connects a scripted client, completes the protocol

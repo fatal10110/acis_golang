@@ -161,7 +161,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 
 	return loginServerConfig{
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
-		GameServerAddr:      listenAddress(props.String("LoginHostname", "*"), linkPort),
+		GameServerAddr:      listenAddress(props.String("LoginHostname", "127.0.0.1"), linkPort),
 		AllowNewGameServers: props.Bool("AcceptNewGameServer", false),
 		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", true),
 		ShowLicence:         props.Bool("ShowLicence", true),

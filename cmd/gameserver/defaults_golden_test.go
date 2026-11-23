@@ -328,6 +328,13 @@ var equivalentDefaults = map[string]string{
 	"GeoDataPath": "an empty path resolves to <data root>/data/geodata (geodata.ResolveDir), the reference's ./data/geodata/",
 }
 
+// divergentDefaults are the keys whose reader deliberately defaults to
+// something other than the reference, by owner decision; each names the
+// issue and the test that pins the new default.
+var divergentDefaults = map[string]string{
+	"LoginHostname": "#4655: the game-server link binds 127.0.0.1 unless configured; cmd/loginserver TestMissingLoginHostnameBindsLinkLoopbackOnly",
+}
+
 // pathsLoaders are the game server's loaders of a properties file, each
 // taking the file paths (and nothing the empty files cannot give).
 var pathsLoaders = []any{
@@ -553,6 +560,10 @@ func TestReaderDefaultsMatchTheReferenceGolden(t *testing.T) {
 	covered := map[string]bool{}
 	for key, refs := range byKey {
 		if _, ok := equivalentDefaults[key]; ok {
+			covered[key] = true
+			continue
+		}
+		if _, ok := divergentDefaults[key]; ok {
 			covered[key] = true
 			continue
 		}
