@@ -198,3 +198,30 @@ func TestCheckPackage(t *testing.T) {
 		})
 	}
 }
+
+// A family package keeps each quest's pages in a file of its own: the check
+// of one quest's files does not see the pages of the others.
+func TestCheckFiles(t *testing.T) {
+	idx, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	const q001 = "quest/Q001_LettersOfLove"
+	dir := filepath.Join("testdata", "family")
+	got, err := CheckFiles(idx, dir, q001, []string{"first.go"})
+	if err != nil || len(got) != 0 {
+		t.Fatalf("first.go: problems %q, err %v", got, err)
+	}
+	got, err = CheckFiles(idx, dir, q001, []string{"second.go"})
+	want := []string{`second.go:3: page "30048-99.htm" is not in the script page index (looked up quest/Q001_LettersOfLove/30048-99.htm)`}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("second.go: problems %q, err %v; want %q", got, err, want)
+	}
+	got, err = CheckFiles(idx, dir, q001, nil)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("whole package: problems %q, err %v", got, err)
+	}
+	if _, err := CheckFiles(idx, dir, q001, []string{"third.go"}); err == nil {
+		t.Fatal("a file outside the package was accepted")
+	}
+}

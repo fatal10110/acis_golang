@@ -151,6 +151,15 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
 
 - **One package per quest, feature and teleporter.** Constants and helpers are ordinary
   package-level code, and lanes cannot collide.
+- **Multi-quest family packages (#4712).** Quests that repeat one mechanic (the raid altars
+  Q604/Q610/Q616/Q625, the Ketra/Varka pairs, bingo, the clan raids) may share one package,
+  the way `ai/wizard` shares one for its classes. The family package is checked by `scriptfp.Check`
+  against the **union** of its member classes (literals, engine calls and hook shapes of every
+  member count), and each quest keeps its own file, constructor and catalog key. A quest never
+  imports another quest's package, and `Check` does not follow imports into helper packages:
+  the union is what keeps a dropped literal or call visible. Per-quest page checks use
+  `scriptpages.CheckFiles` on the quest's own file. `quest/raidaltar` is the first family;
+  the others fold in under #4715.
 - **Behaviors share family packages.** A child imports its parent's package, so parents-first
   is enforced by the compiler.
 - **Catalog files are pre-created, one per owner issue** (`script/catalog/quests_301_up.go`,

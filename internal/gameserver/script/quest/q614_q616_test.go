@@ -17,7 +17,6 @@ func TestQ614ToQ616MatchReferenceFingerprints(t *testing.T) {
 	}{
 		{"q614", "quest.Q614_SlayTheEnemyCommander", nil},
 		{"q615", "quest.Q615_MagicalPowerOfFire_Part1", []string{"number 61503", "number 61504"}},
-		{"q616", "quest.Q616_MagicalPowerOfFire_Part2", []string{"number 61650", "number 61651"}},
 	} {
 		t.Run(c.pkg, func(t *testing.T) {
 			problems, err := scriptfp.Check(c.pkg, []string{c.class}, c.extra...)
@@ -41,7 +40,6 @@ func TestQ614ToQ616PagesAreInTheDatapack(t *testing.T) {
 	for _, c := range []struct{ pkg, dir string }{
 		{"q614", "quest/Q614_SlayTheEnemyCommander"},
 		{"q615", "quest/Q615_MagicalPowerOfFire_Part1"},
-		{"q616", "quest/Q616_MagicalPowerOfFire_Part2"},
 	} {
 		t.Run(c.pkg, func(t *testing.T) {
 			problems, err := scriptpages.CheckPackage(idx, c.pkg, c.dir)

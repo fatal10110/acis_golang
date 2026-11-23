@@ -15,8 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q604"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q625"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/raidaltar"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/rs/zerolog"
 )
@@ -46,12 +45,12 @@ type raidQuest struct {
 
 var (
 	q604Raid = raidQuest{
-		name: "Q604_DaimonTheWhiteEyed_Part2", path: "quest.Q604_DaimonTheWhiteEyed_Part2", newQuest: q604.New,
+		name: "Q604_DaimonTheWhiteEyed_Part2", path: "quest.Q604_DaimonTheWhiteEyed_Part2", newQuest: raidaltar.Q604,
 		eye: 31683, altar: 31541, raid: 25290, summon: 7193, trophy: 7194, called: 60403, left: 60404,
 		at: [3]int{186320, -43904, -3175},
 	}
 	q625Raid = raidQuest{
-		name: "Q625_TheFinestIngredients_Part2", path: "quest.Q625_TheFinestIngredients_Part2", newQuest: q625.New,
+		name: "Q625_TheFinestIngredients_Part2", path: "quest.Q625_TheFinestIngredients_Part2", newQuest: raidaltar.Q625,
 		eye: 31521, altar: 31542, raid: 25296, summon: 7209, trophy: 7210, called: 62503, left: 62504,
 		at: [3]int{158240, -121536, -2222},
 	}

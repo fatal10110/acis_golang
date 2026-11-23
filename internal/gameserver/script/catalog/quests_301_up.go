@@ -94,18 +94,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q604"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q605"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q606"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q608"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q609"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q610"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q611"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q612"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q613"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q614"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q615"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q616"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
@@ -114,7 +111,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q622"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q623"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q624"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q625"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q626"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q627"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q628"
@@ -147,6 +143,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q662"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q663"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q688"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/raidaltar"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -244,18 +241,18 @@ func quests301Up() script.Catalog {
 		"quest.Q601_WatchingEyes":                      q601.New,
 		"quest.Q602_ShadowOfLight":                     q602.New,
 		"quest.Q603_DaimonTheWhiteEyed_Part1":          q603.New,
-		"quest.Q604_DaimonTheWhiteEyed_Part2":          q604.New,
+		"quest.Q604_DaimonTheWhiteEyed_Part2":          raidaltar.Q604,
 		"quest.Q605_AllianceWithKetraOrcs":             q605.New,
 		"quest.Q606_WarWithVarkaSilenos":               q606.New,
 		"quest.Q608_SlayTheEnemyCommander":             q608.New,
 		"quest.Q609_MagicalPowerOfWater_Part1":         q609.New,
-		"quest.Q610_MagicalPowerOfWater_Part2":         q610.New,
+		"quest.Q610_MagicalPowerOfWater_Part2":         raidaltar.Q610,
 		"quest.Q611_AllianceWithVarkaSilenos":          q611.New,
 		"quest.Q612_WarWithKetraOrcs":                  q612.New,
 		"quest.Q613_ProveYourCourage":                  q613.New,
 		"quest.Q614_SlayTheEnemyCommander":             q614.New,
 		"quest.Q615_MagicalPowerOfFire_Part1":          q615.New,
-		"quest.Q616_MagicalPowerOfFire_Part2":          q616.New,
+		"quest.Q616_MagicalPowerOfFire_Part2":          raidaltar.Q616,
 		"quest.Q617_GatherTheFlames":                   q617.New,
 		"quest.Q618_IntoTheFlame":                      q618.New,
 		"quest.Q619_RelicsOfTheOldEmpire":              q619.New,
@@ -264,7 +261,7 @@ func quests301Up() script.Catalog {
 		"quest.Q622_SpecialtyLiquorDelivery":           q622.New,
 		"quest.Q623_TheFinestFood":                     q623.New,
 		"quest.Q624_TheFinestIngredients_Part1":        q624.New,
-		"quest.Q625_TheFinestIngredients_Part2":        q625.New,
+		"quest.Q625_TheFinestIngredients_Part2":        raidaltar.Q625,
 		"quest.Q626_ADarkTwilight":                     q626.New,
 		"quest.Q627_HeartInSearchOfPower":              q627.New,
 		"quest.Q628_HuntOfTheGoldenRamMercenaryForce":  q628.New,
