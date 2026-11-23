@@ -49,6 +49,9 @@ func (f *Functions) Update(hallID int32, funcType, level, lease int, rate int64,
 	switch {
 	case !ok:
 		if level == 0 && lease == 0 {
+			// Parity exception (#5018): cancelling a function the hall
+			// does not rent creates none, rather than a level-0 one whose
+			// fee-free term runs again forever.
 			return
 		}
 		fn = &rented{Function: Function{Type: funcType, Level: level, Lease: lease, Rate: rate, EndTime: nowMs + rate}}

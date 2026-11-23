@@ -274,7 +274,9 @@ func (f *Functions) scheduleLocked(hallID int32, fn *rented, delayMs int64) {
 
 // RemoveAll drops every function hall hallID rents, stopping their fees,
 // and deletes the hall's stored functions, whether or not it rents any: a
-// hall changing hands or freed keeps none.
+// hall changing hands or freed keeps none. Parity exception (#5018): the
+// fees stop with the functions, so a new owner is never charged for its
+// predecessor's.
 func (f *Functions) RemoveAll(hallID int32) {
 	if f == nil {
 		return

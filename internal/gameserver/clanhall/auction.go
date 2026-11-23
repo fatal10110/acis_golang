@@ -171,11 +171,16 @@ func (hs *Halls) resetAuctionLocked(h *hall) {
 // endAuctionLocked ends h's auction. Without a bid a free hall's auction
 // starts over, and a hall for sale stays its owner's: the selling clan is
 // told it found no buyer and the sale is dropped. A highest bidder that
-// came to own a hall while its bid stood cannot take a second one, and one
-// dissolving would leave the hall to a clan about to go: the auction
-// restarts (restartAuctionLocked). Otherwise the selling clan, if
-// any, is paid the highest bid minus the tax and its deposit back, and the
-// hall goes to the highest bidder.
+// came to own a hall while its bid stood cannot take a second one, one
+// dissolving would leave the hall to a clan about to go, and one gone
+// since it bid can take nothing: the auction restarts
+// (restartAuctionLocked). Otherwise the selling clan, if any, is paid the
+// highest bid minus the tax and its deposit back, and the hall goes to the
+// highest bidder.
+//
+// The winner and the seller are the clans that bid and own the hall, by
+// id, never a clan carrying their name (#5113): a namesake founded after a
+// clan was destroyed neither wins its bid nor is paid for its sale.
 func (hs *Halls) endAuctionLocked(h *hall) {
 	a := h.auction
 	if a.highest == nil {
@@ -183,20 +188,24 @@ func (hs *Halls) endAuctionLocked(h *hall) {
 			hs.startAuctionLocked(h)
 			return
 		}
-		seller, _ := hs.clans.ByName(a.seller.ClanName)
+		// Parity exception (#5018): an unsold sale is dropped, its end
+		// date cleared and the hall taken off the listing, rather than
+		// left listed with no end armed; the deposit stays spent.
+		seller, _ := hs.clans.Get(h.ownerID)
 		hs.tellClan(seller, Notice{Kind: NoticeNotSold})
 		hs.resetAuctionLocked(h)
 		hs.updateLocked(h)
 		return
 	}
-	winner, _ := hs.clans.ByName(a.highest.ClanName)
-	if winner != nil && (winner.HallID() > 0 || hs.nowLocked() < winner.Info().DissolvingExpiry) {
+	winner, ok := hs.clans.Get(a.highest.ClanID)
+	if !ok || winner.HallID() > 0 || hs.nowLocked() < winner.Info().DissolvingExpiry {
 		hs.restartAuctionLocked(h)
 		return
 	}
 	var payouts []credit
 	if a.seller != nil {
-		seller, _ := hs.clans.ByName(a.seller.ClanName)
+		// A hall for sale is its seller's: the owner put it up.
+		seller, _ := hs.clans.Get(h.ownerID)
 		payouts = append(owedBack(seller, a.highest.Bid, true), owedBack(seller, h.data.Lease, false)...)
 	}
 	hs.setOwnerLocked(h, winner, payouts...)
@@ -219,16 +228,16 @@ func (hs *Halls) restartAuctionLocked(h *hall) {
 }
 
 // removeBidsLocked drops every bid on h, stored and live. Each bidding
-// clan still standing no longer bids anywhere, gets its bid back minus the
-// tax unless it is newOwner, and, with a newOwner, is told who won. The
-// refunds, and payouts, are paid once the bids' delete has landed
-// (writeThenCredit).
-func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan, payouts ...credit) {
+// clan still standing, resolved by the id it bid under (#5113), no longer
+// bids anywhere, gets its bid back minus the tax unless it is newOwner,
+// and, with a newOwner, is told who won. The refunds are paid once the
+// bids' delete has landed (writeThenCredit).
+func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan) {
 	hallID := h.id()
 	a := h.auction
 	var refunds []credit
 	for _, b := range a.listed() {
-		cl, ok := hs.clans.ByName(b.ClanName)
+		cl, ok := hs.clans.Get(b.ClanID)
 		if !ok {
 			continue
 		}
@@ -242,7 +251,7 @@ func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan, payouts ...credi
 	}
 	hs.writeThenCredit("remove clan hall bids", hallID, func(ctx context.Context, st HallStore) error {
 		return st.DeleteBids(ctx, hallID)
-	}, append(refunds, payouts...))
+	}, refunds)
 	a.clearBids()
 }
 
@@ -344,6 +353,11 @@ func (hs *Halls) CancelBid(cl *clan.Clan) bool {
 	}
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
+	return hs.withdrawBidLocked(cl)
+}
+
+// withdrawBidLocked is CancelBid with hs.mu held.
+func (hs *Halls) withdrawBidLocked(cl *clan.Clan) bool {
 	h, ok := hs.byID[hs.bidAt[cl.ID()]]
 	if !ok || h.auction == nil {
 		return false
@@ -366,7 +380,7 @@ func (hs *Halls) CancelBid(cl *clan.Clan) bool {
 
 // DraftSale sets up the sale of the hall cl owns: cl's leader selling it
 // with a minimum bid of minBid, the auction running days days from now.
-// The sale is registered only once ConfirmSale pays the deposit. It
+// The sale is registered only once ConfirmSale pays the deposit (#5018). It
 // reports false when cl owns no hall with an auction.
 func (hs *Halls) DraftSale(cl *clan.Clan, days, minBid int) (endDate int64, ok bool) {
 	if hs == nil || cl == nil {
@@ -388,19 +402,26 @@ func (hs *Halls) DraftSale(cl *clan.Clan, days, minBid int) (endDate int64, ok b
 type SaleResult int
 
 const (
-	// SaleIgnored found no sale set up, or one already registered:
-	// nothing is said.
+	// SaleIgnored found no sale set up: nothing is said.
 	SaleIgnored SaleResult = iota
 	// SaleRegistered took the deposit and put the hall up for auction.
 	SaleRegistered
 	// SaleNoAdena found less than the deposit in the clan's warehouse.
 	SaleNoAdena
+	// SaleAlreadyRegistered found the hall already up for sale: no second
+	// deposit is taken and the sale stands as it was registered.
+	SaleAlreadyRegistered
 )
 
 // ConfirmSale registers the sale cl set up for the hall it owns: the
 // deposit, the hall's lease, is taken from cl's warehouse, the sale and
 // its end date are stored, and the auction runs until then. The deposit
 // is written ahead of the sale, as a bid's adena is ahead of its row.
+//
+// Parity exception (#5018): the sale's terms and its end are set only once
+// the deposit is paid, the end timed from the confirmed date; a hall
+// already for sale takes no second deposit and keeps its registered terms
+// (SaleAlreadyRegistered).
 func (hs *Halls) ConfirmSale(cl *clan.Clan) SaleResult {
 	if hs == nil || cl == nil {
 		return SaleIgnored
@@ -408,10 +429,17 @@ func (hs *Halls) ConfirmSale(cl *clan.Clan) SaleResult {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	h, ok := hs.byID[cl.HallID()]
-	if !ok || h.auction == nil || h.auction.draft == nil || h.auction.seller != nil {
+	if !ok || h.auction == nil {
 		return SaleIgnored
 	}
 	a := h.auction
+	if a.seller != nil {
+		a.draft = nil
+		return SaleAlreadyRegistered
+	}
+	if a.draft == nil {
+		return SaleIgnored
+	}
 	if hs.bank == nil {
 		return SaleNoAdena
 	}
@@ -446,12 +474,10 @@ func (hs *Halls) CancelSale(cl *clan.Clan) bool {
 	if !ok || h.auction == nil {
 		return false
 	}
-	a := h.auction
-	if a.seller == nil {
+	if h.auction.seller == nil {
 		return true
 	}
-	seller, _ := hs.clans.ByName(a.seller.ClanName)
-	hs.removeBidsLocked(h, seller)
+	hs.removeBidsLocked(h, cl)
 	hs.resetAuctionLocked(h)
 	hs.updateLocked(h)
 	return true
