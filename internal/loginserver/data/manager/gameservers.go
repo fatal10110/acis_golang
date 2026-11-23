@@ -31,20 +31,23 @@ type ServerEntry struct {
 
 // ServerRegistry tracks every game server known to this login server —
 // seeded from the database at boot, updated as game servers connect over
-// the link — plus the accounts each currently reports online.
+// the link — plus the accounts each currently reports online and the
+// server each account was last admitted to with valid session keys.
 //
-// mu guards servers and online.
+// mu guards servers, online and admitted.
 type ServerRegistry struct {
-	mu      sync.RWMutex
-	servers map[int]ServerEntry
-	online  map[int]map[string]struct{}
+	mu       sync.RWMutex
+	servers  map[int]ServerEntry
+	online   map[int]map[string]struct{}
+	admitted map[string]int
 }
 
 // NewServerRegistry returns an empty ServerRegistry.
 func NewServerRegistry() *ServerRegistry {
 	return &ServerRegistry{
-		servers: make(map[int]ServerEntry),
-		online:  make(map[int]map[string]struct{}),
+		servers:  make(map[int]ServerEntry),
+		online:   make(map[int]map[string]struct{}),
+		admitted: make(map[string]int),
 	}
 }
 
@@ -138,7 +141,7 @@ func (r *ServerRegistry) MarkOnline(id int, host string, connIP net.IP, port uin
 }
 
 // MarkOffline marks the entry at id as disconnected and clears its online
-// account set, e.g. once its link connection drops.
+// account set and its admissions, e.g. once its link connection drops.
 func (r *ServerRegistry) MarkOffline(id int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -151,6 +154,11 @@ func (r *ServerRegistry) MarkOffline(id int) {
 	e.Status = link.ServerTypeDown
 	r.servers[id] = e
 	delete(r.online, id)
+	for account, admittedOn := range r.admitted {
+		if admittedOn == id {
+			delete(r.admitted, account)
+		}
+	}
 }
 
 // ApplyStatus applies the attributes status carries (nil fields left
@@ -199,11 +207,33 @@ func (r *ServerRegistry) AddOnlineAccount(id int, account string) {
 	set[account] = struct{}{}
 }
 
-// RemoveOnlineAccount removes account from server id's online set.
+// RemoveOnlineAccount removes account from server id's online set and
+// drops its admission when server id holds it.
 func (r *ServerRegistry) RemoveOnlineAccount(id int, account string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.online[id], account)
+	if r.admitted[account] == id {
+		delete(r.admitted, account)
+	}
+}
+
+// AdmitAccount records that server id admitted account with session keys
+// this login server issued for it, replacing any earlier admission.
+func (r *ServerRegistry) AdmitAccount(id int, account string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.admitted[account] = id
+}
+
+// AdmittedOn reports whether account's latest admission is held by server id.
+// Unlike the online roster, which a linked server fills with any name it
+// reports, an admission needs session keys the client got for that server.
+func (r *ServerRegistry) AdmittedOn(id int, account string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	admittedOn, ok := r.admitted[account]
+	return ok && admittedOn == id
 }
 
 // OnlineAccountCount returns how many accounts server id currently reports

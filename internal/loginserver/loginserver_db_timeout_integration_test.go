@@ -155,6 +155,7 @@ func TestGameServerLinkHeldAccessLevelWriteDoesNotBlockPlayerAuth(t *testing.T) 
 	key := link.SessionKey{LoginKey1: 1, LoginKey2: 2, PlayKey1: 3, PlayKey2: 4}
 	sessions.Put("player2", key, 1)
 
+	admitOn(t, gs, sessions, 1, "player1")
 	gs.sendPlayerInGame("player1")
 	gs.sendChangeAccessLevel(-1, "player1")
 	select {

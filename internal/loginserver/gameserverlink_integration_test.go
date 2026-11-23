@@ -169,7 +169,7 @@ func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
 		t.Fatalf("CreateAccount: %v", err)
 	}
 
-	addr, _, servers, _, _ := newTestLinkCommon(t, false, accounts, loginsql.NewGameServerStore(db))
+	addr, _, servers, sessions, _ := newTestLinkCommon(t, false, accounts, loginsql.NewGameServerStore(db))
 	servers.Register(1, testHexID)
 
 	gs := dialGameServer(t, addr)
@@ -179,6 +179,7 @@ func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
 		t.Fatal("registration failed, want success")
 	}
 
+	admitOn(t, gs, sessions, 1, "player1")
 	gs.sendPlayerInGame("player1")
 	gs.sendChangeAccessLevel(-1, "player1")
 

@@ -74,6 +74,22 @@ func TestServerRegistryMarkOnlineOffline(t *testing.T) {
 	}
 }
 
+func TestServerRegistryAdmissions(t *testing.T) {
+	r := NewServerRegistry()
+	r.Register(5, []byte{0x01})
+	r.AddOnlineAccount(5, "listed")
+	r.AdmitAccount(5, "acc1")
+	r.AdmitAccount(6, "acc2")
+	if r.AdmittedOn(5, "listed") || !r.AdmittedOn(5, "acc1") || r.AdmittedOn(6, "acc1") {
+		t.Fatal("only acc1 should be admitted on 5")
+	}
+
+	r.MarkOffline(5)
+	if r.AdmittedOn(5, "acc1") || !r.AdmittedOn(6, "acc2") {
+		t.Fatal("MarkOffline(5) must drop 5's admissions only")
+	}
+}
+
 func TestServerRegistryMarkOnlineRejectsAlreadyAuthedServer(t *testing.T) {
 	r := NewServerRegistry()
 	r.Register(5, []byte{0x01})

@@ -477,10 +477,11 @@ func (l *GameServerLink) onChangeAccessLevel(c *gameServerConn, payload []byte) 
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("gameserver link")
 		return
 	}
-	// Only an account playing on this server may have its access level
-	// changed by it; a linked server cannot promote or ban any other
-	// account (#4655).
-	if id, online := l.servers.AccountServerID(cal.Account); !online || id != c.id {
+	// Only an account this server admitted with valid session keys, and not
+	// since logged out or admitted elsewhere, may have its access level
+	// changed by it; a linked server cannot promote or ban any other account,
+	// whatever names it reports online (#4655).
+	if !l.servers.AdmittedOn(c.id, cal.Account) {
 		l.log.Warn().Int("server_id", c.id).Str("account", cal.Account).Int32("level", cal.Level).Msg("change access level: ignored, account not online on this server")
 		return
 	}
@@ -509,6 +510,9 @@ func (l *GameServerLink) onPlayerAuthRequest(c *gameServerConn, payload []byte) 
 	// presenting the same keys cannot both be admitted, and only the server
 	// the client chose may claim it (#4655).
 	valid := l.sessions.Claim(req.Account, req.SessionKey, c.id)
+	if valid {
+		l.servers.AdmitAccount(c.id, req.Account)
+	}
 
 	if err := c.send(link.EncodePlayerAuthResponse(req.Account, valid)); err != nil {
 		return

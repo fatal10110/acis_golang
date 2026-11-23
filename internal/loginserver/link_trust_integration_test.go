@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
+	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	loginsql "github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
@@ -66,41 +67,58 @@ func TestSessionKeysValidateOnlyOnTheChosenServer(t *testing.T) {
 	}
 }
 
-// TestChangeAccessLevelOnlyForAccountsOnlineOnTheLink: a linked server's
-// ChangeAccessLevel for an account not online anywhere, or online on another
-// server, is ignored and logged; one for its own online player is applied
+// admitOn admits account on the fake game server gs (linked as id) the way a
+// client entering it is: the session issued at login is bound to id when the
+// client picks it, and gs presents the keys in a PlayerAuthRequest.
+func admitOn(t *testing.T, gs *fakeGameServer, sessions *manager.SessionStore, id int, account string) {
+	t.Helper()
+	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: int32(id), PlayKey2: 44}
+	sessions.Put(account, key, manager.NoServer)
+	if !sessions.Bind(account, key, id) {
+		t.Fatalf("Bind(%s, %d) = false", account, id)
+	}
+	gs.sendPlayerAuthRequest(account, key)
+	if got, ok := gs.readPlayerAuthResponse(); got != account || !ok {
+		t.Fatalf("PlayerAuthResponse = %q, %v, want %s, true", got, ok, account)
+	}
+}
+
+// TestChangeAccessLevelOnlyForAccountsAdmittedOnTheLink: a linked server's
+// ChangeAccessLevel is applied only to an account it admitted with session
+// keys issued for it. Names it merely reports online through PlayerInGame,
+// whether offline or admitted on another server, are ignored and logged
 // (#4655).
-func TestChangeAccessLevelOnlyForAccountsOnlineOnTheLink(t *testing.T) {
+func TestChangeAccessLevelOnlyForAccountsAdmittedOnTheLink(t *testing.T) {
 	db := newIntegrationDB(t)
 	ctx := context.Background()
 	accounts := loginsql.NewAccountStore(db)
-	for _, login := range []string{"offline1", "elsewhere1", "player1"} {
+	for _, login := range []string{"offline1", "victim1", "player1"} {
 		if _, err := accounts.CreateAccount(ctx, login, "hash", time.UnixMilli(1_700_000_000_000)); err != nil {
 			t.Fatalf("CreateAccount(%s): %v", login, err)
 		}
 	}
 
 	var logs syncBuffer
-	addr, _, servers, _, _ := newTestLinkCommon(t, false, accounts, loginsql.NewGameServerStore(db), func(l *GameServerLink) {
+	addr, _, servers, sessions, _ := newTestLinkCommon(t, false, accounts, loginsql.NewGameServerStore(db), func(l *GameServerLink) {
 		l.log = zerolog.New(&logs)
 	})
 	servers.Register(1, testHexID)
 	servers.Register(2, secondHexID)
 	gs := authGameServer(t, addr, 1, testHexID)
-	other := authGameServer(t, addr, 2, secondHexID)
+	rogue := authGameServer(t, addr, 2, secondHexID)
 
-	other.sendPlayerInGame("elsewhere1")
-	waitUntil(t, "elsewhere1 online on server 2", func() bool {
-		id, online := servers.AccountServerID("elsewhere1")
-		return online && id == 2
-	})
+	admitOn(t, gs, sessions, 1, "victim1")
+	admitOn(t, rogue, sessions, 2, "player1")
 
 	// One connection's requests are handled in order, so once the last
 	// change is applied the earlier ones were already decided.
-	gs.sendChangeAccessLevel(8, "offline1")
-	gs.sendChangeAccessLevel(8, "elsewhere1")
-	gs.sendPlayerInGame("player1")
-	gs.sendChangeAccessLevel(8, "player1")
+	rogue.sendPlayerInGame("offline1", "victim1")
+	waitUntil(t, "offline1 and victim1 on server 2's roster", func() bool {
+		return servers.OnlineAccountCount(2) == 2
+	})
+	rogue.sendChangeAccessLevel(8, "offline1")
+	rogue.sendChangeAccessLevel(8, "victim1")
+	rogue.sendChangeAccessLevel(8, "player1")
 	waitUntil(t, "player1 AccessLevel = 8", func() bool {
 		got, err := accounts.Account(ctx, "player1")
 		if err != nil {
@@ -109,7 +127,7 @@ func TestChangeAccessLevelOnlyForAccountsOnlineOnTheLink(t *testing.T) {
 		return got.AccessLevel == 8
 	})
 
-	for _, login := range []string{"offline1", "elsewhere1"} {
+	for _, login := range []string{"offline1", "victim1"} {
 		got, err := accounts.Account(ctx, login)
 		if err != nil {
 			t.Fatalf("Account(%s): %v", login, err)
@@ -117,10 +135,84 @@ func TestChangeAccessLevelOnlyForAccountsOnlineOnTheLink(t *testing.T) {
 		if got.AccessLevel != 0 {
 			t.Errorf("%s AccessLevel = %d, want 0 (request ignored)", login, got.AccessLevel)
 		}
-		if !strings.Contains(logs.String(), `"account":"`+login+`"`) {
+		if !ignoredChangeLogged(logs.String(), login) {
 			t.Errorf("no log for the ignored change of %s; logs:\n%s", login, logs.String())
 		}
 	}
+}
+
+// TestChangeAccessLevelIgnoredAfterLogoutOrAdmissionElsewhere: a server's
+// admission ends when it reports the account logged out, or when another
+// server admits it, so a later ChangeAccessLevel from it is ignored (#4655).
+func TestChangeAccessLevelIgnoredAfterLogoutOrAdmissionElsewhere(t *testing.T) {
+	db := newIntegrationDB(t)
+	ctx := context.Background()
+	accounts := loginsql.NewAccountStore(db)
+	for _, login := range []string{"left1", "moved1", "sync1"} {
+		if _, err := accounts.CreateAccount(ctx, login, "hash", time.UnixMilli(1_700_000_000_000)); err != nil {
+			t.Fatalf("CreateAccount(%s): %v", login, err)
+		}
+	}
+
+	var logs syncBuffer
+	addr, _, servers, sessions, _ := newTestLinkCommon(t, false, accounts, loginsql.NewGameServerStore(db), func(l *GameServerLink) {
+		l.log = zerolog.New(&logs)
+	})
+	servers.Register(1, testHexID)
+	servers.Register(2, secondHexID)
+	first := authGameServer(t, addr, 1, testHexID)
+	second := authGameServer(t, addr, 2, secondHexID)
+
+	admitOn(t, first, sessions, 1, "left1")
+	admitOn(t, first, sessions, 1, "moved1")
+	admitOn(t, first, sessions, 1, "sync1")
+	admitOn(t, second, sessions, 2, "moved1")
+	// A late logout from the first server leaves the second's admission.
+	first.sendPlayerLogout("moved1")
+	first.sendPlayerLogout("left1")
+
+	first.sendChangeAccessLevel(8, "left1")
+	first.sendChangeAccessLevel(8, "moved1")
+	first.sendChangeAccessLevel(8, "sync1")
+	waitUntil(t, "sync1 AccessLevel = 8", func() bool {
+		got, err := accounts.Account(ctx, "sync1")
+		if err != nil {
+			t.Fatalf("Account: %v", err)
+		}
+		return got.AccessLevel == 8
+	})
+	for _, login := range []string{"left1", "moved1"} {
+		got, err := accounts.Account(ctx, login)
+		if err != nil {
+			t.Fatalf("Account(%s): %v", login, err)
+		}
+		if got.AccessLevel != 0 {
+			t.Errorf("%s AccessLevel = %d, want 0 (request ignored)", login, got.AccessLevel)
+		}
+		if !ignoredChangeLogged(logs.String(), login) {
+			t.Errorf("no log for the ignored change of %s; logs:\n%s", login, logs.String())
+		}
+	}
+
+	second.sendChangeAccessLevel(9, "moved1")
+	waitUntil(t, "moved1 AccessLevel = 9 from the server holding it", func() bool {
+		got, err := accounts.Account(ctx, "moved1")
+		if err != nil {
+			t.Fatalf("Account: %v", err)
+		}
+		return got.AccessLevel == 9
+	})
+}
+
+// ignoredChangeLogged reports whether logs hold the warning for an ignored
+// access-level change of account.
+func ignoredChangeLogged(logs, account string) bool {
+	for _, line := range strings.Split(logs, "\n") {
+		if strings.Contains(line, "change access level: ignored") && strings.Contains(line, `"account":"`+account+`"`) {
+			return true
+		}
+	}
+	return false
 }
 
 // TestGameServerLinkRegistrationWriteFailureRefusesLink: when the new
