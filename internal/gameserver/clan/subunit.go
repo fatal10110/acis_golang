@@ -395,9 +395,10 @@ const (
 // Reorganize moves the member called name into sub-unit pledgeType and
 // the member called swapName into name's old sub-unit, on c's order. With
 // selected false it only shows name's card. A sub-unit captain stays in
-// the main clan. A move into a sub-unit the clan does not have is refused
-// with name's card: a crafted request could otherwise hide a member in a
-// sub-unit no roster lists.
+// the main clan, on either side of the swap. A move into a sub-unit the
+// clan does not have, or that is full, is refused with name's card: a
+// crafted request could otherwise hide a member in a sub-unit no roster
+// lists, or fill one past its limit.
 func (s *Service) Reorganize(c *player.Character, selected bool, name string, pledgeType int, swapName string) (*Clan, Member, ReorganizeResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
@@ -419,12 +420,19 @@ func (s *Service) Reorganize(c *player.Character, selected bool, name string, pl
 	switch {
 	case !ok1 || m1.ObjectID == cl.leaderID || !ok2 || m2.ObjectID == cl.leaderID:
 		return nil, Member{}, ReorganizeIgnored
-	case cl.leadsSubunitLocked(m1.ObjectID) != 0:
+	case cl.leadsSubunitLocked(m1.ObjectID) != 0, cl.leadsSubunitLocked(m2.ObjectID) != 0:
+		// Neither side of the swap may be a captain (#5106).
 		return cl, m1, ReorganizeShowMember
 	case m1.PledgeType == pledgeType:
 		return nil, Member{}, ReorganizeIgnored
 	}
 	if _, exists := cl.subunits[pledgeType]; pledgeType != SubunitMain && !exists {
+		return cl, m1, ReorganizeShowMember
+	}
+	// A swap partner from another unit leaves pledgeType one member more,
+	// which its capacity must hold (#5106); name's old unit loses name as it
+	// gains the partner.
+	if m2.PledgeType != pledgeType && cl.subunitCountLocked(pledgeType) >= MaxMembers(cl.level, pledgeType) {
 		return cl, m1, ReorganizeShowMember
 	}
 	old := m1.PledgeType

@@ -29,6 +29,9 @@ type Invite struct {
 	// its name, kept for answers that arrive once it has left.
 	RequesterID   int32
 	RequesterName string
+	// ClanID is the requester's clan as the invitation was sent: an
+	// acceptance joins that clan or nothing (#5105).
+	ClanID int32
 	// PledgeType is the sub-unit a JoinPledge invitation is for.
 	PledgeType int
 	expiresAt  time.Time
@@ -81,9 +84,10 @@ func (b *Invites) activeLocked(objectID int32, at time.Time) (Invite, bool) {
 	return e, !e.left
 }
 
-// Send records an invitation from requesterID to targetID. It first drops
-// every lapsed entry, so the book holds only invitations that still stand.
-func (b *Invites) Send(kind InviteKind, requesterID int32, requesterName string, targetID int32, pledgeType int) InviteStatus {
+// Send records an invitation from requesterID, of clan clanID, to
+// targetID. It first drops every lapsed entry, so the book holds only
+// invitations that still stand.
+func (b *Invites) Send(kind InviteKind, requesterID int32, requesterName string, targetID, clanID int32, pledgeType int) InviteStatus {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	at := b.now()
@@ -99,7 +103,7 @@ func (b *Invites) Send(kind InviteKind, requesterID int32, requesterName string,
 		return InviteRequesterBusy
 	}
 	expires := at.Add(InviteTimeout)
-	sent := Invite{Kind: kind, RequesterID: requesterID, RequesterName: requesterName, PledgeType: pledgeType, expiresAt: expires}
+	sent := Invite{Kind: kind, RequesterID: requesterID, RequesterName: requesterName, ClanID: clanID, PledgeType: pledgeType, expiresAt: expires}
 	sent.PartnerID = targetID
 	b.entries[requesterID] = sent
 	sent.PartnerID = requesterID
