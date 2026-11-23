@@ -115,6 +115,14 @@ func (m *Manager) Rows() []Row {
 	return out
 }
 
+// Forget drops every scheme of the player ownerID, a deleted character,
+// so the shutdown save does not store them again (#4676).
+func (m *Manager) Forget(ownerID int32) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.owners, ownerID)
+}
+
 // offers reports whether skill id is one of the buffer's buffs.
 func (m *Manager) offers(id int32) bool {
 	_, ok := m.buff(id)

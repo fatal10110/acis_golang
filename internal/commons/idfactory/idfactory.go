@@ -29,7 +29,18 @@ var usedObjectIDQueries = [...]string{
 	"SELECT object_id FROM items_on_ground",
 	"SELECT id FROM mods_wedding",
 	"SELECT oid FROM petition",
+	// Deleted characters' ids are never handed out again (#4676).
+	"SELECT object_id FROM retired_object_ids",
 }
+
+// RetiredIDsSchema creates the table that records every deleted
+// character's object id, so no later object can take it over and inherit a
+// row the deletion missed (#4676). The shipped schema has no such table,
+// so New creates it.
+const RetiredIDsSchema = "CREATE TABLE IF NOT EXISTS `retired_object_ids` (\n" +
+	"  `object_id` INT UNSIGNED NOT NULL,\n" +
+	"  PRIMARY KEY (`object_id`)\n" +
+	")"
 
 // orphanCleanupStatements deletes rows whose owner was never removed with
 // them (a crash mid-deletion, or a deletion that predated a table), so a
@@ -52,6 +63,11 @@ var orphanCleanupStatements = [...]string{
 	"DELETE FROM cursed_weapons WHERE cursed_weapons.playerId NOT IN (SELECT obj_Id FROM characters)",
 	"DELETE FROM pets WHERE pets.item_obj_id NOT IN (SELECT object_id FROM items UNION SELECT object_id FROM items_on_ground)",
 	"DELETE FROM seven_signs WHERE seven_signs.char_obj_id NOT IN (SELECT obj_Id FROM characters)",
+	// A deleted character's bookmarks, schemes and marriage go with it
+	// (#4676); a couple's own id is not a character, its spouses are.
+	"DELETE FROM bookmarks WHERE bookmarks.obj_Id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM buffer_schemes WHERE buffer_schemes.object_id NOT IN (SELECT obj_Id FROM characters)",
+	"DELETE FROM mods_wedding WHERE mods_wedding.requesterId NOT IN (SELECT obj_Id FROM characters) OR mods_wedding.partnerId NOT IN (SELECT obj_Id FROM characters)",
 	// Olympiads & heroes
 	"DELETE FROM heroes WHERE heroes.char_id NOT IN (SELECT obj_Id FROM characters)",
 	"DELETE FROM olympiad_nobles WHERE olympiad_nobles.char_id NOT IN (SELECT obj_Id FROM characters)",
@@ -103,7 +119,8 @@ var orphanRepairStatements = [...]string{
 // An id released mid-session only becomes available again once allocation
 // naturally reaches it (ids are handed out in increasing order and the
 // search cursor never moves backward) or the Allocator is rebuilt via New,
-// which reclaims every id no longer present in the database. This trades
+// which reclaims every id no longer present in the database but a retired
+// one, a deleted character's (#4676). This trades
 // perfect same-session reuse for O(1) amortized allocation.
 //
 // mu guards used and next.
@@ -120,7 +137,8 @@ type Allocator struct {
 // for object ids already in use, returning an Allocator seeded with them,
 // ready to hand out ids that don't collide with existing rows. The repair
 // pass (reset stale online flags, purge orphan rows, drop expired skill
-// timestamps) runs before the scan so the scan sees post-cleanup state; a
+// timestamps) runs before the scan so the scan sees post-cleanup state. The
+// scan counts every retired id as in use, creating their table first; a
 // failed repair statement is logged and skipped, since booting without one
 // cleanup beats not booting at all, while an id-scan error still fails
 // loudly rather than booting with a partial id set.
@@ -133,6 +151,9 @@ func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error
 	}
 
 	a.cleanup(ctx, db)
+	if _, err := db.ExecContext(ctx, RetiredIDsSchema); err != nil {
+		return nil, fmt.Errorf("idfactory: create retired id table: %w", err)
+	}
 	if err := ScanUsedIDs(ctx, db, a.markUsed); err != nil {
 		return nil, fmt.Errorf("idfactory: %w", err)
 	}

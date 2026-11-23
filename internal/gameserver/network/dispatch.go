@@ -1012,8 +1012,15 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID, link.clans)
 	if link.roster != nil {
-		clans := link.clans
-		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
+		clans, couples, schemes := link.clans, link.wedding, link.schemeBuffer
+		// A purged character's marriage and schemes leave memory with its
+		// rows, or the shutdown saves would store them again (#4676). No
+		// packet goes to the surviving spouse: nothing it asked for ended.
+		link.roster.SetPurged(func(objectID int32) {
+			clans.RemoveDeleted(objectID, time.Now())
+			couples.Divorce(objectID)
+			schemes.Forget(objectID)
+		})
 	}
 	link.combat.skillHandlers.Register(takeCastleHandler{l: link})
 	link.combat.skillHandlers.Register(siegeFlagHandler{l: link})
