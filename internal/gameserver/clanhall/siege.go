@@ -473,15 +473,19 @@ func (hs *Halls) removeAttackerLocked(h *hall, clanID int32) {
 	hs.saveAttackersLocked(h)
 }
 
-// ForgetClan drops cl, a clan being destroyed, from the hall sieges: a clan
-// owning no hall leaves every siege's attackers; a clan owning a siegable
-// hall loses it.
+// ForgetClan drops cl, a clan being destroyed, from the halls. Its
+// standing bid is withdrawn as a cancelled one is (#5113), so it can
+// never win nor be paid out; the refund finds the clan gone and pays
+// nothing, its warehouse being destroyed with it. A clan owning no hall
+// leaves every siege's attackers; a clan owning a siegable hall loses it.
 func (hs *Halls) ForgetClan(cl *clan.Clan) {
 	if hs == nil {
 		return
 	}
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
+	hs.withdrawBidLocked(cl)
+	delete(hs.bidAt, cl.ID())
 	hallID := cl.HallID()
 	if hallID == 0 {
 		hs.siegeMu.Lock()
