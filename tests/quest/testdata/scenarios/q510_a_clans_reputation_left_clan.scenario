@@ -1,0 +1,26 @@
+# A Clan's Reputation (Q510), refused at the turn-in (#5167): the quest owner left the clan
+# holding three claws. Valdis answers the not-a-leader page before anything is taken: the
+# claws stay, no reputation is paid and the quest stays started on its step.
+# Hand-written from the quest script (no reference trace): the reference takes the claws,
+# then fails on the missing clan and answers nothing.
+character Leader 40
+quest Q510_AClansReputation <state>=STARTED <cond>=1
+hold 8767 3
+script quest.Q510_AClansReputation
+item 8767
+page villagemaster/31331.htm
+page script/quest/Q510_AClansReputation/
+npc valdis 31331 VillageMasterMystic 10 0 0
+
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-0.htm
+  S ActionFailed
+  S ActionFailed
+  items 8767=3
+  state Q510_AClansReputation STARTED
+  rows Q510_AClansReputation <cond>=1 <state>=STARTED

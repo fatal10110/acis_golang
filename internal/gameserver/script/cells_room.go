@@ -15,8 +15,9 @@ import (
 //
 // The room's party is named by identity and followed as it changes: its
 // leader and members are read live, and a party since disbanded keeps the
-// leader it last had and has no members. Asking a room that holds no party
-// for its party's members or ids panics.
+// leader it last had and has no members. A room that holds no party has no
+// members and no ids: rooms change hands across queues, so a read that
+// loses a race to a hand-over or a clear finds the room empty (#5170).
 type RoomCell struct {
 	index int
 	tick  func() int32
@@ -86,22 +87,57 @@ func (r *RoomCell) SetParty(p *Player) {
 	r.setParty(ref)
 }
 
-// SetPartyFrom makes other's party the room's, and takes the object ids of
-// its members as they are now, not as other took them. other holding no
-// party panics.
-func (r *RoomCell) SetPartyFrom(other *RoomCell) {
-	r.setParty(other.mustParty())
+// MovePartyTo hands the room's party over to the room to, in one step under
+// both rooms' locks (#5170): while the room still holds that party and to
+// is unlocked, to is locked holding the party, with the object ids of its
+// members as they are now, and the room is cleared and unlocked; both are
+// stamped with the game tick. It reports whether it moved the party; when
+// the room holds no party, a party it did not hold when the call began, or
+// to is locked, nothing changes. A hand-over racing a clear or another
+// hand-over of the same room thus leaves the party in one room, and no
+// room locked without a party. The rooms are two of one set: their indexes
+// differ, and order the locks.
+func (r *RoomCell) MovePartyTo(to *RoomCell) bool {
+	if r == to {
+		return false
+	}
+	ref := r.heldParty()
+	if ref == nil {
+		return false
+	}
+	ids := memberIDsOf(ref)
+	now := r.tick()
+	first, second := r, to
+	if to.index < r.index {
+		first, second = to, r
+	}
+	first.mu.Lock()
+	defer first.mu.Unlock()
+	second.mu.Lock()
+	defer second.mu.Unlock()
+	if r.party != ref || to.locked {
+		return false
+	}
+	to.locked, to.time, to.party, to.memberIDs = true, now, ref, ids
+	r.locked, r.time, r.party, r.memberIDs = false, now, nil, nil
+	return true
 }
 
 func (r *RoomCell) setParty(ref player.Party) {
+	ids := memberIDsOf(ref)
+	r.mu.Lock()
+	r.party, r.memberIDs = ref, ids
+	r.mu.Unlock()
+}
+
+// memberIDsOf returns the object ids of ref's members as they are now.
+func memberIDsOf(ref player.Party) []int32 {
 	members := ref.Members()
 	ids := make([]int32, len(members))
 	for i, m := range members {
 		ids[i] = m.ObjectID()
 	}
-	r.mu.Lock()
-	r.party, r.memberIDs = ref, ids
-	r.mu.Unlock()
+	return ids
 }
 
 // heldParty returns the room's party, nil when it holds none.
@@ -109,15 +145,6 @@ func (r *RoomCell) heldParty() player.Party {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.party
-}
-
-// mustParty returns the room's party; a room holding none panics.
-func (r *RoomCell) mustParty() player.Party {
-	ref := r.heldParty()
-	if ref == nil {
-		panic("script: the party of a room holding none")
-	}
-	return ref
 }
 
 // HoldsPartyOf reports whether the room's party is the one p is in. A
@@ -141,21 +168,22 @@ func (r *RoomCell) PartyLeader() *Player {
 }
 
 // PartyMembers returns the players of the room's party in the world, in
-// the order they joined; empty once that party disbanded. A room holding
-// no party panics.
+// the order they joined; empty once that party disbanded, and for a room
+// holding no party.
 func (r *RoomCell) PartyMembers() []*Player {
-	return playersOf(r.mustParty().Members())
+	ref := r.heldParty()
+	if ref == nil {
+		return nil
+	}
+	return playersOf(ref.Members())
 }
 
 // MemberIDs returns the object ids of the members of the room's party as
-// they were when it was set, in party order. A room holding no party
-// panics.
+// they were when it was set, in party order; empty for a room holding no
+// party.
 func (r *RoomCell) MemberIDs() []int32 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.party == nil {
-		panic("script: the member ids of a room holding no party")
-	}
 	return slices.Clone(r.memberIDs)
 }
 

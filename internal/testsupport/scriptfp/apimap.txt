@@ -783,7 +783,7 @@ Party.getCommandChannel inline
 # The Dimensional Rift room (#3802): the room cell a script builds with
 # Script.NewRoom. A room has no party handle to return: its party getter
 # folds into the cell's party reads (leader, members, the identity compare
-# HoldsPartyOf, the copy SetPartyFrom).
+# HoldsPartyOf, the hand-over MovePartyTo).
 RoomInfo.clear script.RoomCell.Clear
 RoomInfo.getIndex script.RoomCell.Index
 RoomInfo.getMemberIds script.RoomCell.MemberIDs

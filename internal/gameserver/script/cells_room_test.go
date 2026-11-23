@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
 // newTestRoom returns room index of a script whose game tick reads *now
@@ -75,27 +77,83 @@ func TestRoomCellTryLockHasOneWinner(t *testing.T) {
 	}
 }
 
-// Reading the members or the ids of the party of a room holding none
-// panics, and so does copying it into another room; its leader reads nil.
-func TestRoomCellWithoutPartyPanics(t *testing.T) {
+// A room holding no party reads no members, no ids and no leader, and has
+// none to hand over (#5170).
+func TestRoomCellWithoutPartyReadsNothing(t *testing.T) {
 	var now atomic.Int64
 	r := newTestRoom(0, &now)
 	other := newTestRoom(1, &now)
-	if r.PartyLeader() != nil {
-		t.Error("a room holding no party has a party leader")
+	if r.PartyLeader() != nil || r.PartyMembers() != nil || r.MemberIDs() != nil {
+		t.Error("a room holding no party reads a party")
 	}
-	for name, fn := range map[string]func(){
-		"PartyMembers": func() { r.PartyMembers() },
-		"MemberIDs":    func() { r.MemberIDs() },
-		"SetPartyFrom": func() { other.SetPartyFrom(r) },
-	} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Errorf("%s on a room holding no party did not panic", name)
-				}
-			}()
-			fn()
-		}()
+	if r.MovePartyTo(other) || other.Locked() || other.heldParty() != nil {
+		t.Error("a room holding no party handed one over")
+	}
+}
+
+// roomParty is a party of no members, compared by identity.
+type roomParty struct{ name string }
+
+func (*roomParty) Leader() *player.Character    { return nil }
+func (*roomParty) Members() []*player.Character { return nil }
+
+// A hand-over locks the target holding the party, stamped, and clears and
+// unlocks the source; a locked target or the room itself takes nothing.
+func TestRoomCellMovePartyTo(t *testing.T) {
+	var now atomic.Int64
+	from, to, busy := newTestRoom(4, &now), newTestRoom(2, &now), newTestRoom(7, &now)
+	party := &roomParty{"P"}
+	from.setParty(party)
+	from.SetLock(true)
+	busy.SetLock(true)
+
+	now.Store(50)
+	if from.MovePartyTo(busy) || from.MovePartyTo(from) {
+		t.Fatal("a hand-over to a locked room or to the room itself moved the party")
+	}
+	if !from.Locked() || from.heldParty() != party || busy.heldParty() != nil || from.Time() != 0 {
+		t.Fatal("a failed hand-over changed a room")
+	}
+	if !from.MovePartyTo(to) {
+		t.Fatal("the hand-over to an unlocked room failed")
+	}
+	if !to.Locked() || to.heldParty() != party || to.Time() != 50 {
+		t.Errorf("target: locked %v holds %v time %d, want locked holding P at 50", to.Locked(), to.heldParty(), to.Time())
+	}
+	if from.Locked() || from.heldParty() != nil || from.Time() != 50 {
+		t.Errorf("source: locked %v holds %v time %d, want cleared at 50", from.Locked(), from.heldParty(), from.Time())
+	}
+}
+
+// Hand-overs of one room to two rooms racing a clear of it (a give-up)
+// leave the party in at most one room, and no room locked without a party
+// (#5170). Opposite hand-overs between two rooms do not deadlock.
+func TestRoomCellMovePartyToRaces(t *testing.T) {
+	var now atomic.Int64
+	for range 500 {
+		src, a, b := newTestRoom(3, &now), newTestRoom(1, &now), newTestRoom(5, &now)
+		party := &roomParty{"P"}
+		src.setParty(party)
+		src.SetLock(true)
+		var wg sync.WaitGroup
+		wg.Go(func() { src.MovePartyTo(a) })
+		wg.Go(func() { src.MovePartyTo(b) })
+		wg.Go(func() { src.Clear() })
+		wg.Go(func() { a.MovePartyTo(b) })
+		wg.Go(func() { b.MovePartyTo(a) })
+		wg.Wait()
+		held := 0
+		for _, r := range []*RoomCell{src, a, b} {
+			p := r.heldParty()
+			if p != nil {
+				held++
+			}
+			if r.Locked() && p == nil {
+				t.Fatalf("room %d is locked without a party", r.Index())
+			}
+		}
+		if held > 1 {
+			t.Fatalf("the party is booked in %d rooms", held)
+		}
 	}
 }

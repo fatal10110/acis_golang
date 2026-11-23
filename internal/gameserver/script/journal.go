@@ -151,6 +151,17 @@ func (qs *QuestState) Set(key, value string) {
 	})
 }
 
+// AddInt adds delta to the variable key, unset counting as 0, and writes
+// the sum, in one step: concurrent adds from several queues are all
+// counted, where a GetInt then a Set loses some.
+func (qs *QuestState) AddInt(key string, delta int32) {
+	qs.write(func() {
+		if _, ok := qs.state.Add(key, delta); ok {
+			qs.quests.commit(qs.player)
+		}
+	})
+}
+
 // Unset removes the variable key and deletes its row.
 func (qs *QuestState) Unset(key string) {
 	qs.write(func() {
