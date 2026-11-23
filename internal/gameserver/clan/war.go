@@ -208,8 +208,8 @@ func (s *Service) StopWar(c *player.Character, targetName string, inCombat func(
 }
 
 // CheckSurrender reports whether c's clan may surrender its war on the clan
-// named targetName; EndWar then ends it, once the surrender's cost is
-// paid.
+// named targetName; EndWar then ends it, and only the surrender that ended
+// it pays its cost.
 func (s *Service) CheckSurrender(c *player.Character, targetName string) (War, WarResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {

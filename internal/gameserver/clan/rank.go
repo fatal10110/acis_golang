@@ -27,7 +27,8 @@ const (
 // order. A name no member carries, an academy member and a grade outside
 // 1-9 are ignored. Only a member holding the rank-management privilege may
 // change grades: without that gate any member could raise its own grade
-// and take every privilege the clan gave it.
+// and take every privilege the clan gave it. The leader's grade is not
+// anyone's to change, and is refused as not authorized.
 func (s *Service) SetMemberGrade(c *player.Character, name string, grade int) (*Clan, Member, GradeResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
@@ -39,7 +40,8 @@ func (s *Service) SetMemberGrade(c *player.Character, name string, grade int) (*
 	case !ok, target.PledgeType == SubunitAcademy, grade < minMemberGrade, grade > maxMemberGrade:
 		cl.mu.Unlock()
 		return nil, Member{}, GradeIgnored
-	case cl.memberPrivilegesLocked(c.ID)&int32(PrivManageRanks) == 0:
+	case cl.memberPrivilegesLocked(c.ID)&int32(PrivManageRanks) == 0, target.ObjectID == cl.leaderID:
+		// The leader keeps grade 0: no one may regrade it (#5106).
 		cl.mu.Unlock()
 		return nil, Member{}, GradeNotAuthorized
 	}

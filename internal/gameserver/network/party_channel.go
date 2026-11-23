@@ -44,8 +44,9 @@ func (l *GameClientLink) requestAskJoinChannel(live *livePlayer, req clientpacke
 }
 
 // requestAcceptJoinChannel answers live's pending command channel
-// invitation. With none pending, its inviter gone, or either party gone,
-// nothing answers.
+// invitation. With none pending, its inviter gone, either party gone, or
+// either side no longer leading as it did at the invitation, nothing
+// answers and no Strategy Guide is spent.
 func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpackets.Response) {
 	requesterID, ok := l.tradeBook().TakeInvite(tradebook.KindCommandChannel, live.ObjectID())
 	if !ok {
