@@ -89,8 +89,6 @@ type HallStore interface {
 // Clans resolves the clans owning, selling and bidding on the halls.
 type Clans interface {
 	Get(id int32) (*clan.Clan, bool)
-	// ByName resolves a clan by name, ignoring case.
-	ByName(name string) (*clan.Clan, bool)
 }
 
 // Landing writes the warehouse rows one adena move changed to the
@@ -397,23 +395,19 @@ func (hs *Halls) SetOwner(hallID int32, cl *clan.Clan) bool {
 
 // setOwnerLocked gives h to cl. The hall's auction first refunds its
 // losing bidders, minus the tax, telling each bidding clan who won, and
-// is reset. A nil cl, a winner gone since it bid, then restarts the
-// auction and leaves the owner as it is. Otherwise the former owner loses
-// the hall, the hall loses its functions and closes its doors, and cl owns
-// it with a week's lease paid; both clans' headers are refreshed, the
-// players of other clans are thrown out of its grounds and the row stored.
+// is reset. A nil cl then restarts the auction and leaves the owner as it
+// is. Otherwise the former owner loses the hall, the hall loses its
+// functions and closes its doors, and cl owns it with a week's lease paid;
+// both clans' headers are refreshed, the players of other clans are thrown
+// out of its grounds and the row stored.
 //
 // payouts, a sold hall's seller's due, are paid once the row naming the
-// new owner is stored, and without a new owner once the bids are deleted:
-// a crash before then leaves the sale standing, unpaid, rather than paid
-// and still standing.
+// new owner is stored: a crash before then leaves the sale standing,
+// unpaid, rather than paid and still standing. Without a new owner nothing
+// is paid out.
 func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan, payouts ...credit) {
 	if a := h.auction; a != nil {
-		var unowned []credit
-		if cl == nil {
-			unowned = payouts
-		}
-		hs.removeBidsLocked(h, cl, unowned...)
+		hs.removeBidsLocked(h, cl)
 		hs.resetAuctionLocked(h)
 	}
 	if cl == nil {

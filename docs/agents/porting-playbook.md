@@ -87,6 +87,40 @@ line the party keeps the leader who just disconnected. Go promotes the first rem
 regardless (`party.Registry.Leave`); the party duel is cancelled in both. Pinned by
 `TestDisconnectingLeaderHandsOverToDuelingMember` (`internal/gameserver/party`).
 
+**Parity exception: an unsold clan hall sale is dropped** (#5018). The reference keeps the seller and
+the end date of a sale that ended without a bid, arms no new end and leaves the hall listed. Go tells
+the selling clan the hall was not sold, then drops the sale, clears the end date and takes the hall
+off the listing (`clanhall.Halls.endAuctionLocked`, also reached by the admin auction end). The
+deposit stays spent. Pinned by `TestAuctionEndsWithNoBidOnAHallForSale` (`tests/npcs`).
+
+**Parity exception: re-confirming a registered clan hall sale takes no second deposit** (#5018). The
+reference takes the lease deposit again, overwrites the sale terms and answers as for a new sale. Go
+leaves the registered sale and its deposit as they are and answers with the sale's page alone
+(`clanhall.SaleAlreadyRegistered`). Pinned by `TestAuctionSaleReconfirmTakesNoSecondDeposit`
+(`tests/npcs`).
+
+**Parity exception: a clan hall sale's terms wait for the deposit** (#5018). The reference writes the
+seller, minimum bid and end date into the live auction when the sale is drafted, before the deposit
+is paid. Go keeps them in a draft until the deposit lands and times the end from the confirmed sale
+(`clanhall.Halls.DraftSale`, `ConfirmSale`). Pinned by `TestAuctionSaleRegistersOnDeposit`
+(`tests/npcs`).
+
+**Parity exception: clan hall function fees stop with the functions** (#5018). On a change of owner
+the reference drops a hall's functions but leaves their fee tasks running, so they charge the new
+owner, and cancelling a function the hall does not rent creates a level-0, fee-0 function whose term
+re-runs forever. Go stops the fees with the functions (`clanhall.Functions.RemoveAll`) and creates
+nothing for such a cancel (`Functions.Update`). Pinned by `TestRemoveAllStopsFees`,
+`TestUpdateLevelZeroRentsNothing` and `TestFunctionWithoutTermChargedOnce`
+(`internal/gameserver/clanhall`).
+
+**Parity exception: clan hall auctions resolve clans by id** (#5113). The reference resolves the
+seller, the winner and each refunded bidder by clan name and keeps a destroyed clan's bid, so a
+namesake founded later is refunded or awarded, and a sale whose highest bidder was destroyed still
+pays the seller. Go resolves every one by id, and destroying a clan withdraws its bid as a
+cancellation does; the refund finds the clan gone and pays nothing (`clanhall.Halls.ForgetClan`).
+Pinned by `TestAuctionDestroyedLoserRefundsNoNamesake`, `TestAuctionSaleWithADestroyedHighestBidder`
+(`tests/clan`) and `TestAuctionWinnerIsTheBiddingClanByID` (`tests/npcs`).
+
 ## 4. Design the native Go shape
 
 Search the Go repository for existing domain types, helpers, constructors, fixtures, and package

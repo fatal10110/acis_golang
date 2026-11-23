@@ -41,7 +41,8 @@ func TestAuctionEndsWithNoBidOnAFreeHall(t *testing.T) {
 // TestAuctionEndsWithNoBidOnAHallForSale: Bidders put Moonstone Hall, which
 // it owns, up for sale and nobody bids. When the auction ends the clan's
 // members in the world are told CLANHALL_NOT_SOLD; the hall stays Bidders'
-// and the seller's deposit is not paid back.
+// and the seller's deposit is not paid back. The sale is dropped, its end
+// cleared and the hall off the listing (#5018).
 func TestAuctionEndsWithNoBidOnAHallForSale(t *testing.T) {
 	t.Parallel()
 	end := time.Now().Add(time.Hour).UnixMilli()
@@ -60,8 +61,17 @@ func TestAuctionEndsWithNoBidOnAHallForSale(t *testing.T) {
 
 	w.srv.Advance(t, time.Hour+time.Minute)
 	wantMessages(t, "auction end", drainFrames(t, w.c), serverpackets.SystemMessageClanHallNotSold)
-	if row := storedHall(t, w, moonstone); row.owner != auctionClanID || !row.paid || row.paidUntil != paid {
-		t.Fatalf("stored Moonstone Hall = %+v, want still Bidders'", row)
+	if row := storedHall(t, w, moonstone); row.owner != auctionClanID || !row.paid || row.paidUntil != paid ||
+		row.sellerBid != 0 || row.sellerName != "" || row.sellerCln != "" || row.endDate != 0 {
+		t.Fatalf("stored Moonstone Hall = %+v, want still Bidders', no sale, no end", row)
+	}
+	if v, _ := w.srv.Halls.View(moonstone); v.Seller != nil || v.EndDate != 0 {
+		t.Fatalf("Moonstone Hall = %+v, want its sale dropped", v)
+	}
+	for _, v := range w.srv.Halls.Auctionable() {
+		if v.ID == moonstone {
+			t.Fatal("Moonstone Hall still listed for auction")
+		}
 	}
 	if got := clanAdena(t, w, auctionClanID); got != 1_000_000 {
 		t.Fatalf("Bidders' adena = %d, want 1000000: the deposit is not paid back", got)

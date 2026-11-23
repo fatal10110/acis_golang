@@ -156,7 +156,13 @@ func (l *GameClientLink) saleCommand(live *livePlayer, f *npc.Folk, cl *clan.Cla
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRegisteredForClanHall))
 		case clanhall.SaleNoAdena:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughAdenaInClanWarehouse))
+		case clanhall.SaleAlreadyRegistered:
+			// Parity exception (#5018): a sale already registered is shown
+			// again, its deposit not taken twice.
+			l.showSelectedItems(live, f, cl)
 		case clanhall.SaleIgnored:
+			// Silent: nothing was set up to confirm, and a bypass leaves no
+			// client action pending.
 		}
 	case "sale2":
 		page := fillPage(l.setPage("data/html/auction/AgitSale2.htm"),
