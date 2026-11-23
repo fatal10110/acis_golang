@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -256,5 +257,117 @@ func TestParseAPIMapRejectsMalformedLines(t *testing.T) {
 	}
 	if want := map[string]string{"Quest.giveItems": "script.GiveItems", "Player.getStatus": Inline, "ClanHall.free": Exempt, "DoorData.getDoor": "script.Door,script.DoorByID"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("parseAPIMap = %v, want %v", got, want)
+	}
+}
+
+// splitFixture returns the fixture fingerprint split over two member classes
+// of a family package: the first keeps the numbers and calls named in a, the
+// second the rest, and the hooks alternate.
+func splitFixture(t *testing.T) (map[string]Fingerprint, []string) {
+	t.Helper()
+	fps, err := Build("testdata/java")
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	whole := byClass(fps)["quest.Q900_Fixture"]
+	first := Fingerprint{Class: "quest.Q900_First", Calls: map[string]int{}}
+	second := Fingerprint{Class: "quest.Q900_Second", Calls: map[string]int{}}
+	for i, n := range whole.Numbers {
+		if i%2 == 0 {
+			first.Numbers = append(first.Numbers, n)
+		} else {
+			second.Numbers = append(second.Numbers, n)
+		}
+	}
+	for i, s := range whole.Strings {
+		if i%2 == 0 {
+			first.Strings = append(first.Strings, s)
+		} else {
+			second.Strings = append(second.Strings, s)
+		}
+	}
+	second.Chars = whole.Chars
+	i := 0
+	for row, n := range whole.Calls {
+		if i++; i%2 == 0 {
+			first.Calls[row] = n
+		} else {
+			second.Calls[row] = n
+		}
+	}
+	for i, h := range whole.Hooks {
+		if i%2 == 0 {
+			first.Hooks = append(first.Hooks, h)
+		} else {
+			second.Hooks = append(second.Hooks, h)
+		}
+	}
+	return map[string]Fingerprint{first.Class: first, second.Class: second}, []string{first.Class, second.Class}
+}
+
+// A family package is checked against the union of its member classes: the
+// literals, calls and hooks of every member count, and a literal or call the
+// reference drops from one member is a difference of the package.
+func TestCheckFamilyPackageIsComparedWithTheUnionOfItsClasses(t *testing.T) {
+	ref, classes := splitFixture(t)
+	run := func(ref map[string]Fingerprint, classes []string) []string {
+		t.Helper()
+		got, err := check(ref, fixtureAPIMap, "testdata/go/q900", classes, nil)
+		if err != nil {
+			t.Fatalf("check: %v", err)
+		}
+		return got
+	}
+	if got := run(ref, classes); len(got) != 0 {
+		t.Fatalf("a package of two classes reported against their union:\n%s", strings.Join(got, "\n"))
+	}
+	if got := run(ref, classes[:1]); len(got) == 0 {
+		t.Error("a package checked against one of its two classes passed")
+	}
+
+	for _, class := range classes {
+		fp := ref[class]
+		fp.Numbers = slices.DeleteFunc(slices.Clone(fp.Numbers), func(n string) bool { return n == "57" })
+		ref[class] = fp
+	}
+	got := run(ref, classes)
+	if !slices.ContainsFunc(got, func(p string) bool {
+		return strings.Contains(p, "number 57 is in the Go package but not in the reference")
+	}) {
+		t.Errorf("a literal dropped from the reference was not reported:\n%s", strings.Join(got, "\n"))
+	}
+
+	ref, classes = splitFixture(t)
+	for _, class := range classes {
+		fp := ref[class]
+		delete(fp.Calls, "Quest.giveItems")
+		ref[class] = fp
+	}
+	got = run(ref, classes)
+	want := []string{`quest.Q900_First+quest.Q900_Second: call Quest.giveItems is not in the reference but the Go package calls script.GiveItems`}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("problems:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	// The other direction: a literal and a call that one member of the family
+	// has in the reference, and the Go package lacks.
+	ref, classes = splitFixture(t)
+	first, second := ref[classes[0]], ref[classes[1]]
+	first.Numbers = append(slices.Clone(first.Numbers), "424242")
+	second.Calls = maps.Clone(second.Calls)
+	second.Calls["Quest.neverCalled"] = 1
+	ref[classes[0]], ref[classes[1]] = first, second
+	amap := maps.Clone(fixtureAPIMap)
+	amap["Quest.neverCalled"] = "script.NeverCalled"
+	missing, err := check(ref, amap, "testdata/go/q900", classes, nil)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	want = []string{
+		`quest.Q900_First+quest.Q900_Second: call Quest.neverCalled is in the reference but the Go package never calls script.NeverCalled`,
+		`quest.Q900_First+quest.Q900_Second: number 424242 is in the reference but not in the Go package`,
+	}
+	if !reflect.DeepEqual(missing, want) {
+		t.Errorf("problems:\n%s\nwant:\n%s", strings.Join(missing, "\n"), strings.Join(want, "\n"))
 	}
 }

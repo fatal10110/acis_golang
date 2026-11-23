@@ -31,9 +31,28 @@ import (
 //
 // Test files are not read. Problems are returned sorted.
 func CheckPackage(idx Index, dir, pageDir string, exempt ...string) ([]string, error) {
+	return CheckFiles(idx, dir, pageDir, nil, exempt...)
+}
+
+// CheckFiles is CheckPackage for the named files of the package at dir, for
+// a family package whose quests each own a page directory and keep their
+// pages in files of their own (#4712). With no files it reads the whole
+// package. A file that is not in dir is an error.
+func CheckFiles(idx Index, dir, pageDir string, files []string, exempt ...string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("scriptpages: read package %s: %w", dir, err)
+	}
+	if len(files) > 0 {
+		var picked []os.DirEntry
+		for _, f := range files {
+			i := slices.IndexFunc(entries, func(e os.DirEntry) bool { return e.Name() == f })
+			if i < 0 {
+				return nil, fmt.Errorf("scriptpages: %s is not a file of package %s", f, dir)
+			}
+			picked = append(picked, entries[i])
+		}
+		entries = picked
 	}
 	unused := make(map[string]bool, len(exempt))
 	for _, lit := range exempt {

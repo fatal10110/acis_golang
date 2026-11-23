@@ -8,8 +8,7 @@ import (
 )
 
 // TestQ61xMatchesReferenceFingerprints compares each package with the
-// reference class: literals, engine calls and hook shapes. The ids of
-// Ashutar's two chat lines are named constants in the reference, and the
+// reference class: literals, engine calls and hook shapes. The
 // 15 and 21 of Q611 are the initial sizes of its two chance maps, which Go
 // has no use for.
 func TestQ61xMatchesReferenceFingerprints(t *testing.T) {
@@ -17,7 +16,6 @@ func TestQ61xMatchesReferenceFingerprints(t *testing.T) {
 		pkg, class string
 		extra      []string
 	}{
-		{"q610", "quest.Q610_MagicalPowerOfWater_Part2", []string{"number 61050", "number 61051"}},
 		{"q611", "quest.Q611_AllianceWithVarkaSilenos", []string{"number 15", "number 21"}},
 		{"q612", "quest.Q612_WarWithKetraOrcs", nil},
 		{"q613", "quest.Q613_ProveYourCourage", nil},
@@ -42,7 +40,6 @@ func TestQ61xPagesAreInTheDatapack(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range []struct{ pkg, dir string }{
-		{"q610", "quest/Q610_MagicalPowerOfWater_Part2"},
 		{"q611", "quest/Q611_AllianceWithVarkaSilenos"},
 		{"q612", "quest/Q612_WarWithKetraOrcs"},
 		{"q613", "quest/Q613_ProveYourCourage"},
