@@ -159,7 +159,7 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
   imports another quest's package, and `Check` does not follow imports into helper packages:
   the union is what keeps a dropped literal or call visible. Per-quest page checks use
   `scriptpages.CheckFiles` on the quest's own file. `quest/raidaltar` is the first family;
-  the others fold in under #4715.
+  the others fold in under #5496.
 - **Behaviors share family packages.** A child imports its parent's package, so parents-first
   is enforced by the compiler.
 - **Catalog files are pre-created, one per owner issue** (`script/catalog/quests_301_up.go`,

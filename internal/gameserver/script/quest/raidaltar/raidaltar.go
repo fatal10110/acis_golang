@@ -39,8 +39,7 @@ func newSite(raidNPC int32, at script.Loc, called, left, trophy int32) site {
 // player's call placed one meanwhile: the call is then refused as one made
 // while the raid stood.
 func (q site) call(s *script.Script, altar *script.NPC) bool {
-	at := q.at
-	at.Heading = s.Rnd(65536)
+	at := script.Loc{X: q.at.X, Y: q.at.Y, Z: q.at.Z, Heading: s.Rnd(65536)}
 	raid := s.Spawner().AddSpawn(q.raidNPC, at, false, raidLifetime)
 	if raid == nil {
 		return false

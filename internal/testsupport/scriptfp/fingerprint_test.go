@@ -348,4 +348,26 @@ func TestCheckFamilyPackageIsComparedWithTheUnionOfItsClasses(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("problems:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
+
+	// The other direction: a literal and a call that one member of the family
+	// has in the reference, and the Go package lacks.
+	ref, classes = splitFixture(t)
+	first, second := ref[classes[0]], ref[classes[1]]
+	first.Numbers = append(slices.Clone(first.Numbers), "424242")
+	second.Calls = maps.Clone(second.Calls)
+	second.Calls["Quest.neverCalled"] = 1
+	ref[classes[0]], ref[classes[1]] = first, second
+	amap := maps.Clone(fixtureAPIMap)
+	amap["Quest.neverCalled"] = "script.NeverCalled"
+	missing, err := check(ref, amap, "testdata/go/q900", classes, nil)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	want = []string{
+		`quest.Q900_First+quest.Q900_Second: call Quest.neverCalled is in the reference but the Go package never calls script.NeverCalled`,
+		`quest.Q900_First+quest.Q900_Second: number 424242 is in the reference but not in the Go package`,
+	}
+	if !reflect.DeepEqual(missing, want) {
+		t.Errorf("problems:\n%s\nwant:\n%s", strings.Join(missing, "\n"), strings.Join(want, "\n"))
+	}
 }
