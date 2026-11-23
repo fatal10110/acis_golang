@@ -124,7 +124,7 @@ func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpack
 		return
 	}
 	requester.SendFrame(serverpackets.FrameJoinParty(req.Response))
-	l.applyPartyNotices(l.parties.Answer(requester, live, req.Response == 1))
+	l.changeParty(func() []party.Notice { return l.parties.Answer(requester, live, req.Response == 1) })
 	if req.Response == 1 {
 		l.applyRoomNotices(l.rooms.PartyJoined(requester, live))
 	}
@@ -134,12 +134,12 @@ func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpack
 // leads. Anyone else, or a name no member has, expels nobody and hears
 // nothing.
 func (l *GameClientLink) requestOustPartyMember(live *livePlayer, req clientpackets.TargetName) {
-	l.applyOwnPartyNotices(live, l.parties.Expel(live.ObjectID(), req.Name))
+	l.changeOwnParty(live, func() []party.Notice { return l.parties.Expel(live.ObjectID(), req.Name) })
 }
 
 // requestChangePartyLeader hands the party live leads to the named member.
 func (l *GameClientLink) requestChangePartyLeader(live *livePlayer, req clientpackets.TargetName) {
-	l.applyPartyNotices(l.parties.ChangeLeader(live, req.Name))
+	l.changeParty(func() []party.Notice { return l.parties.ChangeLeader(live, req.Name) })
 }
 
 // leaveParty takes a player leaving the world out of its party.
@@ -147,7 +147,7 @@ func (l *GameClientLink) leaveParty(live *livePlayer) {
 	if l.parties == nil {
 		return
 	}
-	l.applyPartyNotices(l.parties.Leave(live, party.Disconnected))
+	l.changeParty(func() []party.Notice { return l.parties.Leave(live, party.Disconnected) })
 	l.parties.Forget(live.ObjectID())
 }
 
@@ -173,15 +173,28 @@ func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 	})
 }
 
-// applyOwnPartyNotices is applyPartyNotices for a party change made by a
-// task of live's own queue: a festival that takes live out of its arena
-// then does it inside the call, before the notices that follow, while every
-// other member's removal is still posted to its own queue.
-func (l *GameClientLink) applyOwnPartyNotices(live *livePlayer, notices []party.Notice) {
-	live.RunOnOwnQueue(func() { l.applyPartyNotices(notices) })
+// changeOwnParty is changeParty for a party change made by a task of
+// live's own queue: a festival that takes live out of its arena then does
+// it inside the call, before the notices that follow, while every other
+// member's removal is still posted to its own queue. When another
+// goroutine is delivering party notices, it delivers these too, and live's
+// removal is posted to live's queue like any other.
+func (l *GameClientLink) changeOwnParty(live *livePlayer, decide func() []party.Notice) {
+	live.RunOnOwnQueue(func() { l.changeParty(decide) })
 }
 
-// applyPartyNotices sends the packets of a party change, in order.
+// changeParty makes the party changes decide makes and sends their
+// notices to the clients in the order every party change was decided, so
+// that two changes racing on different queues never reach a member in the
+// opposite order (#5144). decide must only call the party registry; the
+// notices may be sent by another goroutine delivering earlier ones, after
+// changeParty has returned.
+func (l *GameClientLink) changeParty(decide func() []party.Notice) {
+	l.partyNotices.Change(decide, l.applyPartyNotices)
+}
+
+// applyPartyNotices sends the packets of a party change, in order. Only
+// changeParty calls it, so that changes reach clients in decision order.
 func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 	for _, n := range notices {
 		switch n := n.(type) {
@@ -255,7 +268,7 @@ func (l *GameClientLink) festivalPartyChanged(member *livePlayer, members []*liv
 		return
 	}
 	if l.festival.UpdateParticipants(member.ObjectID(), festivalMembers(members)) && l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(member, party.Expelled))
+		l.changeParty(func() []party.Notice { return l.parties.Leave(member, party.Expelled) })
 	}
 }
 

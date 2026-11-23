@@ -400,6 +400,7 @@ type GameClientLink struct {
 	inventory        *invops.Service
 	trades           *tradebook.Book
 	parties          *partyRegistry
+	partyNotices     party.Delivery
 	rooms            *roomRegistry
 	duels            *duelRegistry
 	partyPositions   partyPositions

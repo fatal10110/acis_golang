@@ -103,7 +103,7 @@ func (l *GameClientLink) enterOlympiadObserverMode(live *livePlayer, id int) boo
 	}
 	l.dropAllSummons(live)
 	if l.parties != nil {
-		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
+		l.changeOwnParty(live, func() []party.Notice { return l.parties.Leave(live, party.Expelled) })
 	}
 	live.SetOlympiadGameID(id)
 	live.Character.StandUp()

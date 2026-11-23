@@ -10,13 +10,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 )
 
-// partyLootEligible accepts a member that may take one itemID from origin
-// under a random or by-turn loot rule: alive, not leaving the world, with
-// room for it, and within partyRange of origin, body to body in 3D.
-func partyLootEligible(partyRange int, itemID int32, origin party.LootOrigin) func(*livePlayer) bool {
+// partyLootEligible accepts a member that may take units of itemID from
+// origin under a random or by-turn loot rule: alive, not leaving the world,
+// with room for all of them, and within partyRange of origin, body to body
+// in 3D. units is how many a non-stackable arrives as: the whole count under
+// the multiple item drop rule, else one (#5098).
+func partyLootEligible(partyRange int, itemID int32, units int, origin party.LootOrigin) func(*livePlayer) bool {
 	return func(m *livePlayer) bool {
 		inv := m.Inventory()
-		return !m.Dead() && !m.Detaching() && inv != nil && inv.ValidateCapacityByItemID(itemID, 1) && party.InRange(partyRange, origin, m)
+		return !m.Dead() && !m.Detaching() && inv != nil && inv.ValidateCapacityByItemID(itemID, units) && party.InRange(partyRange, origin, m)
 	}
 }
 
@@ -104,7 +106,11 @@ func (l *GameClientLink) lootForParty(picker *livePlayer, itemID int32, count in
 		return ok
 	}
 	rewards := l.killRewards.Settings()
-	looter, members, ok := l.parties.Looter(picker.ObjectID(), spoil, partyLootEligible(rewards.PartyRange, itemID, origin))
+	units := 1
+	if rewards.MultipleItemDrop {
+		units = count
+	}
+	looter, members, ok := l.parties.Looter(picker.ObjectID(), spoil, partyLootEligible(rewards.PartyRange, itemID, units, origin))
 	if !ok {
 		return false
 	}
