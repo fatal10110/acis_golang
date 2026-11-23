@@ -523,7 +523,13 @@ func TestQ334WishRefusals(t *testing.T) {
 		}
 		draws.queue(0)
 		wantLines(t, "one first line", w.advance(t, 3*time.Second), say("matild", q334Matild, 33415))
-		w.advance(t, 8*time.Second)
+		// The two later timers are armed from the clock when the one before
+		// them runs, so on the real pool the chain ends a little past the 11
+		// seconds: wait for the wish to be settled instead of a fixed point.
+		w.advance(t, 7*time.Second)
+		w.srv.AdvanceUntil(t, "the exchange settled", func() bool {
+			return questRows(t, w.srv, w.player, q334Name)["exchange"] == "0"
+		})
 		q334Row(t, w, "exchange", "0")
 		if n := w.srv.PlayerItemCount(t, w.player, 3469); n != 1 {
 			t.Fatalf("%d certificates, want 1 from the one wish", n)
