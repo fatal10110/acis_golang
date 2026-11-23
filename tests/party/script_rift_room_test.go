@@ -124,9 +124,20 @@ func TestScriptRoomFollowsItsParty(t *testing.T) {
 		if p.IsPartyLeader() {
 			t.Error("Leader still leads after handing the party over")
 		}
-		copied.SetPartyFrom(room)
-		if !copied.HoldsPartyOf(p) || copied.PartyChanged() {
-			t.Error("a room given another room's party does not hold it unchanged")
+		if !room.MovePartyTo(copied) {
+			t.Fatal("the hand-over to an unlocked room failed")
+		}
+		if !copied.Locked() || !copied.HoldsPartyOf(p) || copied.PartyChanged() {
+			t.Error("a room handed another room's party is not locked holding it unchanged")
+		}
+		if room.Locked() || room.HoldsPartyOf(p) || room.PartyMembers() != nil || room.MemberIDs() != nil {
+			t.Error("the room that handed its party over still holds it")
+		}
+		if room.MovePartyTo(copied) {
+			t.Error("a room holding no party handed one over")
+		}
+		if !copied.MovePartyTo(room) || !room.HoldsPartyOf(p) || room.PartyChanged() {
+			t.Fatal("the hand-over back did not restore the room's party")
 		}
 		before := sc.CurrentTick()
 		copied.SetLock(true)

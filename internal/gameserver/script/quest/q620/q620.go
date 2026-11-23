@@ -240,10 +240,12 @@ func New() script.Script {
 				[]int32{namelessSpirit, ghostOfWigoth1, ghostOfWigoth2, ghostChamberlain}, managers, gatekeepers,
 			),
 			script.EventCreated: slices.Concat(gatekeepers, managers, []int32{ghostOfWigoth1}),
+			script.EventDecayed: {ghostOfWigoth1},
 			script.EventMyDying: slices.Concat(droppers, []int32{halishaAlectia, halishaTishas, halishaMekara, halishaMorigul}),
 		},
 		Hooks: script.Hooks{
-			OnCreated: onCreated, OnEvent: onAdvEvent, OnMyDying: onMyDying, OnTalk: onTalk, OnTimer: onTimer,
+			OnCreated: onCreated, OnDecayed: onDecayed, OnEvent: onAdvEvent, OnMyDying: onMyDying, OnTalk: onTalk,
+			OnTimer: onTimer,
 		},
 	}
 }
@@ -274,6 +276,14 @@ func onCreated(s *script.Script, e script.Created) {
 	}
 	if npcID == ghostOfWigoth1 {
 		s.StartTimerAtFixedRate(timerWigothWatch, e.NPC, nil, 1000*time.Millisecond, 1000*time.Millisecond)
+	}
+}
+
+// onDecayed stops the watch of a ghost of Wigoth that left: each ghost is
+// a one-off spawn, so a watch outliving it would tick forever (#5168).
+func onDecayed(s *script.Script, e script.Decayed) {
+	if e.NPC.NpcID() == ghostOfWigoth1 {
+		s.CancelTimer(timerWigothWatch, e.NPC, nil)
 	}
 }
 

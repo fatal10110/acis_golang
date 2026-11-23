@@ -106,6 +106,8 @@ var approvedAdditions = map[string]struct{ hooks, binds []string }{
 	// #5162: the pure unicorn frees its cell when it decays, so a quester
 	// can summon it again.
 	"quest.Q242_PossessorOfAPreciousSoul": {hooks: []string{"onDecayed"}, binds: []string{"bind DECAYED 31747"}},
+	// #5168: the Ghost of Wigoth stops its watch timer when it decays.
+	"quest.Q620_FourGoblets": {hooks: []string{"onDecayed"}, binds: []string{"bind DECAYED 31452"}},
 }
 
 // applyApprovedDivergences rewrites the reference bind lines and adds the
