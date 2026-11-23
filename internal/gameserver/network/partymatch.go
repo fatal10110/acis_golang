@@ -170,11 +170,15 @@ func (l *GameClientLink) requestListWaitingPlayers(live *livePlayer, req clientp
 // of a room then leaves the room too. A player in no party leaves nothing
 // and hears nothing: the menu action waits on no answer.
 func (l *GameClientLink) withdrawParty(live *livePlayer) {
-	notices := l.parties.Leave(live, party.Left)
-	if notices == nil {
+	left := false
+	l.changeOwnParty(live, func() []party.Notice {
+		notices := l.parties.Leave(live, party.Left)
+		left = notices != nil
+		return notices
+	})
+	if !left {
 		return
 	}
-	l.applyOwnPartyNotices(live, notices)
 	l.applyRoomNotices(l.rooms.LeaveWithParty(live))
 }
 

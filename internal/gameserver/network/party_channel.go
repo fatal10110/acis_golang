@@ -65,7 +65,7 @@ func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpa
 		return
 	}
 	if !forms {
-		l.applyPartyNotices(l.parties.JoinFormedChannel(requester, live))
+		l.changeParty(func() []party.Notice { return l.parties.JoinFormedChannel(requester, live) })
 		return
 	}
 	// Forming a channel is authorized, and its Strategy Guide paid, on the
@@ -73,7 +73,7 @@ func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpa
 	if !l.commandChannelAuthority(requester, true) {
 		return
 	}
-	l.applyPartyNotices(l.parties.JoinChannel(requester, live))
+	l.changeParty(func() []party.Notice { return l.parties.JoinChannel(requester, live) })
 }
 
 // requestOustFromChannel dismisses the named player's party from the
@@ -88,16 +88,18 @@ func (l *GameClientLink) requestOustFromChannel(live *livePlayer, req clientpack
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 		return
 	}
-	status, notices := l.parties.Oust(live, target.ObjectID())
+	var status party.OustStatus
+	l.changeParty(func() []party.Notice {
+		var notices []party.Notice
+		status, notices = l.parties.Oust(live, target.ObjectID())
+		return notices
+	})
 	switch status {
 	case party.OustInvalidTarget:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
-		return
 	case party.OustNotAuthorized:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
-		return
 	}
-	l.applyPartyNotices(notices)
 }
 
 // requestChannelPartyMembers lists the members of the party the given

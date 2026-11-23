@@ -56,7 +56,7 @@ func (l *GameClientLink) festivalGuideBypass(live *livePlayer, f *npc.Folk, comm
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	if reply.Expel && l.parties != nil {
-		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
+		l.changeOwnParty(live, func() []party.Notice { return l.parties.Leave(live, party.Expelled) })
 	}
 	return true
 }
