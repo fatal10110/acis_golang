@@ -126,6 +126,17 @@ func (c *Character) SetPunishment(kind Punishment, minutes int32) PunishmentChan
 	return PunishmentKept
 }
 
+// ReplacePunishment is SetPunishment applied only while c serves expected:
+// the check and the change are one step on the owner's queue, so a
+// punishment that landed after the caller looked is never replaced or
+// lifted by mistake (#5129).
+func (c *Character) ReplacePunishment(expected, kind Punishment, minutes int32) PunishmentChange {
+	if Punishment(c.punishment.kind.Load()) != expected {
+		return PunishmentKept
+	}
+	return c.SetPunishment(kind, minutes)
+}
+
 // SetPunishmentTimer sets c's punishment timer to ms milliseconds.
 func (c *Character) SetPunishmentTimer(ms int64) {
 	c.punishment.timer.Store(ms)

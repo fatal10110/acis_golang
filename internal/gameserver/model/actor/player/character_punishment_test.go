@@ -18,3 +18,32 @@ func TestSetPunishmentBanKeepsState(t *testing.T) {
 		}
 	}
 }
+
+// TestReplacePunishmentChecksCurrent pins #5129: a replacement applies only
+// over the punishment the caller expects, so an unban of a chat ban never
+// lifts a jail term that landed meanwhile, and a chat ban over one that did
+// is reported kept.
+func TestReplacePunishmentChecksCurrent(t *testing.T) {
+	c := &Character{ID: 1}
+	c.RestorePunishment(int(PunishJail), 60000)
+	if got := c.ReplacePunishment(PunishChat, PunishNone, 0); got != PunishmentKept {
+		t.Fatalf("lift of a chat ban over a jail = %d, want PunishmentKept", got)
+	}
+	if got := c.ReplacePunishment(PunishNone, PunishChat, 5); got != PunishmentKept {
+		t.Fatalf("chat ban over a jail = %d, want PunishmentKept", got)
+	}
+	if got, timer := c.Punishment(); got != PunishJail || timer != 60000 {
+		t.Fatalf("punishment = %d/%d, want the jail 60000", got, timer)
+	}
+
+	c.RestorePunishment(int(PunishChat), 0)
+	if got := c.ReplacePunishment(PunishChat, PunishNone, 0); got != ChatBanLifted {
+		t.Fatalf("lift of a served chat ban = %d, want ChatBanLifted", got)
+	}
+	if got := c.ReplacePunishment(PunishNone, PunishChat, 5); got != ChatBanStarted {
+		t.Fatalf("chat ban over none = %d, want ChatBanStarted", got)
+	}
+	if got, timer := c.Punishment(); got != PunishChat || timer != PunishmentMillis(5) {
+		t.Fatalf("punishment = %d/%d, want a 5-minute chat ban", got, timer)
+	}
+}

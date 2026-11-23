@@ -1111,6 +1111,9 @@ func bootGeo(geo move.Geo) move.Geo {
 
 // Server is a booted gameserver stack plus its first connected client.
 type Server struct {
+	// loginLinkDown hides the login server link from the game server; see
+	// DropLoginLink.
+	loginLinkDown *atomic.Bool
 	// effectRest is the part of a second AdvanceWithEffects has passed
 	// since its last effect sweep; only the test goroutine touches it.
 	effectRest time.Duration
@@ -2199,6 +2202,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	linked.Store(loginLink)
 	cleanup(t, func() { loginLink.Close() })
+	// loginLinkDown makes the game server see no login server link, as
+	// production's link holder does while the login server is away.
+	loginLinkDown := new(atomic.Bool)
 
 	state := world.New()
 	taskEffects := task.NewEffects()
@@ -2433,12 +2439,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			SkillRoll: o.skillEnchantRoll,
 			ArmorSets: o.armorSets,
 		},
-		KillRewards:      killRewards,
-		Events:           events,
-		QuestRates:       questRates,
-		Merchant:         shops,
-		Effects:          effectEnv,
-		LoginLink:        func() *network.LoginLink { return loginLink },
+		KillRewards: killRewards,
+		Events:      events,
+		QuestRates:  questRates,
+		Merchant:    shops,
+		Effects:     effectEnv,
+		LoginLink: func() *network.LoginLink {
+			if loginLinkDown.Load() {
+				return nil
+			}
+			return loginLink
+		},
 		Roster:           roster,
 		Subclasses:       subclasses,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
@@ -2886,6 +2897,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
+		loginLinkDown:       loginLinkDown,
 		idleReads:           idle,
 		shutdown:            shutdownState,
 		Client:              c,
@@ -3092,3 +3104,8 @@ func serviceTimer[T interface{ Stop() bool }](queue *sim.Queue, hook func(time.D
 		return any(t).(T)
 	}
 }
+
+// DropLoginLink makes the game server see no login server link from now
+// on, as while the login server is away: requests it would send there
+// fail.
+func (s *Server) DropLoginLink() { s.loginLinkDown.Store(true) }

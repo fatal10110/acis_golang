@@ -56,7 +56,26 @@ const (
 // told and moved as the change requires, and the result is stored.
 // PunishNone lifts a chat ban or a jail term.
 func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minutes int32) {
-	switch live.SetPunishment(kind, minutes) {
+	l.applyPunishmentChange(live, live.SetPunishment(kind, minutes), minutes)
+	l.storePunishment(live)
+}
+
+// punishIf is punish applied only while live serves expected, checked and
+// changed in one step on live's queue (#5129). It reports what changed;
+// nothing is told, moved or stored when nothing did.
+func (l *GameClientLink) punishIf(live *livePlayer, expected, kind player.Punishment, minutes int32) player.PunishmentChange {
+	change := live.ReplacePunishment(expected, kind, minutes)
+	if change != player.PunishmentKept {
+		l.applyPunishmentChange(live, change, minutes)
+		l.storePunishment(live)
+	}
+	return change
+}
+
+// applyPunishmentChange tells and moves live as change requires, on live's
+// queue; minutes is the term of a punishment change started.
+func (l *GameClientLink) applyPunishmentChange(live *livePlayer, change player.PunishmentChange, minutes int32) {
+	switch change {
 	case player.ChatBanLifted:
 		live.stopPunishTimer(true)
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
@@ -96,23 +115,26 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 		l.endObservationInPlace(live)
 		l.punishTeleportLivePlayer(live, jailLocation, jailEntryOffset, jailedOutside(live))
 	}
-	l.storePunishment(live)
 }
 
 // enterWorldPunishment resumes, at login, the punishment live serves: a
 // timed one restarts its timer, with a reminder of the minutes left, and a
-// jailed player found outside the jail is taken back.
+// jailed player found outside the jail is taken back. A player found in the
+// jail without a jail term, as a jail cleared without moving the character
+// leaves it, is released to Floran village instead (#5128).
 func (l *GameClientLink) enterWorldPunishment(live *livePlayer) {
 	kind, timer := live.Punishment()
-	if kind == player.PunishNone {
-		return
-	}
-	if timer > 0 {
+	if kind != player.PunishNone && timer > 0 {
 		l.armPunishTimer(live)
 		sendText(live, "You are still "+kind.Description()+" for "+strconv.Itoa(int(player.PunishmentMinutesLeft(timer)))+" minutes.")
 	}
-	if kind == player.PunishJail && !inJail(live) {
+	switch {
+	case kind == player.PunishJail && !inJail(live):
 		l.punishTeleportLivePlayer(live, jailLocation, jailReturnOffset, jailedOutside(live))
+	case kind != player.PunishJail && inJail(live):
+		l.punishTeleportLivePlayer(live, jailReleaseLocation, jailReleaseOffset, func() bool {
+			return !jailed(live) && inJail(live)
+		})
 	}
 }
 
