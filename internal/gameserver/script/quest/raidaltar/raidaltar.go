@@ -1,8 +1,9 @@
 // Package raidaltar holds the quests whose altar calls a raid: a player spends
 // the quest's token on an altar, the altar is removed and the raid takes its
 // place for a while, and the one who slays it earns the trophy. The quests are
-// one family in one package, checked against the union of their reference
-// classes (#4712); each quest keeps its own dialogue in its own file.
+// one family in one package, whose literals and calls are checked as the
+// union of its quests (#4712); each quest keeps its own dialogue in its own
+// file.
 package raidaltar
 
 import (
