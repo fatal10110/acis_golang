@@ -22,8 +22,6 @@ func (s *electionStore) BestNoble(_ context.Context, classID, _ int) (int32, str
 	return id, fmt.Sprint("h", id), ok, nil
 }
 
-func (s *electionStore) DeleteHeroItems(context.Context) error { return nil }
-
 func (s *electionStore) ClanID(context.Context, int32) (int32, bool, error) { return 0, false, nil }
 
 func newElectionManager(store *electionStore) *Manager {
@@ -40,7 +38,7 @@ func electedOrder(t *testing.T, m *Manager, store *electionStore, ids ...int32) 
 		store.picks[88+k] = id
 		byName[fmt.Sprint("h", id)] = id
 	}
-	m.Elect(context.Background())
+	m.Elect()
 	var out []int32
 	for _, h := range m.Heroes() {
 		id, ok := byName[h.Name]

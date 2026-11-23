@@ -240,6 +240,7 @@ type options struct {
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
+	wrapHeroStore          func(hero.Store) hero.Store
 	olympiadWindow         *olympiadWindow
 	olympiadConfig         func(*olympiad.Config)
 	olympiadDraw           func(n int) int
@@ -2601,7 +2602,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// The Olympiad's records are restored once the characters are seeded,
 	// below; its calendar is started only for WithOlympiadCompetition or
 	// WithOlympiadValidation.
-	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), hero.TableNames{NPCs: o.npcs, Castles: gclConfig.Castles}, persistWorker, HeroMinMatches, time.Now, o.log)
+	var heroStore hero.Store = gamesql.NewHeroStore(db)
+	if o.wrapHeroStore != nil {
+		heroStore = o.wrapHeroStore(heroStore)
+	}
+	heroes := hero.New(heroStore, gclConfig.Clans.Table(), hero.TableNames{NPCs: o.npcs, Castles: gclConfig.Castles}, persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
 	olympiadQueue := queues.NewQueue("olympiad")
 	olympiadCfg := o.olympiadWindow.config(olympiadQueue.Now())
