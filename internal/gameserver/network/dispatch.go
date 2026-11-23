@@ -113,7 +113,7 @@ type hennaStore interface {
 // writes. Satisfied by *sql.SubclassStore.
 type subclassStore interface {
 	Insert(ctx context.Context, charID int32, sub player.SubClass) error
-	Delete(ctx context.Context, charID int32, index int) error
+	Replace(ctx context.Context, charID int32, sub player.SubClass) error
 }
 
 // recipeBookStore reads and writes the character_recipebook rows of one
