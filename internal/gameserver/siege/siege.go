@@ -611,6 +611,10 @@ func (s *Siege) CheckSides(clanID int32, sides ...Side) bool {
 func (s *Siege) OnOppositeSides(a, b int32) bool {
 	s.e.mu.Lock()
 	defer s.e.mu.Unlock()
+	return s.oppositeLocked(a, b)
+}
+
+func (s *Siege) oppositeLocked(a, b int32) bool {
 	sa, sb := s.sideLocked(a), s.sideLocked(b)
 	if sa == SideNone || sb == SideNone {
 		return false

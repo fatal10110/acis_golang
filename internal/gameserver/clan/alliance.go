@@ -305,7 +305,8 @@ func (s *Service) checkAllyJoinLocked(requesterID int32, target *player.Characte
 }
 
 // JoinAlly puts target's clan into the alliance requesterID's clan leads,
-// re-checking the invitation rules first. The clan takes the alliance's
+// re-checking the invitation rules first; the siege sides are checked
+// again in the same step as the join. The clan takes the alliance's
 // name and crest and drops any alliance penalty it had.
 func (s *Service) JoinAlly(requesterID int32, target *player.Character, now time.Time, sieges Sieges) AllyJoinCheck {
 	s.allyMu.Lock()
@@ -316,10 +317,17 @@ func (s *Service) JoinAlly(requesterID int32, target *player.Character, now time
 	}
 	info := leader.Info()
 	joined := check.Target
-	joined.mu.Lock()
-	s.setAllyCrestLocked(joined, info.AllyCrestID)
-	s.setAllyLocked(joined, info.AllyID, info.AllyName, 0, 0)
-	joined.mu.Unlock()
+	// allyMu keeps every other rule as checked; the sieges hold their
+	// registrations still from their own check to the write, so the clan
+	// cannot register against the alliance in between (#5146).
+	if !siegeUnopposed(sieges, leader.id, joined.id, func() {
+		joined.mu.Lock()
+		s.setAllyCrestLocked(joined, info.AllyCrestID)
+		s.setAllyLocked(joined, info.AllyID, info.AllyName, 0, 0)
+		joined.mu.Unlock()
+	}) {
+		check.Refusal = AllyJoinOpposedInSiege
+	}
 	return check
 }
 

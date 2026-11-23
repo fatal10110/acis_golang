@@ -54,6 +54,9 @@ type siegeRestarter struct {
 	hall bool
 	// hq gives the player's clan a siege headquarters at siegeHQPoint.
 	hq bool
+	// hqOff stands that headquarters off the battlefield instead, as one
+	// left over from a siege no longer fought there.
+	hqOff bool
 }
 
 // bootSiegeRestart boots r stored dead inside castle restartCastleID's
@@ -135,7 +138,11 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 		}
 	}
 	if r.hq {
-		putUpRestartHQ(t, srv)
+		at := siegeHQPoint
+		if r.hqOff {
+			at.X = 20_000
+		}
+		putUpRestartHQ(t, srv, at)
 	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	c.Send(encodeRequestGameStart(0))

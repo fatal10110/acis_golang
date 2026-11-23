@@ -13,37 +13,58 @@ import (
 const siegeVictoryMusic = "Siege_Victory"
 
 // setCastleOwner gives c to cl, reporting false when cl already owns a
-// castle. The clan that held c loses it; its leader, riding a wyvern, is
-// dismounted. cl's members in the world then see its clan header refreshed
-// and hear the siege victory music, each on its own queue, behind what was
-// posted there before. actor is the player whose queue the caller runs on;
-// it gets them inline, ahead of what the caller sends it next. The
-// engraving path passes nil, since the engraver must hear the engraving
-// notice it posted to its own queue first. A siege under way at the castle
-// then turns to its new owner (siege.Siege.MidVictory).
+// castle, and tells of it (seizeCastle). A siege under way at the castle
+// then turns to its new owner (siege.Siege.MidVictory). actor is the
+// player whose queue the caller runs on.
 func (l *GameClientLink) setCastleOwner(actor *livePlayer, c *castle.Castle, cl *clan.Clan) bool {
-	former, ok := l.castles.SetOwner(c, cl)
+	told, ok := l.seizeCastle(actor, c, cl)
 	if !ok {
 		return false
 	}
-	if former != nil {
-		if leader, online := l.livePlayerByID(former.LeaderID()); online {
-			onMemberQueue(actor, leader, func() {
-				if leader.MountType() == player.MountTypeWyvern {
-					leader.Character.Dismount()
-				}
-			})
-		}
+	told()
+	l.castleMidVictory(c)
+	return true
+}
+
+// seizeCastle gives c to cl, reporting false when cl already owns a castle,
+// and returns the telling of it. The clan that held c loses it; its leader,
+// riding a wyvern, is dismounted. cl's members in the world then see its
+// clan header refreshed and hear the siege victory music, each on its own
+// queue, behind what was posted there before. actor is the player whose
+// queue the telling runs on; it gets them inline, ahead of what the caller
+// sends it next. The engraving passes nil, since the engraver must hear the
+// engraving notice it posted to its own queue first, and gives the castle
+// under the siege's lock: the castle changes hands here, the telling waits
+// for the returned call.
+func (l *GameClientLink) seizeCastle(actor *livePlayer, c *castle.Castle, cl *clan.Clan) (told func(), ok bool) {
+	former, ok := l.castles.SetOwner(c, cl)
+	if !ok {
+		return nil, false
 	}
-	l.broadcastToClanQueued(cl, actor,
-		func() wire.Frame { return framePledgeShowInfoUpdate(cl) },
-		func() wire.Frame {
-			return serverpackets.FramePlaySoundAt(serverpackets.Sound{Type: 1, File: siegeVictoryMusic})
-		})
+	return func() {
+		if former != nil {
+			if leader, online := l.livePlayerByID(former.LeaderID()); online {
+				onMemberQueue(actor, leader, func() {
+					if leader.MountType() == player.MountTypeWyvern {
+						leader.Character.Dismount()
+					}
+				})
+			}
+		}
+		l.broadcastToClanQueued(cl, actor,
+			func() wire.Frame { return framePledgeShowInfoUpdate(cl) },
+			func() wire.Frame {
+				return serverpackets.FramePlaySoundAt(serverpackets.Sound{Type: 1, File: siegeVictoryMusic})
+			})
+	}, true
+}
+
+// castleMidVictory turns a siege under way at c to the castle's owner
+// (siege.Siege.MidVictory).
+func (l *GameClientLink) castleMidVictory(c *castle.Castle) {
 	if s, ok := l.castleSiege(int32(c.ID)); ok && s.InProgress() {
 		s.MidVictory()
 	}
-	return true
 }
 
 // removeCastleOwner takes c from the clan owning it, reporting false when c

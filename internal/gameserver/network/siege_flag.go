@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -89,7 +90,8 @@ func (l *GameClientLink) siegeFlagAfterCanCast(live *livePlayer) func() error {
 // siegeFlagHandler lands a SIEGE_FLAG skill: once the headquarters check
 // passes again, told to no one when it does not, a siege headquarters of
 // the caster's clan stands where the caster does, facing its way, with
-// twice the HP for an advanced one.
+// twice the HP for an advanced one. It falls again at once when the siege
+// it was put up for is no longer one the clan attacks.
 type siegeFlagHandler struct{ l *GameClientLink }
 
 func (siegeFlagHandler) Types() []string { return []string{"SIEGE_FLAG"} }
@@ -121,7 +123,28 @@ func (h siegeFlagHandler) Use(c skillhandler.Cast) {
 	if !flag.StandFor(cl) {
 		// Another headquarters of the clan went up meanwhile.
 		flag.DeleteNow()
+		return
 	}
+	// The siege may have ended, or turned the clan to defend, since the
+	// check: its end dropped the headquarters the clan held then, so one
+	// stood after it is dropped here (#5143).
+	if !l.headquartersInSiege(cl.ID(), flag, true) {
+		cl.DropHeadquartersOf(flag.ObjectID())
+	}
+}
+
+// headquartersInSiege reports whether hq, the headquarters clanID holds,
+// stands on the battlefield of a siege in progress it fights for: a castle
+// siege the clan attacks, else a clan hall siege, which the clan must
+// attack when registered is set. Headquarters outside their own running
+// siege are ignored (#5143).
+func (l *GameClientLink) headquartersInSiege(clanID int32, hq clan.Headquarters, registered bool) bool {
+	x, y, z := hq.Position()
+	if s, ok := l.sieges.ActiveAt(x, y, z); ok {
+		return s.Side(clanID) == siege.SideAttacker
+	}
+	hs, ok := l.halls.ActiveSiegeAt(x, y, z)
+	return ok && (!registered || hs.Registered(clanID))
 }
 
 // warnHeadquartersAttacked tells the members of the clan the siege

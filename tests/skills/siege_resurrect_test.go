@@ -268,7 +268,7 @@ func TestSiegeResurrectCastGate(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
 		setup  siegeResSetup
-		hq     bool
+		hq     int // a headquarters of Knights stands this far east of the Caster, 0 for none
 		felled bool
 		refuse int
 	}{
@@ -280,7 +280,9 @@ func TestSiegeResurrectCastGate(t *testing.T) {
 		{name: "owner with a life tower standing", setup: siegeResSetup{side: "OWNER"}},
 		{name: "owner once no life tower stands", setup: siegeResSetup{side: "OWNER"}, felled: true, refuse: serverpackets.SystemMessageTowerDestroyedNoResurrection},
 		{name: "attacker without headquarters", setup: siegeResSetup{side: "ATTACKER"}, refuse: serverpackets.SystemMessageNoResurrectionWithoutBaseCamp},
-		{name: "attacker with headquarters", setup: siegeResSetup{side: "ATTACKER"}, hq: true},
+		{name: "attacker with headquarters", setup: siegeResSetup{side: "ATTACKER"}, hq: 300},
+		// #5143: a headquarters standing on no siege in progress is ignored.
+		{name: "attacker with headquarters off the battlefield", setup: siegeResSetup{side: "ATTACKER"}, hq: 3000, refuse: serverpackets.SystemMessageNoResurrectionWithoutBaseCamp},
 		{name: "attacker without headquarters off the battlefield", setup: siegeResSetup{side: "ATTACKER", offBattlefield: true}},
 		{name: "no clan off the battlefield", setup: siegeResSetup{noClan: true, offBattlefield: true}},
 		{name: "attacker without headquarters before the siege", setup: siegeResSetup{side: "ATTACKER", noSiege: true}},
@@ -288,8 +290,8 @@ func TestSiegeResurrectCastGate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			s := bootSiegeResScene(t, tt.setup, nil)
-			if tt.hq {
-				s.headquarters(t, 3000)
+			if tt.hq != 0 {
+				s.headquarters(t, tt.hq)
 			}
 			if tt.felled {
 				s.felled(t)
@@ -326,7 +328,7 @@ func TestSiegeResurrectScrollGate(t *testing.T) {
 			t.Parallel()
 			s := bootSiegeResScene(t, siegeResSetup{side: "ATTACKER"}, map[int32]int32{resurrectionScrollID: 1}, resurrectionScrollTemplates())
 			if hq {
-				s.headquarters(t, 3000)
+				s.headquarters(t, 300)
 			}
 			s.killStranger(t)
 
