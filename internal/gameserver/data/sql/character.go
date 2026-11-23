@@ -365,9 +365,12 @@ func (s *CharacterStore) SetOnline(ctx context.Context, objectID int32, lastAcce
 // owns - its items, the items its pets carry, shortcuts, macros, memos,
 // quest journal, hennas, recipe book, subclasses, skills, skill-save state,
 // pets, item augmentations, the friend and block relations naming it on
-// either side, its Olympiad and hero records - as one transaction, so a failure or
-// cancellation partway through leaves all of them in place instead of
-// orphaning owned rows behind a deleted character.
+// either side, its Olympiad and hero records, raid points, Seven Signs
+// record, bookmarks, buffer schemes and the marriage it is in on either
+// side - as one transaction, so a failure or cancellation partway through
+// leaves all of them in place instead of orphaning owned rows behind a
+// deleted character. The same transaction retires the character's object
+// id, which is never handed out again (#4676).
 //
 // The items its pets carry are saved under the character, at the pet
 // locations, so they go with its own items. Pets and augmentations of the
@@ -446,6 +449,23 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM seven_signs WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d seven signs: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM bookmarks WHERE obj_Id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d bookmarks: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM buffer_schemes WHERE object_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d buffer schemes: %w", objectID, err)
+	}
+	// Either spouse's deletion ends the marriage (#4676).
+	if _, err := tx.ExecContext(ctx, "DELETE FROM mods_wedding WHERE requesterId = ? OR partnerId = ?", objectID, objectID); err != nil {
+		return false, fmt.Errorf("purge character %d marriage: %w", objectID, err)
+	}
+	// The id is retired, never handed out again, so no row the deletion
+	// missed can attach to a later object (#4676).
+	if n > 0 {
+		if _, err := tx.ExecContext(ctx, "INSERT IGNORE INTO retired_object_ids (object_id) VALUES (?)", objectID); err != nil {
+			return false, fmt.Errorf("purge character %d retire id: %w", objectID, err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
