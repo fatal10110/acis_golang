@@ -55,8 +55,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk pays 50 reputation points a claw. A payer who left the clan
-// panics once the claws are taken.
+// onTalk pays 50 reputation points a claw. A payer who no longer leads a
+// clan is refused before any claw is taken (#5167).
 func onTalk(s *script.Script, e script.Talk) string {
 	st := s.QuestState(e.Player, questName)
 	htmltext := script.NoQuestMsg()
@@ -71,6 +71,10 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "31331-1.htm"
 		}
 	case questlog.StatusStarted:
+		if !e.Player.IsClanLeader() {
+			// The payer left the clan or its lead: nothing is taken (#5167).
+			return "31331-0.htm"
+		}
 		count := 50 * s.TakeAllItems(e.Player, tyrannosaurusClaw)
 		if count > 0 {
 			htmltext = "31331-7.htm"

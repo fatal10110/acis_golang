@@ -1,0 +1,26 @@
+# A Clan's Reputation (Q508), refused at the turn-in (#5167): the quest owner left the clan
+# holding the Themis scale for raid 1. Sir Eric Rodemai answers the not-a-leader page before
+# anything is taken: the scale stays, no reputation is paid and the quest keeps its raid.
+# Hand-written from the quest script (no reference trace): the reference takes the scale,
+# then fails on the missing clan and answers nothing.
+character Leader 40
+quest Q508_AClansReputation <state>=STARTED <cond>=1 raid=1
+hold 8277 1
+script quest.Q508_AClansReputation
+item 8277
+page default/30868.htm
+page script/quest/Q508_AClansReputation/
+npc eric 30868 Folk 10 0 0
+
+action eric
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-0a.htm
+  S ActionFailed
+  S ActionFailed
+  items 8277=1
+  state Q508_AClansReputation STARTED
+  rows Q508_AClansReputation <cond>=1 <state>=STARTED raid=1

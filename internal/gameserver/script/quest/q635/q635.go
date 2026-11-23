@@ -547,11 +547,15 @@ func (q quest) changeRoom(s *script.Script, e script.Event) string {
 			free = append(free, room)
 		}
 	}
+	// The guardian's queue may send the party on or put it out meanwhile,
+	// so each pick is one hand-over (#5170).
 	var room1 *script.RoomCell
 	for room1 == nil && len(free) > 0 {
 		i := s.Rnd(len(free))
-		if free[i].TryLock() {
+		if room0.MovePartyTo(free[i]) {
 			room1 = free[i]
+		} else if !room0.HoldsPartyOf(p) {
+			return ""
 		}
 		free = append(free[:i], free[i+1:]...)
 	}
@@ -560,22 +564,20 @@ func (q quest) changeRoom(s *script.Script, e script.Event) string {
 		return ""
 	}
 
-	room1.SetPartyFrom(room0)
 	makerEvent(s, npc, "0")
-	moveParty(npc, room0, room1.Index())
-	room0.Clear()
+	moveParty(npc, room1, room1.Index())
 	return ""
 }
 
-// moveParty sends the members of the room that stand within 2000 of the
-// NPC to the room numbered index of its level.
-func moveParty(npc *script.NPC, from *script.RoomCell, index int) {
+// moveParty sends the members of the party of the room handed it that
+// stand within 2000 of the NPC to that room, numbered index of its level.
+func moveParty(npc *script.NPC, to *script.RoomCell, index int) {
 	at := script.Loc{
 		X: int(npc.IntParamOr("PosX"+strconv.Itoa(index), 0)),
 		Y: int(npc.IntParamOr("PosY"+strconv.Itoa(index), 0)),
 		Z: script.LocOf(npc).Z,
 	}
-	for _, member := range from.PartyMembers() {
+	for _, member := range to.PartyMembers() {
 		if npc.Distance2D(member) <= 2000 {
 			member.TeleportTo(at, 0)
 		}
@@ -707,30 +709,30 @@ func jump(s *script.Script, e script.Timer, rooms []*script.RoomCell, room0 *scr
 
 	rift := s.EventRules().Rift
 	anakazel := rooms[anakazelRoom]
-	if roomIndex != anakazelRoom && s.Rnd(100) < rift.AnakazelPortChance && anakazel.TryLock() {
-		anakazel.SetPartyFrom(room0)
-		moveParty(npc, room0, anakazelRoom)
+	// The leader's queue may give up or change rooms meanwhile, so each
+	// pick is one hand-over (#5170).
+	if roomIndex != anakazelRoom && s.Rnd(100) < rift.AnakazelPortChance && room0.MovePartyTo(anakazel) {
+		moveParty(npc, anakazel, anakazelRoom)
 		makerEvent(s, npc, "0")
-		room0.Clear()
 		return
 	}
 
 	index := -1
 	for range regularRooms {
-		if i := s.Rnd(regularRooms); rooms[i].TryLock() {
+		if i := s.Rnd(regularRooms); room0.MovePartyTo(rooms[i]) {
 			index = i
 			break
 		}
 	}
 	for i := 0; i < regularRooms && index == -1; i++ {
-		if rooms[i].TryLock() {
+		if room0.MovePartyTo(rooms[i]) {
 			index = i
 		}
 	}
 	if index != -1 {
-		rooms[index].SetPartyFrom(room0)
 		makerEvent(s, npc, "0")
-		moveParty(npc, room0, index)
+		moveParty(npc, rooms[index], index)
+		return
 	}
 	room0.Clear()
 }

@@ -137,6 +137,10 @@ func onTalk(s *script.Script, e script.Talk) string {
 			htmltext = "30868-0c.htm"
 		}
 	case questlog.StatusStarted:
+		if !e.Player.IsClanLeader() {
+			// The owner left the clan or its lead: nothing is taken (#5167).
+			return "30868-0a.htm"
+		}
 		raid := st.GetInt("raid")
 		r := rewards()[raid-1]
 		page := "30868-" + strconv.Itoa(int(raid))

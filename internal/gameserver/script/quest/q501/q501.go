@@ -194,9 +194,10 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// sacrificed marks p as sacrificed in the leader's state lst.
+// sacrificed marks p as sacrificed in the leader's state lst. Members
+// sacrifice on their own queues, so the count is one locked add (#5171).
 func sacrificed(lst *script.QuestState, p *script.Player) {
-	lst.Set("sacrificed", strconv.Itoa(int(lst.GetInt("sacrificed")+1)))
+	lst.AddInt("sacrificed", 1)
 	lst.Set(strconv.Itoa(int(p.ObjectID())), "true")
 }
 

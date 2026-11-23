@@ -1,0 +1,26 @@
+# The Clan's Prestige (Q509), refused at the turn-in (#5167): the quest owner left the clan
+# holding Daimon's eyes for raid 1. Valdis answers the not-a-leader page before anything is
+# taken: the eyes stay, no reputation is paid and the quest keeps its raid.
+# Hand-written from the quest script (no reference trace): the reference takes the eyes,
+# then fails on the missing clan and answers nothing.
+character Leader 40
+quest Q509_TheClansPrestige <state>=STARTED <cond>=1 raid=1
+hold 8489 1
+script quest.Q509_TheClansPrestige
+item 8489
+page villagemaster/31331.htm
+page script/quest/Q509_TheClansPrestige/
+npc valdis 31331 VillageMasterMystic 10 0 0
+
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q509_TheClansPrestige/31331-0a.htm
+  S ActionFailed
+  S ActionFailed
+  items 8489=1
+  state Q509_TheClansPrestige STARTED
+  rows Q509_TheClansPrestige <cond>=1 <state>=STARTED raid=1

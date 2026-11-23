@@ -172,6 +172,23 @@ func (st *State) Set(key, value string) bool {
 	return true
 }
 
+// Add adds delta to st's variable key, read as a 32-bit decimal integer that
+// counts as 0 when it is unset or not such an integer, and writes the sum,
+// wrapping on overflow. The read and the write are one step under the
+// journal's lock, so concurrent adds are all counted. It returns the sum;
+// ok is false, changing nothing, once the journal is sealed.
+func (st *State) Add(key string, delta int32) (sum int32, ok bool) {
+	st.j.mu.Lock()
+	defer st.j.mu.Unlock()
+	if st.j.sealed {
+		return 0, false
+	}
+	n, _ := st.int(key)
+	sum = n + delta
+	st.set(key, strconv.FormatInt(int64(sum), 10))
+	return sum, true
+}
+
 // Unset removes st's variable key and deletes its row, even when st has no
 // such variable. It reports false, changing nothing, once the journal is
 // sealed.
