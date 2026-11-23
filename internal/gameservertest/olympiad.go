@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 )
 
@@ -24,6 +25,12 @@ const HeroMinMatches = 5
 // competition window.
 func WithOlympiadSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedOlympiad = seed }
+}
+
+// WithHeroStore wraps the store the heroes are kept in, so a test can make
+// some of its calls fail.
+func WithHeroStore(wrap func(hero.Store) hero.Store) Option {
+	return func(o *options) { o.wrapHeroStore = wrap }
 }
 
 // WithOlympiadConfig adjusts the Olympiad configuration the server boots

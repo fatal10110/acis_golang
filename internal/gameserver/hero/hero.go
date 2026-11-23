@@ -11,6 +11,7 @@ package hero
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -24,6 +25,13 @@ import (
 
 // taskTimeout bounds one queued database write.
 const taskTimeout = 10 * time.Second
+
+// An election makes up to electionAttempts attempts, each bounded by
+// electionTimeout: its reads and its transaction are some 35 statements.
+const (
+	electionAttempts = 3
+	electionTimeout  = time.Minute
+)
 
 // writeLane is the persistence owner every hero write is queued under. It
 // is the Olympiad's lane too, so an election reads the nobles' records the
@@ -73,14 +81,15 @@ type Store interface {
 	// ClanID returns the clan objectID's character belongs to, 0 for none;
 	// found is false when the character does not exist.
 	ClanID(ctx context.Context, objectID int32) (clanID int32, found bool, err error)
-	// ResetPlayed marks every stored hero as no longer of the running era.
-	ResetPlayed(ctx context.Context) error
 	// BestNoble returns the noble of classID with the most points, then
 	// matches, then wins, among those with at least minMatches matches and
 	// one win; found is false when there is none.
 	BestNoble(ctx context.Context, classID, minMatches int) (objectID int32, name string, found bool, err error)
-	// DeleteHeroItems deletes every hero item no game master owns.
-	DeleteHeroItems(ctx context.Context) error
+	// StoreElection stores an election in one transaction: every stored
+	// hero leaves the running era; unless heroes is empty, every hero item
+	// no game master owns is deleted and heroes are saved as SaveHeroes
+	// does. A failure stores none of it.
+	StoreElection(ctx context.Context, heroes map[int32]Hero) error
 	// SaveHeroes inserts each hero, or updates its count and flags.
 	SaveHeroes(ctx context.Context, heroes map[int32]Hero) error
 	// AddDiaryEntry stores one diary entry made at at, in Unix milliseconds.
@@ -134,6 +143,9 @@ type Manager struct {
 	// table holds the running era's heroes in the order they are listed.
 	table   heroTable
 	records records
+	// electing is set while an election runs; no hero claims its status
+	// meanwhile.
+	electing bool
 }
 
 // New returns a Manager persisting through store, its writes queued on
@@ -237,7 +249,8 @@ func (m *Manager) Heroes() []Hero {
 // Activate has objectID claim the hero status it was elected to, and
 // returns its entry. It reports false, changing nothing, unless objectID
 // is an inactive hero of the running era, so two claims never both
-// succeed. The hero's message is emptied; the claim's diary entry is
+// succeed, or while an election runs, so no outgoing hero claims a status
+// the election is about to take. The hero's message is emptied; the claim's diary entry is
 // stored, then the hero's fights and diary are read back into its pages,
 // then the heroes are stored, all behind it.
 //
@@ -247,7 +260,7 @@ func (m *Manager) Heroes() []Hero {
 func (m *Manager) Activate(objectID int32) (Hero, bool) {
 	m.mu.Lock()
 	h, ok := m.heroes[objectID]
-	if !ok || h.Active {
+	if !ok || h.Active || m.electing {
 		m.mu.Unlock()
 		return Hero{}, false
 	}
@@ -289,28 +302,37 @@ func (m *Manager) AddDiaryEntry(objectID int32, action, param int) {
 // elect the era is left without heroes; otherwise every hero item no game
 // master owns is deleted and the heroes are stored. A re-elected hero
 // keeps the class and clan of its first election and counts one more.
+// Every hero loses its pages and its message.
 //
-// The outgoing heroes leave as the election starts, so none can claim its
-// status meanwhile and store the ending era's heroes behind the new ones.
-// Before anything, every hero loses its pages and its message.
-func (m *Manager) Elect(ctx context.Context) {
+// Every read comes first and changes nothing; the stored heroes then
+// change in one transaction, and only once it commits do the heroes, their
+// pages and the outgoing heroes online change. A failed attempt leaves the
+// running era's heroes, stored and in memory, as they were and is made
+// again, up to electionAttempts times; when all fail the era keeps them
+// (#4697). No hero claims its status while the election runs.
+func (m *Manager) Elect() {
 	m.mu.Lock()
-	m.records.reset()
+	m.electing = true
 	m.mu.Unlock()
-	if err := m.store.ResetPlayed(ctx); err != nil {
-		m.log.Error().Err(err).Msg("hero: reset the running era's heroes")
-	}
-	m.mu.Lock()
-	outgoing := slices.Sorted(maps.Keys(m.heroes))
-	clear(m.heroes)
-	m.table.replace(nil)
-	online := m.online
-	m.mu.Unlock()
-	if online != nil {
-		for _, id := range outgoing {
-			online.Dethrone(id)
+	defer func() {
+		m.mu.Lock()
+		m.electing = false
+		m.mu.Unlock()
+	}()
+	for attempt := 1; attempt <= electionAttempts; attempt++ {
+		err := m.elect()
+		if err == nil {
+			return
 		}
+		m.log.Error().Err(err).Int("attempt", attempt).Msg("hero: elect the heroes")
 	}
+	m.log.Error().Msg("hero: every election attempt failed; the running era keeps its heroes")
+}
+
+// elect makes one election attempt, within electionTimeout.
+func (m *Manager) elect() error {
+	ctx, cancel := context.WithTimeout(context.Background(), electionTimeout)
+	defer cancel()
 
 	type pick struct {
 		objectID int32
@@ -324,17 +346,11 @@ func (m *Manager) Elect(ctx context.Context) {
 		}
 		id, name, found, err := m.store.BestNoble(ctx, classID, m.minMatches)
 		if err != nil {
-			// One failed read ends the election's reads; the heroes
-			// picked so far stand.
-			m.log.Error().Err(err).Int("class_id", classID).Msg("hero: pick the heroes to be")
-			break
+			return fmt.Errorf("pick the hero of class %d: %w", classID, err)
 		}
 		if found {
 			picks = append(picks, pick{objectID: id, name: name, classID: classID})
 		}
-	}
-	if len(picks) == 0 {
-		return
 	}
 
 	m.mu.Lock()
@@ -342,50 +358,50 @@ func (m *Manager) Elect(ctx context.Context) {
 	// The new heroes are gathered in a table of their own, in class
 	// order, and copied over in that table's order.
 	var gathered heroTable
+	var newcomers []int32
 	for _, p := range picks {
 		gathered.put(p.objectID)
 		h, ok := m.allTime[p.objectID]
 		if ok {
 			h.Count++
 			h.Played, h.Active = true, false
-			m.allTime[p.objectID] = h
 		} else {
 			h = Hero{Name: p.name, ClassID: p.classID, Count: 1, Played: true}
+			newcomers = append(newcomers, p.objectID)
 		}
 		elected[p.objectID] = h
 	}
 	m.mu.Unlock()
-
-	if err := m.store.DeleteHeroItems(ctx); err != nil {
-		m.log.Error().Err(err).Msg("hero: delete hero items")
-	}
-	for id, h := range elected {
-		m.mu.Lock()
-		_, known := m.allTime[id]
-		m.mu.Unlock()
-		if known {
-			continue
-		}
+	for _, id := range newcomers {
 		clanID, found, err := m.store.ClanID(ctx, id)
 		if err != nil {
-			m.log.Error().Err(err).Int32("object_id", id).Msg("hero: read the new hero's clan")
+			return fmt.Errorf("read the clan of new hero %d: %w", id, err)
 		}
 		if found {
+			h := elected[id]
 			m.setClan(&h, clanID)
+			elected[id] = h
 		}
-		elected[id] = h
-		m.mu.Lock()
-		m.allTime[id] = h
-		m.mu.Unlock()
 	}
+
+	if err := m.store.StoreElection(ctx, maps.Clone(elected)); err != nil {
+		return err
+	}
+
 	m.mu.Lock()
+	m.records.reset()
+	outgoing := slices.Sorted(maps.Keys(m.heroes))
 	m.heroes = elected
+	maps.Copy(m.allTime, elected)
 	m.table.replace(gathered.order())
-	heroes := maps.Clone(elected)
+	online := m.online
 	m.mu.Unlock()
-	if err := m.store.SaveHeroes(ctx, heroes); err != nil {
-		m.log.Error().Err(err).Msg("hero: save heroes")
+	if online != nil {
+		for _, id := range outgoing {
+			online.Dethrone(id)
+		}
 	}
+	return nil
 }
 
 // write queues fn on the heroes' persistence lane, or runs it at once

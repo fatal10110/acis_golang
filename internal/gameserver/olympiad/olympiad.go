@@ -186,8 +186,9 @@ type Store interface {
 // Heroes elects the heroes from the stored nobles' records.
 type Heroes interface {
 	// Elect runs on the Olympiad's persistence lane, so it reads the
-	// records the Olympiad saved before it.
-	Elect(ctx context.Context)
+	// records the Olympiad saved before it. It bounds its own database
+	// work.
+	Elect()
 }
 
 // step is one scheduled calendar change. The order breaks ties between
@@ -551,8 +552,8 @@ func (o *Olympiad) endOlympiad() {
 	o.mu.Unlock()
 	if o.heroes != nil {
 		heroes := o.heroes
-		o.queueJob("elect heroes", func(ctx context.Context) error {
-			heroes.Elect(ctx)
+		o.queueJob("elect heroes", func(context.Context) error {
+			heroes.Elect()
 			return nil
 		})
 	}

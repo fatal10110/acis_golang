@@ -178,9 +178,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			case 0:
 				htmltext = trumpinWin(s, p, st, htmltext, htmltext, "30935-05a.htm", "30935-05b.htm", "30935-05c.htm", "30935-05d.htm")
 			case 1:
-				s.TakeItems(p, nebuliteOrb, 10)
-				st.Set("param1", itoa(0))
-				st.Set("param2", itoa(2))
+				trumpinLose(s, p, st)
 				htmltext = "30935-06.htm"
 			}
 		} else {
@@ -190,9 +188,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		if p.ItemCount(nebuliteOrb) >= 10 {
 			switch st.GetInt("param2") {
 			case 0:
-				s.TakeItems(p, nebuliteOrb, 10)
-				st.Set("param1", itoa(0))
-				st.Set("param2", itoa(2))
+				trumpinLose(s, p, st)
 			case 1:
 				htmltext = trumpinWin(s, p, st, htmltext, "30935-08.htm", "30935-08a.htm", "30935-08b.htm", "30935-08c.htm", "30935-08d.htm")
 			}
@@ -293,6 +289,16 @@ func marshaDeal(s *script.Script, st *script.QuestState, htmltext string) string
 		st.Set("param1", itoa(int32(i1)))
 	}
 	return htmltext
+}
+
+// trumpinLose takes a lost round's ten orb stake and starts Trumpin's game
+// over. The bet stays spent when the orbs left between the count and the
+// take, so nothing is taken then, yet the round still resets and the other
+// choice cannot be tried (#5243).
+func trumpinLose(s *script.Script, p *script.Player, st *script.QuestState) {
+	s.TakeHeldItems(p, nebuliteOrb, 10)
+	st.Set("param1", itoa(0))
+	st.Set("param2", itoa(2))
 }
 
 // trumpinWin moves a won round of Trumpin's game one step up and returns its
