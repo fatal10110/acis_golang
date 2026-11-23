@@ -34,11 +34,21 @@ func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
 		[3]script.CreatureSlot{npc.CreatureQuest2, npc.CreatureQuest3, npc.CreatureQuest4}
 }
 
+// appear brings Valakas into its lair with its music and, 2 s later,
+// starts the camera sequence that ends at db value 3 with its fight.
+func appear(s *script.Script, n *script.NPC) {
+	n.TeleportTo(script.Loc{X: 212852, Y: -114842, Z: -1632})
+	n.PlayMusic("B03_A")
+
+	s.StartTimer("1004", n, nil, 2000*time.Millisecond)
+}
+
 // Valakas is the grand boss Valakas. A fresh spawn stores db value 0; one
 // restored from its row resumes where it stood: at 1 it appears 10 minutes
-// later, at 3 it fights. Asleep at 0, a script event wakes it: once the
-// ValakasWaitTime has passed it stores 2, appears in its lair with its music
-// and a camera sequence that ends at 3 with its fight. Fighting, it ranks
+// later, at 2 it appears again at once (#5133), at 3 it fights. Asleep at
+// 0, a script event wakes it: once the ValakasWaitTime has passed it stores
+// 2, appears in its lair with its music and a camera sequence that ends at
+// 3 with its fight. Fighting, it ranks
 // up to three targets by the hits and the creatures it sees and casts its
 // skills at the best by its HP and where the target stands; it may raise
 // Lavasaurus Elders around a creature that hits it, flies to its nearest
@@ -80,7 +90,12 @@ func Valakas() script.Script {
 			n.SetInt(slotRearReady, 0)
 			n.SetInt(slotLastHit, s.CurrentTick())
 
-			if n.DBValue() == 3 {
+			switch n.DBValue() {
+			case 2:
+				// Restored while it appeared: nothing else leaves 2, so the
+				// appearance runs again and ends at 3 with the fight (#5133).
+				appear(s, n)
+			case 3:
 				n.AddWanderDesire(5, 5)
 
 				s.StartTimer("1002", n, nil, 60000*time.Millisecond)
@@ -213,10 +228,7 @@ func Valakas() script.Script {
 				n.SetInt(slotLastHit, s.CurrentTick())
 
 				n.SetDBValue(2)
-				n.TeleportTo(script.Loc{X: 212852, Y: -114842, Z: -1632})
-				n.PlayMusic("B03_A")
-
-				s.StartTimer("1004", n, nil, 2000*time.Millisecond)
+				appear(s, n)
 			case strings.EqualFold(name, "1002"):
 				if n.DBValue() == 3 {
 					hp, maxHP := n.HP(), float64(n.MaxHP())

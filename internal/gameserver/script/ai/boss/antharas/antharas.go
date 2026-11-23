@@ -52,9 +52,9 @@ func moveIn(n *script.NPC) {
 // sequence ends at 3 with the fight. Fighting, it ranks up to three
 // targets by the hits and the players it sees, casts its skills at the
 // best, buffs itself by its HP every minute, and calls its Behemoth Dragon
-// once under half its HP (again 4 hours later). A hit while it sleeps
-// sends the players of its lair away; 15 minutes without a hit reset it to
-// 0 out of its lair. Dying, it plays its camera and music, stores 0,
+// once under half its HP (again 4 hours later), never while dead (#5134).
+// A hit while it sleeps sends the players of its lair away; 15 minutes
+// without a hit reset it to 0 out of its lair. Dying, it plays its camera and music, stores 0,
 // clears its global memo key and leaves a teleport cube for 15 minutes.
 func Antharas() script.Script {
 	base := defaultnpc.New().Hooks
@@ -114,7 +114,8 @@ func Antharas() script.Script {
 			n, name := e.NPC, e.Name
 			switch {
 			case strings.EqualFold(name, "2001"):
-				if n.Int(slotCalled) == 0 && n.HPRatio() < 0.5 {
+				// A corpse's HP ratio is 0, so dead it calls none (#5134).
+				if n.Int(slotCalled) == 0 && n.HPRatio() < 0.5 && !n.Dead() {
 					at := script.LocOf(n)
 					at.Heading = 0
 					s.Spawner().CreateOnePrivateEx(n, behemothID, at, 0, script.Params{P1: n.IntParam("GM_ID")})
