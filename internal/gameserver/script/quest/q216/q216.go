@@ -127,6 +127,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			s.PlaySound(p, script.SoundMiddle)
 		}
 	case strings.EqualFold(e.Name, "30103-09a.htm") || strings.EqualFold(e.Name, "30103-09b.htm"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 6 || p.ItemCount(journeymanRing) != 7 || !p.HasItem(altranInstructions) {
+			return ""
+		}
 		s.TakeItems(p, altranInstructions, 1)
 		s.TakeItems(p, journeymanRing, -1)
 		s.GiveItems(p, markOfGuildsman, 1)

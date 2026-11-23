@@ -60,13 +60,13 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(e.Player, script.SoundAccept)
 	case script.IsDigit(e.Name):
+		// #5183: only a reward of the list, to a holder of all the goods on cond 2.
+		index, err := strconv.Atoi(e.Name)
+		if err != nil || index >= len(rewards()) || st.Status() != questlog.StatusStarted || st.Cond() != 2 || e.Player.ItemCount(orcGraveGoods) < 120 {
+			return ""
+		}
 		htmltext = "32017-04.htm"
 		s.TakeItems(e.Player, orcGraveGoods, -1)
-
-		index, err := strconv.Atoi(e.Name)
-		if err != nil {
-			panic(err)
-		}
 		reward := rewards()[index]
 		s.RewardItems(e.Player, reward[0], reward[1])
 

@@ -6,6 +6,7 @@
 package q617
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -123,6 +124,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(1)
 		s.PlaySound(e.Player, script.SoundAccept)
 	case strings.EqualFold(e.Name, "31539-05.htm"):
+		// #5183: torches are traded only on the quest in progress.
+		if st.Status() != questlog.StatusStarted {
+			return ""
+		}
 		if e.Player.ItemCount(torch) >= 1000 {
 			htmltext = "31539-07.htm"
 			s.TakeItems(e.Player, torch, 1000)
@@ -133,11 +138,12 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(e.Player, torch, -1)
 		st.Exit(true)
 	case script.IsDigit(e.Name):
+		// #5183: only a recipe of the list, on the quest in progress.
+		id, err := strconv.ParseInt(e.Name, 10, 32)
+		if err != nil || !slices.Contains(rewards(), int32(id)) || st.Status() != questlog.StatusStarted {
+			return ""
+		}
 		if e.Player.ItemCount(torch) >= 1200 {
-			id, err := strconv.ParseInt(e.Name, 10, 32)
-			if err != nil {
-				panic(err)
-			}
 			htmltext = "32049-03.htm"
 			s.TakeItems(e.Player, torch, 1200)
 			s.GiveItems(e.Player, int32(id), 1)

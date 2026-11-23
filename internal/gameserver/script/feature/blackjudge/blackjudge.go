@@ -37,11 +37,23 @@ func New() script.Script {
 	}
 }
 
+// feeIndex returns the index of the fee for a player of level: the first
+// whose minLevel the level reaches, -1 when none does.
+func feeIndex(level int32) int {
+	for i, dp := range deathPenalties() {
+		if level >= dp.minLevel {
+			return i
+		}
+	}
+	return -1
+}
+
 // onAdvEvent answers the judge's links. "test_dp" opens the fee page of the
 // player's level. "remove_dp <index>" lifts one level of death penalty for
 // the fee of that index: a player with none is told so, one short of the
-// fee is told that; a malformed index, or a fee for a higher level than the
-// player's, answers nothing. Any other event is answered as a page.
+// fee is told that; an index other than the one the fee page of the
+// player's level offers (#5183) answers nothing. Any other event is
+// answered as a page.
 func onAdvEvent(s *script.Script, e script.Event) string {
 	event := e.Name
 	if strings.EqualFold(event, "test_dp") {
@@ -68,14 +80,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 				return ""
 			}
 			index, err := strconv.Atoi(split[1])
-			if err != nil {
-				panic(err)
-			}
-			// An index past the fees aborts the event here.
-			dp := deathPenalties()[index]
-			if e.Player.Level() < dp.minLevel {
+			if err != nil || index != feeIndex(e.Player.Level()) {
 				return ""
 			}
+			dp := deathPenalties()[index]
 			if e.Player.Adena() < dp.fee {
 				event = "black_judge008.htm"
 			} else {

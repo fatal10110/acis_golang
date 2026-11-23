@@ -61,20 +61,24 @@ func (r *Registry) interact(p *Player, n *NPC) bool {
 // through the NPC that the player has a state in other than created, then
 // the real quests the NPC starts; none gives the no-quest page, one that
 // quest's window, more a choice list. With a name it opens the window of
-// the script of that name, ignoring case, bound to the NPC or not; an
-// unknown name gives the no-quest page. It runs on p's own queue, and so
-// does the hook (TeleportTo).
+// the script of that name, ignoring case; an unknown name, or a script the
+// NPC neither talks through nor starts (#5160), gives the no-quest page.
+// It runs on p's own queue, and so does the hook (TeleportTo).
 func (r *Registry) QuestWindow(p *Player, n *NPC, name string) {
 	p.character().RunOnOwnQueue(func() { r.openQuestWindow(p, n, name) })
 }
 
 func (r *Registry) openQuestWindow(p *Player, n *NPC, name string) {
+	npcID := n.NpcID()
 	if name != "" {
-		r.questWindow(p, n, r.byName[strings.ToLower(name)])
+		s := r.byName[strings.ToLower(name)]
+		if !containsScript(r.scripts(npcID, EventTalked), s) && !containsScript(r.scripts(npcID, EventQuestStart), s) {
+			s = nil
+		}
+		r.questWindow(p, n, s)
 		return
 	}
 	c := p.character()
-	npcID := n.NpcID()
 	var quests []*Script
 	for _, s := range r.scripts(npcID, EventTalked) {
 		if s.QuestID <= 0 || containsScript(quests, s) {
@@ -160,8 +164,9 @@ func showQuestChoice(c *player.Character, n *NPC, quests []*Script) {
 // through last, the NPC the player last talked to about quests (nil when
 // that is no NPC in the world): the event hook of the script of that name,
 // ignoring case, runs when the player stands strictly within
-// InteractionDistance of last and a script talking through last counts as
-// the same script. Anything else does nothing. It runs on p's own queue,
+// InteractionDistance of last and that very script talks through last
+// (#5160: a behavior of the same class bound there is another script).
+// Anything else does nothing. It runs on p's own queue,
 // and so does the hook (TeleportTo).
 func (r *Registry) QuestEvent(p *Player, last *NPC, name, event string) {
 	p.character().RunOnOwnQueue(func() { r.questEvent(p, last, name, event) })
@@ -178,27 +183,11 @@ func (r *Registry) questEvent(p *Player, last *NPC, name, event string) {
 	if !location.In3DRadius(x, y, z, nx, ny, nz, InteractionDistance) {
 		return
 	}
-	for _, o := range r.scripts(last.NpcID(), EventTalked) {
-		if !equal(o, s) {
-			continue
-		}
-		res := r.answer(s, hookEvent, func() string { return s.Hooks.Event(s, Event{Name: event, NPC: last, Player: p}) })
-		s.show(c, last, res)
+	if !containsScript(r.scripts(last.NpcID(), EventTalked), s) {
 		return
 	}
-}
-
-// equal reports whether a and b count as one script when a quest event
-// names b: two behaviors always; two scripts of the same quest id when
-// their names match; otherwise the same script.
-func equal(a, b *Script) bool {
-	if a.Behavior && b.Behavior {
-		return true
-	}
-	if a.QuestID > 0 && a.QuestID == b.QuestID {
-		return a.Name == b.Name
-	}
-	return a.path == b.path
+	res := r.answer(s, hookEvent, func() string { return s.Hooks.Event(s, Event{Name: event, NPC: last, Player: p}) })
+	s.show(c, last, res)
 }
 
 func containsScript(list []*Script, s *Script) bool {

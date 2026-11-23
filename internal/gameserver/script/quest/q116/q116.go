@@ -61,12 +61,20 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, goods, 1)
 	case strings.EqualFold(e.Name, "materials"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 2 || !p.HasItem(goods) {
+			return ""
+		}
 		htmltext = "32052-02.htm"
 		s.TakeItems(p, goods, -1)
 		s.RewardItems(p, ssd, 1650)
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)
 	case strings.EqualFold(e.Name, "adena"):
+		// #5183: the reward pays only in the state its page is offered in.
+		if st.Status() != questlog.StatusStarted || st.Cond() != 2 || !p.HasItem(goods) {
+			return ""
+		}
 		htmltext = "32052-02.htm"
 		s.TakeItems(p, goods, -1)
 		s.GiveItems(p, 57, 16500)
