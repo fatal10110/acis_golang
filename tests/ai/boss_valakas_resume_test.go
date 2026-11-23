@@ -35,6 +35,13 @@ func TestValakasResumesItsAppearance(t *testing.T) {
 	if got, want := placeOf(boss), "212852,-114842,-1632 heading 0"; got != want {
 		t.Fatalf("Valakas stands at %s, want %s", got, want)
 	}
+	// The appearance timer is armed while the server boots, so only the
+	// driven clock, which stands still until the test moves it, can pin its
+	// marks to the millisecond; on the real pool the boot itself eats into
+	// the first 2 s.
+	if !w.srv.DrivesClock() {
+		t.Skip("the real pool has no driven clock")
+	}
 	roles := map[int32]string{boss.ObjectID(): "valakas", w.player.ObjectID(): "player"}
 
 	wantAntharasFrames(t, "2 s less 1 ms", w.advance(t, 2*time.Second-time.Millisecond), roles)
