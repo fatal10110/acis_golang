@@ -58,7 +58,8 @@ func (l *GameClientLink) siegeCastAfterCanCast(live *livePlayer, def modelskill.
 // for a clan on no side (a pending defender included),
 // TOWER_DESTROYED_NO_RESURRECTION for the owner or a defender once no life
 // control tower of the castle stands, and NO_RESURRECTION_WITHOUT_BASE_CAMP
-// for an attacker whose clan holds no headquarters.
+// for an attacker whose clan holds no headquarters, or one standing on no
+// siege in progress (headquartersInSiege).
 func (l *GameClientLink) siegeResurrectRefusal(live *livePlayer) int {
 	x, y, z := live.Position()
 	s, ok := l.sieges.ActiveAt(x, y, z)
@@ -75,7 +76,7 @@ func (l *GameClientLink) siegeResurrectRefusal(live *livePlayer) int {
 			return serverpackets.SystemMessageTowerDestroyedNoResurrection
 		}
 	case siege.SideAttacker:
-		if _, held := cl.Headquarters(); !held {
+		if hq, held := cl.Headquarters(); !held || !l.headquartersInSiege(cl.ID(), hq, false) {
 			return serverpackets.SystemMessageNoResurrectionWithoutBaseCamp
 		}
 	default:

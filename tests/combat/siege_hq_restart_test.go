@@ -63,14 +63,14 @@ func startRestartHallSiege(t *testing.T, srv *gameservertest.Server) {
 }
 
 // putUpRestartHQ stands a siege headquarters of the restarter's clan at
-// siegeHQPoint.
-func putUpRestartHQ(t *testing.T, srv *gameservertest.Server) {
+// at.
+func putUpRestartHQ(t *testing.T, srv *gameservertest.Server, at location.Location) {
 	t.Helper()
 	cl, ok := srv.Clans.Table().Get(restartClanID)
 	if !ok {
 		t.Fatalf("clan %#x not loaded", restartClanID)
 	}
-	flag := srv.SpawnFolkNPCAt(t, npc.SiegeFlagTemplate(cl.Name(), false), siegeHQPoint)
+	flag := srv.SpawnFolkNPCAt(t, npc.SiegeFlagTemplate(cl.Name(), false), at)
 	if !flag.StandFor(cl) {
 		t.Fatal("the clan already holds a headquarters")
 	}
@@ -99,6 +99,9 @@ func TestSiegeHQRestart(t *testing.T) {
 		{"hall unregistered with HQ", siegeRestarter{hall: true, hq: true}, 3, deathWindow{}, true},
 		{"hall no clan", siegeRestarter{hall: true, noClan: true}, 3, deathWindow{}, false},
 		{"off the hall battlefield with HQ", siegeRestarter{hall: true, side: "ATTACKER", hq: true, x: 3000}, 3, deathWindow{}, false},
+		// #5143: a headquarters standing on no siege in progress is ignored.
+		{"castle attacker with HQ off the battlefield", siegeRestarter{side: "ATTACKER", hq: true, hqOff: true}, 3, deathWindow{}, false},
+		{"hall attacker with HQ off the battlefield", siegeRestarter{hall: true, side: "ATTACKER", hq: true, hqOff: true}, 3, deathWindow{}, false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
