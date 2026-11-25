@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -46,7 +47,7 @@ func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte
 	}
 	if err != nil {
 		client.frameUnread = true
-		l.log.Warn().Err(err).Msg("game client")
+		l.log.Warn().Err(err).Str("addr", client.Session.remoteIP()).Msg("game client")
 		if errors.Is(err, wire.ErrShortPacket) && (client.State() == StateConnected || client.countUnderflow()) {
 			client.closeNow()
 			return req, errMalformedPacketDisconnect
@@ -202,10 +203,10 @@ func (l *GameClientLink) endConnection(ctx context.Context, cs *connState) {
 
 // logReadFrameError logs the read that ended the connection.
 func (l *GameClientLink) logReadFrameError(client *Client, err error) {
-	// ponytail: pre-auth EOF, whole or mid-frame, is a port probe
-	// (admin panel dials 7777 every 5s, internet scanners send a
-	// stray "GET /" read as a frame header) or an aborted handshake —
-	// not worth a log line. Ceiling: a real client dropping
+	// ponytail: a pre-auth hang-up (EOF, whole or mid-frame, or a
+	// reset) is a port probe (admin panel dials 7777 every 5s,
+	// internet scanners send a stray "GET /" read as a frame header)
+	// or an aborted handshake — not worth a log line. Ceiling: a real client dropping
 	// mid-handshake leaves no trace; log it again once pre-auth
 	// disconnects need diagnosing.
 	if hangUp(err) && client.State() == StateConnected {
@@ -265,7 +266,7 @@ func (l *GameClientLink) gateFrame(client *Client, payload []byte) (serve, open 
 		return false, true
 	}
 	if !client.Accept(payload[0]) {
-		l.log.Warn().Str("state", client.State().String()).Str("opcode", fmt.Sprintf("%#02x", payload[0])).
+		l.log.Warn().Str("state", client.State().String()).Str("addr", client.Session.remoteIP()).Str("opcode", fmt.Sprintf("%#02x", payload[0])).
 			Int("length", len(payload)).Str("head", hex.EncodeToString(payload[:min(len(payload), rejectedFrameHeadBytes)])).
 			Msg("Accept opcode")
 		// Pre-auth, any rejected opcode disconnects immediately; once
@@ -281,9 +282,11 @@ func (l *GameClientLink) gateFrame(client *Client, payload []byte) (serve, open 
 }
 
 // hangUp reports a read ended by the peer closing its side, between frames
-// or part-way through one.
+// or part-way through one, or by the peer resetting or aborting the
+// connection (a client killed or closed with an abortive close).
 func hangUp(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED)
 }
 
 func normalReadFrameError(err error) bool {

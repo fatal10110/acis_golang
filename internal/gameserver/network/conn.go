@@ -1,11 +1,13 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -200,9 +202,15 @@ func (c *Conn) writeLoop() {
 		c.mu.Unlock()
 		if err != nil {
 			// A write cut off by the backlog abort closing the socket was
-			// already reported by that abort.
+			// already reported by that abort. A peer that already left
+			// (broken pipe, reset) is an ordinary disconnect; any other
+			// write failure (a timeout, an unknown error) stays loud.
 			if !aborted {
-				c.log.Warn().Err(err).Msg("game connection write failed, closing")
+				ev := c.log.Warn()
+				if peerGone(err) {
+					ev = c.log.Debug()
+				}
+				ev.Err(err).Msg("game connection write failed, closing")
 			}
 			return
 		}
@@ -210,6 +218,12 @@ func (c *Conn) writeLoop() {
 			batch, bufs = nil, nil
 		}
 	}
+}
+
+// peerGone reports a write that failed because the peer had already closed
+// or reset its end of the connection.
+func peerGone(err error) bool {
+	return errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET)
 }
 
 // writeBatch writes every frame in batch as a single vectored
