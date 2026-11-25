@@ -162,8 +162,11 @@ type hallSiege struct {
 	// accomplished is set by the script once a clan won; previouslyOwned
 	// tells the hall had an owner as its registrations closed.
 	accomplished, previouslyOwned bool
-	// task is the latest step armed; an earlier one still runs when due.
+	// task is the step armed last, the only one that runs: arming a step
+	// stops the one before it, and gen, bumped on every arm and cancel,
+	// drops a stopped step whose expiry was already under way (#4693).
 	task  *sim.Timer
+	gen   uint64
 	armed bool
 	field *zone.Siege
 	// restartPoints are where the players of a clan restart to town while
