@@ -15,11 +15,12 @@ import (
 // (at the Conquerors' Sepulcher doors, numbered 1 to 5, when lock_x1 is 0)
 // and reads the local clock every second: in the first 5 s of each hour
 // it clears the room_trigger_1 npcmaker (event 1000) and refills it 5 s
-// later (1001); at minutes 5 to 45 of each five and second 0 it shouts the
-// minutes gone, at minute 50 that the entry closes, and sends the players
-// of its territory to its EscapeTelPos; in the first 30 s of minute 54 it
-// frees the sepulcher (AVQuest0 slot 0); at minute 55 it shouts the two
-// closing lines. ShoutMsg 1 turns on the minute shouts. Script events 1001
+// later (1001); at minutes 5 to 45 of each five it shouts the minutes gone,
+// at minute 50 that the entry closes, and sends the players of its
+// territory to its EscapeTelPos; in the first 30 s of minute 54 it frees
+// the sepulcher (AVQuest0 slot 0); at minute 55 it shouts the two closing
+// lines. Each of these minute steps runs once, at the first reading of its
+// minute (#5136). ShoutMsg 1 turns on the minute shouts. Script events 1001
 // to 1004 reset rooms 2 to 5, and 1005 one of the boss rooms, each npcmaker
 // cleared and refilled.
 func RoyalRushNpc() script.Script {
@@ -31,7 +32,9 @@ func RoyalRushNpc() script.Script {
 			OnCreated: func(s *script.Script, e script.Created) {
 				n := e.NPC
 				s.StartTimerAtFixedRate("3000", n, nil, 1000*time.Millisecond, 1000*time.Millisecond)
-				n.SetInt(script.SlotIntAI0, 0)
+				// A manager that appears within a step's minute leaves that
+				// step to the next hour.
+				n.SetInt(script.SlotIntAI0, epochMinute(s.Now()))
 				n.SetInt(script.SlotIntAI1, 0)
 
 				if n.IntParam("lock_x1") != 0 {
@@ -71,26 +74,10 @@ func RoyalRushNpc() script.Script {
 							n.SetInt(script.SlotIntAI1, 1)
 							s.StartTimer("3001", n, nil, 5000*time.Millisecond)
 						}
-					case (i0 == 5 || i0 == 10 || i0 == 15 || i0 == 20 || i0 == 25 || i0 == 30 || i0 == 35 || i0 == 40 || i0 == 45) && i1 == 0:
-						if shoutMsg == 1 {
-							n.ShoutInRadius(script.NpcString(1000455)+strconv.Itoa(i0)+script.NpcString(1000456), 11500)
-						}
-					case i0 == 50 && i1 == 0:
-						if shoutMsg == 1 {
-							n.ShoutInRadius(script.NpcString(1000457), 11500)
-						}
-
-						escapeTelPosX := n.IntParam("EscapeTelPosX")
-						escapeTelPosY := n.IntParam("EscapeTelPosY")
-						escapeTelPosZ := n.IntParam("EscapeTelPosZ")
-						if escapeTelPosX != 0 && escapeTelPosY != 0 && escapeTelPosZ != 0 {
-							s.TeleportPlayersInTerritory(n, script.Loc{X: int(escapeTelPosX), Y: int(escapeTelPosY), Z: int(escapeTelPosZ)}, 100)
-						}
 					case i0 == 54 && i1 >= 0 && i1 <= 30:
 						n.SetInt(npc.IntAVQuest0, 0)
-					case i0 == 55 && i1 == 0:
-						n.ShoutInRadius(script.NpcString(1000500), 11500)
-						n.ShoutInRadius(script.NpcString(1000501), 11500)
+					case i0 >= 5 && i0%5 == 0 && stepDue(n, now):
+						minuteStep(s, n, i0, shoutMsg)
 					}
 				}
 				return ""
@@ -124,6 +111,51 @@ func RoyalRushNpc() script.Script {
 // facing heading d.
 func lockAt(n *script.NPC, x, y, z, d string) script.Loc {
 	return script.Loc{X: int(n.IntParam(x)), Y: int(n.IntParam(y)), Z: int(n.IntParam(z)), Heading: int(n.IntParam(d))}
+}
+
+// minuteStep runs the step of minute i0 of the hour, a multiple of 5 from
+// 5 to 55: the minutes gone shouted up to minute 45; at minute 50 the
+// entry closing shouted and the players of the territory sent to the
+// escape point; at minute 55 the two closing lines.
+func minuteStep(s *script.Script, n *script.NPC, i0 int, shoutMsg int32) {
+	switch {
+	case i0 == 5 || i0 == 10 || i0 == 15 || i0 == 20 || i0 == 25 || i0 == 30 || i0 == 35 || i0 == 40 || i0 == 45:
+		if shoutMsg == 1 {
+			n.ShoutInRadius(script.NpcString(1000455)+strconv.Itoa(i0)+script.NpcString(1000456), 11500)
+		}
+	case i0 == 50:
+		if shoutMsg == 1 {
+			n.ShoutInRadius(script.NpcString(1000457), 11500)
+		}
+
+		escapeTelPosX := n.IntParam("EscapeTelPosX")
+		escapeTelPosY := n.IntParam("EscapeTelPosY")
+		escapeTelPosZ := n.IntParam("EscapeTelPosZ")
+		if escapeTelPosX != 0 && escapeTelPosY != 0 && escapeTelPosZ != 0 {
+			s.TeleportPlayersInTerritory(n, script.Loc{X: int(escapeTelPosX), Y: int(escapeTelPosY), Z: int(escapeTelPosZ)}, 100)
+		}
+	case i0 == 55:
+		n.ShoutInRadius(script.NpcString(1000500), 11500)
+		n.ShoutInRadius(script.NpcString(1000501), 11500)
+	}
+}
+
+// stepDue reports whether the minute step of now has yet to run, and marks
+// it run: a step runs at the first reading of its minute, whatever its
+// second, so a late or skipped tick does not lose it (#5136). The AI0 slot
+// holds the minute, counted from the Unix epoch, of the last step run.
+func stepDue(n *script.NPC, now time.Time) bool {
+	m := epochMinute(now)
+	if n.Int(script.SlotIntAI0) == m {
+		return false
+	}
+	n.SetInt(script.SlotIntAI0, m)
+	return true
+}
+
+// epochMinute is the minute of t counted from the Unix epoch.
+func epochMinute(t time.Time) int32 {
+	return int32(t.Unix() / 60)
 }
 
 // resetRoom clears the npcmaker named room (event 1000) and refills it
