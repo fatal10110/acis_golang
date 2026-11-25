@@ -86,10 +86,12 @@ func (z *Damage) enter(a Actor) {
 			z.effects().StartPulse(z)
 		}
 	}
-	enterDanger(a)
+	enterDanger(&z.Zone, a)
 }
 
-func (z *Damage) exit(a Actor) { exitDanger(a) }
+// exit releases the danger hold only when the entry raised it (#4957): a
+// trap dormant on entry raised none.
+func (z *Damage) exit(a Actor) { exitDanger(&z.Zone, a) }
 
 // Endangered is a player that shows whether it stands in a damage or
 // effect zone. Each occupant carries its own reaction, so no zone holds
@@ -101,25 +103,26 @@ type Endangered interface {
 	DangerStateChanged()
 }
 
-// enterDanger marks a player as in danger; every entry refreshes its
-// display, even when an overlapping danger zone already holds it.
-func enterDanger(a Actor) {
+// enterDanger marks a player as in danger through z's hold; every entry
+// refreshes its display, even when an overlapping danger zone already
+// holds it.
+func enterDanger(z *Zone, a Actor) {
 	if a.Class() != ClassPlayer {
 		return
 	}
-	a.ZoneFlags().Set(FlagDanger, true)
+	z.raiseHolds(a, holdsOf(FlagDanger))
 	if e, ok := a.(Endangered); ok {
 		e.DangerStateChanged()
 	}
 }
 
-// exitDanger releases one danger hold on a player, refreshing its display
-// only once the last overlapping danger zone let go.
-func exitDanger(a Actor) {
+// exitDanger releases z's danger hold on a player, if z raised one,
+// refreshing its display once no overlapping danger zone holds it.
+func exitDanger(z *Zone, a Actor) {
 	if a.Class() != ClassPlayer {
 		return
 	}
-	a.ZoneFlags().Set(FlagDanger, false)
+	z.releaseHolds(a)
 	if a.ZoneFlags().Has(FlagDanger) {
 		return
 	}
@@ -176,14 +179,16 @@ func (z *Swamp) enter(a Actor) {
 	if z.dormant(z.effects()) {
 		return
 	}
-	a.ZoneFlags().Set(FlagSwamp, true)
+	z.raiseHolds(a, holdsOf(FlagSwamp))
 	if w, ok := a.(Wader); ok {
 		w.SwampStateChanged(z)
 	}
 }
 
+// exit releases the slow only when the entry raised it (#4957): a swamp
+// dormant on entry raised none.
 func (z *Swamp) exit(a Actor) {
-	a.ZoneFlags().Set(FlagSwamp, false)
+	z.releaseHolds(a)
 	if w, ok := a.(Wader); ok {
 		w.SwampStateChanged(z)
 	}

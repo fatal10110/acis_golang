@@ -18,9 +18,8 @@ func (z *Olympiad) affects(Actor) bool { return true }
 
 func (z *Olympiad) battleRunning() bool { return z.effects().StadiumFighting(z) }
 
-// setRingHolds raises (on) or releases the open combat a fighting stadium
-// keeps everyone inside in.
-func setRingHolds(a Actor, on bool) { a.ZoneFlags().Set(FlagPvP, on) }
+// ringHolds is the open combat a fighting stadium keeps everyone inside in.
+var ringHolds = holdsOf(FlagPvP)
 
 func (z *Olympiad) enter(a Actor) {
 	a.ZoneFlags().Set(FlagNoSummonFriend, true)
@@ -43,29 +42,18 @@ func (z *Olympiad) enter(a Actor) {
 func (z *Olympiad) raise(a Actor) bool {
 	z.mu.Lock()
 	defer z.mu.Unlock()
-	return z.switchOnLocked(a, setRingHolds)
-}
-
-// release takes a out of the ring's combat when it is in it, reporting
-// whether it was.
-func (z *Olympiad) release(a Actor) bool {
-	z.mu.Lock()
-	defer z.mu.Unlock()
-	return z.switchOffLocked(a, setRingHolds)
+	return z.raiseLocked(a, ringHolds)
 }
 
 func (z *Olympiad) exit(a Actor) {
 	a.ZoneFlags().Set(FlagNoSummonFriend, false)
 	a.ZoneFlags().Set(FlagNoRestart, false)
 
-	released := z.release(a)
+	// Leaving releases the ring's combat only when the stadium raised it
+	// (#4957), so it never strips an overlapping zone's.
+	z.releaseHolds(a)
 	if !z.battleRunning() {
 		return
-	}
-	// A fight running releases the ring's combat on the way out even when
-	// the stadium did not raise it.
-	if !released {
-		setRingHolds(a, false)
 	}
 	if a.Class() == ClassPlayer {
 		z.effects().StadiumNotice(z, a, false)
@@ -94,7 +82,7 @@ func (z *Olympiad) replay(a Actor) {
 		return
 	}
 	z.mu.Lock()
-	z.switchOffLocked(a, setRingHolds)
+	z.releaseLocked(a, ringHolds)
 	_, inside := z.occupants[a.ObjectID()]
 	z.mu.Unlock()
 	if inside && a.Class() == ClassPlayer {

@@ -33,14 +33,9 @@ func (z *Siege) Active() bool {
 	return z.active.Load()
 }
 
-// setBattlefieldHolds raises (on) or releases the holds a running siege
-// keeps on everyone inside: open combat, the siege zone, and no summoning of
-// friends.
-func setBattlefieldHolds(a Actor, on bool) {
-	a.ZoneFlags().Set(FlagPvP, on)
-	a.ZoneFlags().Set(FlagSiege, on)
-	a.ZoneFlags().Set(FlagNoSummonFriend, on)
-}
+// battlefieldHolds are the holds a running siege keeps on everyone inside:
+// open combat, the siege zone, and no summoning of friends.
+var battlefieldHolds = holdsOf(FlagPvP, FlagSiege, FlagNoSummonFriend)
 
 func (z *Siege) enter(a Actor) {
 	if z.raise(a) {
@@ -53,7 +48,7 @@ func (z *Siege) enter(a Actor) {
 func (z *Siege) raise(a Actor) bool {
 	z.mu.Lock()
 	defer z.mu.Unlock()
-	return z.active.Load() && z.switchOnLocked(a, setBattlefieldHolds)
+	return z.active.Load() && z.raiseLocked(a, battlefieldHolds)
 }
 
 // combatEntered tells a player its battlefield holds were just raised.
@@ -67,11 +62,9 @@ func (z *Siege) combatEntered(a Actor) {
 
 func (z *Siege) exit(a Actor) {
 	z.mu.Lock()
-	// Leaving releases the battlefield holds once, whether or not the siege
-	// raised them.
-	if !z.switchOffLocked(a, setBattlefieldHolds) {
-		setBattlefieldHolds(a, false)
-	}
+	// Leaving releases only the battlefield holds the siege raised (#4957):
+	// none after an entry while it did not run or once it stopped.
+	z.releaseLocked(a, allHolds)
 	active := z.active.Load()
 	z.mu.Unlock()
 	switch a.Class() {
@@ -111,7 +104,7 @@ func (z *Siege) replay(a Actor) {
 	z.mu.Lock()
 	off := !z.active.Load()
 	if off {
-		z.switchOffLocked(a, setBattlefieldHolds)
+		z.releaseLocked(a, battlefieldHolds)
 	}
 	_, inside := z.occupants[a.ObjectID()]
 	z.mu.Unlock()
