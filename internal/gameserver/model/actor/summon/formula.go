@@ -815,10 +815,11 @@ func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 
 // drainHP takes amount off a live summon's HP, marks it dead below DeathHP,
 // and refreshes its status. It reports whether this call killed the summon;
-// only one caller ever sees true.
+// only one caller ever sees true. A pet a mount is taking away
+// (ClaimDeparture) takes no damage.
 func (a *Actor) drainHP(amount float64) bool {
 	a.vitals.mu.Lock()
-	if a.dead || a.vitals.hp <= 0 {
+	if a.dead || a.departing || a.vitals.hp <= 0 {
 		a.vitals.mu.Unlock()
 		return false
 	}

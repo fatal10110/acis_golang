@@ -240,6 +240,9 @@ type Actor struct {
 	// decayed is set once a pet's corpse decay has claimed it; a revive
 	// racing that decay then loses. Guarded by vitals.mu.
 	decayed bool
+	// departing is set while a mount takes this pet away (ClaimDeparture):
+	// no death lands on it from then on. Guarded by vitals.mu.
+	departing bool
 	// ownerLeft is set once this summon's owner has left the world while it
 	// lay dead; see LeaveWithOwner.
 	ownerLeft atomic.Bool
