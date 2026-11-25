@@ -133,6 +133,7 @@ type options struct {
 	questLoadErr           error
 	subclassFault          SubclassFault
 	petNameLookupErr       error
+	petNameLookupHold      func()
 	characterNameFault     CharacterNameFault
 	captureLog             bool
 	account                string
@@ -2582,11 +2583,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Belongings.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
 		gclConfig.Summoning.Store = slowPetStore{PetStore: petStore, delay: o.slowStores}
 	}
-	if o.petNameLookupErr != nil {
+	if o.petNameLookupErr != nil || o.petNameLookupHold != nil {
 		if o.slowStores > 0 {
-			t.Fatal("gameservertest: WithPetNameLookupError cannot be combined with WithSlowStores")
+			t.Fatal("gameservertest: WithPetNameLookupError and WithPetNameLookupHold cannot be combined with WithSlowStores")
 		}
-		gclConfig.Summoning.Store = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
+		gclConfig.Summoning.Store = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr, hold: o.petNameLookupHold}
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat

@@ -177,6 +177,30 @@ func (a *Actor) Unsummon() {
 	a.despawn(nil)
 }
 
+// ClaimDeparture decides, under the lock every death is marked under, that a
+// mount takes this pet away: it reports false for a pet already dead, and
+// otherwise no death lands on the pet from then on, so its rider never has
+// its corpse beside it (#5059). The mount then sends the pet away with
+// Unsummon, or hands it back with CancelDeparture when it does not go
+// through.
+func (a *Actor) ClaimDeparture() bool {
+	a.vitals.mu.Lock()
+	defer a.vitals.mu.Unlock()
+	if a.dead {
+		return false
+	}
+	a.departing = true
+	return true
+}
+
+// CancelDeparture undoes ClaimDeparture for a mount that did not go through:
+// the pet can die again.
+func (a *Actor) CancelDeparture() {
+	a.vitals.mu.Lock()
+	a.departing = false
+	a.vitals.mu.Unlock()
+}
+
 // LeaveWithOwner handles this summon's owner leaving the world. A living
 // summon leaves with it. A corpse stays where it lies, and its owner's
 // session is done with it (event.CorpseLeftBehind): a pet's row is saved now,

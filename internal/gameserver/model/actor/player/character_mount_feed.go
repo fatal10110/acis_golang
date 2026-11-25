@@ -118,7 +118,9 @@ func (c *Character) loadMountFeed(npcID int32, level int) {
 // StartMountFeed fills the ridden mount's gauge and shows it, then, unless
 // the rider is dead, starts the task that feeds the mount every
 // mountFeedPeriod. It runs once the mount transition was shown, and again
-// when a dead rider is revived: the revived rider's mount is full again.
+// when a dead rider is revived: the revived rider's mount is full again,
+// except a pet's, which resumes at the meal it had (#5090), so its dismount
+// never writes a refilled meal back to the pet.
 func (c *Character) StartMountFeed() {
 	c.startMountFeed(-1, 0)
 }
@@ -130,8 +132,8 @@ func (c *Character) StartPetMountFeed(fed int, controlItemID int32) {
 	c.startMountFeed(fed, controlItemID)
 }
 
-// startMountFeed starts the feed with the gauge at fed, or full when fed
-// is negative.
+// startMountFeed starts the feed with the gauge at fed. A negative fed
+// keeps the gauge of a mount called from a pet and fills any other.
 func (c *Character) startMountFeed(fed int, petCollar int32) {
 	if !c.Mounted() {
 		return
@@ -145,10 +147,13 @@ func (c *Character) startMountFeed(fed int, petCollar int32) {
 	}
 	f.stopLocked()
 	f.fed = true
-	if fed < 0 {
-		fed = f.data.MaxMeal
-	} else {
+	switch {
+	case fed >= 0:
 		f.petCollar = petCollar
+	case f.petCollar != 0:
+		fed = f.current
+	default:
+		fed = f.data.MaxMeal
 	}
 	gauge := f.setCurrentLocked(fed, inCombat)
 	if q := c.Queue(); q != nil && !c.Dead() {
