@@ -75,7 +75,7 @@ func (ix *Index) Clear() {
 		z := k.Core()
 		z.mu.Lock()
 		clear(z.occupants)
-		clear(z.switched)
+		clear(z.raised)
 		z.mu.Unlock()
 	}
 }

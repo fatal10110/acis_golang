@@ -395,19 +395,18 @@ func (z *Town) enter(a Actor) {
 	if z.CombatRule == 1 && inSiege(a) {
 		return
 	}
+	held := holdsOf(FlagTown)
 	if z.raisesPeace() {
-		a.ZoneFlags().Set(FlagPeace, true)
+		held |= holdsOf(FlagPeace)
 	}
-	a.ZoneFlags().Set(FlagTown, true)
+	z.raiseHolds(a, held)
 }
 
 // raisesPeace reports whether entering the town sets the peace flag: the
 // town must be peaceful and its combat rule must not disable peace townwide.
 func (z *Town) raisesPeace() bool { return z.Peaceful && z.CombatRule != 2 }
 
-func (z *Town) exit(a Actor) {
-	if z.Peaceful {
-		a.ZoneFlags().Set(FlagPeace, false)
-	}
-	a.ZoneFlags().Set(FlagTown, false)
-}
+// exit releases only the holds the town's entry raised (#4957): none for a
+// besieger its combat rule kept out, and no peace where it raises none, so
+// an overlapping peace zone keeps its own.
+func (z *Town) exit(a Actor) { z.releaseHolds(a) }

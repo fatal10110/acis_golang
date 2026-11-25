@@ -81,12 +81,16 @@ type Owned interface {
 // Zone is the identity, footprint and occupancy state shared by every zone
 // kind. Concrete kinds embed it and layer their own rules on top.
 //
-// mu guards occupants, switched, enterWatchers and exitWatchers. switched
-// holds the occupants a kind whose rules switch on and off (a battlefield
-// under siege, a stadium whose fight runs) raised its switched holds on;
-// those holds change only together with switched, under mu, so an occupant
-// holds them once while inside and the rules are on, and not at all
-// otherwise, however its entry or exit interleaves with the switch.
+// mu guards occupants, raised, enterWatchers and exitWatchers. raised
+// records, per occupant, the flags whose holds the zone's rules raised on
+// it; those holds change only together with raised, under mu, and a leaving
+// occupant gives back exactly them (#4957). An exit so never releases a
+// hold its entry skipped (a town's peace for a besieger, a battlefield
+// before its siege, a dormant trap), which would strip the hold of an
+// overlapping zone, and a kind whose rules switch on and off (a battlefield
+// under siege, a stadium whose fight runs) holds them once while inside and
+// the rules are on, and not at all otherwise, however its entry or exit
+// interleaves with the switch.
 type Zone struct {
 	id   int
 	form Form
@@ -96,7 +100,7 @@ type Zone struct {
 
 	mu            sync.RWMutex
 	occupants     map[int32]Actor
-	switched      map[int32]struct{}
+	raised        map[int32]holdSet
 	enterWatchers []func(Actor)
 	exitWatchers  []func(Actor)
 }
@@ -182,44 +186,96 @@ func (z *Zone) evict(a Actor) bool {
 	return true
 }
 
-// drop stops tracking a without the zone's exit rules, forgetting any
-// switched holds it raised on a: a zone reload took those with the rest of
-// a's zone holds.
+// drop stops tracking a without the zone's exit rules, forgetting the
+// holds it raised on a: a zone reload took those with the rest of a's zone
+// holds.
 func (z *Zone) drop(a Actor) {
 	z.mu.Lock()
 	defer z.mu.Unlock()
 	delete(z.occupants, a.ObjectID())
-	delete(z.switched, a.ObjectID())
+	delete(z.raised, a.ObjectID())
 }
 
-// switchOnLocked raises a's switched holds through set when a is an
-// occupant that holds none yet, reporting whether it did. Callers hold mu.
-func (z *Zone) switchOnLocked(a Actor, set func(a Actor, on bool)) bool {
+// holdSet is a set of flags, one bit per Flag.
+type holdSet uint32
+
+// The flags must fit a holdSet.
+var _ [32 - FlagCount]struct{}
+
+// allHolds is every flag.
+const allHolds = holdSet(1<<FlagCount - 1)
+
+// holdsOf is the set of flags.
+func holdsOf(flags ...Flag) holdSet {
+	var s holdSet
+	for _, f := range flags {
+		s |= 1 << f
+	}
+	return s
+}
+
+// set raises (on) or releases one hold on a for each flag of s.
+func (s holdSet) set(a Actor, on bool) {
+	flags := a.ZoneFlags()
+	for f := range FlagCount {
+		if s&(1<<f) != 0 {
+			flags.Set(f, on)
+		}
+	}
+}
+
+// raiseLocked raises, when a is an occupant, one hold on a for each flag
+// of s the zone holds none on yet, recording them; it reports whether it
+// raised any. Callers hold mu.
+func (z *Zone) raiseLocked(a Actor, s holdSet) bool {
 	id := a.ObjectID()
 	if _, inside := z.occupants[id]; !inside {
 		return false
 	}
-	if _, held := z.switched[id]; held {
+	had := z.raised[id]
+	add := s &^ had
+	if add == 0 {
 		return false
 	}
-	if z.switched == nil {
-		z.switched = make(map[int32]struct{})
+	if z.raised == nil {
+		z.raised = make(map[int32]holdSet)
 	}
-	z.switched[id] = struct{}{}
-	set(a, true)
+	z.raised[id] = had | add
+	add.set(a, true)
 	return true
 }
 
-// switchOffLocked releases a's switched holds through set when a holds
-// them, reporting whether it did. Callers hold mu.
-func (z *Zone) switchOffLocked(a Actor, set func(a Actor, on bool)) bool {
+// releaseLocked releases the holds the zone raised on a for the flags of
+// s, reporting whether it released any. Callers hold mu.
+func (z *Zone) releaseLocked(a Actor, s holdSet) bool {
 	id := a.ObjectID()
-	if _, held := z.switched[id]; !held {
+	had := z.raised[id]
+	off := s & had
+	if off == 0 {
 		return false
 	}
-	delete(z.switched, id)
-	set(a, false)
+	if left := had &^ off; left != 0 {
+		z.raised[id] = left
+	} else {
+		delete(z.raised, id)
+	}
+	off.set(a, false)
 	return true
+}
+
+// raiseHolds is raiseLocked taking mu.
+func (z *Zone) raiseHolds(a Actor, s holdSet) bool {
+	z.mu.Lock()
+	defer z.mu.Unlock()
+	return z.raiseLocked(a, s)
+}
+
+// releaseHolds releases every hold the zone raised on a, reporting whether
+// it released any.
+func (z *Zone) releaseHolds(a Actor) bool {
+	z.mu.Lock()
+	defer z.mu.Unlock()
+	return z.releaseLocked(a, allHolds)
 }
 
 // membership is an actor whose zone membership a lock of its own
