@@ -176,19 +176,22 @@ func TestSummonSkillOnDeadServitorIsInvalidTarget(t *testing.T) {
 	}
 
 	o.client.Send(encodeRequestMagicSkillUse(groupTargetServitorHeal))
-	frames := drainFrames(t, o.client)
-	var sawInvalid bool
-	for _, frame := range frames {
+	// The request is still on its way when the queued frames are counted, so
+	// the reply is read until it arrives, not drained.
+	var frames [][]byte
+	for sawInvalid := false; !sawInvalid; {
+		frame := o.client.Read()
+		frames = append(frames, frame)
 		switch frame[0] {
 		case serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeMagicSkillLaunched:
 			t.Fatalf("dead servitor heal was cast: frames %x", frameOpcodes(frames))
 		case serverpackets.OpcodeSystemMessage:
-			if wire.NewReader(frame[1:]).ReadInt32() == serverpackets.SystemMessageInvalidTarget {
-				sawInvalid = true
-			}
+			sawInvalid = wire.NewReader(frame[1:]).ReadInt32() == serverpackets.SystemMessageInvalidTarget
 		}
 	}
-	if !sawInvalid {
-		t.Fatalf("dead servitor heal frames %x carry no INVALID_TARGET", frameOpcodes(frames))
+	for _, frame := range drainFrames(t, o.client) {
+		if frame[0] == serverpackets.OpcodeMagicSkillUse || frame[0] == serverpackets.OpcodeMagicSkillLaunched {
+			t.Fatalf("dead servitor heal was cast after INVALID_TARGET: frame %#x", frame[0])
+		}
 	}
 }
