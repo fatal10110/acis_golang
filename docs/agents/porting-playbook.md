@@ -137,9 +137,12 @@ the track's lock (`derby.Track.Bypass`); a purchase that finds sales closed take
 
 **Parity exception: a quoted dollar sign in an HTML value still sends the page** (#4718). The
 reference refuses a placeholder value with an odd run of backslashes before `$` (`a\$`, `a\$1`) and
-never sends the page; a clan notice holding `\$` then fails every member's entry. Go reads the
-backslash as quoting the `$` like any other character and sends the page showing `a$`
-(`commons.HTMLValue`). Pinned by `TestHTMLValue` (`internal/commons`).
+never sends the page. The player-text callers are a clan notice, petition content and feedback
+(`internal/gameserver/network/admin_petition.go`) and a buffer scheme name
+(`internal/gameserver/schemebuffer/dialog.go`); any of them holding `\$` fails the page, so a clan
+notice fails every member's entry. Go reads the backslash as quoting the `$` like any other
+character and sends the page showing `a$` (`commons.HTMLValue`). Pinned by `TestHTMLValue`
+(`internal/commons`).
 
 **Parity exception: a missing or malformed `.properties` file stops boot** (#4772). The reference logs
 the error and carries on: a missing file gives every key its default, and a malformed one keeps the
