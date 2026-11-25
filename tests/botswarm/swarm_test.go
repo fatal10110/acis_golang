@@ -18,7 +18,12 @@ func TestBotSwarmPlaysThroughLoginAndGameServer(t *testing.T) {
 	// swarm0 already has a character and selects it; the others create one.
 	srv.SeedCharacterFor(t, "swarm0", "Swarm0", 1, 0)
 	spawn := location.Location{X: 10, Y: 20, Z: gameservertest.SpawnZ}
-	monster := location.Location{X: spawn.X + 60, Y: spawn.Y, Z: spawn.Z}
+	// In sight but out of reach within the run: an attack that lands, or a
+	// hit taken, leaves the bot in attack stance, where the server rightly
+	// refuses its logout, so a bot that gets that close would end the run
+	// with logout_refused on a slow machine. The run is back to back and
+	// lasts well under the walk this takes.
+	monster := location.Location{X: spawn.X + 1000, Y: spawn.Y, Z: spawn.Z}
 	srv.SpawnMovingHostileNPCTemplate(t, gameservertest.MovingHostileTemplate("Monster"), monster, monster)
 
 	cfg := botclient.DefaultConfig()
