@@ -359,7 +359,8 @@ func (l *GameClientLink) validatePassengerPosition(live *livePlayer, boatID int3
 }
 
 // leaveBoat takes live off the boat it rides, if any: it leaves the boat's
-// peace and the ticket collection due is called off.
+// peace, and any ticket collection due stays for the passengers still
+// aboard (#5154).
 func (l *GameClientLink) leaveBoat(live *livePlayer) {
 	b := riddenBoat(live)
 	if b == nil {
@@ -375,7 +376,7 @@ func (l *GameClientLink) leaveBoat(live *livePlayer) {
 // one: its saved position is already the dock's shore.
 func dropBoat(live *livePlayer) {
 	if b := riddenBoat(live); b != nil {
-		b.DropPassenger(live.ObjectID())
+		b.RemovePassenger(live.ObjectID())
 		live.Board(nil)
 	}
 }
