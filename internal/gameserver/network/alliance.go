@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -249,12 +250,35 @@ func (l *GameClientLink) createAlly(live *livePlayer, name string) {
 }
 
 // requestSetAllyCrest stores the alliance crest live uploads for every
-// clan of the alliance its clan leads; an empty image deletes it.
+// clan of the alliance its clan leads; an empty image deletes it. A new
+// image is written to disk off the queue, on the connection goroutine
+// (deferLookup), and the clans point at it back on the queue, where the
+// upload is answered.
 func (l *GameClientLink) requestSetAllyCrest(live *livePlayer, req clientpackets.CrestUpload) {
 	if req.Length > clientpackets.AllyCrestMaxLength {
 		return
 	}
-	allies, result := l.clanService().SetAllyCrest(live.Character, req.Data, l.crests)
+	svc := l.clanService()
+	allies, result, up := svc.SetAllyCrest(live.Character, req.Data, l.crests)
+	if result != clan.CrestPending {
+		l.answerAllyCrest(live, allies, result)
+		return
+	}
+	live.deferLookup(func(context.Context) {
+		if !svc.StoreCrest(up, l.crests) {
+			return
+		}
+		onLive(live, func() {
+			allies, result := svc.CommitAllyCrest(live.Character, up, l.crests)
+			l.answerAllyCrest(live, allies, result)
+		})
+	})
+}
+
+// answerAllyCrest answers live's alliance crest upload with result: a set
+// or deleted crest refreshes every online member of the alliance's clans
+// before live is told.
+func (l *GameClientLink) answerAllyCrest(live *livePlayer, allies []*clan.Clan, result clan.CrestResult) {
 	var msg int
 	switch result {
 	case clan.CrestDeleted:

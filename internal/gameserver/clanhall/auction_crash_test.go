@@ -372,4 +372,4 @@ func TestAuctionSaleCancelSurvivesACrashAnywhere(t *testing.T) {
 	}
 }
 
-func (b *crashBank) RestoreWarehouse(int32) {}
+func (b *crashBank) RestoreWarehouse(int32) bool { return true }

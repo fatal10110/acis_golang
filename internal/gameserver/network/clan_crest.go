@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -26,11 +27,34 @@ func (l *GameClientLink) requestSetLargePledgeCrest(live *livePlayer, req client
 // deleting a crest that is not set, or whose image is not exactly the
 // crest's size is answered with nothing, as specified: the crest dialog
 // leaves no client action pending.
+//
+// A new image is written to disk off the queue, on the connection
+// goroutine (deferLookup), and the clan points at it back on the queue,
+// where the upload is answered.
 func (l *GameClientLink) requestSetClanCrest(live *livePlayer, typ datacache.CrestType, req clientpackets.CrestUpload, limit int32) {
 	if req.Length > limit {
 		return
 	}
-	cl, result := l.clanService().SetCrest(live.Character, typ, req.Data, l.crests, time.Now())
+	svc := l.clanService()
+	cl, result, up := svc.SetCrest(live.Character, typ, req.Data, l.crests, time.Now())
+	if result != clan.CrestPending {
+		l.answerClanCrest(live, cl, result)
+		return
+	}
+	live.deferLookup(func(context.Context) {
+		if !svc.StoreCrest(up, l.crests) {
+			return
+		}
+		onLive(live, func() {
+			cl, result := svc.CommitCrest(live.Character, up, l.crests, time.Now())
+			l.answerClanCrest(live, cl, result)
+		})
+	})
+}
+
+// answerClanCrest answers live's clan crest upload with result: a set or
+// deleted crest refreshes every online member of cl before live is told.
+func (l *GameClientLink) answerClanCrest(live *livePlayer, cl *clan.Clan, result clan.CrestResult) {
 	var msg int
 	switch result {
 	case clan.CrestDissolving:

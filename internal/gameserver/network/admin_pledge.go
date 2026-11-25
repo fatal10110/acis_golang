@@ -30,8 +30,19 @@ const adminPledgeUsage = "Usage: //pledge create|dismiss|info|level|rep|transfer
 // gm is then shown the game menu, except after a refused transfer. The
 // command runs on the player's queue, where its clan membership changes.
 func (l *GameClientLink) adminPledge(gm *livePlayer, line string) {
-	target := adminTargetPlayer(gm, true)
-	args := spaceTokens(line)[1:]
+	l.adminPledgeOn(gm, adminTargetPlayer(gm, true), spaceTokens(line)[1:])
+}
+
+// adminPledgeOn runs //pledge with args on target. A dismiss destroys the
+// clan's warehouse items, so a warehouse no member has opened yet is read
+// first, off gm's queue (clanWarehouseReady), and the command then runs
+// again; a read that fails dismisses nothing.
+func (l *GameClientLink) adminPledgeOn(gm, target *livePlayer, args []string) {
+	if len(args) > 0 && args[0] == "dismiss" {
+		if cl, ok := l.clanService().ClanOf(target.Character); ok && !l.clanWarehouseReady(gm, cl.ID(), func() { l.adminPledgeOn(gm, target, args) }) {
+			return
+		}
+	}
 	onPlayer(gm, target, func() { l.runAdminPledge(gm, target, args) })
 }
 
