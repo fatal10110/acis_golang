@@ -384,7 +384,9 @@ func (w *Walker) release(actor WalkerActor, now time.Time) error {
 }
 
 func (w *Walker) moveToNextPoint(entry *walkerEntry) error {
-	if !canWorkInRegion(w.state, entry.actor) {
+	// A walker out of the world waits; one in the world walks whatever
+	// its region's activity (#4797).
+	if placed, _ := regionActivity(w.state, entry.actor); !placed {
 		entry.wakeTime = w.now().Add(WalkerTick)
 		return nil
 	}
