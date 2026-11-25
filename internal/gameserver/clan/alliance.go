@@ -449,6 +449,10 @@ func (s *Service) SetAllyCrest(c *player.Character, data []byte, files *datacach
 		}
 		result = CrestDeleted
 	} else {
+		if !datacache.AllyCrest.Fits(data) {
+			// Refused before an object id is drawn for it (#5148).
+			return nil, CrestIgnored
+		}
 		var ok bool
 		if id, ok = s.newCrestID(datacache.AllyCrest, files); !ok {
 			return nil, CrestIgnored

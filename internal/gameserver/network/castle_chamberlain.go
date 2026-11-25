@@ -486,7 +486,8 @@ func (d chamberlainDialog) doorsUpdate(val string, rest []string) bool {
 }
 
 // doorsChooseUpgrade answers "doors_choose_upgrade <gate> <type> <ratio>"
-// with doors-confirm.htm naming them and the upgrade's price.
+// with doors-confirm.htm naming them and the upgrade's price; a type that
+// is not the gate's (see gateOfClass) answers nothing.
 func (d chamberlainDialog) doorsChooseUpgrade(val string, rest []string) bool {
 	if !d.allowed(clan.PrivCastleSetFuncs) {
 		return true
@@ -502,14 +503,18 @@ func (d chamberlainDialog) doorsChooseUpgrade(val string, rest []string) bool {
 	if !ok {
 		return false
 	}
+	if !d.gateOfClass(val, gateType) {
+		return true
+	}
 	price := castle.DoorUpgradeCost(gateType, ratio, d.r.StrifeOwner)
 	d.send("doors-confirm.htm", "%id%", val, "%level%", rest[1], "%type%", rest[0], "%price%", strconv.Itoa(price))
 	return true
 }
 
 // doorsConfirmUpgrade answers "doors_confirm_upgrade <gate> <type>
-// <ratio>": an unpriced upgrade, or a door that is not one of the castle's
-// gates, answers nothing; a gate already at that ratio or above opens
+// <ratio>": an unpriced upgrade, a door that is not one of the castle's
+// gates, or a type that is not the gate's (see gateOfClass), answers
+// nothing; a gate already at that ratio or above opens
 // doors-already-updated.htm naming its ratio in percent; a talker short of
 // the price not-enough-adena.htm; otherwise the price is paid, the gate
 // upgraded and stored, and doors-success.htm opens.
@@ -536,6 +541,9 @@ func (d chamberlainDialog) doorsConfirmUpgrade(val string, rest []string) bool {
 	if !ok {
 		return false
 	}
+	if !d.gateOfClass(val, gateType) {
+		return true
+	}
 	d.c.Purchase(func() {
 		current, ok := d.c.GateUpgradeRatio(id)
 		switch {
@@ -550,6 +558,29 @@ func (d chamberlainDialog) doorsConfirmUpgrade(val string, rest []string) bool {
 		}
 	})
 	return true
+}
+
+// gateOfClass reports whether gateType is the price class of gate on this
+// NPC's gate upgrade page <npcId>-gu.htm, the class its link to the gate
+// carries. The class a command names is checked against it, so a command
+// typed by hand cannot price a gate in a cheaper class (#5148); a gate the
+// page does not list has no class.
+func (d chamberlainDialog) gateOfClass(gate string, gateType int) bool {
+	page, ok := d.l.html.Get(chamberlainPages + strconv.Itoa(d.f.NpcID()) + "-gu.htm")
+	if !ok {
+		return false
+	}
+	link := "doors_update " + gate + " "
+	i := strings.Index(page, link)
+	if i < 0 {
+		return false
+	}
+	class := page[i+len(link):]
+	if end := strings.IndexFunc(class, func(r rune) bool { return r < '0' || r > '9' }); end >= 0 {
+		class = class[:end]
+	}
+	n, ok := parseInt(class)
+	return ok && n == gateType
 }
 
 // trapsUpdate opens the trap upgrade page <npcId>-tu.htm, or with a trap

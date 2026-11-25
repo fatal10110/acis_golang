@@ -121,9 +121,9 @@ var folkChats = map[InstanceKind]folkChat{
 
 // siegeMessengers are the civilian types whose chat window the network
 // answers from siege state: a castle's or a siegable hall's messenger. One
-// serving neither residence opens no page. Their pages carry no command
-// links, so a dialog command addressed to one is not modeled: it answers
-// BypassUnported, which the network logs and releases with ActionFailed.
+// serving neither residence opens no page. Their dialog commands are the
+// generic ones, a chat page read from data/html/default as for a type
+// absent from folkChats (#4975).
 var siegeMessengers = map[InstanceKind]struct{}{
 	"SiegeNpc": {},
 }

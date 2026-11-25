@@ -88,16 +88,23 @@ func TestChannelOustRefusals(t *testing.T) {
 }
 
 // TestChannelPartyMembersInfo pins RequestExMPCCShowPartyMembersInfo: any
-// online party member's id lists its party's members, in join order, with
-// their class; a player in no party lists nothing.
+// member's id of a party in the asker's command channel lists that party's
+// members, in join order, with their class. A party outside the asker's
+// channel, an asker in no channel, and a player in no party list nothing
+// (owner-approved divergence, #5148).
 func TestChannelPartyMembersInfo(t *testing.T) {
 	t.Parallel()
-	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Loner", 40}})
+	g, _ := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}, {"Outside", 40}, {"Sixth", 50}, {"Loner", 40}},
+		authorityClan{level: 5, leads: true}, 1)
 	g.invite(t, 0, 1, 0)
-	loner := g.players[2]
+	g.invite(t, 2, 3, 0)
+	g.invite(t, 4, 5, 0)
+	g.askAndAccept(t, 0, 2)
+	g.quiet(t)
+	other, outside, loner := g.players[2], g.players[4], g.players[6]
 
-	loner.c.Send(encodeExtendedInt(clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo, g.players[1].id))
-	frame := loner.c.Read()
+	other.c.Send(encodeExtendedInt(clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo, g.players[1].id))
+	frame := skipPositions(other.c)
 	assertFrameOpcode(t, frame, serverpackets.OpcodeExtended, "ExMPCCShowPartyMemberInfo")
 	r := wire.NewReader(frame[1:])
 	if sub := r.ReadUint16(); sub != serverpackets.OpcodeExMPCCShowPartyMemberInfo {
@@ -113,6 +120,12 @@ func TestChannelPartyMembersInfo(t *testing.T) {
 		r.ReadInt32()
 	}
 
+	other.c.Send(encodeExtendedInt(clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo, outside.id))
+	assertSilent(t, other.c, "members of a party outside the channel")
+	outside.c.Send(encodeExtendedInt(clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo, g.players[1].id))
+	assertSilent(t, outside.c, "members asked from outside the channel")
+	loner.c.Send(encodeExtendedInt(clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo, g.players[1].id))
+	assertSilent(t, loner.c, "members asked by a player in no party")
 	g.players[0].c.Send(encodeExtendedInt(clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo, loner.id))
 	assertSilent(t, g.players[0].c, "members of no party")
 }

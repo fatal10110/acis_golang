@@ -83,7 +83,8 @@ func (l *GameClientLink) showWearWindow(live *livePlayer, f *npc.Folk, listID in
 // or too much weight, then ActionFailed. The others (an unknown list, a
 // game master's list sent by anyone else, an untargeted or unreachable
 // seller, an item off the list, an unpriced item, a count over the stock,
-// a total price overflowing the adena range) answer nothing by design. The
+// a total price overflowing the adena range, a seller whose dialog refuses
+// the buyer now) answer nothing by design. The
 // buy window's submit leaves no client action pending, so that silence
 // cannot hang the client.
 func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.RequestBuyItem) {
@@ -105,7 +106,8 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 		return
 	case list.NPCID > 0:
 		f, _ := live.Target().(*npc.Folk)
-		if f == nil || !(f.Merchant() || f.MercenaryManager()) || !list.AllowsNPC(f.NpcID()) || !l.playerCanDoInteract(live, f) {
+		if f == nil || !(f.Merchant() || f.MercenaryManager()) || !list.AllowsNPC(f.NpcID()) || !l.playerCanDoInteract(live, f) ||
+			f.BuyRefused(l.residenceTalk(live, f)) {
 			return
 		}
 		seller = f

@@ -1,6 +1,10 @@
 package npc
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+)
 
 // merchantKinds are the civilian types built on the merchant: a buylist
 // purchase or try-on may target any of them.
@@ -18,6 +22,21 @@ var merchantKinds = map[InstanceKind]struct{}{
 func (f *Folk) Merchant() bool {
 	_, ok := merchantKinds[hostileKind(f.Instance)]
 	return ok
+}
+
+// BuyRefused reports whether f's dialog, the one opening its buy lists,
+// refuses talker r now, so that a purchase sent without it is refused as
+// well (#5148): a castle chamberlain refuses whom its products command
+// refuses, a mercenary manager whom its hire command does. Any other seller
+// refuses no one here.
+func (f *Folk) BuyRefused(r ResidenceTalk) bool {
+	switch kind := hostileKind(f.Instance); kind {
+	case "CastleChamberlain":
+		return r.ChamberlainRefusal(kind, clan.PrivCastleFunctions) != ""
+	case "MercenaryManagerNpc":
+		return r.castleTalkCond(r.SiegeInProgress, clan.PrivCastleMercenary) != talkOwner || !r.SealValidation
+	}
+	return false
 }
 
 // MercenaryManager reports whether f is a castle mercenary manager, which

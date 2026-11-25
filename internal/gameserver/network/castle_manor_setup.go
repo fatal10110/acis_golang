@@ -141,8 +141,9 @@ func (l *GameClientLink) manorManagerMenu(live *livePlayer, f *npc.Folk, command
 
 // chamberlainManorMenu answers the manor windows of a castle chamberlain,
 // or of a wyvern manager, which heeds only the talker who last selected it.
-// A talker who may not run its castle's manor gets the refusal page, any
-// talker at a chamberlain while the siege runs the busy page; see
+// A talker who may not run its castle's manor gets the refusal page, a
+// clan member while the castle's siege runs the busy page (#5147 for the
+// wyvern manager); see
 // chamberlainManorWindows for the rest.
 func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, kind npc.InstanceKind, command string) {
 	if kind == "WyvernManagerNpc" && live.currentFolk.Load() != f {
@@ -161,8 +162,9 @@ func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, kin
 // chamberlainManorWindows answers a chamberlain dialog's manor windows for
 // a talker allowed to run the manor of the castle r names: the seeds or
 // crops of a castle for a period, or the manor's crops, with the purchase
-// buttons hidden, and the seed and crop setting windows outside the
-// approved period. A command that does not parse, or an unknown ask,
+// buttons hidden, and the seed and crop setting windows of the NPC's own
+// castle outside the approved period: the castle id the request names does
+// not open another castle's plan (#5148). A command that does not parse, or an unknown ask,
 // answers nothing, as specified; a link click leaves no client action
 // pending.
 func (l *GameClientLink) chamberlainManorWindows(live *livePlayer, r npc.ResidenceTalk, command string) {
@@ -189,9 +191,9 @@ func (l *GameClientLink) chamberlainManorWindows(live *livePlayer, r npc.Residen
 		case l.castleManor.IsManorApproved():
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageManorCannotBeSetUp))
 		case menu.ask == 7:
-			live.SendFrame(l.frameManorSeedSetting(castleID))
+			live.SendFrame(l.frameManorSeedSetting(r.CastleID))
 		default:
-			live.SendFrame(l.frameManorCropSetting(castleID))
+			live.SendFrame(l.frameManorCropSetting(r.CastleID))
 		}
 	}
 }
