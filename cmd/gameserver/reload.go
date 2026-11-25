@@ -188,7 +188,7 @@ func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logge
 	if err != nil {
 		return network.PlayerConfig{}, err
 	}
-	cfg, err := gameServerConfigFromLoadedProperties(paths, serverProps, hexProps)
+	cfg, err := gameServerConfigFromProperties(paths, serverProps, hexProps.Props)
 	if err != nil {
 		return network.PlayerConfig{}, err
 	}
