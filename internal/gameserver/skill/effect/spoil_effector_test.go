@@ -14,6 +14,13 @@ type spoilTarget struct {
 
 func (t spoilTarget) SpoilPool() *item.SpoilPool { return t.pool }
 
+func (t spoilTarget) MarkSpoil(spoilerID int32) (alive, marked bool) {
+	if t.Dead() {
+		return false, false
+	}
+	return true, t.pool.Mark(spoilerID)
+}
+
 // TestSpoilStartRequiresPlayerEffector pins that only a player spoils: a
 // Spoil effect from any other effector fails to start and leaves the pool
 // unmarked, whatever the success roll would have been.

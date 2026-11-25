@@ -25,6 +25,13 @@ func (s *spoilFakeTarget) Dead() bool                 { return s.dead }
 func (s *spoilFakeTarget) Level() int                 { return s.level }
 func (s *spoilFakeTarget) SpoilPool() *item.SpoilPool { return s.pool }
 
+func (s *spoilFakeTarget) MarkSpoil(spoilerID int32) (alive, marked bool) {
+	if s.dead {
+		return false, false
+	}
+	return true, s.pool.Mark(spoilerID)
+}
+
 type spoilFakeCaster struct {
 	neutralPlayer
 	world.Presence
@@ -130,6 +137,28 @@ func TestSpoilReportsFailedMagicRollAtLevelOne(t *testing.T) {
 	}
 	if len(caster.resisted) != 1 || caster.resisted[0] != (Resisted{SkillID: 254, SkillLevel: 1}) || len(result.Resisted) != 0 {
 		t.Fatalf("direct resists = %+v, deferred resists = %+v; want one direct level-1 report", caster.resisted, result.Resisted)
+	}
+}
+
+// TestSpoilTargetDyingBeforeMarkGetsNoMark covers #5086: a target that dies
+// between the handler's liveness check and the mark takes no mark, and the
+// caster gets no success message.
+func TestSpoilTargetDyingBeforeMarkGetsNoMark(t *testing.T) {
+	target := &spoilFakeTarget{level: 1, pool: &item.SpoilPool{}}
+	registry := NewRegistry(spoilHandler{roll: func(int) int {
+		target.dead = true // the killing blow lands while the success roll is taken
+		return 9999
+	}})
+	caster := &spoilFakeCaster{id: 42, level: 1}
+	result, ok := registry.UseResult(Cast{
+		Caster: caster, Skill: modelskill.Definition{ID: 254, Level: 7, SkillType: "SPOIL", MagicLevel: 1},
+		Targets: []Actor{target},
+	})
+	if !ok || target.pool.IsSpoiled() {
+		t.Fatalf("UseResult() handled = %t, spoiled = %t; want handled and no mark", ok, target.pool.IsSpoiled())
+	}
+	if len(caster.notices) != 0 || len(result.Messages) != 0 {
+		t.Fatalf("caster notices = %v, deferred messages = %v; want none", caster.notices, result.Messages)
 	}
 }
 

@@ -207,5 +207,8 @@ func (f *Folk) Lethalable() bool { return !f.SiegeFlag() }
 // SpoilPool reports none: a civilian NPC has nothing to sweep.
 func (f *Folk) SpoilPool() *item.SpoilPool { return nil }
 
+// MarkSpoil never marks a folk NPC, which has no spoil pool.
+func (f *Folk) MarkSpoil(int32) (alive, marked bool) { return !f.Dead(), false }
+
 // SeedState reports none: a civilian NPC is never sown.
 func (f *Folk) SeedState() *SeedState { return nil }

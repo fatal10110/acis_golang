@@ -418,6 +418,7 @@ func (t *liveEffectTarget) RandomNearbyCombatant(int) (attackable.Combatant, boo
 func (t *liveEffectTarget) RandomizeHate() bool                                    { return false }
 func (t *liveEffectTarget) StopMostHatedTarget()                                   {}
 func (t *liveEffectTarget) SpoilPool() *item.SpoilPool                             { return nil }
+func (t *liveEffectTarget) MarkSpoil(int32) (alive, marked bool)                   { return !t.dead, false }
 func (t *liveEffectTarget) CollisionRadius() float64                               { return 0 }
 func (t *liveEffectTarget) SetCollisionRadius(float64)                             {}
 func (t *liveEffectTarget) ResetCollisionRadius()                                  {}
