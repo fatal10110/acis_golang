@@ -81,3 +81,31 @@ func TestChamberlainSiegeHourChoiceIsNotKept(t *testing.T) {
 		t.Fatalf("next date moved: stored siege date %d over %q, want %d true", date, over, next+(2*time.Hour).Milliseconds())
 	}
 }
+
+// TestCastleSiegeHourRefusedOnClosedDate: a siege hour set once the date is
+// closed to change, as by a second talker who passed the window check just
+// before the first one closed it, is refused and moves nothing (#5114).
+func TestCastleSiegeHourRefusedOnClosedDate(t *testing.T) {
+	t.Parallel()
+	w := bootChamberlain(t, commandSetup{})
+	c, _ := w.srv.Castles.Get(taxCastleID)
+
+	open := time.Date(2030, 6, 9, 18, 0, 0, 0, time.Local).UnixMilli()
+	c.SetSiegeDate(open)
+	c.SetTimeRegistrationOver(false)
+	c.SaveSiegeInfo()
+	if !c.SetSiegeHour(16) {
+		t.Fatal("SetSiegeHour on an open date = false, want true")
+	}
+	moved := time.Date(2030, 6, 9, 16, 0, 0, 0, time.Local).UnixMilli()
+
+	if c.SetSiegeHour(20) {
+		t.Fatal("SetSiegeHour on a closed date = true, want false")
+	}
+	if got := c.SiegeDate(); got != moved || !c.IsTimeRegistrationOver() {
+		t.Fatalf("siege date %d over %v after refused hour, want %d true", got, c.IsTimeRegistrationOver(), moved)
+	}
+	if _, _, _, date, over := w.castleRow(t); date != moved || over != "true" {
+		t.Fatalf("stored siege date %d over %q after refused hour, want %d true", date, over, moved)
+	}
+}
