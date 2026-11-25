@@ -36,7 +36,12 @@ func TestPetitionSaveIsOneTransaction(t *testing.T) {
 		t.Fatalf("stored petitions = %+v (%v), want %+v", got, err, want)
 	}
 
-	if err := store.Save(ctx, append(slices.Clone(records), records[0])); err == nil {
+	// The failing batch differs from the stored rows, so a save that cleared
+	// the tables and inserted the first copy before failing would show it.
+	changed := records[0]
+	changed.Content = "changed before the failing save"
+	changed.Feedback = "changed feedback"
+	if err := store.Save(ctx, append(records[:0:0], changed, changed)); err == nil {
 		t.Fatal("save of a petition stored twice succeeded")
 	}
 	if got, err := store.Load(ctx); err != nil || !reflect.DeepEqual(got, want) {
