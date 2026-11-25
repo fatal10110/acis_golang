@@ -40,7 +40,6 @@ type loc struct{ x, y, z int32 }
 // raidList is the quest whose leader picks one raid boss of a list and is
 // paid for each proof of its death.
 type raidList struct {
-	name string
 	// raids are numbered from 1 by the "raid" variable.
 	raids []raid
 }

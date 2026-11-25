@@ -35,7 +35,7 @@ type q509 struct{ raidList }
 // from Valdis's list, and each proof of its death the leader's clan brings
 // back raises the clan's reputation.
 func Q509() script.Script {
-	q := q509{raidList{name: q509Name, raids: []raid{
+	q := q509{raidList{raids: []raid{
 		{daimonTheWhiteEyed, daimonEyes, 180, 215, loc{186320, -43904, -3175}},
 		{hestiaGuardianDeity, hestiaFairyStone, 430, 465, loc{134672, -115600, -1216}},
 		{plagueGolem, nucleusOfLesserGolem, 380, 415, loc{170000, -59900, -3848}},

@@ -40,7 +40,7 @@ type q508 struct{ raidList }
 // from Sir Eric Rodemai's list, and each proof of its death the leader's clan
 // brings back raises the clan's reputation.
 func Q508() script.Script {
-	q := q508{raidList{name: q508Name, raids: []raid{
+	q := q508{raidList{raids: []raid{
 		{palibatiQueenThemis, themisScale, 65, 100, loc{192346, 21528, -3648}},
 		{hekatonPrime, nucleusOfHekatonPrime, 40, 75, loc{191979, 54902, -7658}},
 		{gargoyleLordTiphon, tiphonShard, 30, 65, loc{170038, -26236, -3824}},
