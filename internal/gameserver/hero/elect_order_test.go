@@ -38,7 +38,7 @@ func electedOrder(t *testing.T, m *Manager, store *electionStore, ids ...int32) 
 		store.picks[88+k] = id
 		byName[fmt.Sprint("h", id)] = id
 	}
-	m.Elect()
+	m.Elect(1)
 	var out []int32
 	for _, h := range m.Heroes() {
 		id, ok := byName[h.Name]

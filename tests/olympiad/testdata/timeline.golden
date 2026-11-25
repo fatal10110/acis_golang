@@ -48,6 +48,8 @@ ANN game_ended
 DB save_status 4 -
 DB save_nobles 1001:10,1002:0
 @2026-10-08T00:00:00Z cycle=4 period=INTERVAL nobles=1001:10,1002:0
+DB save_status 4 -
+DB save_nobles 1001:13,1002:3
 ANN game_started
 @2026-10-08T18:00:00Z cycle=4 period=COMPETITION nobles=1001:13,1002:3
 ANN registration_ended
@@ -94,6 +96,7 @@ DB save_nobles 1001:5
 DB save_status 1 2026-11-02T12:00:00Z
 DB save_nobles 1001:5
 DB snapshot_month
+DB save_status 1 2026-11-02T12:00:00Z
 @2026-11-01T12:00:00Z cycle=1 period=VALIDATION nobles=1001:5
 DB delete_nobles
 ANN cycle_started 2
@@ -126,6 +129,7 @@ DB save_status 7 -
 ANN cycle_ended 7
 DB save_status 7 2026-12-02T12:00:00Z
 DB snapshot_month
+DB save_status 7 2026-12-02T12:00:00Z
 @2026-12-01T12:00:00Z cycle=7 period=VALIDATION nobles=-
 DB delete_nobles
 ANN cycle_started 8
@@ -251,6 +255,7 @@ DB save_nobles 1001:20
 DB save_status 9 2027-03-02T12:00:00Z
 DB save_nobles 1001:20
 DB snapshot_month
+DB save_status 9 2027-03-02T12:00:00Z
 @2027-03-01T12:00:00Z cycle=9 period=VALIDATION nobles=1001:20
 @2027-03-01T18:00:00Z cycle=9 period=VALIDATION nobles=1001:20
 DB delete_nobles

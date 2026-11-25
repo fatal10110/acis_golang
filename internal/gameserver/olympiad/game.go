@@ -286,6 +286,9 @@ func (g *Game) Judge(now time.Time, standing func(objectID int32) Standing) Outc
 
 	j := judging{g: g}
 	one, two := g.players[0], g.players[1]
+	// Both records are saved as the match left them, so a crash before the
+	// next status save loses no match (#4696).
+	defer g.o.saveRecords(one.ObjectID, two.ObjectID)
 	onePoints, twoPoints := g.points(one.ObjectID), g.points(two.ObjectID)
 	maxPoints := g.o.cfg.MaxPoints
 

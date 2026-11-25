@@ -102,8 +102,13 @@ public class OlyProbe
 			case SAVE_NOBLE_POINTS:
 				setNextNoblePointsUpdate();
 				// 401: a grant in the validation period adds nothing.
+				// Deviation: a grant made, even to no record, is saved at
+				// once, with the next grant's time (#4695).
 				if (!_ended)
+				{
 					_nobles.values().forEach(n -> n[0] = Math.max(0, n[0] + OLY_WEEKLY_POINTS));
+					saveOlympiadStatus();
+				}
 				break;
 			case REGISTRATION:
 				p("ANN registration_ended");
@@ -120,6 +125,9 @@ public class OlyProbe
 
 	// 401: the validation period follows the end, its window closed, instead
 	// of init(). Deviation: _validationEnd is set before the status save.
+	// Deviation: the status is saved before the heroes are elected, the end
+	// marked unfinished, and again once they are and the month's standings
+	// are kept, the end marked finished (#4695).
 	void endOlympiad()
 	{
 		_registrationEnd = -1;
@@ -129,6 +137,7 @@ public class OlyProbe
 		_validationEnd = now + OLY_VPERIOD;
 		saveOlympiadStatus();
 		p("DB snapshot_month");
+		p("DB save_status " + _currentCycle + " " + t(_validationEnd));
 	}
 
 	// 401 validationEnd(), with startNewCycle's announcement where 401's

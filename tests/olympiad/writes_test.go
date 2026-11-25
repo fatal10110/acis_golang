@@ -126,6 +126,7 @@ func TestOlympiadStepsDoNotWaitOnTheDatabase(t *testing.T) {
 	want := []string{
 		"save_status 2 -", "save_nobles 1001:5",
 		"save_nobles 1001:5", "save_status 2 2026-11-02T12:00:00Z", "save_nobles 1001:5", "snapshot_month",
+		"save_status 2 2026-11-02T12:00:00Z",
 		"delete_nobles", "save_status 3 -",
 		"save_status 3 -",
 	}
