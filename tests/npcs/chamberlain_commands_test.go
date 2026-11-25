@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -28,7 +29,8 @@ import (
 //   - every command first meets the talk condition: no clan, another clan
 //     or no castle opens noprivs.htm, a clan member while the siege runs
 //     busy.htm, each as read; a wyvern manager answers its castle owner's
-//     members and never as under siege;
+//     members, and busy.htm while the siege runs too (owner-approved
+//     divergence, #5147);
 //   - validatePrivileges opens noprivs.htm as read and stops;
 //     sendFileMessage fills %objectId%, %npcId% and %time%;
 //   - manage_vault moves adena between the talker and the treasury below
@@ -57,10 +59,17 @@ const (
 // chamberlainPage names file and every placeholder the chamberlain dialog
 // fills.
 func chamberlainPage(file string) string {
-	return "<html><body>" + file + " %objectId% %npcId% %time% %tax_income% %tax_income_reserved% %seed_income% " +
+	body := file + " %objectId% %npcId% %time% %tax_income% %tax_income_reserved% %seed_income% " +
 		"%withdraw_amount% %currentTaxRate% %nextTaxRate% %taxLimit% %clanname% %clanleadername% %castlename% " +
 		"%ss_event% %ss_avarice% %ss_gnosis% %ss_strife% %CharName% %FeudName% %left% %bundle% %price% %id% " +
-		"%type% %level% %trapIndex%</body></html>"
+		"%type% %level% %trapIndex%"
+	if file == "35100-gu.htm" {
+		// The gate page links each gate with its price class, which the
+		// upgrade commands check theirs against (#5148).
+		body += fmt.Sprintf(`<a action="bypass -h npc_%%objectId%%_doors_update %d 1">A</a>`+
+			`<a action="bypass -h npc_%%objectId%%_doors_update %d 2">B</a>`, castleGateA, castleGateB)
+	}
+	return "<html><body>" + body + "</body></html>"
 }
 
 var chamberlainFiles = []string{

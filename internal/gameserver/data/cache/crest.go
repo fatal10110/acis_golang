@@ -296,6 +296,13 @@ func parseCrestID(name string, spec crestSpec) (int, error) {
 	return int(id), nil
 }
 
+// Fits reports whether data is an image of a typ crest's size, the only
+// size Save stores.
+func (t CrestType) Fits(data []byte) bool {
+	spec, ok := t.spec()
+	return ok && len(data) == spec.size
+}
+
 func (t CrestType) spec() (crestSpec, bool) {
 	switch t {
 	case PledgeCrest:

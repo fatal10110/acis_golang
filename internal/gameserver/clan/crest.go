@@ -54,6 +54,10 @@ func (s *Service) SetCrest(c *player.Character, typ datacache.CrestType, data []
 	if cl.Level() < minCrestLevel {
 		return cl, CrestLevelTooLow
 	}
+	if !typ.Fits(data) {
+		// Refused before an object id is drawn for it (#5148).
+		return cl, CrestIgnored
+	}
 	id, ok := s.newCrestID(typ, files)
 	if !ok {
 		return cl, CrestIgnored

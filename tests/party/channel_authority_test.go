@@ -120,17 +120,23 @@ func (a authorityClan) option(t *testing.T) gameservertest.Option {
 }
 
 // bootAuthority boots one client per seat as bootGroup does, Leader being
-// the first, with Leader's clan stored and guides Strategy Guides (each
+// the first, with Leader's clan stored, the shipped skills when the clan
+// has a skill, and guides Strategy Guides (each
 // its own item, the guide not stacking) in Leader's inventory before it
 // enters the world. It returns the first guide's object id (0 without one).
 func bootAuthority(t *testing.T, seats []seat, clan authorityClan, guides int) (*group, int32) {
 	t.Helper()
-	opts := append([]gameservertest.Option{
+	opts := []gameservertest.Option{
 		gameservertest.WithCharacter(seats[0].name, seats[0].level, 0),
 		gameservertest.WithWantChars(1),
 		strategyGuideTemplates(),
 		clan.option(t),
-	}, skillOptions(t)...)
+	}
+	if len(clan.skills) > 0 {
+		// Only a clan skill needs the shipped skills: without one the
+		// group boots without the datapack.
+		opts = append(opts, skillOptions(t)...)
+	}
 	srv := gameservertest.Boot(t, opts...)
 	leaderID := srv.SoleObjectID(t)
 	var guideID int32

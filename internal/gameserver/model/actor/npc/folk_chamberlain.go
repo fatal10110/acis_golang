@@ -25,16 +25,17 @@ const (
 
 // ChamberlainStanding is the talker's standing at the chamberlain dialog of
 // an NPC of kind. A chamberlain answers only a clan member at an NPC of a
-// castle as more than a stranger, as under siege while the castle's siege
-// runs; a wyvern manager answers a member of the clan owning its residence,
-// and never as under siege.
+// castle as more than a stranger; a wyvern manager answers a member of the
+// clan owning its residence. Both answer a clan member as under siege while
+// their castle's siege runs: the wyvern manager forwards no chamberlain
+// command then either (#5147).
 func (r ResidenceTalk) ChamberlainStanding(kind InstanceKind) ChamberlainStanding {
 	switch {
 	case r.ClanID == 0:
 		return StandingStranger
 	case kind == "CastleChamberlain" && r.CastleID == 0:
 		return StandingStranger
-	case kind == "CastleChamberlain" && r.SiegeInProgress:
+	case r.CastleID != 0 && r.SiegeInProgress:
 		return StandingUnderSiege
 	case !r.owns():
 		return StandingStranger

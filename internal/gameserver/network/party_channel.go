@@ -103,10 +103,12 @@ func (l *GameClientLink) requestOustFromChannel(live *livePlayer, req clientpack
 }
 
 // requestChannelPartyMembers lists the members of the party the given
-// player is in. A player not online or in no party gets no list.
+// player is in. A player not online, in no party, or in a party outside
+// the asker's command channel gets no list (#5148): the window opens only
+// from the asker's channel.
 func (l *GameClientLink) requestChannelPartyMembers(live *livePlayer, req clientpackets.RequestExMPCCShowPartyMembersInfo) {
 	leader, ok := l.livePlayerByID(req.PartyLeaderID)
-	if !ok {
+	if !ok || !l.parties.SameChannel(live.ObjectID(), leader.ObjectID()) {
 		return
 	}
 	view, ok := l.parties.View(leader.ObjectID())

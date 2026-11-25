@@ -312,7 +312,9 @@ func (s *Service) CreateSubunit(c *player.Character, kind int, name, captainName
 }
 
 // RenameSubunit renames the sub-unit whose pledge type idArg spells to
-// name, on its leader c's order. An id that is not a number is ignored.
+// name, on its leader c's order. An id that is not a number is ignored. A
+// name another sub-unit, of any clan, already has is refused as at the
+// founding (#5148); the unit may take its own name in another case.
 func (s *Service) RenameSubunit(c *player.Character, idArg, name string) (SubunitChange, SubunitResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok || !cl.IsLeader(c.ID) {
@@ -322,9 +324,13 @@ func (s *Service) RenameSubunit(c *player.Character, idArg, name string) (Subuni
 	if err != nil {
 		return SubunitChange{}, SubunitIgnored
 	}
-	cl.mu.Lock()
-	defer cl.mu.Unlock()
+	// Held as at the founding, so no other unit takes name meanwhile.
+	s.subunitMu.Lock()
+	defer s.subunitMu.Unlock()
+	cl.mu.RLock()
 	sp, ok := cl.subunits[int(id)]
+	own := ok && strings.EqualFold(sp.Name, name)
+	cl.mu.RUnlock()
 	switch {
 	case !ok:
 		return SubunitChange{}, SubunitUnknown
@@ -332,6 +338,13 @@ func (s *Service) RenameSubunit(c *player.Character, idArg, name string) (Subuni
 		return SubunitChange{}, SubunitNameInvalid
 	case nameLength(name) < minNameLength || nameLength(name) > maxNameLength:
 		return SubunitChange{}, SubunitNameLength
+	case !own && s.table.subunitNameTaken(name):
+		return SubunitChange{}, SubunitNameTaken
+	}
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	if sp, ok = cl.subunits[int(id)]; !ok {
+		return SubunitChange{}, SubunitUnknown
 	}
 	sp.Name = name
 	s.updateSubunitLocked(cl, *sp)
