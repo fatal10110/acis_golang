@@ -124,15 +124,15 @@ func TestPassengerWithoutTicketIsPutAshore(t *testing.T) {
 	}
 }
 
-// TestPassengerLeavingCallsOffFare pins the reference's ticket collection
-// being called off by any passenger leaving the boat: one passenger
-// stepping off before the collection runs spares the other, who holds no
-// ticket either and sails on.
-func TestPassengerLeavingCallsOffFare(t *testing.T) {
+// TestPassengerSteppingOffKeepsFareForOthers pins the ticket collection
+// surviving one passenger leaving the boat (owner decision, #5154): one
+// passenger stepping off before the collection runs is not charged, and the
+// other, who holds no ticket either, is still put ashore when it runs.
+func TestPassengerSteppingOffKeepsFareForOthers(t *testing.T) {
 	t.Parallel()
 	srv, c, me, b := bootPassenger(t, runeBoarding, 0)
 	board(t, srv, c, b)
-	other, _ := enterSecondClient(t, srv, runeBoarding)
+	other, otherID := enterSecondClient(t, srv, runeBoarding)
 	board(t, srv, other, b)
 
 	sail(srv, 305)
@@ -147,17 +147,25 @@ func TestPassengerLeavingCallsOffFare(t *testing.T) {
 	if log := passengerLog(t, srv, c); !slices.Contains(log, getOff(me, b, location.Location{X: x, Y: y - 300, Z: z})) {
 		t.Fatalf("stepping off at sea: %q", log)
 	}
+	if got := srv.Boats.Boats()[0].Passengers(); !slices.Equal(got, []int32{otherID}) {
+		t.Fatalf("passengers after stepping off %v, want only %d", got, otherID)
+	}
 	sail(srv, 4)
-	rest, checks := withoutChecks(passengerLog(t, srv, other))
+	rest, _ := withoutChecks(passengerLog(t, srv, other))
 	var own []string
 	for _, s := range rest {
 		if !strings.Contains(s, fmt.Sprint(" ", me, " ")) {
 			own = append(own, s)
 		}
 	}
-	assertLog(t, "the other passenger, past 308", own)
-	if len(checks) != 40 {
-		t.Fatalf("the other passenger got %d checks over 4 seconds, want 40", len(checks))
+	assertLog(t, "the other passenger, past 308", own,
+		af, af, af, af, af, teleport(otherID, runeOust), sm(serverpackets.SystemMessageExitPeacefulZone), sm(serverpackets.SystemMessageNotCorrectBoatTicket))
+	leaver := passengerLog(t, srv, c)
+	if slices.Contains(leaver, teleport(me, runeOust)) || slices.Contains(leaver, sm(serverpackets.SystemMessageNotCorrectBoatTicket)) {
+		t.Fatalf("the passenger who stepped off was charged: %q", leaver)
+	}
+	if got := srv.Boats.Boats()[0].Passengers(); len(got) != 0 {
+		t.Fatalf("passengers after the fare %v, want none", got)
 	}
 }
 

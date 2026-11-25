@@ -60,18 +60,10 @@ func (b *Boat) AddPassenger(objectID int32) (added, ok bool) {
 	return true, true
 }
 
-// RemovePassenger puts the player objectID off b. Any passenger leaving
-// calls off the ticket collection due.
+// RemovePassenger puts the player objectID off b, whether it stepped off,
+// was teleported away or left the world aboard. Any ticket collection due
+// stays in place for the passengers still aboard (owner decision, #5154).
 func (b *Boat) RemovePassenger(objectID int32) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.fare = fareDue{}
-	b.passengers = slices.DeleteFunc(b.passengers, func(id int32) bool { return id == objectID })
-}
-
-// DropPassenger forgets the player objectID, who left the world aboard,
-// leaving any ticket collection due in place.
-func (b *Boat) DropPassenger(objectID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.passengers = slices.DeleteFunc(b.passengers, func(id int32) bool { return id == objectID })
