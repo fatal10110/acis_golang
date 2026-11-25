@@ -51,8 +51,14 @@ func TestRegisterFlagRegistersAndRerunIsNoOp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GameServer(1) after register: %v", err)
 	}
-	if len(row.HexID) != authKeyLen {
-		t.Fatalf("registered key is %d bytes, want %d", len(row.HexID), authKeyLen)
+	// The stored key is a signed big-integer, so it reads back in its minimal
+	// two's-complement form: shorter than authKeyLen when the random key
+	// starts with zero bytes. Compare the normalized form, not the raw length.
+	if n := len(row.HexID); n == 0 || n > authKeyLen {
+		t.Fatalf("registered key is %d bytes, want 1..%d", n, authKeyLen)
+	}
+	if reparsed, err := model.ParseHexKey(model.HexKeyText(row.HexID)); err != nil || !bytes.Equal(reparsed, row.HexID) {
+		t.Fatalf("registered key %x is not in normalized form: reparsed %x, err %v", row.HexID, reparsed, err)
 	}
 	id, hexText := hexIDFile(t, path)
 	if id != 1 || hexText != model.HexKeyText(row.HexID) {
