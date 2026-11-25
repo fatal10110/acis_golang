@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -79,6 +80,11 @@ func (w cancelWorld) castPinned(t *testing.T, roll int, e *effect.Effect) (strip
 		pc.SetRollSource(func(int) int { return roll })
 	})
 	w.srv.Client.Send(encodeRequestMagicSkillUse(cancelSkillID, false, false))
+	// The cast is on the wire once its MagicSkillUse is read; it has resolved
+	// (the strip rolled) once the caster is no longer casting. Counting the
+	// queued frames proves neither: the request may not have been handled yet.
+	readUntil(t, w.srv.Client, serverpackets.OpcodeMagicSkillUse)
+	w.srv.AdvanceUntil(t, "cancel cast end", func() bool { return !w.srv.PlayerCastingNow(t, w.objID) })
 	drainUntilQuiet(t, w.srv.Client)
 	onPlayerQueue(t, w.srv, w.objID, func(pc *player.Character) {
 		stripped = !slices.Contains(pc.EffectList().All(), e)

@@ -52,11 +52,21 @@ var devastatedBanish = location.Location{X: 178497, Y: -13129, Z: -2200}
 type standIn struct {
 	winner             atomic.Int32
 	spawned, unspawned atomic.Int32
+	// afterClose, once set, runs right after the base close of the
+	// registrations, while the close still holds the steps' lock: the start
+	// it armed cannot have run yet, however busy the halls' queue is.
+	afterClose atomic.Pointer[func()]
 }
 
 func (s *standIn) script() clanhall.SiegeScript {
 	return clanhall.SiegeScript{
-		Winner:      func() int32 { return s.winner.Load() },
+		Winner: func() int32 { return s.winner.Load() },
+		Prepare: func(b clanhall.SiegeBase, delay time.Duration) {
+			b.Prepare(delay)
+			if probe := s.afterClose.Load(); probe != nil {
+				(*probe)()
+			}
+		},
 		SpawnNPCs:   func() { s.spawned.Add(1) },
 		UnspawnNPCs: func() { s.unspawned.Add(1) },
 	}
@@ -306,12 +316,20 @@ func TestHallSiegeRegistersStartsAndEnds(t *testing.T) {
 		t.Fatalf("gate HP before the siege = %v, want 100", hp)
 	}
 
-	// The start follows the close at once, on the halls' queue.
+	// The start follows the close at once, on the halls' queue, and may run
+	// as soon as Instant returns, so the state the close leaves is read
+	// inside it (see standIn.afterClose).
+	var closedWaiting bool
+	var closedAttackers []int32
+	probe := func() {
+		closedWaiting, closedAttackers = w.siege.WaitingBattle(), w.siege.Attackers()
+	}
+	w.script.afterClose.Store(&probe)
 	if !w.siege.Instant() {
 		t.Fatal("no siege to start")
 	}
-	if !w.siege.WaitingBattle() || !slices.Equal(w.siege.Attackers(), []int32{besiegersClanID, holdersClanID}) {
-		t.Fatalf("after the close: waiting %v, attackers %#x", w.siege.WaitingBattle(), w.siege.Attackers())
+	if !closedWaiting || !slices.Equal(closedAttackers, []int32{besiegersClanID, holdersClanID}) {
+		t.Fatalf("after the close: waiting %v, attackers %#x", closedWaiting, closedAttackers)
 	}
 	w.srv.Advance(t, 0)
 	frames := drainFrames(t, w.c)
