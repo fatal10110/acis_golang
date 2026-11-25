@@ -2,7 +2,6 @@ package gameservertest
 
 import (
 	"context"
-	"database/sql"
 	"sync"
 	"testing"
 
@@ -221,9 +220,9 @@ type questBoot struct {
 // or player queue) runs on engine. The scripts read the Seven Signs from
 // sevenSigns, the party range and multiple item drop rule from drops, the
 // event settings from events and the quest rates from rates.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, events *script.EventBook, rates *script.RateBook, o *options) *questBoot {
+func bootQuests(questRows *gamesql.QuestStore, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, events *script.EventBook, rates *script.RateBook, o *options) *questBoot {
 	so := o.scriptHelpers()
-	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
+	store := &journalStore{QuestStore: questRows, loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
 	env := &script.Env{
 		Quests:     journals,

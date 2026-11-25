@@ -8,8 +8,8 @@ import (
 
 	"go.uber.org/fx"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/app"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
-	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
@@ -146,10 +146,25 @@ func newGameServerApp(paths gameServerPaths, zone processZone) *fx.App {
 // constructor graph, split out from newGameServerApp so fx.ValidateApp can
 // check it resolves without a database (see TestGameServerGraphValidates).
 func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
-	return []fx.Option{
+	return append([]fx.Option{
 		fx.StopTimeout(gameServerStopTimeout),
 		fx.StartTimeout(gameServerStartTimeout),
+	}, append(gameServerProviders(paths),
+		fx.Invoke(requireDatabase, clearServerSessionOnStop),
+		fx.Invoke(reportConfigKeys),
+		fx.Invoke(buildScripts),
+		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, stopSevenSigns, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, markServerSession, startGameServer),
+	)...)
+}
+
+// gameServerProviders is the production provider graph: the shared options
+// of internal/gameserver/app, which the test harness boots from too, and the
+// providers not moved there yet (#4709).
+func gameServerProviders(paths gameServerPaths) []fx.Option {
+	return []fx.Option{
 		fx.Supply(paths),
+		app.Stores,
 		fx.Provide(
 			provideBootContext,
 			loadGameServerProperties,
@@ -165,19 +180,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			loadHTMLCache,
 			loadCrestCache,
 			loadGameData,
-			gamesql.NewCharacterStore,
-			gamesql.NewItemStore,
-			gamesql.NewShortcutStore,
-			gamesql.NewHennaStore,
-			gamesql.NewRecipeBookStore,
-			gamesql.NewMacroStore,
-			gamesql.NewBookmarkStore,
-			gamesql.NewRecommendationStore,
-			gamesql.NewQuestStore,
-			gamesql.NewMemoStore,
-			gamesql.NewSubclassStore,
-			gamesql.NewPetStore,
-			gamesql.NewBossZoneStore,
 			provideIDAllocator,
 			loadClanConfig,
 			provideClans,
@@ -252,10 +254,5 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGameClientLink,
 			provideClientBans,
 		),
-		fx.Invoke(requireDatabase, clearServerSessionOnStop),
-		fx.Invoke(reportConfigKeys),
-		fx.Invoke(buildScripts),
-		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, stopSevenSigns, startEffects, startNPCRegen, startNpcs, startObserverTowers, startCastleArtifacts, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startSchedule, markServerSession, startGameServer),
 	}
 }

@@ -2136,12 +2136,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.dbFault != nil {
 		db = o.dbFault.Wrap(t, rowsDB)
 	}
-	chars := gamesql.NewCharacterStore(db)
-	items := gamesql.NewItemStore(db)
-	shortcuts := gamesql.NewShortcutStore(db)
-	hennas := gamesql.NewHennaStore(db)
-	recipeBooks := gamesql.NewRecipeBookStore(db)
-	subclasses := gamesql.NewSubclassStore(db)
+	stores := buildGraph(t, db)
+	chars := stores.Characters
+	items := stores.Items
+	shortcuts := stores.Shortcuts
+	hennas := stores.Hennas
+	recipeBooks := stores.RecipeBooks
+	subclasses := stores.Subclasses
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
 		skillTable := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}})
@@ -2312,7 +2313,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		itemFlusher = faultyItemFlusher{inner: itemFlusher, fault: o.itemFlushFault}
 	}
 	itemInstances := task.NewItemInstances(itemFlusher, itemTemplates, persistWorker, itemWrites, zerolog.Nop())
-	petStore := gamesql.NewPetStore(db)
+	petStore := stores.Pets
 
 	// Mirror the production boot for the Seven Signs calendar: optional
 	// test seed first, then restore the persisted status and arm the
@@ -2474,7 +2475,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
 		Boats:            boats,
-		BossZones:        o.wrapBossZones(gamesql.NewBossZoneStore(db)),
+		BossZones:        o.wrapBossZones(stores.BossZones),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
@@ -2556,12 +2557,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Petitions = petitions
 	couples, coupleRows := bootWedding(t, db, ids, o.weddingConfig, o.tradeClock)
 	gclConfig.Wedding = couples
-	gclConfig.Macros = gamesql.NewMacroStore(db)
-	gclConfig.Bookmarks = gamesql.NewBookmarkStore(db)
-	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
+	gclConfig.Macros = stores.Macros
+	gclConfig.Bookmarks = stores.Bookmarks
+	gclConfig.Recommendations = stores.Recommendations
+	quests := bootQuests(stores.Quests, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
-	quests.memos = &memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
+	quests.memos = &memoStore{MemoStore: stores.Memos, loadErr: o.memoLoadErr}
 	gclConfig.Memos = quests.memos
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
@@ -2879,7 +2880,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore cursed weapons: %v", err)
 	}
 	if o.zones != nil {
-		if err := gamesql.NewBossZoneStore(db).Restore(context.Background(), zone.OfKind[*zone.Boss](o.zones)); err != nil {
+		if err := stores.BossZones.Restore(context.Background(), zone.OfKind[*zone.Boss](o.zones)); err != nil {
 			t.Fatalf("restore boss zones: %v", err)
 		}
 	}
