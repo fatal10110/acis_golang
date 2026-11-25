@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/cabalbuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
 	featuretutorial "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	quest023 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	quest070 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q070"
@@ -22,7 +23,6 @@ import (
 	quest422 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q422"
 	quest508 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q508"
 	quest510 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q510"
-	quest607 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
 	quest646 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
 	quest651 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
@@ -59,7 +59,7 @@ var scenarioScripts = withContentScripts(script.Catalog{
 	"quest.Q422_RepentYourSins":          quest422.New,
 	"quest.Q508_AClansReputation":        quest508.New,
 	"quest.Q510_AClansReputation":        quest510.New,
-	"quest.Q607_ProveYourCourage":        quest607.New,
+	"quest.Q607_ProveYourCourage":        ketravarka.Q607,
 	"quest.Q646_SignsOfRevolt":           quest646.New,
 	"quest.Q651_RunawayYouth":            quest651.New,
 	"quest.ThirdClassQuest":              func() script.Script { return thirdclass.NewCore(scenarioSagas) },

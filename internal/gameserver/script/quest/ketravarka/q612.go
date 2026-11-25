@@ -1,8 +1,4 @@
-// Package q612 is the quest War with Ketra Orcs: Ashas Varka Durai asks a
-// Varka ally of level 74 or more for Ketra molars, and pays 20 Nepenthes
-// Seeds for every 100. The molars drop through the Alliance with Varka
-// Silenos quest, which has no kill hook here to share.
-package q612
+package ketravarka
 
 import (
 	"strings"
@@ -11,19 +7,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-const questName = "Q612_WarWithKetraOrcs"
+const nepenthesSeed = 7187
 
-// ashas is the quest giver, Ashas Varka Durai.
-const ashas = 31377
-
-// Items.
-const (
-	nepenthesSeed = 7187
-	ketraMolar    = 7234
-)
-
-// New returns the quest.
-func New() script.Script {
+// Q612 is the quest War with Ketra Orcs: Ashas Varka Durai asks a Varka ally
+// of level 74 or more for Ketra molars, and pays 20 Nepenthes Seeds for every
+// 100. The molars drop through the kill hook of Alliance with Varka Silenos.
+func Q612() script.Script {
 	return script.Script{
 		Title:   "War with Ketra Orcs",
 		QuestID: 612,
@@ -32,15 +21,15 @@ func New() script.Script {
 			script.EventQuestStart: {ashas},
 			script.EventTalked:     {ashas},
 		},
-		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk},
+		Hooks: script.Hooks{OnEvent: q612AdvEvent, OnTalk: q612Talk},
 	}
 }
 
-// onAdvEvent starts the quest, trades 100 molars for 20 seeds, or ends the
+// q612AdvEvent starts the quest, trades 100 molars for 20 seeds, or ends the
 // quest and takes every molar.
-func onAdvEvent(s *script.Script, e script.Event) string {
+func q612AdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q612Name)
 	if st == nil {
 		return htmltext
 	}
@@ -64,10 +53,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk offers the quest to a Varka ally of level 74 or more.
-func onTalk(s *script.Script, e script.Talk) string {
+// q612Talk offers the quest to a Varka ally of level 74 or more.
+func q612Talk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q612Name)
 	if st == nil {
 		return htmltext
 	}

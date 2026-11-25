@@ -20,6 +20,7 @@ import (
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q070"
@@ -34,7 +35,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q422"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q508"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q510"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
@@ -69,7 +69,7 @@ func Quests(crystals *item.SoulCrystalTable, sagas *thirdclass.Family) script.Ca
 		"quest.Q422_RepentYourSins":         q422.New,
 		"quest.Q508_AClansReputation":       q508.New,
 		"quest.Q510_AClansReputation":       q510.New,
-		"quest.Q607_ProveYourCourage":       q607.New,
+		"quest.Q607_ProveYourCourage":       ketravarka.Q607,
 		"quest.Q636_TruthBeyondTheGate":     q636.New,
 		"quest.Q646_SignsOfRevolt":          q646.New,
 		"quest.Q651_RunawayYouth":           q651.New,

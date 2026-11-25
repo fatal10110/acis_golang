@@ -6,7 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q614"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -41,7 +41,7 @@ func TestQ614TayrCreditsEveryVarkaAllyOfTheParty(t *testing.T) {
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{tayrID: script.KindHostile},
 			[]script.Listing{{Path: q614Path}},
-			script.Catalog{q614Path: q614.New},
+			script.Catalog{q614Path: ketravarka.Q614},
 		),
 		varkaItemTemplates(headOfTayrID, varkaAlliance4ID),
 	)
