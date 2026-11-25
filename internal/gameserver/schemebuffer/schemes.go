@@ -3,10 +3,12 @@
 package schemebuffer
 
 import (
+	"context"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -48,6 +50,21 @@ type owner struct {
 	schemes []*scheme
 }
 
+// Store replaces one player's stored schemes.
+type Store interface {
+	// SaveOwner replaces every stored scheme of ownerID with rows.
+	SaveOwner(ctx context.Context, ownerID int32, rows []Row) error
+}
+
+// Writer runs a database job later, on ownerID's persistence lane, so a
+// dialog never waits on the database.
+type Writer interface {
+	Enqueue(ownerID int32, job func()) bool
+}
+
+// writeTimeout bounds one player's schemes write.
+const writeTimeout = 10 * time.Second
+
 // Manager holds the buffs the scheme buffer offers and every player's
 // schemes. Its methods are safe for concurrent use.
 type Manager struct {
@@ -55,14 +72,32 @@ type Manager struct {
 	buffs  *skill.BufferTable
 	skills *skill.Table
 
+	store  Store
+	writes Writer
+	log    zerolog.Logger
+
 	mu     sync.Mutex
 	owners map[int32]*owner
 }
 
+// Option configures a Manager.
+type Option func(*Manager)
+
+// WithStore has every change to a player's schemes written to store on
+// that player's lane of writes, or at once without a writer. Without it
+// the schemes are kept in memory only.
+func WithStore(store Store, writes Writer, log zerolog.Logger) Option {
+	return func(m *Manager) { m.store, m.writes, m.log = store, writes, log }
+}
+
 // New returns a Manager offering buffs, whose level-1 names it reads in
 // skills. Either may be nil: nothing is then offered, or named.
-func New(cfg Config, buffs *skill.BufferTable, skills *skill.Table) *Manager {
-	return &Manager{cfg: cfg, buffs: buffs, skills: skills, owners: make(map[int32]*owner)}
+func New(cfg Config, buffs *skill.BufferTable, skills *skill.Table, opts ...Option) *Manager {
+	m := &Manager{cfg: cfg, buffs: buffs, skills: skills, log: zerolog.Nop(), owners: make(map[int32]*owner)}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
 }
 
 // Restore loads the stored schemes, in row order. A stored skill id the
@@ -104,23 +139,62 @@ func (m *Manager) Rows() []Row {
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	var out []Row
 	for _, id := range ids {
-		for _, s := range m.owners[id].schemes {
-			parts := make([]string, len(s.skills))
-			for i, sk := range s.skills {
-				parts[i] = strconv.Itoa(int(sk))
-			}
-			out = append(out, Row{OwnerID: id, Name: s.name, Skills: strings.Join(parts, ",")})
+		out = append(out, m.rowsLocked(id)...)
+	}
+	return out
+}
+
+// rowsLocked returns ownerID's schemes as buffer_schemes stores them.
+func (m *Manager) rowsLocked(ownerID int32) []Row {
+	o := m.owners[ownerID]
+	if o == nil {
+		return nil
+	}
+	out := make([]Row, 0, len(o.schemes))
+	for _, s := range o.schemes {
+		parts := make([]string, len(s.skills))
+		for i, sk := range s.skills {
+			parts[i] = strconv.Itoa(int(sk))
 		}
+		out = append(out, Row{OwnerID: ownerID, Name: s.name, Skills: strings.Join(parts, ",")})
 	}
 	return out
 }
 
 // Forget drops every scheme of the player ownerID, a deleted character,
-// so the shutdown save does not store them again (#4676).
+// so the shutdown save does not store them again (#4676). The emptied list
+// is written too, behind any write of that player still queued, so a write
+// queued before the character was purged cannot store its schemes again.
 func (m *Manager) Forget(ownerID int32) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.owners, ownerID)
+	m.saveLocked(ownerID)
+}
+
+// saveLocked writes ownerID's schemes as they stand, replacing its stored
+// ones, so a change outlives a server stopped before its shutdown save
+// (#4699). Every write of one player goes to that player's lane with the
+// rows taken when it was queued, so the last change lands last.
+func (m *Manager) saveLocked(ownerID int32) {
+	if m.store == nil {
+		return
+	}
+	rows, store, log := m.rowsLocked(ownerID), m.store, m.log
+	job := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
+		defer cancel()
+		if err := store.SaveOwner(ctx, ownerID, rows); err != nil {
+			log.Error().Err(err).Int32("object_id", ownerID).Msg("scheme buffer: failed to save schemes")
+		}
+	}
+	if m.writes == nil {
+		job()
+		return
+	}
+	if !m.writes.Enqueue(ownerID, job) {
+		log.Error().Int32("object_id", ownerID).Msg("scheme buffer: failed to save schemes: write dropped")
+	}
 }
 
 // offers reports whether skill id is one of the buffer's buffs.

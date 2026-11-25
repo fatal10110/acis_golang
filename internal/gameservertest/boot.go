@@ -296,6 +296,7 @@ type options struct {
 	boats                  []route.BoatItinerary
 	petitionConfig         *petition.Config
 	schemeBuffer           *schemebuffer.Manager
+	newSchemeBuffer        func(schemebuffer.Option) *schemebuffer.Manager
 	weddingConfig          *wedding.Config
 	lottery                *lotteryFixture
 	fishChamp              *fishChampFixture
@@ -2542,7 +2543,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	o.configKeys.apply(&gclConfig)
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.Manor = o.manor
-	gclConfig.SchemeBuffer = o.schemeBuffer
+	gclConfig.SchemeBuffer = storedSchemeBuffer(t, o.newSchemeBuffer, o.schemeBuffer, db, persistWorker, o.log)
 	gclConfig.Derby = derbyTrack
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars

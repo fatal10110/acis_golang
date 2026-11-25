@@ -75,7 +75,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startSevenSigns":            {shutdownSaveTimeout, "shutdownSaveTimeout", "once stopSevenSigns stopped the period and festival timers, saves seven_signs_festival (outside seal validation), seven_signs and seven_signs_status in one budget"},
 		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, which does no I/O, then for its queued olympiad_nobles and server_memo writes and the final save on the persistence lane, each bounded by olympiad.TaskTimeout"},
 		"startBossZones":             {shutdownSaveTimeout, "shutdownSaveTimeout", "grandboss_list save"},
-		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save"},
+		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save; the schemes' queued per-player writes land when the persistence worker drains"},
 		"startWedding":               {shutdownSaveTimeout, "shutdownSaveTimeout", "mods_wedding save"},
 		"startFishingChampionship":   {fishchamp.TaskTimeout + shutdownSaveTimeout, "shutdownSaveTimeout", "fishing_championship and server_memo save, behind a save already running on the persistence lane, bounded by fishchamp.TaskTimeout"},
 		"startCastleManor":           {castlemanor.TaskTimeout + shutdownSaveTimeout, "shutdownSaveTimeout", "castle_manor_production and castle_manor_procure save, behind a save already running on the persistence lane, bounded by castlemanor.TaskTimeout"},

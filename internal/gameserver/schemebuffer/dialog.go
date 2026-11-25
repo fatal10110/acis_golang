@@ -230,11 +230,13 @@ func (d dialog) selectSkill(command string, args []string) Reply {
 		}
 		if _, offered := d.m.buff(int32(id)); offered {
 			s.skills = append(s.skills, int32(id))
+			d.m.saveLocked(d.talker.ObjectID)
 		}
 	case strings.HasPrefix(command, "skillunselect") && kept:
 		for i, sk := range s.skills {
 			if sk == int32(id) {
 				s.skills = append(s.skills[:i:i], s.skills[i+1:]...)
+				d.m.saveLocked(d.talker.ObjectID)
 				break
 			}
 		}
@@ -271,6 +273,7 @@ func (d dialog) create(args []string) Reply {
 		}
 	}
 	d.m.setLocked(d.talker.ObjectID, strings.TrimFunc(name, isCtrlOrSpace), nil)
+	d.m.saveLocked(d.talker.ObjectID)
 	return Reply{Page: d.schemesPage()}
 }
 
@@ -284,6 +287,7 @@ func (d dialog) remove(args []string) Reply {
 	} else if o := d.m.owners[d.talker.ObjectID]; o != nil {
 		if i, ok := o.find(args[0]); ok {
 			o.schemes = append(o.schemes[:i:i], o.schemes[i+1:]...)
+			d.m.saveLocked(d.talker.ObjectID)
 		}
 	}
 	reply.Page = d.schemesPage()
