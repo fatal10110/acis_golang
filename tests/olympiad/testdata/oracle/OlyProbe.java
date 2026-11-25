@@ -102,9 +102,9 @@ public class OlyProbe
 			case SAVE_NOBLE_POINTS:
 				setNextNoblePointsUpdate();
 				// 401: a grant in the validation period adds nothing.
-				// Deviation: a grant made is saved at once, with the next
-				// grant's time (#4695).
-				if (!_ended && !_nobles.isEmpty())
+				// Deviation: a grant made, even to no record, is saved at
+				// once, with the next grant's time (#4695).
+				if (!_ended)
 				{
 					_nobles.values().forEach(n -> n[0] = Math.max(0, n[0] + OLY_WEEKLY_POINTS));
 					saveOlympiadStatus();

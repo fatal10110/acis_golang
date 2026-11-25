@@ -236,3 +236,45 @@ func TestOlympiadWeeklyGrantCaughtUpAtBoot(t *testing.T) {
 	}
 	o.Stop(ctx)
 }
+
+// TestOlympiadWeeklyGrantToNoRecordSaved pins a weekly grant that falls due
+// with no record held (#4695): its next time is stored at once, so a record
+// a match saves afterwards is not granted the missed week again by a boot
+// after a crash.
+func TestOlympiadWeeklyGrantToNoRecordSaved(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := sqltest.SharedDB(t)
+	seedNobles(t, db, 2, nil)
+	// 2026-10-01 is a Thursday, so the grants fall on Thursdays at 18:00.
+	start := time.Date(2026, 10, 8, 17, 0, 0, 0, time.UTC)
+	o, loop, _ := calendarOlympiad(t, db, start, &trace{})
+	o.Start()
+	loop.Advance(0)
+	o.Stop(ctx)
+
+	o, loop, worker := calendarOlympiad(t, db, start.Add(2*time.Hour), &trace{})
+	o.Start()
+	// The grant the clock passed fires at once, to no record.
+	loop.Advance(0)
+	flush(t, worker)
+	if got := memo(t, db, "olympiad_next_pts"); got != millis(start.Add(7*24*time.Hour+time.Hour)) {
+		t.Fatalf("stored next grant = %q, want a week later", got)
+	}
+
+	// A match stores the first record, then the server dies without its
+	// stop save.
+	if _, err := db.ExecContext(ctx, "INSERT INTO characters (account_name, obj_Id, char_name, nobless) VALUES ('olympiad', 1001, 'Noble1001', 1)"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO olympiad_nobles (char_id, class_id, olympiad_points, competitions_done) VALUES (1001, 88, 15, 1)"); err != nil {
+		t.Fatal(err)
+	}
+	o, loop, _ = calendarOlympiad(t, db, start.Add(3*time.Hour), &trace{})
+	o.Start()
+	loop.Advance(0)
+	if n, ok := o.Noble(1001); !ok || n.Points != 15 {
+		t.Fatalf("points after a boot = %d, %v; want 15", n.Points, ok)
+	}
+	o.Stop(ctx)
+}

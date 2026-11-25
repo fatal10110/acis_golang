@@ -425,20 +425,20 @@ func (o *Olympiad) fire() {
 		o.startCycle()
 	case stepNoblePoints:
 		// A grant due in the validation period adds nothing. A grant
-		// made is saved with the next grant's time, so a restart
-		// neither repeats nor loses it, whatever was saved since
-		// (#4695, #4696).
+		// made, even to no record, is saved with the next grant's time,
+		// so a restart neither repeats nor loses it, whatever was saved
+		// since (#4695, #4696).
 		o.nextPoints = nextNoblePointsUpdate(o.queue.Now(), o.cfg)
 		o.mu.Lock()
-		granted := o.period != Validation && len(o.nobles) > 0
-		if granted {
+		open := o.period != Validation
+		if open {
 			for id, n := range o.nobles {
 				n.addPoints(o.cfg.WeeklyPoints)
 				o.nobles[id] = n
 			}
 		}
 		o.mu.Unlock()
-		if granted {
+		if open {
 			o.saveStatus()
 		}
 	case stepRegistrationEnd:
