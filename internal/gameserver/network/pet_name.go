@@ -94,8 +94,14 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 	if !ok {
 		return nil
 	}
-	name := req.Name
+	name, names := req.Name, &l.summoning.names
 	return func(ctx context.Context) {
+		// A name another rename claimed and has not yet written is taken
+		// too, so two renames to one name cannot both read it free (#5060).
+		if !names.claim(name) {
+			onLive(live, func() { l.finishChangePetName(live, name, true) })
+			return
+		}
 		readCtx, cancel := context.WithTimeout(ctx, renameTimeout)
 		defer cancel()
 		taken, err := store.NameTaken(readCtx, name)
@@ -106,21 +112,30 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 			l.log.Error().Err(err).Str("name", name).Msg("check pet name")
 			taken = true
 		}
-		onLive(live, func() { l.finishChangePetName(live, name, taken) })
+		if taken {
+			names.release(name)
+		}
+		if !onLive(live, func() { l.finishChangePetName(live, name, taken) }) && !taken {
+			names.release(name)
+		}
 	}
 }
 
 // finishChangePetName applies the rename back on live's queue, with the
 // uniqueness result the lookup read. The pet is re-resolved and re-checked
 // here: an unsummon, a logout or another rename may have run on the queue
-// while the read was outstanding.
+// while the read was outstanding. A name not taken is claimed
+// (petNameClaims): the claim is dropped here when the name is not applied,
+// and once its row write is done when it is.
 func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, taken bool) {
 	if taken {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingAlreadyInUseByAnotherPet))
 		return
 	}
+	names := &l.summoning.names
 	actor, ok := l.ownedPet(live)
 	if !ok || actor.IsNamed() {
+		names.release(name)
 		return
 	}
 
@@ -131,6 +146,7 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 	if !ok {
 		actor.SetName(oldName)
 		actor.SetNamed(oldNamed)
+		names.release(name)
 		return
 	}
 	// Written on the control item's lane, behind any pet save already queued,
@@ -138,13 +154,17 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 	// the rename itself is in memory and the name is otherwise stored with
 	// the pet's next save, so a failed write is logged, not rolled back.
 	pets, log := l.summoning.store, l.log
-	l.persist.Enqueue(itemObjectID, func() {
+	queued := l.persist.Enqueue(itemObjectID, func() {
+		defer names.release(name)
 		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if err := pets.Save(saveCtx, itemObjectID, state); err != nil {
 			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet name")
 		}
 	})
+	if !queued {
+		names.release(name)
+	}
 	if inv := live.Inventory(); inv != nil {
 		inv.SetCustomType2(inv.ItemByObjectID(actor.ControlItemID()), 1)
 	}

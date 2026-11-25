@@ -18,13 +18,14 @@ var _ task.SummonDecayActor = (*Actor)(nil)
 const petCorpseTime = 1200 * time.Second
 
 // Kill runs a's death sequence at once, whatever its HP, crediting killer,
-// and reports whether this call killed it; a dead summon ignores it. No hit
+// and reports whether this call killed it; a dead summon, or one a mount is
+// taking away (ClaimDeparture), ignores it. No hit
 // lands on the way: invulnerability, damage permission, the hit side
 // effects and the owner's damage notice play no part. As with a lethal hit,
 // HP drops to zero and the status is republished before the death sequence.
 func (a *Actor) Kill(killer attackable.Combatant) bool {
 	a.vitals.mu.Lock()
-	if a.dead {
+	if a.dead || a.departing {
 		a.vitals.mu.Unlock()
 		return false
 	}

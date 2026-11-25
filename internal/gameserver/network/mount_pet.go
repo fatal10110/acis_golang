@@ -120,14 +120,23 @@ func (l *GameClientLink) mountPet(live *livePlayer, p *summon.Actor) {
 		live.SendFrame(serverpackets.FrameSystemMessage(petMountRefusals[refusal]))
 		return
 	}
+	// A pet killed since the checks read it refuses as a dead one; one still
+	// alive can no longer die before it leaves below, so no corpse stays
+	// beside its rider (#5059).
+	if !p.ClaimDeparture() {
+		live.SendFrame(serverpackets.FrameSystemMessage(petMountRefusals[player.PetMountPetDead]))
+		return
+	}
 	// A cursed weapon, the one hand disarm keeps, was refused above.
 	if !l.disarm(live, true) {
+		p.CancelDeparture()
 		return
 	}
 	l.changeLiveMoveType(live, true)
 	live.Character.EffectList().StopAllToggles()
 	npcID, collar := int32(p.NPCID()), p.ControlItemID()
 	if !live.Character.MountPet(npcID, collar, p.Level()) {
+		p.CancelDeparture()
 		return
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
