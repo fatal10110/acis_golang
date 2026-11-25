@@ -83,7 +83,9 @@ func ParseString(s string) (*Properties, error) {
 	return Parse(strings.NewReader(s))
 }
 
-// LoadFile reads one .properties file.
+// LoadFile reads one .properties file. A missing or malformed file is an
+// error, and the servers stop booting on it rather than carrying on with
+// defaults: strict loading is kept as a parity exception (#4772).
 func LoadFile(name string) (*Properties, error) {
 	f, err := os.Open(name)
 	if err != nil {

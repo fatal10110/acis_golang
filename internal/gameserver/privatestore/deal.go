@@ -122,7 +122,7 @@ func (s *Store) Buy(svc *invops.Service, owner, buyer Trader, rows []PurchaseRow
 			return Deal{}, nil
 		}
 		// No more units than the row still offers: the owner priced only
-		// those.
+		// those (parity exception #4826).
 		asked[row.ObjectID] += row.Count
 		if asked[row.ObjectID] > listed.Count {
 			return Deal{}, nil
@@ -144,6 +144,7 @@ func (s *Store) Buy(svc *invops.Service, owner, buyer Trader, rows []PurchaseRow
 		moved = append(moved, Moved{ItemID: listed.TemplateID, Count: row.Count, Enchant: listed.Enchant, Stackable: tmpl.Stackable})
 	}
 	if operate == OperatePackageSell {
+		// A package goes whole or not at all (parity exception #4826).
 		for _, listed := range s.sell {
 			if asked[listed.ObjectID] != listed.Count {
 				return Deal{}, nil
@@ -227,7 +228,8 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 			return Deal{}, nil
 		}
 		// The row must match what the owner listed, enchant included, and
-		// may not fill more than the owner still wants.
+		// may not fill more than the owner still wants (parity exception
+		// #4826).
 		idx := s.buyRowLocked(row.ItemID, row.Enchant, row.Price)
 		if idx < 0 {
 			return Deal{}, nil
