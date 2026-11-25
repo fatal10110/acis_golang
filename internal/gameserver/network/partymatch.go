@@ -53,27 +53,34 @@ func (l *GameClientLink) requestManagePartyRoom(live *livePlayer, req clientpack
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	location := l.roomLocation(live)
 	if req.RoomID > 0 {
-		l.applyRoomNotices(l.rooms.Revise(live, req.RoomID, settings, l.roomLocation(live)))
+		l.changeRooms(func() []partymatch.Notice { return l.rooms.Revise(live, req.RoomID, settings, location) })
 		return
 	}
-	var members []*livePlayer
-	if view, ok := l.parties.View(live.ObjectID()); ok {
-		members = view.Members
-	}
-	l.applyRoomNotices(l.rooms.Open(live, settings, l.roomLocation(live), members))
+	l.changeRooms(func() []partymatch.Notice {
+		var members []*livePlayer
+		if view, ok := l.parties.View(live.ObjectID()); ok {
+			members = view.Members
+		}
+		return l.rooms.Open(live, settings, location, members)
+	})
 }
 
 // requestJoinPartyRoom enters live into the room it picked, or into the
 // first one its window lists. No such room, or one live may not enter, is
 // refused; a player off the waiting list enters nothing and hears nothing.
 func (l *GameClientLink) requestJoinPartyRoom(live *livePlayer, req clientpackets.RequestJoinPartyRoom) {
-	notices, status := l.rooms.Join(live, req.RoomID, req.Location, req.LevelMode, l.nearTo(live))
+	near := l.nearTo(live)
+	var status partymatch.JoinStatus
+	l.changeRooms(func() []partymatch.Notice {
+		var notices []partymatch.Notice
+		notices, status = l.rooms.Join(live, req.RoomID, req.Location, req.LevelMode, near)
+		return notices
+	})
 	if status == partymatch.JoinRefused {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantEnterPartyRoom))
-		return
 	}
-	l.applyRoomNotices(notices)
 }
 
 // requestOustFromPartyRoom takes a member out of the room live leads and
@@ -85,13 +92,14 @@ func (l *GameClientLink) requestOustFromPartyRoom(live *livePlayer, req clientpa
 	if !ok {
 		return
 	}
-	notices, status := l.rooms.Oust(live, target, l.sameParty)
-	switch status {
-	case partymatch.OustPartyMember:
+	var status partymatch.OustStatus
+	l.changeRooms(func() []partymatch.Notice {
+		var notices []partymatch.Notice
+		notices, status = l.rooms.Oust(live, target, l.sameParty)
+		return notices
+	})
+	if status == partymatch.OustPartyMember {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDismissPartyMember))
-	case partymatch.Ousted:
-		l.applyRoomNotices(notices)
-		target.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOustedFromPartyRoom))
 	}
 }
 
@@ -99,19 +107,17 @@ func (l *GameClientLink) requestOustFromPartyRoom(live *livePlayer, req clientpa
 // not lead stays: only its leader's window offers the command, so the
 // refusal answers nothing.
 func (l *GameClientLink) requestDismissPartyRoom(live *livePlayer, req clientpackets.PartyRoomRef) {
-	l.applyRoomNotices(l.rooms.Dismiss(live, req.RoomID))
+	l.changeRooms(func() []partymatch.Notice { return l.rooms.Dismiss(live, req.RoomID) })
 }
 
 // requestWithdrawPartyRoom takes live out of a room. A member of the
 // leader's party stays, and an unknown room changes nothing; neither
 // answers.
 func (l *GameClientLink) requestWithdrawPartyRoom(live *livePlayer, req clientpackets.PartyRoomRef) {
-	notices, status := l.rooms.Withdraw(live, req.RoomID, l.sameParty)
-	if status != partymatch.Withdrew {
-		return
-	}
-	l.applyRoomNotices(notices)
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePartyRoomExited))
+	l.changeRooms(func() []partymatch.Notice {
+		notices, _ := l.rooms.Withdraw(live, req.RoomID, l.sameParty)
+		return notices
+	})
 }
 
 // requestAskJoinPartyRoom invites the named player into live's room.
@@ -147,12 +153,15 @@ func (l *GameClientLink) answerJoinPartyRoom(live *livePlayer, req clientpackets
 		partner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePartyMatchingRequestNoResponse))
 		return
 	}
-	notices, status := l.rooms.Answer(live, partner)
+	var status partymatch.JoinStatus
+	l.changeRooms(func() []partymatch.Notice {
+		var notices []partymatch.Notice
+		notices, status = l.rooms.Answer(live, partner)
+		return notices
+	})
 	if status == partymatch.JoinRefused {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantEnterPartyRoom))
-		return
 	}
-	l.applyRoomNotices(notices)
 }
 
 // requestListWaitingPlayers lists the waiting players of the asked level
@@ -167,19 +176,20 @@ func (l *GameClientLink) requestListWaitingPlayers(live *livePlayer, req clientp
 }
 
 // withdrawParty takes live out of its party at its own request; a member
-// of a room then leaves the room too. A player in no party leaves nothing
-// and hears nothing: the menu action waits on no answer.
+// of a room then leaves the room too, its room notices after its party
+// ones. A player in no party leaves nothing and hears nothing: the menu
+// action waits on no answer. Like changeOwnParty, it runs on live's own
+// queue.
 func (l *GameClientLink) withdrawParty(live *livePlayer) {
-	left := false
-	l.changeOwnParty(live, func() []party.Notice {
-		notices := l.parties.Leave(live, party.Left)
-		left = notices != nil
-		return notices
+	live.RunOnOwnQueue(func() {
+		l.changeGroups(func() []groupNotice {
+			notices := l.parties.Leave(live, party.Left)
+			if notices == nil {
+				return nil
+			}
+			return appendRoomNotices(l.partyGroupNotices(notices), l.rooms.LeaveWithParty(live))
+		})
 	})
-	if !left {
-		return
-	}
-	l.applyRoomNotices(l.rooms.LeaveWithParty(live))
 }
 
 // leavePartyMatch takes a player leaving the world off the waiting list
@@ -188,7 +198,7 @@ func (l *GameClientLink) leavePartyMatch(live *livePlayer) {
 	if l.rooms == nil {
 		return
 	}
-	l.applyRoomNotices(l.rooms.Leave(live))
+	l.changeRooms(func() []partymatch.Notice { return l.rooms.Leave(live) })
 }
 
 // chatPartyMatchRoom is heard by every member of live's room, live
@@ -201,34 +211,32 @@ func (l *GameClientLink) chatPartyMatchRoom(_ *Client, live *livePlayer, line ch
 	sendToMembers(room.Members, frameCreatureSay(live, line))
 }
 
-// applyRoomNotices sends the packets of a party-matching change, in order.
-func (l *GameClientLink) applyRoomNotices(notices []partymatch.Notice) {
-	for _, n := range notices {
-		switch n := n.(type) {
-		case partymatch.Detail[*livePlayer]:
-			n.To.SendFrame(serverpackets.FramePartyMatchDetail(roomTerms(n.Room)))
-		case partymatch.MemberList[*livePlayer]:
-			n.To.SendFrame(serverpackets.FrameExPartyRoomMember(int32(n.Mode), l.roomMemberRows(n.Room)))
-		case partymatch.MemberChange[*livePlayer]:
-			row := l.roomMemberRow(n.Member, n.Leader)
-			sendToMembers(n.To, func() wire.Frame {
-				return serverpackets.FrameExManagePartyRoomMember(int32(n.Mode), row)
-			})
-		case partymatch.Msg[*livePlayer]:
-			id := roomMessages[n.ID]
-			sendToMembers(n.To, func() wire.Frame {
-				if n.Name != "" {
-					return serverpackets.FrameSystemMessageString(id, n.Name)
-				}
-				return serverpackets.FrameSystemMessage(id)
-			})
-		case partymatch.Close[*livePlayer]:
-			n.To.SendFrame(serverpackets.FrameExClosePartyRoom())
-		case partymatch.InfoRefresh[*livePlayer]:
-			l.broadcastCharacterInfo(n.Member)
-		case partymatch.RoomList[*livePlayer]:
-			n.To.SendFrame(serverpackets.FramePartyMatchList(roomRows(n.Rooms)))
-		}
+// applyRoomNotice sends the packets of one party-matching notice.
+func (l *GameClientLink) applyRoomNotice(n partymatch.Notice) {
+	switch n := n.(type) {
+	case partymatch.Detail[*livePlayer]:
+		n.To.SendFrame(serverpackets.FramePartyMatchDetail(roomTerms(n.Room)))
+	case partymatch.MemberList[*livePlayer]:
+		n.To.SendFrame(serverpackets.FrameExPartyRoomMember(int32(n.Mode), l.roomMemberRows(n.Room)))
+	case partymatch.MemberChange[*livePlayer]:
+		row := l.roomMemberRow(n.Member, n.Leader)
+		sendToMembers(n.To, func() wire.Frame {
+			return serverpackets.FrameExManagePartyRoomMember(int32(n.Mode), row)
+		})
+	case partymatch.Msg[*livePlayer]:
+		id := roomMessages[n.ID]
+		sendToMembers(n.To, func() wire.Frame {
+			if n.Name != "" {
+				return serverpackets.FrameSystemMessageString(id, n.Name)
+			}
+			return serverpackets.FrameSystemMessage(id)
+		})
+	case partymatch.Close[*livePlayer]:
+		n.To.SendFrame(serverpackets.FrameExClosePartyRoom())
+	case partymatch.InfoRefresh[*livePlayer]:
+		l.broadcastCharacterInfo(n.Member)
+	case partymatch.RoomList[*livePlayer]:
+		n.To.SendFrame(serverpackets.FramePartyMatchList(roomRows(n.Rooms)))
 	}
 }
 
@@ -320,4 +328,6 @@ var roomMessages = map[partymatch.MessageID]int{
 	partymatch.MsgRoomLeaderChanged: serverpackets.SystemMessagePartyRoomLeaderChanged,
 	partymatch.MsgEnteredRoom:       serverpackets.SystemMessageS1EnteredPartyRoom,
 	partymatch.MsgLeftRoom:          serverpackets.SystemMessageS1LeftPartyRoom,
+	partymatch.MsgOusted:            serverpackets.SystemMessageOustedFromPartyRoom,
+	partymatch.MsgRoomExited:        serverpackets.SystemMessagePartyRoomExited,
 }

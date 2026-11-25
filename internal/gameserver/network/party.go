@@ -5,6 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
+	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
 
@@ -124,10 +125,13 @@ func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpack
 		return
 	}
 	requester.SendFrame(serverpackets.FrameJoinParty(req.Response))
-	l.changeParty(func() []party.Notice { return l.parties.Answer(requester, live, req.Response == 1) })
-	if req.Response == 1 {
-		l.applyRoomNotices(l.rooms.PartyJoined(requester, live))
-	}
+	l.changeGroups(func() []groupNotice {
+		notices := l.partyGroupNotices(l.parties.Answer(requester, live, req.Response == 1))
+		if req.Response != 1 {
+			return notices
+		}
+		return appendRoomNotices(notices, l.rooms.PartyJoined(requester, live))
+	})
 }
 
 // requestOustPartyMember expels the named member from the party live
@@ -183,79 +187,125 @@ func (l *GameClientLink) changeOwnParty(live *livePlayer, decide func() []party.
 	live.RunOnOwnQueue(func() { l.changeParty(decide) })
 }
 
-// changeParty makes the party changes decide makes and sends their
-// notices to the clients in the order every party change was decided, so
-// that two changes racing on different queues never reach a member in the
-// opposite order (#5144). decide must only call the party registry; the
-// notices may be sent by another goroutine delivering earlier ones, after
-// changeParty has returned.
-func (l *GameClientLink) changeParty(decide func() []party.Notice) {
-	l.partyNotices.Change(decide, l.applyPartyNotices)
+// groupNotice is one notice of a party or party-room change: exactly one
+// of party and room is set.
+type groupNotice struct {
+	party party.Notice
+	room  partymatch.Notice
 }
 
-// applyPartyNotices sends the packets of a party change, in order. Only
-// changeParty calls it, so that changes reach clients in decision order.
-func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
+// changeGroups makes the party and room changes decide makes and sends
+// their notices to the clients in the order every such change was decided,
+// so that two changes racing on different queues never reach a member in
+// the opposite order (#5144, #5489), and a room change decided after a
+// party change reaches clients after it. decide must only call the party
+// and room registries; the notices may be sent by another goroutine
+// delivering earlier ones, after changeGroups has returned.
+func (l *GameClientLink) changeGroups(decide func() []groupNotice) {
+	l.groupNotices.Change(decide, l.applyGroupNotices)
+}
+
+// changeParty is changeGroups for a change of parties alone.
+func (l *GameClientLink) changeParty(decide func() []party.Notice) {
+	l.changeGroups(func() []groupNotice { return l.partyGroupNotices(decide()) })
+}
+
+// changeRooms is changeGroups for a change of party rooms alone.
+func (l *GameClientLink) changeRooms(decide func() []partymatch.Notice) {
+	l.changeGroups(func() []groupNotice { return appendRoomNotices(nil, decide()) })
+}
+
+// partyGroupNotices wraps the notices of a party change. A party's new
+// leader takes over its room in the same change, its room notices right
+// after the leader change.
+func (l *GameClientLink) partyGroupNotices(notices []party.Notice) []groupNotice {
+	var out []groupNotice
 	for _, n := range notices {
-		switch n := n.(type) {
-		case party.WindowAll[*livePlayer]:
-			rows := make([]serverpackets.PartyMember, len(n.Others))
-			for i, m := range n.Others {
-				rows[i] = partyMemberRow(m)
-			}
-			n.To.SendFrame(serverpackets.FramePartySmallWindowAll(n.Leader, int32(n.Loot), rows))
-		case party.WindowAdd[*livePlayer]:
-			row := partyMemberRow(n.Member)
-			sendToMembers(n.To, func() wire.Frame {
-				return serverpackets.FramePartySmallWindowAdd(n.Leader, int32(n.Loot), row)
-			})
-		case party.WindowDelete[*livePlayer]:
-			sendToMembers(n.To, func() wire.Frame {
-				return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.CharacterName())
-			})
-		case party.WindowDeleteAll[*livePlayer]:
-			n.To.SendFrame(serverpackets.FramePartySmallWindowDeleteAll())
-		case party.Msg[*livePlayer]:
-			id := partyMessages[n.ID]
-			sendToMembers(n.To, func() wire.Frame {
-				if n.Name != "" {
-					return serverpackets.FrameSystemMessageString(id, n.Name)
-				}
-				return serverpackets.FrameSystemMessage(id)
-			})
-		case party.IconRefresh[*livePlayer]:
-			// A member who never held an effect has no icons to show.
-			if n.Member.EffectList().HasHeld() {
-				sendPartySpelled(n.Member, n.To)
-			}
-		case party.InfoRefresh[*livePlayer]:
-			l.broadcastCharacterInfo(n.Member)
-		case party.FusionStop[*livePlayer]:
-			if n.Member.fusionTargetID.Load() != 0 {
-				n.Member.Character.StopCast()
-			}
-			l.abortFusionTargeting(n.Member)
-		case party.ChannelOpen[*livePlayer]:
-			sendToMembers(n.To, serverpackets.FrameExOpenMPCC)
-		case party.ChannelClose[*livePlayer]:
-			sendToMembers(n.To, serverpackets.FrameExCloseMPCC)
-		case party.ChannelPartyUpdate[*livePlayer]:
-			sendToMembers(n.To, func() wire.Frame {
-				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.CharacterName(), n.Leader.ObjectID(), int32(n.Count), n.Added)
-			})
-		case party.LeaderChanged[*livePlayer]:
-			if l.rooms != nil {
-				l.applyRoomNotices(l.rooms.PartyLeaderChanged(n.Leader))
-			}
-		case party.Formed:
-			l.startPartyPositions(n.ID)
-		case party.Dispersed:
-			l.stopPartyPositions(n.ID)
-		case party.Edited[*livePlayer]:
-			l.cancelPartyDuel(n.Leader)
-		case party.Departing[*livePlayer]:
-			l.festivalPartyChanged(n.Member, n.Members)
+		out = append(out, groupNotice{party: n})
+		if changed, ok := n.(party.LeaderChanged[*livePlayer]); ok && l.rooms != nil {
+			out = appendRoomNotices(out, l.rooms.PartyLeaderChanged(changed.Leader))
 		}
+	}
+	return out
+}
+
+// appendRoomNotices appends the notices of a room change to out.
+func appendRoomNotices(out []groupNotice, notices []partymatch.Notice) []groupNotice {
+	for _, n := range notices {
+		out = append(out, groupNotice{room: n})
+	}
+	return out
+}
+
+// applyGroupNotices sends the packets of a party or room change, in order.
+// Only changeGroups calls it, so that changes reach clients in decision
+// order.
+func (l *GameClientLink) applyGroupNotices(notices []groupNotice) {
+	for _, n := range notices {
+		if n.party != nil {
+			l.applyPartyNotice(n.party)
+		} else {
+			l.applyRoomNotice(n.room)
+		}
+	}
+}
+
+// applyPartyNotice sends the packets of one party notice.
+func (l *GameClientLink) applyPartyNotice(n party.Notice) {
+	switch n := n.(type) {
+	case party.WindowAll[*livePlayer]:
+		rows := make([]serverpackets.PartyMember, len(n.Others))
+		for i, m := range n.Others {
+			rows[i] = partyMemberRow(m)
+		}
+		n.To.SendFrame(serverpackets.FramePartySmallWindowAll(n.Leader, int32(n.Loot), rows))
+	case party.WindowAdd[*livePlayer]:
+		row := partyMemberRow(n.Member)
+		sendToMembers(n.To, func() wire.Frame {
+			return serverpackets.FramePartySmallWindowAdd(n.Leader, int32(n.Loot), row)
+		})
+	case party.WindowDelete[*livePlayer]:
+		sendToMembers(n.To, func() wire.Frame {
+			return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.CharacterName())
+		})
+	case party.WindowDeleteAll[*livePlayer]:
+		n.To.SendFrame(serverpackets.FramePartySmallWindowDeleteAll())
+	case party.Msg[*livePlayer]:
+		id := partyMessages[n.ID]
+		sendToMembers(n.To, func() wire.Frame {
+			if n.Name != "" {
+				return serverpackets.FrameSystemMessageString(id, n.Name)
+			}
+			return serverpackets.FrameSystemMessage(id)
+		})
+	case party.IconRefresh[*livePlayer]:
+		// A member who never held an effect has no icons to show.
+		if n.Member.EffectList().HasHeld() {
+			sendPartySpelled(n.Member, n.To)
+		}
+	case party.InfoRefresh[*livePlayer]:
+		l.broadcastCharacterInfo(n.Member)
+	case party.FusionStop[*livePlayer]:
+		if n.Member.fusionTargetID.Load() != 0 {
+			n.Member.Character.StopCast()
+		}
+		l.abortFusionTargeting(n.Member)
+	case party.ChannelOpen[*livePlayer]:
+		sendToMembers(n.To, serverpackets.FrameExOpenMPCC)
+	case party.ChannelClose[*livePlayer]:
+		sendToMembers(n.To, serverpackets.FrameExCloseMPCC)
+	case party.ChannelPartyUpdate[*livePlayer]:
+		sendToMembers(n.To, func() wire.Frame {
+			return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.CharacterName(), n.Leader.ObjectID(), int32(n.Count), n.Added)
+		})
+	case party.Formed:
+		l.startPartyPositions(n.ID)
+	case party.Dispersed:
+		l.stopPartyPositions(n.ID)
+	case party.Edited[*livePlayer]:
+		l.cancelPartyDuel(n.Leader)
+	case party.Departing[*livePlayer]:
+		l.festivalPartyChanged(n.Member, n.Members)
 	}
 }
 
