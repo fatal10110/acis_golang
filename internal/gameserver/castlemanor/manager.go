@@ -108,13 +108,16 @@ type ProcureRow struct {
 	NextPeriod                                               bool
 }
 
-// Store persists every castle's period lists.
+// Store persists every castle's period lists and when the manor last
+// rolled its period over.
 type Store interface {
 	// Load returns every stored row, each table in castle, item and period
-	// order.
-	Load(ctx context.Context) ([]ProductionRow, []ProcureRow, error)
-	// Save replaces every stored row with production and procure.
-	Save(ctx context.Context, production []ProductionRow, procure []ProcureRow) error
+	// order, and the last rollover's time in Unix milliseconds, 0 when none
+	// is stored.
+	Load(ctx context.Context) ([]ProductionRow, []ProcureRow, int64, error)
+	// Save replaces every stored row with production and procure, and
+	// stores lastRollover unless it is 0.
+	Save(ctx context.Context, production []ProductionRow, procure []ProcureRow, lastRollover int64) error
 }
 
 // Writer runs a database job later, on ownerID's persistence lane, so the
@@ -188,6 +191,9 @@ type Manager struct {
 	queue      *sim.Queue
 	effects    Effects
 	stopped    bool
+	// lastRollover is when the period last rolled over; zero while none is
+	// known.
+	lastRollover time.Time
 }
 
 // New returns the manor of castles over the seed table seeds, every castle
@@ -236,12 +242,15 @@ func (m *Manager) Restore(ctx context.Context) error {
 	if !m.Enabled() || m.store == nil {
 		return nil
 	}
-	production, procure, err := m.store.Load(ctx)
+	production, procure, lastRollover, err := m.store.Load(ctx)
 	if err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if lastRollover > 0 {
+		m.lastRollover = time.UnixMilli(lastRollover)
+	}
 	for _, r := range production {
 		p, ok := m.byCastle[int(r.CastleID)]
 		if !ok {
@@ -271,22 +280,63 @@ func (m *Manager) Restore(ctx context.Context) error {
 
 // Start runs the cycle on queue, which it owns from then on, in the time
 // zone of the queue's clock: the mode is set from the time of day and the
-// next change scheduled, and the lists are saved every SavePeriod. effects
-// reaches the clans and players a change acts on.
+// next change scheduled, and the lists are saved every SavePeriod. A
+// refresh time passed since the stored last rollover, the server down
+// across it, rolls the period over once now (#4694). With none stored, a
+// start rolls nothing over on a guess: it takes the latest refresh time
+// as the last rollover, stored with the next save, unless its due-at-once
+// change rolls over by itself. effects reaches the clans and players a
+// change acts on.
 func (m *Manager) Start(queue *sim.Queue, effects Effects) {
 	if !m.Enabled() {
 		return
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.queue, m.effects = queue, effects
 	now := queue.Now()
 	m.status = statusAt(m.cfg, now)
+	var payouts []func()
+	missed := !m.lastRollover.IsZero() && m.rolloverDueLocked(now)
+	if missed {
+		payouts = m.rolloverLocked(now)
+	}
 	m.scheduleLocked(now)
+	if m.lastRollover.IsZero() && (m.status != StatusApproved || m.nextChange.After(now)) {
+		m.lastRollover = lastRefreshAt(m.cfg, now)
+	}
 	if m.cfg.SavePeriod > 0 {
 		queue.Every(m.cfg.SavePeriod, m.queueSave)
 	}
-	m.log.Info().Stringer("mode", m.status).Time("next_change", m.nextChange).Msg("manor: started")
+	m.log.Info().Stringer("mode", m.status).Time("next_change", m.nextChange).Bool("missed_rollover", missed).Msg("manor: started")
+	m.mu.Unlock()
+
+	for _, pay := range payouts {
+		pay()
+	}
+	if missed {
+		m.queueSave()
+	}
+}
+
+// rolloverDueLocked reports whether the period is owed a rollover at now:
+// none is known, or the latest refresh time at or before now came after
+// the last one. Runs under mu.
+func (m *Manager) rolloverDueLocked(now time.Time) bool {
+	return m.lastRollover.IsZero() || m.lastRollover.Before(lastRefreshAt(m.cfg, now))
+}
+
+// lastRefreshAt is the latest refresh time at or before now: today's, or
+// yesterday's when today's is still ahead. Clock times resolve with
+// wallClockAt.
+func lastRefreshAt(cfg Config, now time.Time) time.Time {
+	y, mo, d := now.Date()
+	at := func(day int) time.Time {
+		return wallClockAt(time.Date(y, mo, day, cfg.RefreshHour, cfg.RefreshMin, 0, 0, time.UTC), now.Location())
+	}
+	if r := at(d); !r.After(now) {
+		return r
+	}
+	return at(d - 1)
 }
 
 // Stop cancels the cycle, then saves the lists as they stand.
@@ -415,8 +465,13 @@ func (m *Manager) changeMode() {
 	switch m.status {
 	case StatusApproved:
 		m.status = StatusMaintenance
-		payouts = m.rolloverLocked()
-		save = true
+		// A start that already rolled over the refresh time it passed, or a
+		// change due at once on a start past a refresh time the period was
+		// rolled over at, rolls nothing over again (#4694).
+		if now := m.queue.Now(); m.rolloverDueLocked(now) {
+			payouts = m.rolloverLocked(now)
+			save = true
+		}
 	case StatusMaintenance:
 		for _, c := range m.castles.All() {
 			if owner, ok := m.ownerLocked(c); ok && m.effects != nil {
@@ -445,7 +500,8 @@ func (m *Manager) changeMode() {
 }
 
 // rolloverLocked turns each owned castle's next period into its running
-// one and returns the payouts to make once mu is released. Runs under mu.
+// one, at now, and returns the payouts to make once mu is released. Runs
+// under mu.
 //
 // Each crop the castle bought, at least one bought and not all wanted
 // bought, pays 90% of the count bought, truncated, into the owning clan's
@@ -457,7 +513,8 @@ func (m *Manager) changeMode() {
 // treasury, and lists the treasury cannot pay for do not go live, leaving
 // both periods empty. Lists that go live start with every amount at its
 // start amount, and the next period starts over from fresh copies of them.
-func (m *Manager) rolloverLocked() []func() {
+func (m *Manager) rolloverLocked(now time.Time) []func() {
+	m.lastRollover = now
 	var out []func()
 	sink := m.effects
 	for _, c := range m.castles.All() {
@@ -746,15 +803,17 @@ func (m *Manager) save(ctx context.Context) error {
 	}
 	m.saveMu.Lock()
 	defer m.saveMu.Unlock()
-	production, procure := m.snapshot()
-	return m.store.Save(ctx, production, procure)
+	production, procure, lastRollover := m.snapshot()
+	return m.store.Save(ctx, production, procure, lastRollover)
 }
 
 // snapshot returns every castle's lists as rows, castle by castle in
 // castle order, the running period's before the next one's. A seed or crop
 // a period list holds twice gives one row, its first entry's, so one
-// castle's list never fails the store's save of every castle's.
-func (m *Manager) snapshot() ([]ProductionRow, []ProcureRow) {
+// castle's list never fails the store's save of every castle's. The last
+// rollover's time comes with them, in Unix milliseconds, 0 when none is
+// known.
+func (m *Manager) snapshot() ([]ProductionRow, []ProcureRow, int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var production []ProductionRow
@@ -792,7 +851,11 @@ func (m *Manager) snapshot() ([]ProductionRow, []ProcureRow) {
 			}
 		}
 	}
-	return production, procure
+	var lastRollover int64
+	if !m.lastRollover.IsZero() {
+		lastRollover = m.lastRollover.UnixMilli()
+	}
+	return production, procure, lastRollover
 }
 
 // truncate narrows v toward zero to an int32, saturating at its range.

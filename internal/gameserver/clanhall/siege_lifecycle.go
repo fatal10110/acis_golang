@@ -85,9 +85,11 @@ func (s *HallSiege) runStep(due func() bool, override func(SiegeScript) func(Sie
 	base(b)
 }
 
-// prepareStep closes the registrations, the siege starting after delay.
-func (s *HallSiege) prepareStep(delay time.Duration) {
-	s.runStep(nil, func(sc SiegeScript) func(SiegeBase) {
+// prepareStep closes the registrations, the siege starting after delay. due
+// is nil for a close run at once, else the check that its timer is still
+// the step armed last.
+func (s *HallSiege) prepareStep(due func() bool, delay time.Duration) {
+	s.runStep(due, func(sc SiegeScript) func(SiegeBase) {
 		if sc.Prepare == nil {
 			return nil
 		}
@@ -95,23 +97,24 @@ func (s *HallSiege) prepareStep(delay time.Duration) {
 	}, func(b SiegeBase) { b.Prepare(delay) })
 }
 
-// startStep starts the siege.
-func (s *HallSiege) startStep() {
-	s.runStep(nil, func(sc SiegeScript) func(SiegeBase) { return sc.Start }, SiegeBase.Start)
+// startStep starts the siege, its timer still the step armed last.
+func (s *HallSiege) startStep(due func() bool) {
+	s.runStep(due, func(sc SiegeScript) func(SiegeBase) { return sc.Start }, SiegeBase.Start)
 }
 
 // endStep ends the siege, once: an end whose turn comes with the siege no
 // longer fought, another end having run first (the armed end and a script's
 // End racing), does not run, and the win the script recorded for it is
-// dropped so that it does not decide the next siege.
-func (s *HallSiege) endStep() {
+// dropped so that it does not decide the next siege. due is nil for an end
+// run at once, else the check that its timer is still the step armed last.
+func (s *HallSiege) endStep(due func() bool) {
 	s.runStep(func() bool {
-		if s.InProgress() {
-			return true
+		if !s.InProgress() {
+			s.SetMissionAccomplished(false)
+			s.hs.log.Debug().Int32("hall_id", s.h.id()).Msg("clanhall: siege end dropped, the siege is not fought")
+			return false
 		}
-		s.SetMissionAccomplished(false)
-		s.hs.log.Debug().Int32("hall_id", s.h.id()).Msg("clanhall: siege end dropped, the siege is not fought")
-		return false
+		return due == nil || due()
 	}, func(sc SiegeScript) func(SiegeBase) { return sc.End }, SiegeBase.End)
 }
 
@@ -124,14 +127,37 @@ func (hs *Halls) setSiege(f func()) {
 	f()
 }
 
-// armLocked arms fire after d. The step armed before it is no longer the
-// one CancelTask stops, but still runs when due.
-func (hs *Halls) armLocked(h *hall, d time.Duration, fire func()) {
+// armLocked arms fire after d as h's only step: the step armed before it
+// is stopped, and fire is handed the check that it is still the step armed
+// last, which drops it once another step is armed or the task cancelled
+// while its expiry was under way (#4693).
+func (hs *Halls) armLocked(h *hall, d time.Duration, fire func(due func() bool)) {
+	st := h.siege
+	var gen uint64
+	hs.setSiege(func() {
+		stopTaskLocked(st)
+		gen = st.gen
+	})
+	due := func() bool {
+		hs.siegeMu.Lock()
+		defer hs.siegeMu.Unlock()
+		return st.gen == gen
+	}
 	var t *sim.Timer
 	if hs.queue != nil {
-		t = hs.queue.After(max(d, 0), fire)
+		t = hs.queue.After(max(d, 0), func() { fire(due) })
 	}
-	hs.setSiege(func() { h.siege.task, h.siege.armed = t, true })
+	hs.setSiege(func() { st.task, st.armed = t, true })
+}
+
+// stopTaskLocked stops st's step armed last and drops its expiry if under
+// way. siegeMu is held.
+func stopTaskLocked(st *hallSiege) {
+	if st.task != nil {
+		st.task.Stop()
+		st.task = nil
+	}
+	st.gen++
 }
 
 // armPrepareLocked arms h's registrations' close an hour before its siege
@@ -139,8 +165,8 @@ func (hs *Halls) armLocked(h *hall, d time.Duration, fire func()) {
 func (hs *Halls) armPrepareLocked(h *hall) {
 	next := h.siege.next
 	s := &HallSiege{hs: hs, h: h}
-	hs.armLocked(h, hs.siegeDelay(next-registrationCloseMs), func() {
-		s.prepareStep(time.Duration(s.Date()-hs.Now()) * time.Millisecond)
+	hs.armLocked(h, hs.siegeDelay(next-registrationCloseMs), func(due func() bool) {
+		s.prepareStep(due, time.Duration(s.Date()-hs.Now())*time.Millisecond)
 	})
 	hs.log.Info().Int32("hall_id", h.id()).Time("date", time.UnixMilli(next)).Msg("clanhall: siege scheduled")
 }
@@ -161,7 +187,7 @@ func (s *HallSiege) Instant() bool {
 	if s.script() == nil {
 		return false
 	}
-	s.prepareStep(0)
+	s.prepareStep(nil, 0)
 	return true
 }
 
@@ -172,18 +198,15 @@ func (s *HallSiege) End() bool {
 	if s.script() == nil {
 		return false
 	}
-	s.endStep()
+	s.endStep(nil)
 	return true
 }
 
-// CancelTask stops the step armed last.
+// CancelTask stops the step armed last, its expiry dropped if under way.
 func (s *HallSiege) CancelTask() {
 	s.hs.siegeMu.Lock()
-	t := s.h.siege.task
-	s.hs.siegeMu.Unlock()
-	if t != nil {
-		t.Stop()
-	}
+	defer s.hs.siegeMu.Unlock()
+	stopTaskLocked(s.h.siege)
 }
 
 func (s *HallSiege) script() *SiegeScript {
