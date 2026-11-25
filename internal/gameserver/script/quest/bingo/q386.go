@@ -1,7 +1,4 @@
-// Package q386 is the quest Stolen Dignity: Romp buys the infernium ore of
-// the monsters for a game of picking six cells of a scrambled board, and
-// pays a random reward by the lines the picks complete.
-package q386
+package bingo
 
 import (
 	"strconv"
@@ -11,7 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-const questName = "Q386_StolenDignity"
+const q386Name = "Q386_StolenDignity"
 
 // Npc.
 const romp = 30843
@@ -19,8 +16,8 @@ const romp = 30843
 // Quest item.
 const stolenInfernium = 6363
 
-// chances returns the ore drop chance of each monster, by NPC id.
-func chances() map[int32]int32 {
+// q386Chances returns the ore drop chance of each monster, by NPC id.
+func q386Chances() map[int32]int32 {
 	return map[int32]int32{
 		20970: 208000, // Soldier of Ancient Times
 		20971: 299000, // Warrior of Ancient Times
@@ -51,16 +48,18 @@ func chances() map[int32]int32 {
 	}
 }
 
-// rewards returns the items the board pays.
-func rewards() []int32 {
+// q386Rewards returns the items the board pays.
+func q386Rewards() []int32 {
 	return []int32{
 		5529, 5532, 5533, 5534, 5535, 5536, 5537, 5538, 5539, 5541, 5542, 5543, 5544, 5545, 5546, 5547, 5548,
 		8331, 8341, 8342, 8349, 8346,
 	}
 }
 
-// New returns the quest.
-func New() script.Script {
+// Q386 is the quest Stolen Dignity: Romp buys the infernium ore of
+// the monsters for a game of picking six cells of a scrambled board, and
+// pays a random reward by the lines the picks complete.
+func Q386() script.Script {
 	return script.Script{
 		Title:   "Stolen Dignity",
 		QuestID: 386,
@@ -72,23 +71,13 @@ func New() script.Script {
 				21005, 21116, 21113, 20954, 20671, 21110, 20967, 20956, 21021, 21259, 20974, 20975, 21001,
 			},
 		},
-		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
+		Hooks: script.Hooks{OnEvent: q386Event, OnTalk: q386Talk, OnMyDying: q386Dying},
 	}
 }
 
-// variable returns the state's variable key; a variable that was never set
-// aborts the invocation, as the board does of a pick made before the bet.
-func variable(st *script.QuestState, key string) string {
-	v, ok := st.Get(key)
-	if !ok {
-		panic("q386: no variable " + key)
-	}
-	return v
-}
-
-func onAdvEvent(s *script.Script, e script.Event) string {
+func q386Event(s *script.Script, e script.Event) string {
 	htmltext := e.Name
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q386Name)
 	if st == nil {
 		return htmltext
 	}
@@ -141,67 +130,33 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		if strings.Contains(playerArray, number) {
 			htmltext = fillBoard(st, s.HTMLText("30843-25.htm"))
 		} else {
-			// No need to store the String on player db, but still need to update it.
+			// The sixth pick completes the picks and is not stored.
 			playerChoice := playerArray + number
 
-			// Transform the generated board (9 string length) into a 2d matrice (3x3 int).
 			board := strings.Split(variable(st, "board"), "")
 
-			// test for all line combination
-			winningLines := 0
-
-			lines := [8][3]int{
-				{1, 2, 3}, // line 1
-				{4, 5, 6}, // line 2
-				{7, 8, 9}, // line 3
-				{1, 4, 7}, // column 1
-				{2, 5, 8}, // column 2
-				{3, 6, 9}, // column 3
-				{1, 5, 9}, // diagonal 1
-				{3, 5, 7}, // diagonal 2
-			}
-			for _, m := range lines {
-				// test line combination
-				won := true
-				for _, index := range m {
-					won = won && strings.Contains(playerChoice, board[index-1])
-				}
-
-				// cut the loop, when you won
-				if won {
-					winningLines++
-				}
-			}
-
-			switch winningLines {
+			switch winningLines(board, playerChoice) {
 			case 3:
 				htmltext = s.HTMLText("30843-22.htm")
-				table := rewards()
+				table := q386Rewards()
 				s.GiveItems(p, table[s.Rnd(len(table))], 4)
 			case 0:
 				htmltext = s.HTMLText("30843-24.htm")
-				table := rewards()
+				table := q386Rewards()
 				s.GiveItems(p, table[s.Rnd(len(table))], 10)
 			default:
 				htmltext = s.HTMLText("30843-23.htm")
 			}
 
-			for i := 1; i < 10; i++ {
-				htmltext = strings.ReplaceAll(htmltext, "<?Cell"+strconv.Itoa(i)+"?>", board[i-1])
-				color := "ffffff"
-				if strings.Contains(playerChoice, board[i-1]) {
-					color = "ff0000"
-				}
-				htmltext = strings.ReplaceAll(htmltext, "<?FontColor"+strconv.Itoa(i)+"?>", color)
-			}
+			htmltext = reveal(htmltext, board, playerChoice)
 		}
 	}
 	return htmltext
 }
 
-func onTalk(s *script.Script, e script.Talk) string {
+func q386Talk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q386Name)
 	if st == nil {
 		return htmltext
 	}
@@ -223,26 +178,10 @@ func onTalk(s *script.Script, e script.Talk) string {
 	return htmltext
 }
 
-func onMyDying(s *script.Script, e script.MyDying) {
+func q386Dying(s *script.Script, e script.MyDying) {
 	st := s.RandomPartyMemberState(script.ActingPlayer(e.Killer), e.NPC, questlog.StatusStarted)
 	if st == nil {
 		return
 	}
-	s.DropItems(st.Player(), stolenInfernium, 1, 0, chances()[e.NPC.NpcID()])
-}
-
-// fillBoard fills the cells of the page with the picked numbers of the
-// board and a question mark for the cells not picked yet.
-func fillBoard(st *script.QuestState, htmltext string) string {
-	playerArray := variable(st, "playerArray")
-	board := strings.Split(variable(st, "board"), "")
-
-	for i := 1; i < 10; i++ {
-		cell := "?"
-		if strings.Contains(playerArray, board[i-1]) {
-			cell = board[i-1]
-		}
-		htmltext = strings.ReplaceAll(htmltext, "<?Cell"+strconv.Itoa(i)+"?>", cell)
-	}
-	return htmltext
+	s.DropItems(st.Player(), stolenInfernium, 1, 0, q386Chances()[e.NPC.NpcID()])
 }

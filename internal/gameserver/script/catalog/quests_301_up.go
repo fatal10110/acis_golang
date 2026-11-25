@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/bingo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q303"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q306"
@@ -61,9 +62,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q381"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q382"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q383"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q384"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q385"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q386"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q401"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q402"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q403"
@@ -199,9 +198,9 @@ func quests301Up() script.Catalog {
 		"quest.Q381_LetsBecomeARoyalMember":            q381.New,
 		"quest.Q382_KailsMagicCoin":                    q382.New,
 		"quest.Q383_SearchingForTreasure":              q383.New,
-		"quest.Q384_WarehouseKeepersPastime":           q384.New,
+		"quest.Q384_WarehouseKeepersPastime":           bingo.Q384,
 		"quest.Q385_YokeOfThePast":                     q385.New,
-		"quest.Q386_StolenDignity":                     q386.New,
+		"quest.Q386_StolenDignity":                     bingo.Q386,
 		"quest.Q401_PathToAWarrior":                    q401.New,
 		"quest.Q402_PathToAHumanKnight":                q402.New,
 		"quest.Q403_PathToARogue":                      q403.New,

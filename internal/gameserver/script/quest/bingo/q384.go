@@ -1,7 +1,4 @@
-// Package q384 is the quest Warehouse Keeper's Pastime: Cliff trades the
-// medals of the monsters for a game of picking six cells of a scrambled
-// board, and pays by the lines the picks complete.
-package q384
+package bingo
 
 import (
 	"strconv"
@@ -11,7 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-const questName = "Q384_WarehouseKeepersPastime"
+const q384Name = "Q384_WarehouseKeepersPastime"
 
 // Npcs.
 const (
@@ -28,8 +25,8 @@ type reward struct {
 	item   int32
 }
 
-// chances returns the medal drop chance of each monster, by NPC id.
-func chances() map[int32]int32 {
+// q384Chances returns the medal drop chance of each monster, by NPC id.
+func q384Chances() map[int32]int32 {
 	return map[int32]int32{
 		20947: 160000, // Connabi
 		20948: 180000, // Bartal
@@ -99,8 +96,10 @@ func rewards100Lose() []reward {
 	}
 }
 
-// New returns the quest.
-func New() script.Script {
+// Q384 is the quest Warehouse Keeper's Pastime: Cliff trades the
+// medals of the monsters for a game of picking six cells of a scrambled
+// board, and pays by the lines the picks complete.
+func Q384() script.Script {
 	return script.Script{
 		Title:   "Warehouse Keeper's Pastime",
 		QuestID: 384,
@@ -112,23 +111,13 @@ func New() script.Script {
 				20668, 20241, 20286, 20949, 20950, 20942, 20943, 20944, 20559, 20243, 20282, 20677, 20605,
 			},
 		},
-		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
+		Hooks: script.Hooks{OnEvent: q384Event, OnTalk: q384Talk, OnMyDying: q384Dying},
 	}
 }
 
-// variable returns the state's variable key; a variable that was never set
-// aborts the invocation, as the board does of a pick made before the bet.
-func variable(st *script.QuestState, key string) string {
-	v, ok := st.Get(key)
-	if !ok {
-		panic("q384: no variable " + key)
-	}
-	return v
-}
-
-func onAdvEvent(s *script.Script, e script.Event) string {
+func q384Event(s *script.Script, e script.Event) string {
 	htmltext := e.Name
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q384Name)
 	if st == nil {
 		return htmltext
 	}
@@ -191,39 +180,12 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		if strings.Contains(playerArray, number) {
 			htmltext = fillBoard(st, s.HTMLText(npcID+"-26.htm"))
 		} else {
-			// No need to store the String on player db, but still need to update it.
+			// The sixth pick completes the picks and is not stored.
 			playerChoice := playerArray + number
 
-			// Transform the generated board (9 string length) into a 2d matrice (3x3 int).
 			board := strings.Split(variable(st, "board"), "")
 
-			// test for all line combination
-			winningLines := 0
-
-			lines := [8][3]int{
-				{1, 2, 3}, // line 1
-				{4, 5, 6}, // line 2
-				{7, 8, 9}, // line 3
-				{1, 4, 7}, // column 1
-				{2, 5, 8}, // column 2
-				{3, 6, 9}, // column 3
-				{1, 5, 9}, // diagonal 1
-				{3, 5, 7}, // diagonal 2
-			}
-			for _, m := range lines {
-				// test line combination
-				won := true
-				for _, index := range m {
-					won = won && strings.Contains(playerChoice, board[index-1])
-				}
-
-				// cut the loop, when you won
-				if won {
-					winningLines++
-				}
-			}
-
-			switch winningLines {
+			switch winningLines(board, playerChoice) {
 			case 3:
 				htmltext = s.HTMLText(npcID + "-23.htm")
 
@@ -259,22 +221,15 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 				htmltext = s.HTMLText(npcID + "-24.htm")
 			}
 
-			for i := 1; i < 10; i++ {
-				htmltext = strings.ReplaceAll(htmltext, "<?Cell"+strconv.Itoa(i)+"?>", board[i-1])
-				color := "ffffff"
-				if strings.Contains(playerChoice, board[i-1]) {
-					color = "ff0000"
-				}
-				htmltext = strings.ReplaceAll(htmltext, "<?FontColor"+strconv.Itoa(i)+"?>", color)
-			}
+			htmltext = reveal(htmltext, board, playerChoice)
 		}
 	}
 	return htmltext
 }
 
-func onTalk(s *script.Script, e script.Talk) string {
+func q384Talk(s *script.Script, e script.Talk) string {
 	htmltext := script.NoQuestMsg()
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q384Name)
 	if st == nil {
 		return htmltext
 	}
@@ -305,26 +260,10 @@ func onTalk(s *script.Script, e script.Talk) string {
 	return htmltext
 }
 
-func onMyDying(s *script.Script, e script.MyDying) {
+func q384Dying(s *script.Script, e script.MyDying) {
 	st := s.RandomPartyMemberState(script.ActingPlayer(e.Killer), e.NPC, questlog.StatusStarted)
 	if st == nil {
 		return
 	}
-	s.DropItems(st.Player(), medal, 1, 0, chances()[e.NPC.NpcID()])
-}
-
-// fillBoard fills the cells of the page with the picked numbers of the
-// board and a question mark for the cells not picked yet.
-func fillBoard(st *script.QuestState, htmltext string) string {
-	playerArray := variable(st, "playerArray")
-	board := strings.Split(variable(st, "board"), "")
-
-	for i := 1; i < 10; i++ {
-		cell := "?"
-		if strings.Contains(playerArray, board[i-1]) {
-			cell = board[i-1]
-		}
-		htmltext = strings.ReplaceAll(htmltext, "<?Cell"+strconv.Itoa(i)+"?>", cell)
-	}
-	return htmltext
+	s.DropItems(st.Player(), medal, 1, 0, q384Chances()[e.NPC.NpcID()])
 }
