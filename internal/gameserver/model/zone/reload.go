@@ -22,6 +22,8 @@ func (s *zoneSet) holders() map[int32][]Kind {
 // swapped out, a is dropped from that set's zones that held it, without
 // their exit rules, and loses every flag; those zones are returned for
 // settleDropped. The caller holds a's membership, as for Revalidate.
+// Dropping every hold of the old zones is kept as a parity exception
+// (#4801): no flag an old zone raised outlives the reload.
 func (s *zoneSet) sync(a Actor) []Kind {
 	prev := a.ZoneFlags().resync(s)
 	if prev == nil {

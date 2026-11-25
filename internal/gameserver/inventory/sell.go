@@ -54,7 +54,8 @@ func (s *Service) SellableItems(inv *itemcontainer.Inventory, summonedControl fu
 // int32, the whole sale is refused: it reports false and nothing changes,
 // the rows before the overflowing one included. Every row is checked before
 // the first is taken, so a refused sale never takes items it does not pay
-// for. Adena paid on top of a full stack caps it at the largest int32.
+// for (parity exception #4829). Adena paid on top of a full stack caps it
+// at the largest int32.
 // An error once rows were taken, when no object id could be had for new
 // adena, comes back with what the sale took.
 func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(objectID int32) bool) (SaleResult, bool, error) {

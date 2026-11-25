@@ -135,6 +135,81 @@ the track's lock (`derby.Track.Bypass`); a purchase that finds sales closed take
 `TestBuyTicketStakesBeforeTheSalesClose` (`internal/gameserver/derby`) and
 `TestDerbyTicketBoughtDuringTheClosingTick` (`tests/npcs`).
 
+**Parity exception: a quoted dollar sign in an HTML value still sends the page** (#4718). The
+reference refuses a placeholder value with an odd run of backslashes before `$` (`a\$`, `a\$1`) and
+never sends the page. The player-text callers are a clan notice, petition content and feedback
+(`internal/gameserver/network/admin_petition.go`) and a buffer scheme name
+(`internal/gameserver/schemebuffer/dialog.go`); any of them holding `\$` fails the page, so a clan
+notice fails every member's entry. Go reads the backslash as quoting the `$` like any other
+character and sends the page showing `a$` (`commons.HTMLValue`). Pinned by `TestHTMLValue`
+(`internal/commons`).
+
+**Parity exception: a missing or malformed `.properties` file stops boot** (#4772). The reference logs
+the error and carries on: a missing file gives every key its default, and a malformed one keeps the
+keys read before the bad line. Go returns the error (`config.LoadFile`) and the server stops booting.
+Pinned by `TestLoadFileRefusesMissingAndMalformedFiles` (`internal/config`).
+
+**Parity exception: a blank line in `banned_ips.properties` is skipped silently** (#4909). The
+reference reports a blank line as an invalid ban address. Go skips blank and whitespace-only lines
+without a log (`manager.LoadIPBanList`); a bad address is still reported. Pinned by
+`TestLoadIPBanList_SkipsBlankLinesSilently` (`internal/loginserver/data/manager`).
+
+**Parity exception: `//reload zone` drops what the old zones raised** (#4801). The reference drops its
+zones without their exit rules but leaves the flags they raised on the creatures inside, so a player in
+town stays peaceful after leaving it until a relog. Go drops every hold of the old zones with them and
+enters the new zones around each creature (`zone.zoneSet.sync`); boat holds and boss grants are kept
+across the reload (#5198). Pinned by `TestReloadMovesMembersWithoutExitRules`
+(`internal/gameserver/model/zone`).
+
+**Parity exception: the wyvern countdown re-arms after it runs** (#4802). The reference never clears a
+spent forced-dismount countdown, so after the first forced dismount a rider entering a no-landing zone
+or a siege again only gets the warning and flies on. Go clears the countdown once it has run, so every
+entry starts a new one (`network.armWyvernDismount`). Pinned by `TestWyvernDismountedAgainOnNextSiege`
+(`tests/pets`).
+
+**Parity exception: a pet stack's count change reaches the pet window** (#4813). The reference queues an
+item update only for the player's inventory and paperdoll, so a count change on a pet's stack (feeding,
+a merge from give-to-pet or pickup, a partial take-back or destroy) leaves the pet window stale. Go
+sends a `PetInventoryUpdate` listing the stack with its new count
+(`network.petInventoryDelivery.QueueInventoryUpdate`). Pinned by
+`TestPartialPetStackMoveListsModifiedEntries` (`tests/pets`).
+
+**Parity exception: the summoned pet's collar never drops on death** (#4973). The death drop skips the
+control item of the pet the player has out or rides, matched by object id. The reference compares an
+object id with a template id there, so only the configured kept-pet-items list protects a collar. With
+the stock list nothing differs. With a list that leaves out a collar, the reference drops it and Go
+keeps it. Pinned by `tests/pets` `TestDeathDropKeepsSummonedPetCollar`.
+
+**Parity exception: crafted private store and trade requests are refused** (#4826). The reference lets
+a buyer take more units than a sell row lists (it checks only what the owner holds), take part of a
+package sale, sell into a buy row an item of another enchant or more units than the row wants, and put
+a worn item on a sell list or in a trade offer. Go refuses each with nothing moved
+(`privatestore.Store` deal and list fills, `trade.manipulableItem`). Pinned by `TestDealDivergences`
+(`internal/gameserver/privatestore`) and `TestEquippedItemRefusedOnSellListAndTradeOffer`
+(`tests/trade`).
+
+**Parity exception: `FreightChar` opens only the account's own characters** (#4826). The reference opens
+the freight of whatever character id the command names. Go opens nothing for a character outside the
+player's account (`network` warehouse `FreightCharacter` reply). Pinned by
+`TestFreightCharDepositsIntoAccountCharacter` (`tests/npcs`).
+
+**Parity exception: region-based freight is tagged with a stable region key** (#4826). The reference
+tags region-based freight with an identity hash of the region object, which changes on every run and
+cannot be reproduced. Go tags it with `world.RegionKey`, a positive number the same on every boot.
+Pinned by `TestPackageSendNeedsKeeperAndTagsItsRegion` (`tests/npcs`).
+
+**Parity exception: merchant lists refuse a GM list and an overflowing sale** (#4829). The reference
+opens a buy list no NPC sells (npc id 0 or below) to any client that names it, and a sale whose payment
+passes the largest int32 destroys the rows before the overflowing one and pays nothing. Go refuses
+such a list to a player who is not a GM (`network` merchant buy) and refuses an overflowing sale whole
+with nothing taken (`inventory.Service.Sell`). Pinned by `TestMerchantRefusesGMListToPlayer` and
+`TestSellItemRefusals` (`tests/npcs`).
+
+**Parity exception: `//enchant` updates the enchanted player's inventory window** (#5042). The reference
+queues the enchanted item's `InventoryUpdate` on the GM's inventory, so the target's client gets none.
+Go queues it on the owner's inventory (`network` admin enchant). Pinned by
+`TestAdminEnchantSelectedPlayerInventoryUpdate` (`tests/admin`).
+
 ## 4. Design the native Go shape
 
 Search the Go repository for existing domain types, helpers, constructors, fixtures, and package

@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,6 +158,28 @@ func TestLoadIPBanList_SkipsCommentsAndBadLines(t *testing.T) {
 
 	if got := len(l.bans); got != 2 {
 		t.Fatalf("loaded %d bans, want 2", got)
+	}
+	if !l.IsBanned(net.ParseIP("1.2.3.4")) {
+		t.Error("1.2.3.4 should be banned")
+	}
+	if !l.IsBanned(net.ParseIP("::1")) {
+		t.Error("::1 should be banned")
+	}
+}
+
+// TestLoadIPBanList_SkipsBlankLinesSilently pins #4909: blank and
+// whitespace-only lines ban nothing and log nothing, while a bad address
+// beside them is still reported.
+func TestLoadIPBanList_SkipsBlankLinesSilently(t *testing.T) {
+	path := writeBanFile(t, "\n1.2.3.4\n   \n\t\nnot-an-ip-and-no-dns\n\n::1\n\n")
+	var out bytes.Buffer
+	l := LoadIPBanList(path, zerolog.New(&out))
+
+	if got := len(l.bans); got != 2 {
+		t.Fatalf("loaded %d bans, want 2", got)
+	}
+	if got := strings.Count(out.String(), "invalid ban address"); got != 1 {
+		t.Fatalf("invalid ban address logged %d times, want 1 (the bad address only): %s", got, out.String())
 	}
 	if !l.IsBanned(net.ParseIP("1.2.3.4")) {
 		t.Error("1.2.3.4 should be banned")

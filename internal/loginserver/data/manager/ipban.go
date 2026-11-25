@@ -55,7 +55,8 @@ func LoadIPBanList(path string, log zerolog.Logger) *IPBanList {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, "#") {
+		// A blank line bans nothing and is skipped without a log (#4909).
+		if strings.Contains(line, "#") || strings.TrimSpace(line) == "" {
 			continue
 		}
 

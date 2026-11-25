@@ -284,7 +284,8 @@ func TestDealsNeedTheStoreOpen(t *testing.T) {
 // TestDealDivergences pins the trust gaps the store closes beyond the
 // reference: buying more units than a row lists, selling a buy row an
 // item at another enchant or more units than it still wants, and buying
-// part of a package. Each is refused with nothing moved.
+// part of a package. Each is refused with nothing moved; all are kept as
+// the #4826 parity exceptions.
 func TestDealDivergences(t *testing.T) {
 	t.Run("past the listed count", func(t *testing.T) {
 		w := newDealWorld()

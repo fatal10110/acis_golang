@@ -63,6 +63,9 @@ type petInventoryDelivery struct {
 	log     zerolog.Logger
 }
 
+// QueueInventoryUpdate queues every change to the pet's inventory, a count
+// change on one of its stacks included, so the pet window always shows the
+// current count (parity exception #4813).
 func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory) {
 	if d == nil || d.updates == nil {
 		return

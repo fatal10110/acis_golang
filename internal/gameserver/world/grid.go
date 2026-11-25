@@ -52,7 +52,8 @@ func (g *Grid) RegionAt(x, y int) (region *Region, ok bool) {
 
 // RegionKey identifies the region holding game coordinate (x, y): a
 // positive number no other region shares, and the same one on every boot,
-// or 0 outside the world's bounds.
+// or 0 outside the world's bounds. Being stable across boots, it is kept as
+// a parity exception for the region-based freight tag (#4826).
 func RegionKey(x, y int) int {
 	if x < MinX || x > MaxX || y < MinY || y > MaxY {
 		return 0

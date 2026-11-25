@@ -203,7 +203,8 @@ func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply np
 			return false
 		}
 		// Only the account's own characters have a freight to open here;
-		// one naming any other character opens nothing.
+		// one naming any other character opens nothing (parity exception
+		// #4826).
 		target, ok := l.activateDeposit(live, int32(id))
 		if !ok {
 			return true

@@ -122,7 +122,8 @@ func (s *Store) addSellLocked(inv Holdings, row SellRow) bool {
 	}
 	st := inst.Snapshot()
 	// A worn item never reaches the owner's manage window, and a store
-	// cannot hand one over: it would leave the paperdoll holding it.
+	// cannot hand one over: it would leave the paperdoll holding it
+	// (parity exception #4826).
 	if st.Equipped() {
 		return false
 	}
