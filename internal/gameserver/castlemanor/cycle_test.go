@@ -112,19 +112,23 @@ type memStore struct {
 	mu         sync.Mutex
 	production []ProductionRow
 	procure    []ProcureRow
+	last       int64
 	saves      int
 }
 
-func (s *memStore) Load(context.Context) ([]ProductionRow, []ProcureRow, error) {
+func (s *memStore) Load(context.Context) ([]ProductionRow, []ProcureRow, int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.production), slices.Clone(s.procure), nil
+	return slices.Clone(s.production), slices.Clone(s.procure), s.last, nil
 }
 
-func (s *memStore) Save(_ context.Context, production []ProductionRow, procure []ProcureRow) error {
+func (s *memStore) Save(_ context.Context, production []ProductionRow, procure []ProcureRow, last int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.production, s.procure = production, procure
+	if last != 0 {
+		s.last = last
+	}
 	s.saves++
 	return nil
 }
