@@ -145,14 +145,12 @@ func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Charact
 	// The members leave while cl is still registered: a member entering
 	// the world meanwhile either finds itself still listed and enters
 	// online, or finds itself gone with its removal kept for it, never a
-	// clan missing with its removal still to come.
+	// clan missing with its removal still to come. Each member leaves as
+	// its presence stands when it is removed (removeMember), so one that
+	// entered online since the roster was read leaves online.
 	out := Dissolution{LeaderID: leaderID}
 	for _, m := range cl.Members() {
-		var live *player.Character
-		if m.Online && online != nil {
-			live = online(m.ObjectID)
-		}
-		if removed, ok := s.remove(cl, m.ObjectID, 0, live, now); ok {
+		if removed, ok := s.removeMember(cl, m.ObjectID, 0, online, now); ok {
 			out.Members = append(out.Members, removed)
 		}
 	}
