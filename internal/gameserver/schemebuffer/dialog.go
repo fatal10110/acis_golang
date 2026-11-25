@@ -462,7 +462,9 @@ func (m *Manager) skillName(id int32) (string, bool) {
 }
 
 // fee is what giving ids costs: the static cost per buff when one is set,
-// else the sum of the buffs' prices, in 32-bit arithmetic.
+// else the sum of the buffs' prices, in 32-bit arithmetic. An id the
+// buffer does not offer costs nothing, so the page showing the fee still
+// opens (parity exception, #5033).
 func (m *Manager) fee(ids []int32) int32 {
 	if m.cfg.StaticCost > 0 {
 		return int32(len(ids)) * int32(m.cfg.StaticCost)

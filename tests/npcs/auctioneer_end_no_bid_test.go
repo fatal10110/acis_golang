@@ -42,7 +42,7 @@ func TestAuctionEndsWithNoBidOnAFreeHall(t *testing.T) {
 // it owns, up for sale and nobody bids. When the auction ends the clan's
 // members in the world are told CLANHALL_NOT_SOLD; the hall stays Bidders'
 // and the seller's deposit is not paid back. The sale is dropped, its end
-// cleared and the hall off the listing (#5018).
+// cleared and the hall off the listing (parity exception, #5018, #5356).
 func TestAuctionEndsWithNoBidOnAHallForSale(t *testing.T) {
 	t.Parallel()
 	end := time.Now().Add(time.Hour).UnixMilli()

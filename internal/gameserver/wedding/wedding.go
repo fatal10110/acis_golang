@@ -345,7 +345,8 @@ func (m *Manager) answer(requester, partner Spouse, accepted bool) Answer {
 // whose adena leaves between the check and the payment leaves both
 // unmarried and, once the other's payment is refunded, neither paying.
 // Taking payment first means a spouse short of adena never marries for free
-// and a requester who asked two players never ends up in two couples.
+// and a requester who asked two players never ends up in two couples
+// (parity exception, #5010).
 func (m *Manager) marry(requester, partner Spouse) Answer {
 	out := Answer{Outcome: AnswerVoid, Requester: requester}
 	if m.byPlayer[requester.ObjectID()] > 0 || m.byPlayer[partner.ObjectID()] > 0 || m.ids == nil {

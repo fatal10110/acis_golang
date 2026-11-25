@@ -343,7 +343,8 @@ func (c *chateau) setFinalAttackers(s *script.Script, h *script.Hall) {
 		clan := s.Clan(clanID)
 		if c.accepted.Len() > 3 {
 			// A clan no longer existing, or whose leader is away, is
-			// passed over without a word.
+			// passed over without a word, and the choice goes on
+			// (parity exception, #5022).
 			if clan != nil {
 				if leader := clan.ClanLeader(); leader != nil {
 					leader.SystemMessage(msgRegistrationFailed)
