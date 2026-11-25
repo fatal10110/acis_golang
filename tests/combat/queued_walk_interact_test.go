@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -280,8 +279,7 @@ func TestFearedThroneClickKeepsFleeing(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	startInWorld(t, c)
-	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
-	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", fearHome, fearHome)
 	throne := spawnThrone(t, srv)
 	drainUntilQuiet(t, c)
 
@@ -301,7 +299,9 @@ func TestFearedThroneClickKeepsFleeing(t *testing.T) {
 	if !ok {
 		t.Fatalf("world.Player(%d) = %T is not an effect holder", objID, obj)
 	}
-	landFear(t, hostile, player, curseFearSkillID, 10)
+	// The run under test is the landing flee; no tick may land on the wall
+	// clock between the click and the reads below.
+	landFearEvery(t, hostile, player, curseFearSkillID, 10, 600)
 	readMoveOf(t, c, objID, "landing flee")
 	if !player.IsMoving() {
 		t.Fatal("IsMoving() = false after the landing flee, want a live run")

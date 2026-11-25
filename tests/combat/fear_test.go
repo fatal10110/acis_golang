@@ -25,14 +25,32 @@ const curseFearSkillID = 1169
 // fearFleeDistance is how far every flee runs from the effector.
 const fearFleeDistance = 500
 
+// fearHome is where a test puts the monster that frightens the player at
+// playerOrigin. It stands one row off the player's: a flee from a monster on
+// the player's own row has no cross-row offset to split the distance on, so
+// the target is the player's own cell and the run ends on the next movement
+// tick (100 ms), too short for a test on the wall clock to catch it running.
+var fearHome = location.Location{X: hostileX, Y: hostileY + 1, Z: hostileZ}
+
+// fearTickSeconds is the period of the Fear effect landFear applies.
+const fearTickSeconds = 2
+
 // landFear applies a real Fear effect from effector to target on target's
 // own queue, the way a landed fear skill does, waits for its start hook to
 // finish, and returns it.
 func landFear(t *testing.T, effector effect.Actor, target effectHolder, skillID modelskill.ID, count int) *effect.Effect {
 	t.Helper()
+	return landFearEvery(t, effector, target, skillID, count, fearTickSeconds)
+}
+
+// landFearEvery is landFear with a tick every seconds seconds. A test that
+// only needs the landing flee passes a period longer than the test, so no
+// tick of the wall clock lands in the middle of what it reads.
+func landFearEvery(t *testing.T, effector effect.Actor, target effectHolder, skillID modelskill.ID, count, seconds int) *effect.Effect {
+	t.Helper()
 	e, err := effect.New(
 		effect.Skill{ID: skillID, Level: 1, Debuff: true},
-		modelskill.EffectTemplate{Name: "Fear", Count: count, Time: 2, Icon: true},
+		modelskill.EffectTemplate{Name: "Fear", Count: count, Time: seconds, Icon: true},
 	)
 	if err != nil {
 		t.Fatalf("effect.New(Fear): %v", err)
@@ -166,8 +184,7 @@ func TestFearOnPlayerFleesOnceThenRefuses(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	startInWorld(t, c)
 
-	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
-	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", fearHome, fearHome)
 	drainUntilQuiet(t, c)
 	obj, ok := srv.State.Player(objID)
 	if !ok {
@@ -194,7 +211,7 @@ func TestFearOnPlayerFleesOnceThenRefuses(t *testing.T) {
 		t.Fatal("Afraid() = false after fear landed, want true")
 	}
 	dest := readMoveOf(t, c, objID, "landing flee")
-	if want := origin.FleeFrom(hostileX, hostileY, fearFleeDistance); dest.X != want.X || dest.Y != want.Y {
+	if want := origin.FleeFrom(fearHome.X, fearHome.Y, fearFleeDistance); dest.X != want.X || dest.Y != want.Y {
 		t.Fatalf("landing flee dest = %+v, want %+v away from the monster", dest, want)
 	}
 	if !player.IsMoving() {
