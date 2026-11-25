@@ -1037,11 +1037,20 @@ func loadHexIDProperties(paths gameServerPaths) (hexIDProperties, error) {
 	return hexIDProperties{Props: props}, nil
 }
 
+// gameServerConfigFromLoadedProperties builds the boot configuration.
 func gameServerConfigFromLoadedProperties(paths gameServerPaths, serverProps *config.Properties, hexProps hexIDProperties) (gameServerConfig, error) {
+	// #4776: the listen host has no default; an absent key aborts boot and
+	// only an explicit "*" listens on every address.
+	if _, ok := serverProps.Lookup("GameserverHostname"); !ok {
+		return gameServerConfig{}, fmt.Errorf("missing GameserverHostname in server.properties; use * to listen on every address")
+	}
 	return gameServerConfigFromProperties(paths, serverProps, hexProps.Props)
 }
 
 func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps *config.Properties) (gameServerConfig, error) {
+	// Required only at boot (gameServerConfigFromLoadedProperties); a config
+	// reload never rebinds the listener, so it discards ListenAddr.
+	listenHost, _ := serverProps.Lookup("GameserverHostname")
 	listenPort, err := serverProps.Int("GameserverPort", 7777)
 	if err != nil {
 		return gameServerConfig{}, err
@@ -1120,7 +1129,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		return gameServerConfig{}, err
 	}
 	return gameServerConfig{
-		ListenAddr:   listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
+		ListenAddr:   listenAddress(listenHost, listenPort),
 		AcceptFilter: acceptFilter,
 		LoginAddr:    net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
 		Auth: network.LoginServerAuth{
