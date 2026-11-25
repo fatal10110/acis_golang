@@ -30,7 +30,7 @@ func TestCastRefusalOnBoat(t *testing.T) {
 		{"aboard, running a store, in water", fisher{rod: true, boat: true, operating: true, water: true}, RefuseOnBoat},
 		{"ashore, running a store", fisher{rod: true, operating: true}, RefuseOperating},
 	} {
-		if got := CastRefusal(tc.f, true); got != tc.want {
+		if got := CastRefusal(tc.f, 6520); got != tc.want {
 			t.Errorf("%s: CastRefusal = %d, want %d", tc.name, got, tc.want)
 		}
 	}

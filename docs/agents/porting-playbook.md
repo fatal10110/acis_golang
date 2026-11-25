@@ -121,6 +121,20 @@ cancellation does; the refund finds the clan gone and pays nothing (`clanhall.Ha
 Pinned by `TestAuctionDestroyedLoserRefundsNoNamesake`, `TestAuctionSaleWithADestroyedHighestBidder`
 (`tests/clan`) and `TestAuctionWinnerIsTheBiddingClanByID` (`tests/npcs`).
 
+**Parity exception: a lure with no grade is refused** (#5118). The reference casts a line baited with
+an equippable lure its grade table does not list (6528, 7067-7070, 8496-8504), uses one up and holds
+the caster in place with no bite to come and no way out but a relog. Go refuses the cast before
+anything is used up, with the bait notice (`fishing.RefuseUngradedLure`). Pinned by
+`TestCastRefusalUngradedLure` (`internal/gameserver/fishing`) and
+`TestFishingCastRefusesUngradedLure` (`tests/items`).
+
+**Parity exception: a race ticket sells only while sales are open** (#5119). The reference checks
+that sales are open, then later takes the adena and adds the stake, so a purchase straddling the
+close is sold after it and left out of the odds. Go checks, takes the adena and stakes in one hold of
+the track's lock (`derby.Track.Bypass`); a purchase that finds sales closed takes nothing. Pinned by
+`TestBuyTicketStakesBeforeTheSalesClose` (`internal/gameserver/derby`) and
+`TestDerbyTicketBoughtDuringTheClosingTick` (`tests/npcs`).
+
 ## 4. Design the native Go shape
 
 Search the Go repository for existing domain types, helpers, constructors, fixtures, and package
