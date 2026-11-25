@@ -44,6 +44,7 @@ type noTickets struct{}
 
 func (noTickets) Tickets() []Ticket         { return nil }
 func (noTickets) Item(int32) (Ticket, bool) { return Ticket{}, false }
+func (noTickets) Pay(int) bool              { return true }
 
 func testTemplates() []Template {
 	var out []Template
@@ -74,8 +75,7 @@ func TestNewLeavesOutStakesOutsideTheEightLanes(t *testing.T) {
 
 // TestBuyTicketRefusesALanePastTheEighth pins the Decision on purchases: a
 // ninth lane picked, with a price already picked, answers the purchase with
-// nothing at all, and a stake placed on it changes no lane and stores
-// nothing.
+// nothing at all, changes no lane's stake and stores nothing.
 func TestBuyTicketRefusesALanePastTheEighth(t *testing.T) {
 	store := &fakeStore{}
 	track := newTestTrack(t, store)
@@ -94,11 +94,8 @@ func TestBuyTicketRefusesALanePastTheEighth(t *testing.T) {
 		t.Fatalf("buying lane 9 = %+v, want aborted", reply)
 	}
 
-	for _, lane := range []int{0, 9, -1} {
-		track.PlaceBet(lane, 500)
-	}
 	if got := track.Stakes(); got != ([Lanes]int64{}) {
-		t.Fatalf("stakes after bets on lanes 0, 9 and -1 = %v, want none", got)
+		t.Fatalf("stakes after buying lane 9 = %v, want none", got)
 	}
 	if len(store.saved) != 0 {
 		t.Fatalf("stored %v for lanes outside 1 to 8, want nothing", store.saved)

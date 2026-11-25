@@ -256,17 +256,6 @@ func (t *Track) Stakes() [Lanes]int64 {
 	return t.bets
 }
 
-// PlaceBet adds amount to lane's stake, in memory; SaveBet stores it. A
-// lane outside 1 to 8 is refused.
-func (t *Track) PlaceBet(lane int, amount int64) {
-	if lane < 1 || lane > Lanes {
-		return
-	}
-	t.mu.Lock()
-	t.bets[lane-1] += amount
-	t.mu.Unlock()
-}
-
 // SaveBet stores lane's current total stake under ctx. The total is read
 // as the store is made, in turn with the race's own stores, so the stored
 // total never falls behind a later one however the saves interleave.

@@ -91,10 +91,14 @@ func (l *GameClientLink) castFishing(live *livePlayer) {
 	}
 	inv := live.Inventory()
 	var lure *item.Instance
+	var lureID int32
 	if inv != nil {
 		lure = inv.ItemAt(itemcontainer.LHand)
 	}
-	switch fishing.CastRefusal(live.Character, lure != nil) {
+	if lure != nil {
+		lureID = lure.TemplateID
+	}
+	switch fishing.CastRefusal(live.Character, lureID) {
 	case fishing.RefuseNoRod:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFishingPoleNotEquipped))
 		return
@@ -107,7 +111,8 @@ func (l *GameClientLink) castFishing(live *livePlayer) {
 	case fishing.RefuseInWater:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotFishUnderWater))
 		return
-	case fishing.RefuseNoLure:
+	case fishing.RefuseNoLure, fishing.RefuseUngradedLure:
+		// A lure with no grade is no usable bait (#5118).
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageBaitOnHookBeforeFishing))
 		return
 	}
@@ -116,7 +121,6 @@ func (l *GameClientLink) castFishing(live *livePlayer) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotFishHere))
 		return
 	}
-	lureID := lure.TemplateID
 	res, ok := l.inventory.DestroyItem(inv, lure.ObjectID, 1)
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughBait))
@@ -151,8 +155,8 @@ func (l *GameClientLink) fishingBaitSpot(live *livePlayer) (location.Location, b
 
 // startFishing casts live's line baited with lureID at bait: live stops
 // and is held in place, the fish the line is cast for is drawn, and the wait
-// for a bite begins. A lure whose grade sets no look period never gets a
-// bite: its line stays cast with nothing looking for one.
+// for a bite begins. A line with no look period ends at once rather than
+// leaving live held in place (#5118).
 func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, lureID int32) {
 	sim.AssertOwner(live.Queue())
 	if live.Dead() {
@@ -182,6 +186,7 @@ func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, 
 
 	period := fishing.CheckDelay(lureID, f.GutsCheckTime)
 	if period <= 0 {
+		l.endFishing(live, false)
 		return
 	}
 	q := live.Queue()
