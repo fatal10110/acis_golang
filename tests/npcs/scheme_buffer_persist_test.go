@@ -66,9 +66,7 @@ func TestSchemeBufferChangesOutliveAStopWithoutTheShutdownSave(t *testing.T) {
 // seeds the talker; a restart plays the one it stored.
 func storedSchemeBufferWorld(t *testing.T, first bool) (*folkWorld, *npc.Folk) {
 	t.Helper()
-	stored := gameservertest.WithStoredSchemeBuffer(func(store schemebuffer.Option) *schemebuffer.Manager {
-		return schemebuffer.New(schemebuffer.DefaultConfig(), schemeBufferBuffs(t), schemeBufferSkills(t), store)
-	})
+	stored := storedSchemeBuffer(t)
 	if first {
 		return schemeBufferWorld(t, nil, 0, stored)
 	}
@@ -91,6 +89,15 @@ func storedSchemeBufferWorld(t *testing.T, first bool) (*folkWorld, *npc.Folk) {
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	return w, w.spawnFolk(t, folkTemplate("SchemeBuffer", schemeBufferID), 60)
+}
+
+// storedSchemeBuffer wires the shipped buffer's schemes to the fixture
+// database: loaded at boot, written as they change.
+func storedSchemeBuffer(t *testing.T) gameservertest.Option {
+	t.Helper()
+	return gameservertest.WithStoredSchemeBuffer(func(store schemebuffer.Option) *schemebuffer.Manager {
+		return schemebuffer.New(schemebuffer.DefaultConfig(), schemeBufferBuffs(t), schemeBufferSkills(t), store)
+	})
 }
 
 // assertStoredSchemes checks every buffer_schemes row against want.
