@@ -133,3 +133,52 @@ func TestMixedPolarityCancelLesserVictimFreesBuffSlot(t *testing.T) {
 		t.Fatalf("held effects after a new buff at the cap = %v, want nothing evicted [304 306 308]", ids)
 	}
 }
+
+// TestMixedPolarityCancelLesserDropsDebuffVictim covers #4692 in the other
+// direction: a debuff that a stronger same-stack buff cancels leaves the
+// debuff list at once. It keeps no flag, and its own expiry later sends
+// nothing while the buff stays.
+func TestMixedPolarityCancelLesserDropsDebuffVictim(t *testing.T) {
+	t.Parallel()
+	victim := speedUpBlockerDef(311, 2)
+	victim.Effects[0].Name = "SilentMove"
+	victim.Effects[0].StackOrder = 1
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{victim, stackedBuffDef(312, 2, 60)})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 311, 1)
+	seedKnownSkill(t, srv, objID, 312, 1)
+	startInWorld(t, c)
+	list := playerEffectList(t, srv, objID)
+
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 311)); !slices.Equal(icons, []int32{311}) {
+		t.Fatalf("icons after debuff = %v, want [311]", icons)
+	}
+	if !list.IsAffected(effect.FlagSilentMove) {
+		t.Fatal("debuff flag not set after the debuff landed")
+	}
+
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 312)); !slices.Equal(icons, []int32{312}) {
+		t.Fatalf("icons after same-stack buff = %v, want [312]", icons)
+	}
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{312}) {
+		t.Fatalf("held effects after same-stack buff = %v, want debuff victim dropped [312]", ids)
+	}
+	if list.IsAffected(effect.FlagSilentMove) {
+		t.Fatal("cancelled debuff victim still sets its flag")
+	}
+	drainUntilQuiet(t, c)
+
+	// Past the cancelled debuff's own duration: nothing is left to expire.
+	srv.Advance(t, 3*time.Second)
+	srv.TickEffects()
+	if frames := c.ReadQueued(); len(frames) != 0 {
+		t.Fatalf("frames at the cancelled debuff's own expiry = %d (first opcode %#x), want none", len(frames), frames[0][0])
+	}
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{312}) || list.IsAffected(effect.FlagSilentMove) {
+		t.Fatalf("held effects = %v, flags = %#x after the cancelled debuff's own expiry; want [312] without the debuff flag", ids, list.Flags())
+	}
+}
