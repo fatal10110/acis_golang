@@ -166,10 +166,14 @@ func (c *Castle) SetTimeRegistrationOver(over bool) {
 
 // SetSiegeHour moves the siege to hour on its day, in the server's time
 // zone, an hour past 23 rolling into the next day, closes the date to
-// change and stores both.
-func (c *Castle) SetSiegeHour(hour int) {
+// change and stores both. It reports false, changing nothing, when the date
+// is already closed to change (#5114).
+func (c *Castle) SetSiegeHour(hour int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.regTimeOver {
+		return false
+	}
 	t := time.UnixMilli(c.siegeDate)
 	t = time.Date(t.Year(), t.Month(), t.Day(), hour, t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 	c.siegeDate, c.regTimeOver = t.UnixMilli(), true
@@ -177,6 +181,7 @@ func (c *Castle) SetSiegeHour(hour int) {
 	c.write("update siege info", func(ctx context.Context, st Store) error {
 		return st.UpdateSiegeInfo(ctx, c.id(), date, true)
 	})
+	return true
 }
 
 // SaveSiegeInfo stores the siege date and whether it is still open to

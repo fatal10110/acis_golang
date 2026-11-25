@@ -1039,7 +1039,7 @@ final class ContractProbe
 			GS + "scripting/ScheduledQuest.java 218-241 notifyAndSchedule",
 			GS + "enums/ScheduleType.java 8-16 ScheduleType",
 			"../aCis_datapack/data/xml/scripts.xml 978-985 task entries"
-		}, "Each row calls setSchedule(type, start, null) at the virtual instant now (zone and locale given; Calendar.getInstance() and the clock read in setSchedule are the probe's), then notifyAndSchedule() three times.", "next0 is getTimeNext() after setSchedule; next1..next3 after each notifyAndSchedule(); started is the start hook count at setup (always 0: one-event scripts never start at load). Times are local ISO-8601 with offset.", "HOURLY start is minute:second. WEEK_OF_MONTH and DAY_OF_WEEK resolve with the locale's first day of week and minimal days in the first week.");
+		}, "Each row calls setSchedule(type, start, null) at the virtual instant now (zone and locale given; Calendar.getInstance() and the clock read in setSchedule are the probe's), then notifyAndSchedule() three times.", "next0 is getTimeNext() after setSchedule; next1..next3 after each notifyAndSchedule(); started is the start hook count at setup (always 0: one-event scripts never start at load). Times are local ISO-8601 with offset.", "HOURLY start is minute:second. WEEK_OF_MONTH and DAY_OF_WEEK resolve with the locale's first day of week and minimal days in the first week. The server keeps Monday-first weeks with four minimal days (ISO, #5404), as the en-GB and de-DE rows resolve them; the en-US rows keep Sunday-first weeks for comparison.");
 		final String[][] entries =
 		{
 			{ "task.SevenSignsUpdate", "HOURLY", "00:00" },
@@ -1052,11 +1052,11 @@ final class ContractProbe
 		final String[] nows = { "2026-10-05T12:00:00", "2026-10-04T23:59:59", "2026-10-06T16:55:00", "2026-10-06T00:00:00", "2026-12-31T23:30:00", "2027-02-28T13:00:00", "2026-09-01T00:00:01" };
 		for (String[] e : entries)
 			for (String now : nows)
-				schedRow(g, e, now, "UTC", Locale.US);
+				schedRow(g, e, now, "UTC", Locale.UK);
 		for (String[] e : entries)
-			schedRow(g, e, "2026-03-28T23:30:00", "Europe/Berlin", Locale.US);
+			schedRow(g, e, "2026-03-28T23:30:00", "Europe/Berlin", Locale.UK);
 		for (String[] e : entries)
-			schedRow(g, e, "2026-10-24T23:30:00", "Europe/Berlin", Locale.US);
+			schedRow(g, e, "2026-10-24T23:30:00", "Europe/Berlin", Locale.UK);
 		for (String now : new String[] { "2026-10-04T12:00:00", "2026-11-01T12:00:00", "2027-01-03T12:00:00", "2027-02-01T12:00:00" })
 		{
 			schedRow(g, entries[4], now, "UTC", Locale.GERMANY);

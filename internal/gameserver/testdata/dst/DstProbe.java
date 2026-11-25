@@ -5,9 +5,9 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Replays the four calendar schedules that run on the server's wall clock
+ * Replays the calendar schedules that run on the server's wall clock
  * (lottery drawing, fishing championship end, castle manor mode change,
- * Seven Signs period change) in zones with daylight saving, with the calendar
+ * Seven Signs period change, next siege date) in zones with daylight saving, with the calendar
  * code the reference runs. Each line: kind zone local-input => input-epoch-ms
  * output-epoch-ms.
  */
@@ -139,6 +139,30 @@ public class DstProbe
 		return cal.getTimeInMillis();
 	}
 	
+	// The next siege date from a date already passed: the castle's siege day
+	// (Sunday for castles 3, 4, 6 and 7, Saturday for the others) of the week,
+	// two weeks on, at 18:00.
+	static long siege(String zone, long from, int castle)
+	{
+		final Calendar siegeDate = at(zone, from);
+		switch (castle)
+		{
+			case 3, 4, 6, 7:
+				siegeDate.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
+				break;
+			
+			default:
+				siegeDate.set(Calendar.DAY_OF_WEEK, Calendar.SATURDAY);
+				break;
+		}
+		siegeDate.add(Calendar.WEEK_OF_YEAR, 2);
+		siegeDate.set(Calendar.HOUR_OF_DAY, 18);
+		siegeDate.set(Calendar.MINUTE, 0);
+		siegeDate.set(Calendar.SECOND, 0);
+		siegeDate.set(Calendar.MILLISECOND, 0);
+		return siegeDate.getTimeInMillis();
+	}
+	
 	// Mirrors the calendar arithmetic of the period change for the two major
 	// periods; the minor ones add a fixed length and have no calendar step.
 	static long sevenSigns(String zone, long now)
@@ -217,6 +241,10 @@ public class DstProbe
 						break;
 					case "fishing":
 						System.out.println("fishing " + zone + " " + local + " => " + in + " " + fishing(zone, in));
+						break;
+					case "siege":
+						for (int castle : new int[] { 1, 3 })
+							System.out.println("siege " + zone + " " + local + " " + castle + " => " + in + " " + siege(zone, in, castle));
 						break;
 					default:
 						for (int[] c : MANOR)

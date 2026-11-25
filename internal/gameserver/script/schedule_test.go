@@ -16,10 +16,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// localeWeeks are the week rules of the locales the calendar golden uses.
+// localeWeeks are the week rules of the locales the calendar golden uses:
+// en-GB and de-DE keep the runner's Monday-first weeks, en-US the
+// Sunday-first ones.
 var localeWeeks = map[string]weekRules{
-	"en-US": usWeek,
-	"de-DE": {first: time.Monday, minDays: 4},
+	"en-GB": isoWeek,
+	"de-DE": isoWeek,
+	"en-US": {first: time.Sunday, minDays: 1},
 }
 
 // TestScheduleCalendar replays the reference's schedule calendar: for each
