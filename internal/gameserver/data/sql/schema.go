@@ -7,15 +7,19 @@ import (
 	"strings"
 )
 
-// secondaryIndexes are the indexes the server's reads need beyond the
-// shipped schema, which keys items and characters by object id only:
-// without them every read of a character's items, of an account's
-// characters or of a character by name scans the whole table. Each index is
+// secondaryIndexes are the indexes the server's reads and writes need
+// beyond the shipped schema, which keys items and characters by object id
+// only: without them every read of a character's items, of an account's
+// characters or of a character by name scans the whole table, and so does
+// the clearing of a departing clan member's apprentice and sponsor links,
+// which then locks every character row until it commits. Each index is
 // named after its column.
 var secondaryIndexes = []struct{ table, column string }{
 	{"items", "owner_id"},
 	{"characters", "account_name"},
 	{"characters", "char_name"},
+	{"characters", "apprentice"},
+	{"characters", "sponsor"},
 }
 
 // EnsureIndexes adds each secondary index db lacks. A column that already

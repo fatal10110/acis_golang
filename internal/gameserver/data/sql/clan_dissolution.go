@@ -9,8 +9,13 @@ import (
 // clan_data, clan_privs, clan_skills and clan_subpledges rows, every
 // clan_wars row naming it on either side and its siege_clans
 // registrations, and resets the tax of castleID, the castle it held, when
-// it held one.
+// it held one. A transaction the database rolls back for a lock conflict
+// runs again.
 func (s *ClanStore) DeleteClan(ctx context.Context, clanID, castleID int32) error {
+	return retryLockConflict(ctx, func() error { return s.deleteClan(ctx, clanID, castleID) })
+}
+
+func (s *ClanStore) deleteClan(ctx context.Context, clanID, castleID int32) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("delete clan %d: %w", clanID, err)
