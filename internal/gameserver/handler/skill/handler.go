@@ -156,6 +156,9 @@ type NPC interface {
 	Lethalable() bool
 	// SpoilPool is the NPC's sweepable drop pool, nil when it has none.
 	SpoilPool() *item.SpoilPool
+	// MarkSpoil takes the spoil mark for spoilerID atomically with the NPC's
+	// death: alive is false for a corpse, which takes no mark.
+	MarkSpoil(spoilerID int32) (alive, marked bool)
 	// SeedState is the NPC life's manor sow/harvest lifecycle.
 	SeedState() *npc.SeedState
 	// MonsterKind reports a Monster-family NPC, the only one sown or

@@ -89,6 +89,7 @@ func (f *confusionFake) RandomizeHate() bool                                  { 
 func (f *confusionFake) StopMostHatedTarget()                                 {}
 func (f *confusionFake) Think() error                                         { return nil }
 func (f *confusionFake) SpoilPool() *item.SpoilPool                           { return nil }
+func (f *confusionFake) MarkSpoil(int32) (alive, marked bool)                 { return true, false }
 func (f *confusionFake) CollisionRadius() float64                             { return 0 }
 func (f *confusionFake) SetCollisionRadius(float64)                           {}
 func (f *confusionFake) ResetCollisionRadius()                                {}

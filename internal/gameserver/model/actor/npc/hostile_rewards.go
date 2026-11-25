@@ -43,6 +43,19 @@ func (h *Hostile) SpoilPool() *item.SpoilPool {
 	return &h.ensureLoot().spoil
 }
 
+// MarkSpoil records spoilerID as this life's spoiler under the death latch,
+// so a monster that died after the caller's own liveness check takes no mark
+// (#5086). It reports whether the NPC was still alive and, if so, whether
+// spoilerID took the mark rather than finding it already spoiled.
+func (h *Hostile) MarkSpoil(spoilerID int32) (alive, marked bool) {
+	h.deathMu.Lock()
+	defer h.deathMu.Unlock()
+	if h.dead {
+		return false, false
+	}
+	return true, h.SpoilPool().Mark(spoilerID)
+}
+
 // ExistingSpoilPool returns this NPC life's spoil state, nil when no spoil
 // or sweep skill has touched it.
 func (h *Hostile) ExistingSpoilPool() *item.SpoilPool {

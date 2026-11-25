@@ -54,9 +54,13 @@ func (h spoilHandler) Use(cast Cast) {
 
 		rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), cast.Skill.MagicLevel, cast.Skill.LevelDepend, penalty)
 		if formulas.MagicSucceeds(rate, roll(10000)) {
-			// Another spoiler can mark the pool between the check above
-			// and here; losing that race reads as the pool already spoiled.
-			marked := pool.Mark(caster.ObjectID())
+			// The target can die, or another spoiler can mark it, after the
+			// checks above. A corpse takes no mark and no message (#5086);
+			// losing the mark race reads as the pool already spoiled.
+			alive, marked := target.MarkSpoil(caster.ObjectID())
+			if !alive {
+				continue
+			}
 			if notify, ok := asPlayer(cast.Caster); ok {
 				if marked {
 					notify.NotifySpoilSuccess()

@@ -62,9 +62,10 @@ type neutralNPC struct {
 	neutralCreature
 }
 
-func (neutralNPC) Kind() actor.Kind           { return actor.KindNPC }
-func (neutralNPC) Lethalable() bool           { return true }
-func (neutralNPC) SpoilPool() *item.SpoilPool { return nil }
+func (neutralNPC) Kind() actor.Kind                     { return actor.KindNPC }
+func (neutralNPC) Lethalable() bool                     { return true }
+func (neutralNPC) SpoilPool() *item.SpoilPool           { return nil }
+func (neutralNPC) MarkSpoil(int32) (alive, marked bool) { return true, false }
 
 // SeedState: the neutral NPC was never sown, so the manor handlers find no
 // lifecycle to act on.
