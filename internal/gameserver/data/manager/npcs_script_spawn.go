@@ -167,14 +167,16 @@ func (n *Npcs) privatesOf(master npc.PartyMember) []spawn.Private {
 // createPrivate places one private of tmpl for master under a slot of its
 // own that respawns after respawn, when a script asks it to. It places
 // nothing, and reports no error, for a master that left the world. A
-// private asked for while master was alive is never left linked to it dead
-// (#5156); one asked for a master already dead, as its own dying hooks do,
-// is linked to it.
+// private asked for before master's death let its privates go is never left
+// linked to it dead (#5156); one asked for after, as master's own dying
+// hooks do, is linked to it.
 func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *location.Location, heading int, despawn time.Duration, params [3]int32, respawn time.Duration) (npc.PartyMember, error) {
 	if master == nil {
 		return nil, fmt.Errorf("%w: npc %d has no master", ErrNotPlaceable, tmpl.ID)
 	}
-	alive := !master.Dead()
+	// Whether master's death had let its privates go when this one was
+	// asked for; read before the link (keepLinked).
+	letGo := master.PrivatesLetGo()
 
 	entry := &spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
 	slot := slotInfo{entry: entry, master: master, tmpl: tmpl, scripted: true, memory: newSlotMemory(entry, nil)}
@@ -208,7 +210,7 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 		}
 		return nil, fmt.Errorf("%w: private npc %d", ErrNotPlaceable, tmpl.ID)
 	}
-	if !n.keepLinked(master, private, alive) {
+	if !n.keepLinked(master, private, letGo) {
 		return nil, nil
 	}
 	n.ScheduleDespawn(private, despawn)
@@ -222,10 +224,11 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 // takes its privates; the private is linked before master is read here, so
 // of the two, one sees the other. A master gone meanwhile takes the private
 // out of the world, as its delete would have: keepLinked reports false. A
-// master alive when the private was asked for (alive) that died meanwhile
-// lets it go, as its death would have, so it neither stays linked to the
-// dead master nor follows its next life.
-func (n *Npcs) keepLinked(master, private npc.PartyMember, alive bool) bool {
+// master dead now whose death had not let its privates go when the private
+// was asked for (letGo) lets it go, as its death would have, so it neither
+// stays linked to the dead master nor follows its next life: whether that
+// death saw the link or not, and whichever queue the request came from.
+func (n *Npcs) keepLinked(master, private npc.PartyMember, letGo bool) bool {
 	n.mu.Lock()
 	gone := n.goneLocked(master)
 	n.mu.Unlock()
@@ -233,7 +236,7 @@ func (n *Npcs) keepLinked(master, private npc.PartyMember, alive bool) bool {
 		n.takePrivate(master, private)
 		return false
 	}
-	if alive && master.Dead() {
+	if !letGo && master.Dead() {
 		private.SetMaster(nil)
 	}
 	return true

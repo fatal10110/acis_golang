@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -70,17 +71,18 @@ func TestPrivateWhoseMasterDiesMeanwhileIsLetGo(t *testing.T) {
 }
 
 // TestPrivateCreatedWhileItsMasterDiesIsLetGo pins #5156 under a race: a
-// script creating a private for a live master that dies meanwhile on
-// another goroutine never leaves the private linked to the dead master,
+// script creating a private for a master that dies meanwhile on another
+// goroutine never leaves the private linked to the dead master unless the
+// death had let the master's privates go before the private was asked for,
 // whichever of the two links or lets go first.
 func TestPrivateCreatedWhileItsMasterDiesIsLetGo(t *testing.T) {
 	for range 300 {
 		w := newScriptRespawnWorld(t)
 		tmpl, _ := w.npcs.templates.Get(2)
-		// The master alive as the private is placed was alive when the
-		// private was asked for.
-		var aliveAtPlacing bool
-		w.npcs.ids = &placingIDs{idAllocator: w.npcs.ids, hook: func() { aliveAtPlacing = !w.master.Dead() }}
+		// A master whose death had not let its privates go as the
+		// private is placed had not when the private was asked for.
+		var letGoAtPlacing bool
+		w.npcs.ids = &placingIDs{idAllocator: w.npcs.ids, hook: func() { letGoAtPlacing = w.master.PrivatesLetGo() }}
 		start := make(chan struct{})
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -103,14 +105,98 @@ func TestPrivateCreatedWhileItsMasterDiesIsLetGo(t *testing.T) {
 		if createErr != nil || private == nil {
 			t.Fatalf("createPrivate() = %v, %v, want a private", private, createErr)
 		}
-		if m := private.Master(); aliveAtPlacing && m != nil && m.Dead() {
-			t.Fatal("a private asked for while its master was alive is linked to the dead master")
+		if m := private.Master(); !letGoAtPlacing && m != nil && m.Dead() {
+			t.Fatal("a private asked for before its master's death let its privates go is linked to the dead master")
 		}
 		for _, m := range w.master.Minions() {
 			if !npc.SameNPC(m, private) && m.Master() != nil {
 				t.Fatal("the master's declared private is still linked to the dead master")
 			}
 		}
+	}
+}
+
+// partyDiedHooks runs onPartyDied for every party-died hook raised; every
+// other hook does nothing.
+type partyDiedHooks struct {
+	npc.ScriptHooks
+	onPartyDied func(caller, called npc.PartyMember)
+}
+
+func (h partyDiedHooks) PartyDied(caller, called npc.PartyMember)      { h.onPartyDied(caller, called) }
+func (partyDiedHooks) SeesCreatures(int32) bool                        { return false }
+func (partyDiedHooks) HostileCreated(*npc.Hostile)                     {}
+func (partyDiedHooks) HostileNoDesire(*npc.Hostile)                    {}
+func (partyDiedHooks) HostileDying(*npc.Hostile, attackable.Combatant) {}
+func (partyDiedHooks) ClanDied(_, _, _ attackable.Combatant)           {}
+
+// TestPrivateAskedForBeforeItsDeadMasterLetsGoIsLetGo pins #5156 for a
+// private asked for on another queue while its master dies: the master is
+// already dead, its death runs its party-died hooks, and lets its privates
+// go before the private is linked. The private, asked for before that
+// death let the privates go, is let go too, so it neither stays linked to
+// the dead master nor follows its next life.
+func TestPrivateAskedForBeforeItsDeadMasterLetsGoIsLetGo(t *testing.T) {
+	w := newScriptRespawnWorld(t)
+	tmpl, _ := w.npcs.templates.Get(2)
+	placing, proceed := make(chan struct{}), make(chan struct{})
+	ids := w.npcs.ids
+	var (
+		once      sync.Once
+		master    npc.PartyMember
+		private   npc.PartyMember
+		createErr error
+		done      = make(chan struct{})
+	)
+	w.npcs.scripts = partyDiedHooks{onPartyDied: func(_, called npc.PartyMember) {
+		once.Do(func() {
+			if !called.Dead() || called.PrivatesLetGo() {
+				t.Error("the party-died hooks run before the dead master lets its privates go")
+			}
+			// Another queue asks for a private now, and links it only
+			// once the master's death let its privates go.
+			w.npcs.ids = &placingIDs{idAllocator: ids, hook: func() {
+				close(placing)
+				<-proceed
+			}}
+			go func() {
+				defer close(done)
+				private, createErr = w.npcs.createPrivate(called, tmpl, nil, 0, 0, [3]int32{}, 0)
+			}()
+			<-placing
+		})
+	}}
+	live, err := w.npcs.AddSpawn(1, 0, 0, 0, 0, false, 0)
+	if err != nil {
+		t.Fatalf("AddSpawn() error: %v", err)
+	}
+	master = live.(*npc.Hostile)
+	if err := w.npcs.CreatePrivates(master); err != nil {
+		t.Fatalf("CreatePrivates() error: %v", err)
+	}
+	master.(*npc.Hostile).Kill(nil)
+	if !master.PrivatesLetGo() {
+		t.Fatal("the dead master's death has not let its privates go")
+	}
+	close(proceed)
+	<-done
+	w.npcs.ids = ids
+	if createErr != nil || private == nil {
+		t.Fatalf("createPrivate() = %v, %v, want a private", private, createErr)
+	}
+	if m := private.Master(); m != nil {
+		t.Fatalf("the late private's master = %d, want none: it was asked for before its master let its privates go", m.ObjectID())
+	}
+	if !private.IsPrivate() {
+		t.Fatal("the late private is no private, want one let go")
+	}
+
+	after, err := w.npcs.createPrivate(master, tmpl, nil, 0, 0, [3]int32{}, 0)
+	if err != nil || after == nil {
+		t.Fatalf("createPrivate() after the death = %v, %v, want a private", after, err)
+	}
+	if m := after.Master(); m == nil || m.ObjectID() != master.ObjectID() {
+		t.Fatalf("a private asked for after the death let the privates go has master %v, want the dead master (#5512)", m)
 	}
 }
 
