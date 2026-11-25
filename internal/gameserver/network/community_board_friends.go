@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -107,7 +108,12 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 	session := &live.board
 	switch action {
 	case "select":
-		session.friends.Add(id)
+		// #5102: only a friend on live's own list can be picked, and never
+		// more of them than the list holds; another id still shows the
+		// page, naming nothing of it.
+		if friends := l.relations.FriendIDs(live.ObjectID()); slices.Contains(friends, id) {
+			session.friends.Add(id, len(friends))
+		}
 		l.showFriendList(live, false)
 	case "deselect":
 		session.friends.Remove(id)
@@ -162,7 +168,10 @@ func (l *GameClientLink) boardBlockAction(live *livePlayer, action string, id in
 	confirm := false
 	switch action {
 	case "select":
-		session.blocks.Add(id)
+		// #5102: as for friends, only an id on live's own block list.
+		if blocked := l.relations.BlockedIDs(live.ObjectID()); slices.Contains(blocked, id) {
+			session.blocks.Add(id, len(blocked))
+		}
 	case "deselect":
 		session.blocks.Remove(id)
 	case "delall":
@@ -211,7 +220,7 @@ func (l *GameClientLink) showFriendList(live *livePlayer, confirm bool) {
 	}
 	friends := l.relations.FriendIDs(live.ObjectID())
 	picked := live.board.friends.IDs()
-	l.withNames(live, append(append([]int32(nil), friends...), picked...), func(names map[int32]string) {
+	l.withNames(live, withPicked(friends, picked), func(names map[int32]string) {
 		l.sendBoard(live, bbs.RenderFriendList(page, friends, picked, boardContacts{link: l, names: names}, confirm))
 	})
 }
@@ -223,9 +232,25 @@ func (l *GameClientLink) showBlockList(live *livePlayer, confirm bool) {
 	}
 	blocked := l.relations.BlockedIDs(live.ObjectID())
 	picked := live.board.blocks.IDs()
-	l.withNames(live, append(append([]int32(nil), blocked...), picked...), func(names map[int32]string) {
+	l.withNames(live, withPicked(blocked, picked), func(names map[int32]string) {
 		l.sendBoard(live, bbs.RenderBlockList(page, blocked, picked, boardContacts{link: l, names: names}, confirm))
 	})
+}
+
+// withPicked is listed and the picked ids not on it: each id a list page
+// names, once.
+func withPicked(listed, picked []int32) []int32 {
+	ids := slices.Clone(listed)
+	on := make(map[int32]struct{}, len(listed))
+	for _, id := range listed {
+		on[id] = struct{}{}
+	}
+	for _, id := range picked {
+		if _, ok := on[id]; !ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func (l *GameClientLink) showFriendMail(live *livePlayer) {

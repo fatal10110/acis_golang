@@ -62,6 +62,16 @@ func (t *pairTable) update(k pair, added bool) {
 	}
 }
 
+// place is where the walk meets k: its bin and its index in that bin, -1
+// when the table does not hold it.
+func (t *pairTable) place(k pair) (bin, index int) {
+	if t.bins == nil {
+		return 0, -1
+	}
+	bin = int(pairHash(k) & uint32(len(t.bins)-1))
+	return bin, slices.Index(t.bins[bin].pairs, k)
+}
+
 // treeify turns bin i into a tree, which keeps its order. Below
 // minTreeifyBuckets bins it doubles the table instead, until three quarters
 // of it reach the power of two at or above 3n+1 for n bins: 16 bins grow to

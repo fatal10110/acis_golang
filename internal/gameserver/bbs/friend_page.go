@@ -37,9 +37,11 @@ type Selection struct {
 	buckets int
 }
 
-// Add puts id in the selection.
-func (s *Selection) Add(id int32) {
-	if slices.Contains(s.ids, id) {
+// Add puts id in the selection unless it already holds limit ids: the
+// caller passes the size of the list id was picked from, so a selection
+// never outgrows its list (#5102).
+func (s *Selection) Add(id int32, limit int) {
+	if slices.Contains(s.ids, id) || len(s.ids) >= limit {
 		return
 	}
 	s.ids = append(s.ids, id)
@@ -100,8 +102,7 @@ func contactRows(ids []int32, skip func(int32) bool, contacts Contacts, command,
 // RenderFriendList fills page, the friends list, with friends not picked
 // and the picked ones; confirm adds the delete-all confirmation.
 func RenderFriendList(page string, friends, picked []int32, contacts Contacts, confirm bool) string {
-	isPicked := func(id int32) bool { return slices.Contains(picked, id) }
-	page = strings.ReplaceAll(page, "%friendslist%", contactRows(friends, isPicked, contacts, "_friend", "select", "[Select]"))
+	page = strings.ReplaceAll(page, "%friendslist%", contactRows(friends, pickedSet(picked), contacts, "_friend", "select", "[Select]"))
 	page = strings.ReplaceAll(page, "%selectedFriendsList%", contactRows(picked, nil, contacts, "_friend", "deselect", "[Deselect]"))
 	return strings.ReplaceAll(page, "%deleteMSG%", confirmation(confirm, friendDeleteAll))
 }
@@ -109,10 +110,19 @@ func RenderFriendList(page string, friends, picked []int32, contacts Contacts, c
 // RenderBlockList fills page, the block list, with blocked not picked and
 // the picked ones; confirm adds the delete-all confirmation.
 func RenderBlockList(page string, blocked, picked []int32, contacts Contacts, confirm bool) string {
-	isPicked := func(id int32) bool { return slices.Contains(picked, id) }
-	page = strings.ReplaceAll(page, "%blocklist%", contactRows(blocked, isPicked, contacts, "_block", "select", "[Select]"))
+	page = strings.ReplaceAll(page, "%blocklist%", contactRows(blocked, pickedSet(picked), contacts, "_block", "select", "[Select]"))
 	page = strings.ReplaceAll(page, "%selectedBlocksList%", contactRows(picked, nil, contacts, "_block", "deselect", "[Deselect]"))
 	return strings.ReplaceAll(page, "%deleteMSG%", confirmation(confirm, blockDeleteAll))
+}
+
+// pickedSet reports whether an id is among picked, in constant time so a
+// list rendered next to its picks costs their sum, not their product.
+func pickedSet(picked []int32) func(int32) bool {
+	set := make(map[int32]struct{}, len(picked))
+	for _, id := range picked {
+		set[id] = struct{}{}
+	}
+	return func(id int32) bool { _, ok := set[id]; return ok }
 }
 
 // RenderFriendMail fills page, the mail form to the picked friends, with

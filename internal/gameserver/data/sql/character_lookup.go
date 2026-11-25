@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
@@ -37,13 +38,24 @@ func (s *CharacterStore) FindByName(ctx context.Context, name string) (relation.
 	return relation.Named{}, false, nil
 }
 
+// namesBatch is the most ids one names query binds; a longer list is read
+// in batches, each well under the server's placeholder limit (#5102).
+const namesBatch = 1000
+
 // Names returns the stored name of each of ids that names a character; an
 // id with no characters row is absent from the map.
 func (s *CharacterStore) Names(ctx context.Context, ids []int32) (map[int32]string, error) {
 	out := make(map[int32]string, len(ids))
-	if len(ids) == 0 {
-		return out, nil
+	for batch := range slices.Chunk(ids, namesBatch) {
+		if err := s.names(ctx, batch, out); err != nil {
+			return nil, err
+		}
 	}
+	return out, nil
+}
+
+// names adds the stored names of ids, at least one, to out.
+func (s *CharacterStore) names(ctx context.Context, ids []int32, out map[int32]string) error {
 	args := make([]any, len(ids))
 	for i, id := range ids {
 		args[i] = id
@@ -51,7 +63,7 @@ func (s *CharacterStore) Names(ctx context.Context, ids []int32) (map[int32]stri
 	query := "SELECT obj_Id, char_name FROM characters WHERE obj_Id IN (?" + strings.Repeat(",?", len(ids)-1) + ")"
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("character names: %w", err)
+		return fmt.Errorf("character names: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -60,12 +72,12 @@ func (s *CharacterStore) Names(ctx context.Context, ids []int32) (map[int32]stri
 			name string
 		)
 		if err := rows.Scan(&id, &name); err != nil {
-			return nil, fmt.Errorf("character names: %w", err)
+			return fmt.Errorf("character names: %w", err)
 		}
 		out[id] = name
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("character names: %w", err)
+		return fmt.Errorf("character names: %w", err)
 	}
-	return out, nil
+	return nil
 }
