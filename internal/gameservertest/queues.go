@@ -69,7 +69,10 @@ var errUnsettled = errors.New("actor queues did not settle")
 // timer armed already due (a cast that lands at once) fires only when the
 // runner next looks for work, which a barrier does not wait for. Settle
 // therefore runs the runner's due work around each pass, and repeats the pass
-// until one accepts nothing but its own barriers.
+// until one accepts nothing but its own barriers. On the pool such a timer
+// posts its task from the wall clock's goroutine a moment after arming, which
+// is not accepted work either, so each pass also waits for the expiries
+// already due; a delivered one is accepted work and forces another pass.
 func (q *queues) settle() error {
 	deadline := time.After(shutdownDrainTimeout)
 	for {
@@ -80,6 +83,11 @@ func (q *queues) settle() error {
 			return err
 		}
 		q.runDue()
+		if q.advance == nil {
+			if err := q.awaitDueTimers(time.Now()); err != nil {
+				return err
+			}
+		}
 		if q.accepted()-before == barriers {
 			return nil
 		}
