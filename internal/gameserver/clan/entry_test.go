@@ -112,17 +112,13 @@ func TestEntryRemovalRacesEnter(t *testing.T) {
 		wg.Go(func() {
 			// A member already online is removed online, as the expulsion
 			// finds it in the world.
-			var live *player.Character
-			if m, ok := cl.Member(11); ok && m.Online {
-				live = c
-			}
-			removed, _ = s.remove(cl, 11, join, live, now)
+			removed, _ = s.removeMember(cl, 11, join, func(int32) *player.Character { return c }, now)
 		})
 		_, entered := s.Enter(c)
 		wg.Wait()
 		switch {
-		case entered && removed.Entering:
-			t.Fatalf("run %d: entered as a member and kept a removal", i)
+		case entered && (!removed.Online || removed.Entering):
+			t.Fatalf("run %d: entered as a member but removed offline (online %v, entering %v)", i, removed.Online, removed.Entering)
 		case !entered && (c.ClanID() != 0 || c.ClanJoinExpiryTime() != join):
 			t.Fatalf("run %d: removed first but entered with clan %d join %d", i, c.ClanID(), c.ClanJoinExpiryTime())
 		}
