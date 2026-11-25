@@ -155,6 +155,9 @@ type NPCActor interface {
 	StopMostHatedTarget()
 	Think() error
 	SpoilPool() *item.SpoilPool
+	// MarkSpoil takes the spoil mark for spoilerID atomically with the NPC's
+	// death: alive is false for a corpse, which takes no mark.
+	MarkSpoil(spoilerID int32) (alive, marked bool)
 	CollisionRadius() float64
 	SetCollisionRadius(radius float64)
 	ResetCollisionRadius()

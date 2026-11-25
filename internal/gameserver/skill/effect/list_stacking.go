@@ -8,9 +8,7 @@ import (
 // doesStack reports whether e's skill shares a stack type with a held buff,
 // exempting it from buff-slot cap eviction. The stack type comes from the
 // skill's first effect template (Skill.StackType), not from e itself, and
-// the scan covers l.buffs rather than the stack queue: a cancel-lesser
-// victim stays in l.buffs after leaving its queue (see addStacked) and
-// still counts here.
+// the scan covers l.buffs rather than the stack queue.
 func (l *List) doesStack(e *Effect) bool {
 	stackType := e.Skill.StackType
 	if stackType == "" || stackType == "none" {
@@ -105,18 +103,12 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 		if l.cancelLesser && !e.Herb && len(queue) > 1 {
 			victim := queue[1]
 			queue = slices.Delete(queue, 1, 2)
-			// The victim leaves the newcomer's visible list, not its own: a
-			// buff displaced by a same-stack debuff (or vice versa) stays held,
-			// inactive, counted by doesStack/buffCount, and OR'd into
-			// flagsLocked — for as long as this stack queue stays non-empty.
-			// remove() (below) early-returns once the queue is gone, so if
-			// the newcomer's own duration
-			// ends first, the queue empties and the victim's later expiry
-			// never touches the visible list: it stays held until relog.
-			if e.Skill.Debuff {
+			// The victim leaves whichever visible list holds it, so a buff
+			// displaced by a same-stack debuff (or the reverse) is not kept
+			// as an inactive phantom that still takes a buff slot and sets
+			// its flags after its stack queue is gone (#4692).
+			if !removeEffect(&l.buffs, victim) {
 				removeEffect(&l.debuffs, victim)
-			} else {
-				removeEffect(&l.buffs, victim)
 			}
 			l.publishFlagsLocked()
 		}

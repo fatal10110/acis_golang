@@ -30,9 +30,14 @@ func spoilStart(e *Effect) bool {
 
 	rate := formulas.MagicSuccessRate(target.Level(), player.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, player.WeaponGradePenalty())
 	if formulas.MagicSucceeds(rate, rnd.Get(spoilRoll)) {
-		// Another spoiler can mark the pool between the check above and
-		// here; losing that race is the already-spoiled branch.
-		if !pool.Mark(player.ObjectID()) {
+		// The target can die, or another spoiler can mark it, after the
+		// checks above. A corpse takes no mark and no message (#5086);
+		// losing the mark race is the already-spoiled branch.
+		alive, marked := target.MarkSpoil(player.ObjectID())
+		if !alive {
+			return false
+		}
+		if !marked {
 			player.NotifySpoilAlready()
 			return false
 		}
