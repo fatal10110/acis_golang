@@ -172,8 +172,10 @@ func (p *Persistence) Save(ctx context.Context, st SaveState) error {
 // BuildSaveRows needs: the effect list itself is the single source of truth for
 // what gets saved, not a separate write-only registry. A stacked-out effect
 // still held in the list is saved too, so it resumes behind the stronger one
-// after relog. An effect whose skill definition no longer resolves is
-// dropped, matching a stale datapack change.
+// after relog. Each effect is saved under the skill level that cast it, not
+// its applied level: a seed's grown power is not saved, and the restore
+// rebuilds it from its skill at power 1. An effect whose skill definition no
+// longer resolves is dropped, matching a stale datapack change.
 func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []effect.ActiveEffect {
 	list := c.EffectList()
 	if list == nil {
@@ -181,7 +183,7 @@ func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []ef
 	}
 	var out []effect.ActiveEffect
 	for _, e := range list.All() {
-		ref := modelskill.Ref{ID: e.Skill.ID, Level: list.Level(e)}
+		ref := modelskill.Ref{ID: e.Skill.ID, Level: e.Skill.Level}
 		def, ok := p.definition(ref)
 		if !ok {
 			continue
