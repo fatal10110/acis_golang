@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -163,6 +164,18 @@ func parkQueue(t *testing.T, q *sim.Queue) (release func()) {
 // It returns the server and Player's object id once Player left the world.
 func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int32) {
 	t.Helper()
+	srv, userID, _ := commandsBehindLogout(t, nil, line)
+	return srv, userID
+}
+
+// commandsBehindLogout is commandBehindLogout running the GM's command lines
+// before, answers drained, while Player is still in the world, then lines
+// behind Player's logout check, each sent by a GM of its own: the first by
+// "Admin", the others by GMs entered for them, which name their target, as
+// a connection reads its next packet only once its queue ran the last one.
+// It also returns every frame the GMs were sent from lines on, GM by GM.
+func commandsBehindLogout(t *testing.T, before []string, lines ...string) (*gameservertest.Server, int32, [][]byte) {
+	t.Helper()
 	srv, gmID := bootAdmin(t, adminLevel)
 	if !srv.DrivesClock() {
 		t.Skip("counting queue posts across a parked detach needs the one-FIFO inline executor")
@@ -170,13 +183,23 @@ func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int
 	gm := srv.Client
 	enterWorld(t, gm)
 	user, userID := addPlayer(t, srv, "player2", "Player", userLevel)
-	drain(t, gm)
+	gms, gmQueues := []*testsupport.ScriptedClient{gm}, []*sim.Queue{srv.PlayerQueue(t, gmID)}
+	for i := 1; i < len(lines); i++ {
+		c, id := addPlayer(t, srv, "gm"+strconv.Itoa(i), "Admin"+strconv.Itoa(i), adminLevel)
+		gms, gmQueues = append(gms, c), append(gmQueues, srv.PlayerQueue(t, id))
+	}
+	for _, c := range gms {
+		drain(t, c)
+	}
 	exchange(t, gm, encodeAction(userID))
+	for _, line := range before {
+		exchange(t, gm, encodeBuildCmd(line))
+	}
 	drain(t, user)
 
 	// Player's connection waits on its logout check, so it never returns to
 	// reading while the queue is parked: the waits below count queue posts.
-	gmQueue, userQueue := srv.PlayerQueue(t, gmID), srv.PlayerQueue(t, userID)
+	userQueue := srv.PlayerQueue(t, userID)
 	first := parkQueue(t, userQueue)
 	n := userQueue.Accepted()
 	user.Send(encodeLogout())
@@ -189,9 +212,11 @@ func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int
 		close(parked)
 		<-gate
 	})
-	n = gmQueue.Accepted()
-	gm.Send(encodeBuildCmd(line))
-	srv.AwaitQueueAccepted(t, gmQueue, n) // the command
+	for i, line := range lines {
+		n = gmQueues[i].Accepted()
+		gms[i].Send(encodeBuildCmd(line))
+		srv.AwaitQueueAccepted(t, gmQueues[i], n) // the command
+	}
 	n = userQueue.Accepted()
 	first()
 	<-parked
@@ -204,8 +229,11 @@ func commandBehindLogout(t *testing.T, line string) (*gameservertest.Server, int
 	leftWorld(t, srv, "Player")
 	srv.Settle(t)
 	srv.FlushPersistence(t)
-	drain(t, gm)
-	return srv, userID
+	var frames [][]byte
+	for _, c := range gms {
+		frames = append(frames, c.ReadQueued()...)
+	}
+	return srv, userID, frames
 }
 
 // TestAdminPromotionBehindLogoutStored pins a promotion reaching a player

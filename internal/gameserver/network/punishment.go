@@ -18,6 +18,7 @@ import (
 type punishmentStore interface {
 	SetPunishment(ctx context.Context, objectID int32, level int, timer int64) error
 	SetPunishmentAt(ctx context.Context, objectID int32, level int, timer int64, at location.Location) error
+	ReplacePunishment(ctx context.Context, objectID int32, expected, level int, timer int64) (int, error)
 }
 
 // punishmentWriteTimeout bounds one punishment write.
@@ -231,6 +232,31 @@ func (l *GameClientLink) storePunishmentAt(objectID int32, kind player.Punishmen
 		}
 	}) {
 		log.Error().Int32("object_id", objectID).Msg("store punishment: persistence closed")
+	}
+}
+
+// replaceStoredPunishment stores kind and timer as objectID's punishment
+// on its persistence lane, after any save its logout queued, only while the
+// stored one is expected: the check and the write are one step there, so a
+// punishment stored meanwhile is never replaced or lifted by mistake
+// (#5502). report is then given the punishment stored before, expected
+// when it was replaced; a failed write is logged and reports nothing.
+func (l *GameClientLink) replaceStoredPunishment(objectID int32, expected, kind player.Punishment, timer int64, report func(stored player.Punishment)) {
+	if l.punishments == nil {
+		return
+	}
+	store, log := l.punishments, l.log
+	if !l.persist.Enqueue(objectID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), punishmentWriteTimeout)
+		defer cancel()
+		stored, err := store.ReplacePunishment(ctx, objectID, int(expected), int(kind), timer)
+		if err != nil {
+			log.Error().Err(err).Int32("object_id", objectID).Msg("replace punishment")
+			return
+		}
+		report(player.Punishment(stored))
+	}) {
+		log.Error().Int32("object_id", objectID).Msg("replace punishment: persistence closed")
 	}
 }
 
