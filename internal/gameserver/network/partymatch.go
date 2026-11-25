@@ -18,12 +18,24 @@ type roomRegistry = partymatch.Registry[*livePlayer]
 // requestListPartyWaiting opens live's party-matching window. In a room,
 // it shows that room again. Otherwise live joins the waiting list and is
 // shown the rooms it asked for, unless it is a party member that does not
-// lead its party.
+// lead its party. The room is shown through the room notice stream, so a
+// room change decided before this view reaches live before it, and the
+// view never holds a member whose arrival is still to be announced.
 func (l *GameClientLink) requestListPartyWaiting(live *livePlayer, req clientpackets.RequestListPartyWaiting) {
-	if room, ok := l.rooms.RoomOf(live.ObjectID()); ok {
-		live.SendFrame(serverpackets.FramePartyMatchDetail(roomTerms(room)))
-		live.SendFrame(serverpackets.FrameExPartyRoomMember(int32(partymatch.ListRevised), l.roomMemberRows(room)))
-		l.broadcastCharacterInfo(live)
+	inRoom := false
+	l.changeRooms(func() []partymatch.Notice {
+		room, ok := l.rooms.RoomOf(live.ObjectID())
+		if !ok {
+			return nil
+		}
+		inRoom = true
+		return []partymatch.Notice{
+			partymatch.Detail[*livePlayer]{To: live, Room: room},
+			partymatch.MemberList[*livePlayer]{To: live, Room: room, Mode: partymatch.ListRevised},
+			partymatch.InfoRefresh[*livePlayer]{Member: live},
+		}
+	})
+	if inRoom {
 		return
 	}
 	if view, ok := l.parties.View(live.ObjectID()); ok && view.Leader.ObjectID() != live.ObjectID() {
