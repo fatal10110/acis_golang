@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 )
@@ -91,11 +92,33 @@ func (s *HeroStore) BestNoble(ctx context.Context, classID, minMatches int) (int
 	return id, name, true, nil
 }
 
-// StoreElection stores an election in one transaction: every stored hero
-// leaves the running era, then, unless heroes is empty, every hero item
-// whose owner is not a character with an access level above 0 is deleted
-// and heroes are saved as SaveHeroes does. A failure stores none of it.
-func (s *HeroStore) StoreElection(ctx context.Context, heroes map[int32]hero.Hero) error {
+// heroElectionMemo is the server_memo variable holding the number of the
+// last election stored.
+const heroElectionMemo = "hero_election"
+
+// LastElection returns the number of the last election stored, 0 for none.
+func (s *HeroStore) LastElection(ctx context.Context) (int64, error) {
+	var value string
+	err := s.db.QueryRowContext(ctx, "SELECT value FROM server_memo WHERE var = ?", heroElectionMemo).Scan(&value)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("load last election: %w", err)
+	}
+	election, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("load last election %q: %w", value, err)
+	}
+	return election, nil
+}
+
+// StoreElection stores election, numbered, in one transaction: every
+// stored hero leaves the running era, then, unless heroes is empty, every
+// hero item whose owner is not a character with an access level above 0 is
+// deleted and heroes are saved as SaveHeroes does; the number is kept as
+// the last election's. A failure stores none of it.
+func (s *HeroStore) StoreElection(ctx context.Context, heroes map[int32]hero.Hero, election int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store election: %w", err)
@@ -113,6 +136,12 @@ func (s *HeroStore) StoreElection(ctx context.Context, heroes map[int32]hero.Her
 		if err := upsertHeroes(ctx, tx, heroes); err != nil {
 			return err
 		}
+	}
+	if _, err := tx.ExecContext(ctx,
+		"INSERT INTO server_memo (var, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
+		heroElectionMemo, strconv.FormatInt(election, 10),
+	); err != nil {
+		return fmt.Errorf("store election number: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("store election: %w", err)

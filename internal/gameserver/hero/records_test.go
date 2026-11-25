@@ -60,7 +60,9 @@ func (s *recordStore) BestNoble(context.Context, int, int) (int32, string, bool,
 
 func (s *recordStore) SaveHeroes(context.Context, map[int32]Hero) error { return nil }
 
-func (s *recordStore) StoreElection(context.Context, map[int32]Hero) error { return nil }
+func (s *recordStore) StoreElection(context.Context, map[int32]Hero, int64) error { return nil }
+
+func (s *recordStore) LastElection(context.Context) (int64, error) { return 0, nil }
 
 // fixedNames names npc 25001 and castle 1.
 type fixedNames struct{}
@@ -246,7 +248,7 @@ func TestElectionAndClaimReloadRecords(t *testing.T) {
 		messages: map[int32]string{1: "old"},
 	}
 	m := newRecordsManager(t, store)
-	m.Elect()
+	m.Elect(1)
 	if _, ok := m.DiaryPage(diaryTemplate, "One", 88, 1, 1); ok {
 		t.Fatal("the outgoing hero's diary page is still sent")
 	}
