@@ -5,6 +5,7 @@
 package announcement
 
 import (
+	"errors"
 	"maps"
 	"math"
 	"slices"
@@ -27,6 +28,17 @@ type Store interface {
 	Save([]admin.Announcement) error
 }
 
+// Reasons Add refuses an announcement.
+var (
+	ErrEmptyMessage = errors.New("announcement: empty message")
+	// ErrDelay refuses an automatic announcement whose delay is under a
+	// second, which would repeat with no pause (#5126).
+	ErrDelay = errors.New("announcement: automatic delay under one second")
+	// ErrLimit refuses an automatic announcement with a negative limit,
+	// which would never count down to its end (#5126).
+	ErrLimit = errors.New("announcement: negative automatic limit")
+)
+
 // Indexed is an announcement with the index a game master deletes it by.
 type Indexed struct {
 	Index int
@@ -36,10 +48,9 @@ type Indexed struct {
 // Registry holds the announcements by index and runs the automatic ones'
 // schedules. All methods are safe for concurrent use.
 //
-// An announcement takes the index equal to the number held when it is
-// added, so after a deletion a new one can take an index still in use and
-// replace that announcement; a replaced automatic announcement keeps
-// repeating until the server stops.
+// Each announcement added takes the index after the highest one handed out
+// since the file was last loaded, so an index is never reused after a
+// deletion and no announcement is ever replaced (#4707).
 type Registry struct {
 	store Store
 	out   Announcer
@@ -47,10 +58,11 @@ type Registry struct {
 	// queue runs the schedules: their timers and announcements.
 	queue *sim.Queue
 
-	// mu guards entries, orphans, stopped and every entry's schedule.
+	// mu guards entries, next, stopped and every entry's schedule.
 	mu      sync.Mutex
 	entries map[int]*entry
-	orphans []*entry
+	// next is the index the next announcement held takes.
+	next    int
 	stopped bool
 }
 
@@ -63,8 +75,7 @@ type entry struct {
 	// that fires anyway does nothing.
 	run uint64
 	// unlimited repeats at a fixed rate from next; otherwise left counts
-	// the announcements still to make, a negative count never reaching
-	// zero before it wraps.
+	// the announcements still to make.
 	unlimited bool
 	left      int32
 	next      time.Time
@@ -78,10 +89,12 @@ func NewRegistry(store Store, out Announcer, log zerolog.Logger, queue *sim.Queu
 	return &Registry{store: store, out: out, log: log, queue: queue, entries: map[int]*entry{}}
 }
 
-// Load reads the announcement file anew and starts the automatic
-// announcements' schedules. The announcements held before are dropped and
-// their schedules stopped first; a file that fails to load is an error and
-// leaves them held and running.
+// Load reads the announcement file anew, indexing the announcements from 0
+// in file order, and starts the automatic announcements' schedules. The
+// announcements held before are dropped and their schedules stopped first;
+// a file that fails to load is an error and leaves them held and running.
+// An automatic announcement Add would refuse is skipped with a warning, so
+// no stored entry starts a schedule without pause (#5126).
 func (r *Registry) Load() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -96,10 +109,16 @@ func (r *Registry) Load() error {
 		e.stop()
 	}
 	clear(r.entries)
+	r.next = 0
 	if r.store == nil {
 		return nil
 	}
 	for _, a := range list {
+		if err := check(a); err != nil {
+			r.log.Warn().Err(err).Str("message", a.Message).Int("delay", a.Delay).Int("limit", a.Limit).
+				Msg("Skipped an automatic announcement.")
+			continue
+		}
 		r.putLocked(a)
 	}
 	r.log.Info().Msgf("Loaded %d announcements.", len(r.entries))
@@ -143,10 +162,12 @@ func (r *Registry) RestartAuto() {
 
 // Add holds a new announcement, starts its schedule when automatic and
 // rewrites the file. An announcement that is not automatic keeps no
-// schedule values. An empty message is refused.
-func (r *Registry) Add(a admin.Announcement) bool {
-	if a.Message == "" {
-		return false
+// schedule values. It refuses, changing nothing, an empty message
+// (ErrEmptyMessage), and an automatic announcement with a delay under a
+// second (ErrDelay) or a negative limit (ErrLimit).
+func (r *Registry) Add(a admin.Announcement) error {
+	if err := check(a); err != nil {
+		return err
 	}
 	if !a.Auto {
 		a = admin.Announcement{Message: a.Message, Critical: a.Critical}
@@ -155,7 +176,23 @@ func (r *Registry) Add(a admin.Announcement) bool {
 	defer r.mu.Unlock()
 	r.putLocked(a)
 	r.saveLocked()
-	return true
+	return nil
+}
+
+// check reports why a cannot be held, or nil when it can. Only an automatic
+// announcement's schedule values count: the others keep none.
+func check(a admin.Announcement) error {
+	switch {
+	case a.Message == "":
+		return ErrEmptyMessage
+	case !a.Auto:
+		return nil
+	case a.Delay < 1:
+		return ErrDelay
+	case a.Limit < 0:
+		return ErrLimit
+	}
+	return nil
 }
 
 // Delete drops the announcement at index, stops its schedule and rewrites
@@ -174,8 +211,8 @@ func (r *Registry) Delete(index int) bool {
 	return true
 }
 
-// Stop ends every schedule, replaced announcements' too, and closes the
-// queue; a stopped registry starts none again.
+// Stop ends every schedule and closes the queue; a stopped registry starts
+// none again.
 func (r *Registry) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -184,22 +221,14 @@ func (r *Registry) Stop() {
 	for _, e := range r.entries {
 		e.stop()
 	}
-	for _, e := range r.orphans {
-		e.stop()
-	}
-	r.orphans = nil
 }
 
-// putLocked holds a at the next index and starts its schedule. An
-// announcement already at that index is replaced, its schedule left
-// running.
+// putLocked holds a at the next index, one no announcement has held since
+// the last load (#4707), and starts its schedule.
 func (r *Registry) putLocked(a admin.Announcement) {
-	index := len(r.entries)
-	if old, ok := r.entries[index]; ok && old.timer != nil {
-		r.orphans = append(r.orphans, old)
-	}
 	e := &entry{Announcement: a}
-	r.entries[index] = e
+	r.entries[r.next] = e
+	r.next++
 	r.startLocked(e)
 }
 
@@ -222,10 +251,11 @@ func (r *Registry) saveLocked() {
 
 // startLocked stops e's schedule and, when e is automatic, starts it anew:
 // with no limit the first announcement comes after the initial delay and
-// the next ones at a fixed rate of one per delay, a delay that is not
-// positive starting nothing; with a limit, that many announcements come,
-// the first after the initial delay and each next one a delay after the
-// last. A negative delay counts as none.
+// the next ones at a fixed rate of one per delay; with a limit, that many
+// announcements come, the first after the initial delay and each next one
+// a delay after the last. A negative initial delay counts as none; check
+// keeps every held delay at a second or more and every limit at zero or
+// more.
 func (r *Registry) startLocked(e *entry) {
 	e.stop()
 	if !e.Auto || r.stopped {
@@ -234,9 +264,6 @@ func (r *Registry) startLocked(e *entry) {
 	initial := max(seconds(e.InitialDelay), 0)
 	if e.Limit == 0 {
 		e.unlimited = true
-		if seconds(e.Delay) <= 0 {
-			return
-		}
 		e.next = r.queue.Now().Add(initial)
 	} else {
 		e.left = clampInt32(e.Limit)
@@ -263,7 +290,7 @@ func (r *Registry) fire(e *entry, run uint64) {
 		}
 		e.left--
 		if e.left != 0 {
-			e.timer = r.queue.After(max(seconds(e.Delay), 0), func() { r.fire(e, run) })
+			e.timer = r.queue.After(seconds(e.Delay), func() { r.fire(e, run) })
 		}
 	}
 	message, critical := e.Message, e.Critical
