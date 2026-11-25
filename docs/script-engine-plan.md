@@ -158,8 +158,10 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
   member count), and each quest keeps its own file, constructor and catalog key. A quest never
   imports another quest's package, and `Check` does not follow imports into helper packages:
   the union is what keeps a dropped literal or call visible. Per-quest page checks use
-  `scriptpages.CheckFiles` on the quest's own file. `quest/raidaltar` is the first family;
-  the others fold in under #5496.
+  `scriptpages.CheckFiles` on the quest's own file. The families are `quest/raidaltar`,
+  `quest/ketravarka` (Q605-Q609, Q611-Q615), `quest/bingo` (Q384, Q386) and `quest/clanrep`
+  (Q508-Q510); each quest keeps its dialogue and page literals in its own file and shares
+  the family's mechanics.
 - **Behaviors share family packages.** A child imports its parent's package, so parents-first
   is enforced by the compiler.
 - **Catalog files are pre-created, one per owner issue** (`script/catalog/quests_301_up.go`,
