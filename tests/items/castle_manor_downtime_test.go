@@ -102,3 +102,60 @@ func TestCastleManorRollsOverMissedRefreshOnce(t *testing.T) {
 		})
 	}
 }
+
+// TestCastleManorSeedsUnknownLastRollover boots Gludio's manor with lists
+// and no stored rollover time. A start at 20:30 rolls nothing over on a
+// guess and stores today's 20:00 refresh as the last rollover once the
+// manor saves, so a later downtime across 20:00 is caught up. A start in
+// the 21:00 window, its due change rolling over by itself, still rolls
+// over once and stores that rollover's time.
+func TestCastleManorSeedsUnknownLastRollover(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		boot     time.Time
+		rollover bool
+		want     int64
+	}{
+		{"boot at 20:30", time.Date(2026, 10, 5, 20, 30, 0, 0, time.UTC), false, time.Date(2026, 10, 5, 20, 0, 0, 0, time.UTC).UnixMilli()},
+		{"boot at 21:03", time.Date(2026, 10, 5, 21, 3, 0, 0, time.UTC), true, time.Date(2026, 10, 5, 21, 3, 0, 0, time.UTC).UnixMilli()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			manorCfg, _ := shippedManor()
+			cfg := castlemanor.DefaultConfig()
+			cfg.SavePeriod = 0
+			w := bootCastleWorld(t, 1, func(db *sql.DB) {
+				for _, q := range []string{
+					"UPDATE castle SET treasury = 5000 WHERE id = 1",
+					"INSERT INTO castle_manor_procure VALUES (1, 5073, 40, 100, 50, 1, 0), (1, 5068, 9, 10, 7, 2, 0), (1, 5073, 100, 100, 30, 1, 1)",
+					"INSERT INTO castle_manor_production VALUES (1, 5016, 10, 10, 5, 1)",
+				} {
+					if _, err := db.ExecContext(context.Background(), q); err != nil {
+						t.Fatalf("seed manor: %v", err)
+					}
+				}
+			},
+				gameservertest.WithManor(manorCfg),
+				gameservertest.WithCastleManor(cfg, tc.boot, castlemanor.WithRoll(func(int) int { return 0 })),
+			)
+			m := w.srv.CastleManor
+			w.srv.CastleManorClock.Advance(0)
+			gludio, _ := w.srv.Castles.Get(1)
+			running := m.CropProcure(1, false)
+			if tc.rollover {
+				if want := int64(5000 - 10*5 - 100*30); gludio.Treasury() != want || len(running) != 1 {
+					t.Fatalf("running crops %+v, treasury %d; want one rollover and %d", running, gludio.Treasury(), want)
+				}
+			} else if len(running) != 2 || gludio.Treasury() != 5000 {
+				t.Fatalf("running crops %+v, treasury %d; want the period kept and 5000", running, gludio.Treasury())
+			}
+			if err := m.Stop(context.Background()); err != nil {
+				t.Fatalf("stop manor: %v", err)
+			}
+			if got := queryCastleInt(t, w.srv, "SELECT CAST(value AS SIGNED) FROM server_memo WHERE var = 'manorLastRollover'"); got != tc.want {
+				t.Fatalf("stored last rollover = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}

@@ -282,8 +282,11 @@ func (m *Manager) Restore(ctx context.Context) error {
 // zone of the queue's clock: the mode is set from the time of day and the
 // next change scheduled, and the lists are saved every SavePeriod. A
 // refresh time passed since the stored last rollover, the server down
-// across it, rolls the period over once now (#4694). effects reaches the
-// clans and players a change acts on.
+// across it, rolls the period over once now (#4694). With none stored, a
+// start rolls nothing over on a guess: it takes the latest refresh time
+// as the last rollover, stored with the next save, unless its due-at-once
+// change rolls over by itself. effects reaches the clans and players a
+// change acts on.
 func (m *Manager) Start(queue *sim.Queue, effects Effects) {
 	if !m.Enabled() {
 		return
@@ -298,6 +301,9 @@ func (m *Manager) Start(queue *sim.Queue, effects Effects) {
 		payouts = m.rolloverLocked(now)
 	}
 	m.scheduleLocked(now)
+	if m.lastRollover.IsZero() && (m.status != StatusApproved || m.nextChange.After(now)) {
+		m.lastRollover = lastRefreshAt(m.cfg, now)
+	}
 	if m.cfg.SavePeriod > 0 {
 		queue.Every(m.cfg.SavePeriod, m.queueSave)
 	}
