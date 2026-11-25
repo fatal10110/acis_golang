@@ -18,12 +18,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TestNextDate pins Siege.setNextSiegeDate: from the stored date, or from
-// now once it has passed, the castle's siege day of that week (Sunday for
-// castles 3, 4, 6 and 7, Saturday for the others; a Calendar week starts on
-// Sunday), plus two weeks, at 18:00. The vectors follow
-// java.util.Calendar's lenient DAY_OF_WEEK resolution, including the week
-// that crosses a year.
+// TestNextDate pins the next siege date: from the stored date, or from now
+// once it has passed, the castle's siege day of its Monday-to-Sunday week
+// (#5404; Sunday for castles 3, 4, 6 and 7, Saturday for the others), plus
+// two weeks, at 18:00:00.000, including the week that crosses a year. The
+// daylight-saving and week-edge rows are in TestNextDateMatchesReference.
 func TestNextDate(t *testing.T) {
 	at := func(y int, m time.Month, d, h int) time.Time { return time.Date(y, m, d, h, 0, 0, 0, time.UTC) }
 	now := at(2026, time.October, 7, 12) // a Wednesday
@@ -33,13 +32,20 @@ func TestNextDate(t *testing.T) {
 		want      time.Time
 	}{
 		{1, at(2026, time.September, 1, 18), now, at(2026, time.October, 24, 18)},
-		{3, at(2026, time.September, 1, 18), now, at(2026, time.October, 18, 18)},
+		// The Sunday closing the week of Wednesday 7 October.
+		{3, at(2026, time.September, 1, 18), now, at(2026, time.October, 25, 18)},
 		{1, at(2026, time.October, 24, 18), now, at(2026, time.November, 7, 18)},
 		{7, at(2026, time.October, 25, 18), now, at(2026, time.November, 8, 18)},
 		{5, time.UnixMilli(0), at(2026, time.December, 30, 9), at(2027, time.January, 16, 18)},
-		{4, time.UnixMilli(0), at(2026, time.December, 30, 9), at(2027, time.January, 10, 18)},
+		{4, time.UnixMilli(0), at(2026, time.December, 30, 9), at(2027, time.January, 17, 18)},
 		// A siege day itself: the same day two weeks on.
 		{2, at(2026, time.October, 10, 18), at(2026, time.October, 10, 20), at(2026, time.October, 24, 18)},
+		// From a Sunday the Saturday is the day before it, from a Monday
+		// the Sunday six days on.
+		{1, time.UnixMilli(0), at(2026, time.October, 11, 12), at(2026, time.October, 24, 18)},
+		{3, time.UnixMilli(0), at(2026, time.October, 5, 12), at(2026, time.October, 25, 18)},
+		// The milliseconds of now are dropped.
+		{1, time.UnixMilli(0), at(2026, time.October, 7, 12).Add(123 * time.Millisecond), at(2026, time.October, 24, 18)},
 	} {
 		if got := NextDate(tc.castle, tc.prev, tc.now); !got.Equal(tc.want) {
 			t.Errorf("NextDate(%d, %v, %v) = %v, want %v", tc.castle, tc.prev, tc.now, got, tc.want)
@@ -429,7 +435,8 @@ func TestRestore(t *testing.T) {
 
 // TestBootWithPassedDate pins Siege.startAutoTask for a date already
 // passed: the next date is set and announced, the registrations open,
-// and nothing is scheduled.
+// and nothing is scheduled. Weeks start on Monday (#5404), so from
+// Wednesday 10-14 Giran's Sunday is the one ending the week of 10-28.
 func TestBootWithPassedDate(t *testing.T) {
 	w := newWorld(t, DefaultConfig())
 	w.start(time.Date(2026, time.October, 14, 12, 0, 0, 0, time.UTC))
@@ -441,7 +448,7 @@ func TestBootWithPassedDate(t *testing.T) {
 	if got, want := time.UnixMilli(w.siege(1).Date()).UTC(), time.Date(2026, time.October, 31, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("Gludio date = %v, want %v", got, want)
 	}
-	if got, want := time.UnixMilli(w.siege(3).Date()).UTC(), time.Date(2026, time.October, 25, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
+	if got, want := time.UnixMilli(w.siege(3).Date()).UTC(), time.Date(2026, time.November, 1, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("Giran date = %v, want %v", got, want)
 	}
 	expectLines(t, "notices", w.notes.take(), []string{"all 292 castle=1", "all 292 castle=2", "all 292 castle=3"})

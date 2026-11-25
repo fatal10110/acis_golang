@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
@@ -26,9 +27,9 @@ const (
 
 // NextDate is the siege date after prev, set when a siege ends or is
 // called off: from prev, or from now when prev has passed, the castle's
-// siege day of that week (Sunday for castles 3, 4, 6 and 7, Saturday for
-// the others, weeks starting on Sunday), two weeks later, at 18:00 on
-// now's clock.
+// siege day of its Monday-to-Sunday week (#5404; Sunday for castles 3, 4, 6
+// and 7, Saturday for the others), two weeks later, at 18:00 sharp on now's
+// clock.
 func NextDate(castleID int, prev, now time.Time) time.Time {
 	base := prev.In(now.Location())
 	if prev.Before(now) {
@@ -39,8 +40,8 @@ func NextDate(castleID int, prev, now time.Time) time.Time {
 	case 3, 4, 6, 7:
 		day = time.Sunday
 	}
-	d := base.AddDate(0, 0, int(day)-int(base.Weekday())+14)
-	return time.Date(d.Year(), d.Month(), d.Day(), siegeHour, 0, 0, 0, d.Location())
+	d := commons.WeekdayAt(base, 14, day, siegeHour)
+	return d.Add(-time.Duration(d.Nanosecond()))
 }
 
 // startAutoTaskLocked sets the siege's calendar going at boot: a date
