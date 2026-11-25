@@ -295,7 +295,7 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 		return nil, Member{}, OustInCombat
 	}
 	joinExpiry := s.joinExpiry(now)
-	m, removed := s.remove(cl, target.ObjectID, joinExpiry, live, now)
+	m, removed := s.removeMember(cl, target.ObjectID, joinExpiry, online, now)
 	if !removed {
 		return nil, Member{}, OustUnknownTarget
 	}
@@ -314,6 +314,34 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
 	return s.removeLocked(cl, objectID, joinExpiry, live, now)
+}
+
+// removeMember is remove for a member whose presence the roster tells:
+// online resolves its live character while the roster shows it online.
+// The removal goes ahead only on the presence its character was resolved
+// for; when the member entered or left the world in between, the presence
+// is read again. A member entering meanwhile is so either removed online,
+// or removed before it is marked online, its removal kept for its
+// selection; never removed as offline once online.
+func (s *Service) removeMember(cl *Clan, objectID int32, joinExpiry int64, online func(int32) *player.Character, now time.Time) (Member, bool) {
+	for {
+		m, ok := cl.Member(objectID)
+		if !ok {
+			return Member{}, false
+		}
+		var live *player.Character
+		if m.Online && online != nil {
+			live = online(objectID)
+		}
+		cl.mu.Lock()
+		if cur, ok := cl.members[objectID]; ok && cur.Online != m.Online {
+			cl.mu.Unlock()
+			continue
+		}
+		out, removed := s.removeLocked(cl, objectID, joinExpiry, live, now)
+		cl.mu.Unlock()
+		return out, removed
+	}
 }
 
 // removeLocked is remove with cl.mu held.
