@@ -88,3 +88,33 @@ func TestSettleRunsATimerArmedAlreadyDue(t *testing.T) {
 		}
 	}
 }
+
+// TestSettleRunsATimerArmedAlreadyDueOnThePool: on the pool a timer armed with
+// no delay posts its task from the wall clock's goroutine a moment later, and
+// arming it is not accepted work, so a barrier pass can finish first. Settle
+// must not return before the timer's task has run.
+func TestSettleRunsATimerArmedAlreadyDueOnThePool(t *testing.T) {
+	pool := sim.NewPool(2, zerolog.Nop())
+	pool.Start(context.Background())
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+		defer cancel()
+		if err := pool.Stop(ctx); err != nil {
+			t.Errorf("stop sim pool: %v", err)
+		}
+	})
+	qs := &queues{newQueue: pool.NewQueue}
+	q := qs.NewQueue("caster")
+	for range 2000 {
+		var fired atomic.Bool
+		if !q.Post(func() { q.After(0, func() { fired.Store(true) }) }) {
+			t.Fatal("open queue refused the task")
+		}
+		if err := qs.settle(); err != nil {
+			t.Fatalf("settle: %v", err)
+		}
+		if !fired.Load() {
+			t.Fatal("settle returned before the timer armed already due had fired")
+		}
+	}
+}
