@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -34,9 +35,10 @@ func loadSchemeBufferConfig(paths gameServerPaths) (schemebuffer.Config, error) 
 }
 
 // provideSchemeBuffer returns the scheme buffer offering the buffs of the
-// datapack's bufferSkills.xml. The players' schemes are restored by
-// startSchemeBuffer.
-func provideSchemeBuffer(paths gameServerPaths, data *gameData, log zerolog.Logger) (*schemebuffer.Manager, error) {
+// datapack's bufferSkills.xml, writing each player's schemes on that
+// player's persistence lane as they change (#4699). The players' schemes
+// are restored by startSchemeBuffer.
+func provideSchemeBuffer(paths gameServerPaths, data *gameData, db *sql.DB, worker *persist.Worker, log zerolog.Logger) (*schemebuffer.Manager, error) {
 	cfg, err := loadSchemeBufferConfig(paths)
 	if err != nil {
 		return nil, err
@@ -46,12 +48,13 @@ func provideSchemeBuffer(paths gameServerPaths, data *gameData, log zerolog.Logg
 		return nil, err
 	}
 	log.Info().Int("count", buffs.Count()).Msg("scheme buffer: loaded available buffs")
-	return schemebuffer.New(cfg, buffs, data.Skills), nil
+	return schemebuffer.New(cfg, buffs, data.Skills, schemebuffer.WithStore(gamesql.NewBufferSchemeStore(db), worker, log)), nil
 }
 
 // startSchemeBuffer restores the players' schemes before any character can
-// log in, and stores them all once the game server has let every player
-// go: the schemes are written at shutdown only.
+// log in, and stores them all again once the game server has let every
+// player go. A player's change queued on the persistence lane and still
+// pending then holds the same rows, so either write may land last.
 func startSchemeBuffer(lc fx.Lifecycle, buffer *schemebuffer.Manager, db *sql.DB, log zerolog.Logger) {
 	store := gamesql.NewBufferSchemeStore(db)
 	lc.Append(fx.Hook{
