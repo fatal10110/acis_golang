@@ -730,6 +730,17 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 		return account, true
 
 	default:
+		if account.Login != req.Username {
+			// The table's collation matched a differently spelled name (for
+			// instance an accented one) to this account. The game server
+			// keys the session by the typed name, so such a login could
+			// never enter the game: refuse it here like an unknown account,
+			// before the password is checked so the reply says nothing
+			// about it (#5464).
+			l.recordFailedAttempt(c.remoteIP, req.Username, time.Now())
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
+			return model.Account{}, false
+		}
 		match, cerr := model.CheckPassword(account.Password, req.Password)
 		if cerr != nil {
 			// A stored hash that cannot be checked is the server's fault, not
