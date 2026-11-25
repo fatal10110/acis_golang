@@ -19,6 +19,7 @@ func (s *historyStore) LoadHistory(context.Context) ([]History, error) { return 
 type heldItem struct{ item Ticket }
 
 func (heldItem) Tickets() []Ticket { return nil }
+func (heldItem) Pay(int) bool      { return false }
 func (h heldItem) Item(objectID int32) (Ticket, bool) {
 	return h.item, objectID == h.item.ObjectID
 }

@@ -1,6 +1,7 @@
 package items
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -158,10 +159,12 @@ func bootFishingWith(t *testing.T, equipLure bool, opts ...gameservertest.Option
 }
 
 // fishingSpec is how bootFishingSpec readies the fisher: the lures on the
-// rod or not, and the level of its pumping and reeling skills.
+// rod or not, the level of its pumping and reeling skills, and the lure
+// template given, fishLure when 0.
 type fishingSpec struct {
 	equipLure   bool
 	actionLevel int
+	lure        int32
 }
 
 func bootFishingSpec(t *testing.T, spec fishingSpec, opts ...gameservertest.Option) *fishingRig {
@@ -193,7 +196,7 @@ func bootFishingSpec(t *testing.T, spec fishingSpec, opts ...gameservertest.Opti
 		}
 	}
 	r.rod = srv.GiveItem(t, r.objID, fishRodD, 1)
-	r.lure = srv.GiveItem(t, r.objID, fishLure, 5)
+	r.lure = srv.GiveItem(t, r.objID, cmp.Or(spec.lure, fishLure), 5)
 	r.nightLure = srv.GiveItem(t, r.objID, fishNightLure, 5)
 	r.shotD = srv.GiveItem(t, r.objID, fishShotD, 3)
 	r.shotC = srv.GiveItem(t, r.objID, fishShotC, 1)

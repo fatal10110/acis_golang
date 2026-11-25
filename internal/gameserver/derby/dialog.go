@@ -56,10 +56,13 @@ type Holder interface {
 	// Item returns the held item objectID read as a ticket, whatever its
 	// template.
 	Item(objectID int32) (Ticket, bool)
+	// Pay takes price adena with its notices, reporting false, taking
+	// none, when not enough is held. It runs under the track's lock.
+	Pay(price int) bool
 }
 
-// Purchase is a ticket bought: Price adena taken, then a ticket for Lane of
-// Race handed over and Price added to Lane's stake.
+// Purchase is a ticket bought: Price adena already taken and added to
+// Lane's stake, its ticket for Lane of Race still to be handed over.
 type Purchase struct {
 	Race  int
 	Lane  int
@@ -105,7 +108,7 @@ func (t *Track) Bypass(pages Pages, npcID int, objectID int32, picks *Picks, hol
 	d := dialog{t: t, pages: pages, npcID: npcID, objectID: objectID}
 	switch {
 	case strings.HasPrefix(command, "BuyTicket"):
-		return d.buyTicket(picks, command)
+		return d.buyTicket(picks, holder, command)
 	case command == "ShowOdds":
 		return d.showOdds()
 	case command == "ShowInfo":
@@ -127,10 +130,13 @@ func (t *Track) Bypass(pages Pages, npcID int, objectID int32, picks *Picks, hol
 
 // buyTicket walks the ticket purchase: BuyTicket 0 (or 1 to 9, picking a
 // lane) lists the runners, 10 (or 11 to 18, picking a price) the prices,
-// 20 the summary, and anything past 20 buys the ticket. Tickets sell only
-// while bets are accepted. A step taken before the lane (or price) it needs
-// was picked starts over, or answers nothing.
-func (d dialog) buyTicket(picks *Picks, command string) Reply {
+// 20 the summary, and anything past 20 buys the ticket: holder pays and the
+// price joins the lane's stake. Tickets sell only while bets are accepted;
+// that check, the payment and the stake share one hold of the track's lock,
+// so no ticket sells once the sales close and every stake sold makes the
+// odds (#5119). A step taken before the lane (or price) it needs was picked
+// starts over, or answers nothing.
+func (d dialog) buyTicket(picks *Picks, holder Holder, command string) Reply {
 	t := d.t
 	if t.state != acceptingBets {
 		return Reply{Notice: MsgTicketsNotAvailable, Chat: true}
@@ -199,7 +205,15 @@ func (d dialog) buyTicket(picks *Picks, command string) Reply {
 		if picks.Lane < 1 || picks.Lane > Lanes {
 			return Reply{Aborted: true}
 		}
-		return Reply{Buy: &Purchase{Race: t.raceNumber, Lane: picks.Lane, Price: ticketPrices[picks.Price-1]}, Chat: true}
+		buy := Purchase{Race: t.raceNumber, Lane: picks.Lane, Price: ticketPrices[picks.Price-1]}
+		// A better short of the price keeps its picks: the summary's
+		// Confirm buys that ticket once paid for.
+		if !holder.Pay(buy.Price) {
+			return Reply{}
+		}
+		*picks = Picks{}
+		t.bets[buy.Lane-1] += int64(buy.Price)
+		return Reply{Buy: &buy, Chat: true}
 	}
 	page = replace(page, "1race", strconv.Itoa(t.raceNumber))
 	return Reply{Page: d.fill(page)}
