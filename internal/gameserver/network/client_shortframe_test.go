@@ -57,7 +57,7 @@ func TestPreAuthShortFrameClosesWithServerClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"level":"warn","error":` + string(quotedErr) + `,"message":"game client"}`
+	want := `{"level":"warn","error":` + string(quotedErr) + `,"addr":"127.0.0.1","message":"game client"}`
 	var found int
 	for _, line := range logged.lines() {
 		if strings.Contains(line, `"message":"game client"`) {
