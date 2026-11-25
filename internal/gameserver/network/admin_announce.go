@@ -1,9 +1,11 @@
 package network
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
@@ -96,9 +98,18 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 	}
 }
 
-// addAnnouncement adds a, telling gm when its message is empty.
+// addAnnouncement adds a, telling gm why when it is refused.
 func (l *GameClientLink) addAnnouncement(gm *livePlayer, a admin.Announcement) {
-	if !l.announcements.Add(a) {
+	switch err := l.announcements.Add(a); {
+	case err == nil:
+	case errors.Is(err, announcement.ErrDelay):
+		// #5126: an automatic announcement repeating with no pause would
+		// flood every player online.
+		sendText(gm, "Invalid //announce delay ; an automatic announcement needs at least 1 second.")
+	case errors.Is(err, announcement.ErrLimit):
+		// #5126: a negative limit would never count down to its end.
+		sendText(gm, "Invalid //announce limit ; can't be negative.")
+	default:
 		sendText(gm, "Invalid //announce message content ; can't be null or empty.")
 	}
 }

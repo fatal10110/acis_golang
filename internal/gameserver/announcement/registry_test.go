@@ -1,6 +1,7 @@
 package announcement
 
 import (
+	"errors"
 	"math"
 	"slices"
 	"testing"
@@ -74,21 +75,68 @@ func assertTimes(t *testing.T, rec *recorder, msg string, want ...int) {
 	}
 }
 
-// An unlimited announcement whose delay is not positive starts nothing, not
-// even its first announcement: the reference's fixed-rate schedule refuses
-// a period that is not positive.
-func TestUnlimitedWithoutPositiveDelayStartsNothing(t *testing.T) {
-	r, clock, rec := newTestRegistry(t, nil)
-	r.Add(auto("zero", 5, 0, 0))
-	r.Add(auto("negative", 5, -10, 0))
-
+// An automatic announcement with a delay under a second or a negative
+// limit is refused (#5126): nothing is held, saved or scheduled. One that
+// is not automatic keeps no schedule values, so its values are not checked.
+func TestAddRefusesFloodingSchedules(t *testing.T) {
+	store := &fakeStore{}
+	r, clock, rec := newTestRegistry(t, store)
+	for _, c := range []struct {
+		a    admin.Announcement
+		want error
+	}{
+		{auto("zero", 5, 0, 0), ErrDelay},
+		{auto("zero limited", 5, 0, 3), ErrDelay},
+		{auto("negative", 5, -10, 0), ErrDelay},
+		{auto("negative limit", 5, 10, -2), ErrLimit},
+		{auto("", 5, 10, 0), ErrEmptyMessage},
+		{admin.Announcement{}, ErrEmptyMessage},
+	} {
+		if err := r.Add(c.a); !errors.Is(err, c.want) {
+			t.Errorf("Add(%+v) = %v, want %v", c.a, err, c.want)
+		}
+	}
 	clock.Advance(time.Hour)
-	if len(rec.fires) != 0 {
-		t.Fatalf("delivered %v, want nothing", rec.fires)
+	if len(rec.fires) != 0 || len(r.List()) != 0 || len(store.saved) != 0 {
+		t.Fatalf("after refusals: delivered %v, held %v, saved %v, want nothing", rec.fires, r.List(), store.saved)
 	}
 	if at, ok := clock.NextTimer(); ok {
 		t.Fatalf("a timer is armed for %v, want none", at)
 	}
+
+	login := admin.Announcement{Message: "login", Auto: false, Delay: -1, Limit: -1}
+	if err := r.Add(login); err != nil {
+		t.Fatalf("Add(%+v) = %v, want nil", login, err)
+	}
+	if got, want := r.List(), []Indexed{{Index: 0, Announcement: admin.Announcement{Message: "login"}}}; !slices.Equal(got, want) {
+		t.Fatalf("List() = %+v, want %+v", got, want)
+	}
+}
+
+// Load skips a stored automatic announcement with a delay under a second
+// or a negative limit (#5126), so no schedule without pause starts; the
+// rest are indexed from 0 in file order.
+func TestLoadSkipsFloodingSchedules(t *testing.T) {
+	store := &fakeStore{list: []admin.Announcement{
+		auto("zero", 0, 0, 0),
+		auto("zero limited", 0, 0, 5),
+		auto("kept", 5, 10, 0),
+		auto("negative limit", 0, 10, -1),
+		{Message: "login"},
+	}}
+	r, clock, rec := newTestRegistry(t, store)
+	if err := r.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	want := []Indexed{{Index: 0, Announcement: auto("kept", 5, 10, 0)}, {Index: 1, Announcement: admin.Announcement{Message: "login"}}}
+	if got := r.List(); !slices.Equal(got, want) {
+		t.Fatalf("List() = %+v, want %+v", got, want)
+	}
+	clock.Advance(20 * time.Second)
+	if len(rec.fires) != 2 {
+		t.Fatalf("delivered %v, want only kept at 5 s and 15 s", rec.fires)
+	}
+	assertTimes(t, rec, "kept", 5, 15)
 }
 
 // An unlimited announcement comes after its initial delay, then once per
@@ -115,29 +163,19 @@ func TestLimitedStopsAfterItsCount(t *testing.T) {
 	}
 }
 
-// A negative limit counts down away from zero, so the announcement repeats
-// past the limit's absolute value, indefinitely in practice.
-func TestNegativeLimitRepeatsIndefinitely(t *testing.T) {
-	r, clock, rec := newTestRegistry(t, nil)
-	r.Add(auto("negative", 5, 10, -2))
-
-	clock.Advance(95 * time.Second)
-	assertTimes(t, rec, "negative", 5, 15, 25, 35, 45, 55, 65, 75, 85, 95)
-}
-
-// A negative initial delay or delay counts as none.
-func TestNegativeDelaysCountAsZero(t *testing.T) {
+// A negative initial delay counts as none.
+func TestNegativeInitialDelayCountsAsZero(t *testing.T) {
 	r, clock, rec := newTestRegistry(t, nil)
 	r.Add(auto("unlimited", -5, 10, 0))
-	r.Add(auto("limited", -3, -7, 3))
+	r.Add(auto("limited", -3, 7, 3))
 
 	clock.Advance(0)
 	assertTimes(t, rec, "unlimited", 0)
-	assertTimes(t, rec, "limited", 0, 0, 0)
+	assertTimes(t, rec, "limited", 0)
 
 	clock.Advance(25 * time.Second)
 	assertTimes(t, rec, "unlimited", 0, 10, 20)
-	assertTimes(t, rec, "limited", 0, 0, 0)
+	assertTimes(t, rec, "limited", 0, 7, 14)
 }
 
 // Restarting the automatic announcements starts each schedule over from its
@@ -154,36 +192,48 @@ func TestRestartAutoStartsSchedulesOver(t *testing.T) {
 	assertTimes(t, rec, "twice", 5, 12, 22)
 }
 
-// An announcement added after a deletion takes the index equal to the
-// number held, replacing the announcement still at that index. A replaced
-// automatic announcement leaves the file and the list but keeps repeating;
-// Stop ends it.
-func TestReplacedAutomaticKeepsRepeatingUntilStop(t *testing.T) {
+// An announcement added after a deletion takes an index never handed out
+// before, even when the highest one was deleted, so it replaces nothing
+// (#4707); the deleted automatic announcement stops at once and Stop leaves
+// no timer armed.
+func TestIndexNeverReusedAfterDelete(t *testing.T) {
 	store := &fakeStore{}
 	r, clock, rec := newTestRegistry(t, store)
 	r.Add(admin.Announcement{Message: "login"})
-	r.Add(auto("replaced", 10, 10, 0))
-	if !r.Delete(0) {
-		t.Fatal("Delete(0) = false, want true")
+	r.Add(auto("deleted", 10, 10, 0))
+	r.Add(auto("kept", 10, 10, 0))
+	r.Add(auto("top", 10, 10, 0))
+	clock.Advance(10 * time.Second)
+	if !r.Delete(1) || !r.Delete(3) {
+		t.Fatal("Delete(1), Delete(3) = false, want true")
 	}
-	r.Add(auto("replacing", 5, 20, 0))
+	r.Add(auto("added", 5, 20, 0))
 
-	want := []Indexed{{Index: 1, Announcement: auto("replacing", 5, 20, 0)}}
+	want := []Indexed{
+		{Index: 0, Announcement: admin.Announcement{Message: "login"}},
+		{Index: 2, Announcement: auto("kept", 10, 10, 0)},
+		{Index: 4, Announcement: auto("added", 5, 20, 0)},
+	}
 	if got := r.List(); !slices.Equal(got, want) {
 		t.Fatalf("List() = %+v, want %+v", got, want)
 	}
-	if got := store.saved[len(store.saved)-1]; !slices.Equal(got, []admin.Announcement{auto("replacing", 5, 20, 0)}) {
-		t.Fatalf("last save = %+v, want only the replacing announcement", got)
+	wantSaved := []admin.Announcement{{Message: "login"}, auto("kept", 10, 10, 0), auto("added", 5, 20, 0)}
+	if got := store.saved[len(store.saved)-1]; !slices.Equal(got, wantSaved) {
+		t.Fatalf("last save = %+v, want %+v", got, wantSaved)
 	}
 
-	clock.Advance(30 * time.Second)
-	assertTimes(t, rec, "replaced", 10, 20, 30)
-	assertTimes(t, rec, "replacing", 5, 25)
+	clock.Advance(30 * time.Second) // to 40
+	assertTimes(t, rec, "deleted", 10)
+	assertTimes(t, rec, "top", 10)
+	assertTimes(t, rec, "kept", 10, 20, 30, 40)
+	assertTimes(t, rec, "added", 15, 35)
 
 	r.Stop()
 	clock.Advance(time.Hour)
-	assertTimes(t, rec, "replaced", 10, 20, 30)
-	assertTimes(t, rec, "replacing", 5, 25)
+	assertTimes(t, rec, "deleted", 10)
+	assertTimes(t, rec, "top", 10)
+	assertTimes(t, rec, "kept", 10, 20, 30, 40)
+	assertTimes(t, rec, "added", 15, 35)
 	if at, ok := clock.NextTimer(); ok {
 		t.Fatalf("a timer is armed for %v after Stop, want none", at)
 	}
@@ -193,6 +243,24 @@ func TestReplacedAutomaticKeepsRepeatingUntilStop(t *testing.T) {
 	r.RestartAuto()
 	clock.Advance(time.Hour)
 	assertTimes(t, rec, "late")
+}
+
+// Loading again indexes the announcements from 0 in file order.
+func TestLoadRestartsIndexes(t *testing.T) {
+	store := &fakeStore{}
+	r, _, _ := newTestRegistry(t, store)
+	r.Add(admin.Announcement{Message: "first"})
+	r.Add(admin.Announcement{Message: "second"})
+	r.Delete(0)
+	store.list = store.saved[len(store.saved)-1]
+	if err := r.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	r.Add(admin.Announcement{Message: "third"})
+	want := []Indexed{{Index: 0, Announcement: admin.Announcement{Message: "second"}}, {Index: 1, Announcement: admin.Announcement{Message: "third"}}}
+	if got := r.List(); !slices.Equal(got, want) {
+		t.Fatalf("List() = %+v, want %+v", got, want)
+	}
 }
 
 // Loading again stops the schedules of the announcements it drops before
