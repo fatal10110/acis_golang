@@ -435,7 +435,8 @@ func TestRestore(t *testing.T) {
 
 // TestBootWithPassedDate pins Siege.startAutoTask for a date already
 // passed: the next date is set and announced, the registrations open,
-// and nothing is scheduled.
+// and nothing is scheduled. Weeks start on Monday (#5404), so from
+// Wednesday 10-14 Giran's Sunday is the one ending the week of 10-28.
 func TestBootWithPassedDate(t *testing.T) {
 	w := newWorld(t, DefaultConfig())
 	w.start(time.Date(2026, time.October, 14, 12, 0, 0, 0, time.UTC))
@@ -447,7 +448,7 @@ func TestBootWithPassedDate(t *testing.T) {
 	if got, want := time.UnixMilli(w.siege(1).Date()).UTC(), time.Date(2026, time.October, 31, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("Gludio date = %v, want %v", got, want)
 	}
-	if got, want := time.UnixMilli(w.siege(3).Date()).UTC(), time.Date(2026, time.October, 25, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
+	if got, want := time.UnixMilli(w.siege(3).Date()).UTC(), time.Date(2026, time.November, 1, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("Giran date = %v, want %v", got, want)
 	}
 	expectLines(t, "notices", w.notes.take(), []string{"all 292 castle=1", "all 292 castle=2", "all 292 castle=3"})
