@@ -39,7 +39,7 @@ func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDro
 	for _, inst := range inv.Items() {
 		tmpl, ok := invops.DeathDroppable(inv, inst, e.Kept)
 		// The collar of the pet live has out or rides never drops, whatever
-		// the configured list of kept pet items says.
+		// the configured list of kept pet items says (parity exception #4973).
 		if !ok || live.ControlItemInUse(inst.ObjectID) {
 			continue
 		}

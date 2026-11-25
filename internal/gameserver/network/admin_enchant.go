@@ -13,7 +13,8 @@ import (
 // level, with the skills the new level brings or takes, and gm is told the
 // change.
 //
-// The item's InventoryUpdate goes to its owner, whose inventory changed.
+// The item's InventoryUpdate goes to its owner, whose inventory changed
+// (parity exception #5042).
 func (l *GameClientLink) adminEnchant(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) != 2 {

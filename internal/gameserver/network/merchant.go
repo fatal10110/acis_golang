@@ -102,7 +102,8 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 	case list.NPCID <= 0 && !live.accessLevel().IsGM:
 		// A list no NPC sells opens only through //buy; anyone else
 		// sending it is refused, unanswered like the other refusals:
-		// otherwise any client could buy from a GM list by its id.
+		// otherwise any client could buy from a GM list by its id (parity
+		// exception #4829).
 		return
 	case list.NPCID > 0:
 		f, _ := live.Target().(*npc.Folk)

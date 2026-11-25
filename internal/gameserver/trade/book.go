@@ -795,6 +795,7 @@ func manipulableItem(inv Holdings, bound BoundItems, ownerID, objectID int32) *i
 		return nil
 	}
 	st := inst.Snapshot()
+	// A worn item is never offered (parity exception #4826).
 	if st.OwnerID != ownerID || st.Equipped() {
 		return nil
 	}

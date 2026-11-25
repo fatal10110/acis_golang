@@ -6,7 +6,9 @@ import "strings"
 // it into the page. The substitution reads a backslash as quoting the
 // character after it, which it keeps alone, so "a\b" shows as "ab" and
 // "a\\b" as "a\b". A backslash ending the value is kept, so the
-// page is still sent.
+// page is still sent. A backslash before a dollar sign quotes it like any
+// other character, so "a\$1" shows as "a$1" and the page is still sent
+// too (#4718).
 func HTMLValue(value string) string {
 	if !strings.Contains(value, `\`) {
 		return value

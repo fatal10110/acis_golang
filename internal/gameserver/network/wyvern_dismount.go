@@ -51,8 +51,9 @@ func (l *GameClientLink) wyvernDismountTimer(a zone.Actor, entering bool) {
 // live unless one is already running, or stops it (arm false). Once the
 // countdown has run it is spent, so the next entry starts a new one: a
 // rider who remounts inside the zone, or re-enters another, is always taken
-// off again rather than left free to fly over it. The rider is taken off
-// only if it still rides a wyvern then. It runs on live's queue.
+// off again rather than left free to fly over it; re-arming is kept as a
+// parity exception (#4802). The rider is taken off only if it still rides a
+// wyvern then. It runs on live's queue.
 func armWyvernDismount(live *livePlayer, arm bool) {
 	sim.AssertOwner(live.Queue())
 	if !arm {

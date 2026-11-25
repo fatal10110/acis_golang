@@ -20,7 +20,8 @@ func (s *swimmingStub) SwimStateChanged(swimming bool) { s.swims = append(s.swim
 // what they raised and enters the new zones around it; a creature that only
 // the old zones kept in water is told it left the water; one mid-teleport
 // enters nothing until it lands; Clear empties the old zones of whatever
-// the reload did not reach.
+// the reload did not reach. Clearing the old zones' flags is the #4801
+// parity exception.
 func TestReloadMovesMembersWithoutExitRules(t *testing.T) {
 	ix := NewIndex()
 	field := NewSiege(1, testCuboid(t, 0, 1000, 0, 1000))
