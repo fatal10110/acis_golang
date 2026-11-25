@@ -3,6 +3,7 @@ package catalog
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/bingo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/clanrep"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q303"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q306"
@@ -90,7 +91,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q501"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q503"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q509"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
@@ -228,7 +228,7 @@ func quests301Up() script.Catalog {
 		"quest.Q501_ProofOfClanAlliance":               q501.New,
 		"quest.Q503_PursuitOfClanAmbition":             q503.New,
 		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
-		"quest.Q509_TheClansPrestige":                  q509.New,
+		"quest.Q509_TheClansPrestige":                  clanrep.Q509,
 		"quest.Q601_WatchingEyes":                      q601.New,
 		"quest.Q602_ShadowOfLight":                     q602.New,
 		"quest.Q603_DaimonTheWhiteEyed_Part1":          q603.New,

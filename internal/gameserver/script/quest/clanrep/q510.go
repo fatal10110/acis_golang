@@ -1,7 +1,4 @@
-// Package q510 is the quest A Clan's Reputation (Valdis): the leader of a
-// clan of level 5 or more hunts tyrannosaurs, and every claw the leader's
-// clan brings back is worth 50 reputation points.
-package q510
+package clanrep
 
 import (
 	"strings"
@@ -10,20 +7,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-const questName = "Q510_AClansReputation"
+const q510Name = "Q510_AClansReputation"
 
-// valdis is the quest giver.
-const valdis = 31331
-
-// tyrannosaurusClaw is the quest item.
+// tyrannosaurusClaw is the proof of Q510.
 const tyrannosaurusClaw = 8767
 
-// clanQuestCompleted is the system message of the reputation a clan quest
-// earned.
-const clanQuestCompleted = 1777
-
-// New returns the quest.
-func New() script.Script {
+// Q510 is the quest A Clan's Reputation (Valdis): the leader of a
+// clan of level 5 or more hunts tyrannosaurs, and every claw the leader's
+// clan brings back is worth 50 reputation points.
+func Q510() script.Script {
 	return script.Script{
 		Title:   "A Clan's Reputation",
 		QuestID: 510,
@@ -33,13 +25,13 @@ func New() script.Script {
 			script.EventTalked:     {valdis},
 			script.EventMyDying:    {22215, 22216, 22217},
 		},
-		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
+		Hooks: script.Hooks{OnEvent: q510Event, OnTalk: q510Talk, OnMyDying: q510Dying},
 	}
 }
 
-func onAdvEvent(s *script.Script, e script.Event) string {
+func q510Event(s *script.Script, e script.Event) string {
 	htmltext := e.Name
-	st := s.QuestState(e.Player, questName)
+	st := s.QuestState(e.Player, q510Name)
 	if st == nil {
 		return htmltext
 	}
@@ -55,10 +47,10 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	return htmltext
 }
 
-// onTalk pays 50 reputation points a claw. A payer who no longer leads a
+// q510Talk pays 50 reputation points a claw. A payer who no longer leads a
 // clan is refused before any claw is taken (#5167).
-func onTalk(s *script.Script, e script.Talk) string {
-	st := s.QuestState(e.Player, questName)
+func q510Talk(s *script.Script, e script.Talk) string {
+	st := s.QuestState(e.Player, q510Name)
 	htmltext := script.NoQuestMsg()
 	if st == nil {
 		return htmltext
@@ -78,9 +70,7 @@ func onTalk(s *script.Script, e script.Talk) string {
 		count := 50 * s.TakeAllItems(e.Player, tyrannosaurusClaw)
 		if count > 0 {
 			htmltext = "31331-7.htm"
-			e.Player.AddClanReputation(count)
-			e.Player.SystemMessageNumbers(clanQuestCompleted, count)
-			e.Player.BroadcastClanInfo()
+			payClan(e.Player, count)
 		} else {
 			htmltext = "31331-4.htm"
 		}
@@ -88,9 +78,9 @@ func onTalk(s *script.Script, e script.Talk) string {
 	return htmltext
 }
 
-// onMyDying gives a claw to the killer's clan leader, when the leader
+// q510Dying gives a claw to the killer's clan leader, when the leader
 // stands near with the quest started.
-func onMyDying(s *script.Script, e script.MyDying) {
+func q510Dying(s *script.Script, e script.MyDying) {
 	p := script.ActingPlayer(e.Killer)
 	st := s.ClanLeaderQuestState(p, e.NPC)
 	if st == nil || st.Status() != questlog.StatusStarted {
