@@ -68,7 +68,7 @@ func TestSkillSaveStore_ReplaceRetriesDeadlockVictim(t *testing.T) {
 	go func() { done <- store.Replace(ctx, saver, classIndex, rows) }()
 
 	// The Replace has taken its delete's gap lock once its insert runs.
-	waitForInsert(ctx, t, tx, done)
+	waitForStatement(ctx, t, tx, done, "INSERT INTO character_skills_save")
 
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO character_skills_save (char_obj_id, skill_id, skill_level, class_index, buff_index) VALUES (?, 1, 1, ?, 1)`,
@@ -98,25 +98,25 @@ func TestSkillSaveStore_ReplaceRetriesDeadlockVictim(t *testing.T) {
 	}
 }
 
-// waitForInsert returns once another connection to this database is
-// running an insert into character_skills_save. The process list is read
+// waitForStatement returns once another connection to this database is
+// running a statement that starts with prefix. The process list is read
 // live; the lock-wait tables are a snapshot refreshed only between idle
 // reads, so a tight poll on them never sees a new waiter. It fails the
-// test if the save under test returns first or ctx ends.
-func waitForInsert(ctx context.Context, t *testing.T, tx *sql.Tx, done <-chan error) {
+// test if the store call under test returns first or ctx ends.
+func waitForStatement(ctx context.Context, t *testing.T, tx *sql.Tx, done <-chan error, prefix string) {
 	t.Helper()
 	for {
 		select {
 		case err := <-done:
-			t.Fatalf("Replace() returned %v before inserting into the contended gap", err)
+			t.Fatalf("store call returned %v before running %q", err, prefix)
 		default:
 		}
 		var running int
 		err := tx.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM information_schema.PROCESSLIST
-			 WHERE ID <> CONNECTION_ID() AND DB = DATABASE() AND INFO LIKE 'INSERT INTO character_skills_save%'`).Scan(&running)
+			 WHERE ID <> CONNECTION_ID() AND DB = DATABASE() AND INFO LIKE CONCAT(?, '%')`, prefix).Scan(&running)
 		if ctx.Err() != nil {
-			t.Fatalf("Replace() never reached its insert: %v", ctx.Err())
+			t.Fatalf("store call never ran %q: %v", prefix, ctx.Err())
 		}
 		if err != nil {
 			t.Fatalf("read process list: %v", err)

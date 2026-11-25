@@ -174,8 +174,15 @@ func (s *ClanStore) SaveMembership(ctx context.Context, r clan.MembershipRow) er
 
 // RemoveMembership clears a character's clan columns and title as it
 // leaves a clan. An online member's personal surrender is left to its own
-// save; an offline member's is cleared.
+// save; an offline member's is cleared, along with every other character's
+// apprentice or sponsor link to it. A transaction the database rolls back
+// for a lock conflict with a concurrent character save runs again, so the
+// removal still lands.
 func (s *ClanStore) RemoveMembership(ctx context.Context, r clan.RemovalRow) error {
+	return retryLockConflict(ctx, func() error { return s.removeMembership(ctx, r) })
+}
+
+func (s *ClanStore) removeMembership(ctx context.Context, r clan.RemovalRow) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("remove clan member %d: %w", r.ObjectID, err)
