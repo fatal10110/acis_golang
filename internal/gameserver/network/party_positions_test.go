@@ -39,6 +39,11 @@ func TestPartyPositionsDispersedBeforeFormedLeavesNoQueue(t *testing.T) {
 	link := newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop(), Queues: in, TradeClock: in.Now})
 	leader := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
 	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
+	applyPartyNotices := func(notices []party.Notice) {
+		for _, n := range notices {
+			link.applyPartyNotice(n)
+		}
+	}
 
 	for round := range 3 {
 		if status, _ := link.parties.BeginInvite(leader.ObjectID(), 0); status != party.InviteReady {
@@ -49,8 +54,8 @@ func TestPartyPositionsDispersedBeforeFormedLeavesNoQueue(t *testing.T) {
 		if len(formed) != 1 || len(dispersed) != 1 {
 			t.Fatalf("round %d notices formed %v dispersed %v, want one each", round, formed, dispersed)
 		}
-		link.applyPartyNotices(dispersed)
-		link.applyPartyNotices(formed)
+		applyPartyNotices(dispersed)
+		applyPartyNotices(formed)
 		if n := positionQueues(link); n != 0 {
 			t.Fatalf("round %d: %d position queues left for dispersed parties, want none", round, n)
 		}
@@ -58,11 +63,11 @@ func TestPartyPositionsDispersedBeforeFormedLeavesNoQueue(t *testing.T) {
 
 	// A party still standing keeps its queue until it disperses.
 	link.parties.BeginInvite(leader.ObjectID(), 0)
-	link.applyPartyNotices(lifecycleNotices(link.parties.Answer(leader, target, true)))
+	applyPartyNotices(lifecycleNotices(link.parties.Answer(leader, target, true)))
 	if n := positionQueues(link); n != 1 {
 		t.Fatalf("position queues for a standing party = %d, want 1", n)
 	}
-	link.applyPartyNotices(lifecycleNotices(link.parties.Leave(leader, party.Left)))
+	applyPartyNotices(lifecycleNotices(link.parties.Leave(leader, party.Left)))
 	if n := positionQueues(link); n != 0 {
 		t.Fatalf("position queues after the party dispersed = %d, want none", n)
 	}

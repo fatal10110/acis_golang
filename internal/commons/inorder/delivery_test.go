@@ -1,4 +1,4 @@
-package party
+package inorder
 
 import (
 	"slices"
@@ -6,20 +6,20 @@ import (
 	"testing"
 )
 
-// batch is a one-notice batch whose Dispersed id names it.
-func batch(id ID) []Notice { return []Notice{Dispersed{ID: id}} }
+// batch is a one-notice batch whose notice names it.
+func batch(id int) []int { return []int{id} }
 
-// TestDeliveryKeepsDecisionOrder pins #5144: a change decided while another
+// TestDeliveryKeepsDecisionOrder pins #5144 and #5489: a change decided while another
 // goroutine still applies an earlier change's notices is applied after
 // them, by that goroutine, and its own caller returns without waiting.
 func TestDeliveryKeepsDecisionOrder(t *testing.T) {
-	var d Delivery
+	var d Delivery[int]
 	var mu sync.Mutex
-	var applied []ID
+	var applied []int
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	apply := func(n []Notice) {
-		id := n[0].(Dispersed).ID
+	apply := func(n []int) {
+		id := n[0]
 		if id == 1 {
 			close(entered)
 			<-release
@@ -32,12 +32,12 @@ func TestDeliveryKeepsDecisionOrder(t *testing.T) {
 	first := make(chan struct{})
 	go func() {
 		defer close(first)
-		d.Change(func() []Notice { return batch(1) }, apply)
+		d.Change(func() []int { return batch(1) }, apply)
 	}()
 	<-entered
 	// Decided second, while the first change is still being applied: it
 	// must not overtake it.
-	d.Change(func() []Notice { return batch(2) }, apply)
+	d.Change(func() []int { return batch(2) }, apply)
 	mu.Lock()
 	early := slices.Clone(applied)
 	mu.Unlock()
@@ -46,7 +46,7 @@ func TestDeliveryKeepsDecisionOrder(t *testing.T) {
 	}
 	close(release)
 	<-first
-	if want := []ID{1, 2}; !slices.Equal(applied, want) {
+	if want := []int{1, 2}; !slices.Equal(applied, want) {
 		t.Fatalf("applied %v, want %v", applied, want)
 	}
 }
@@ -55,22 +55,22 @@ func TestDeliveryKeepsDecisionOrder(t *testing.T) {
 // applied after the notices that led to it, and that an empty decision
 // applies nothing.
 func TestDeliveryNestedChangeFollows(t *testing.T) {
-	var d Delivery
-	var applied []ID
-	var apply func([]Notice)
-	apply = func(n []Notice) {
-		id := n[0].(Dispersed).ID
+	var d Delivery[int]
+	var applied []int
+	var apply func([]int)
+	apply = func(n []int) {
+		id := n[0]
 		applied = append(applied, id)
 		if id == 1 {
-			d.Change(func() []Notice { return nil }, apply)
-			d.Change(func() []Notice { return batch(2) }, apply)
+			d.Change(func() []int { return nil }, apply)
+			d.Change(func() []int { return batch(2) }, apply)
 			if len(applied) != 1 {
 				t.Fatalf("nested change applied inside its trigger: %v", applied)
 			}
 		}
 	}
-	d.Change(func() []Notice { return batch(1) }, apply)
-	if want := []ID{1, 2}; !slices.Equal(applied, want) {
+	d.Change(func() []int { return batch(1) }, apply)
+	if want := []int{1, 2}; !slices.Equal(applied, want) {
 		t.Fatalf("applied %v, want %v", applied, want)
 	}
 }
@@ -78,14 +78,14 @@ func TestDeliveryNestedChangeFollows(t *testing.T) {
 // TestDeliveryRecoversFromPanickingApply pins that a panicking apply does
 // not stop later changes from being delivered.
 func TestDeliveryRecoversFromPanickingApply(t *testing.T) {
-	var d Delivery
+	var d Delivery[int]
 	func() {
 		defer func() { _ = recover() }()
-		d.Change(func() []Notice { return batch(1) }, func([]Notice) { panic("apply") })
+		d.Change(func() []int { return batch(1) }, func([]int) { panic("apply") })
 	}()
-	var applied []ID
-	d.Change(func() []Notice { return batch(2) }, func(n []Notice) { applied = append(applied, n[0].(Dispersed).ID) })
-	if want := []ID{2}; !slices.Equal(applied, want) {
+	var applied []int
+	d.Change(func() []int { return batch(2) }, func(n []int) { applied = append(applied, n[0]) })
+	if want := []int{2}; !slices.Equal(applied, want) {
 		t.Fatalf("applied %v, want %v", applied, want)
 	}
 }

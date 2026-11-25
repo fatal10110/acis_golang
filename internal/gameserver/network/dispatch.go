@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/inorder"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
@@ -400,7 +401,7 @@ type GameClientLink struct {
 	inventory        *invops.Service
 	trades           *tradebook.Book
 	parties          *partyRegistry
-	partyNotices     party.Delivery
+	groupNotices     inorder.Delivery[groupNotice]
 	rooms            *roomRegistry
 	duels            *duelRegistry
 	partyPositions   partyPositions

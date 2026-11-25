@@ -339,7 +339,7 @@ const (
 // Oust takes target out of the room leader leads and puts it back on the
 // waiting list. sameParty reports whether two players share a party; it is
 // called under the registry lock. The returned notices end with the room
-// list target now sees.
+// list target now sees, then its message that it was ousted.
 func (r *Registry[M]) Oust(leader, target M, sameParty func(a, b M) bool) ([]Notice, OustStatus) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -354,6 +354,7 @@ func (r *Registry[M]) Oust(leader, target M, sameParty func(a, b M) bool) ([]Not
 	r.remove(&out, rm, target)
 	r.addWaiting(target)
 	out.add(RoomList[M]{To: target, Rooms: r.available(target, ousterLocation, ousterLevelMode, nil)})
+	out.add(Msg[M]{To: []M{target}, ID: MsgOusted})
 	return out, Ousted
 }
 
@@ -392,7 +393,8 @@ const (
 )
 
 // Withdraw takes player out of the room roomID. sameParty is as for Oust.
-// A player not in that room leaves nothing, yet still withdraws.
+// A player not in that room leaves nothing, yet still withdraws. The
+// returned notices end with player's message that it left the room.
 func (r *Registry[M]) Withdraw(player M, roomID int32, sameParty func(a, b M) bool) ([]Notice, WithdrawStatus) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -405,6 +407,7 @@ func (r *Registry[M]) Withdraw(player M, roomID int32, sameParty func(a, b M) bo
 	}
 	var out notices
 	r.remove(&out, rm, player)
+	out.add(Msg[M]{To: []M{player}, ID: MsgRoomExited})
 	return out, Withdrew
 }
 

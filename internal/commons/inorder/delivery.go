@@ -1,20 +1,22 @@
-package party
+// Package inorder delivers the consequences of changes in the order the
+// changes were decided, whichever goroutines decide them.
+package inorder
 
 import "sync"
 
-// Delivery hands the notices of party changes to the clients in the order
-// the changes were decided, whichever goroutines decide them, so that no
-// member sees a later change before an earlier one (#5144): a join decided
-// before a leave lists the leaver in the joiner's window before the leaver's
-// row is deleted from it. The zero Delivery is ready to use.
-type Delivery struct {
+// Delivery hands the notices of changes to apply in the order the changes
+// were decided, so that no observer sees a later change before an earlier
+// one: a party join decided before a leave lists the leaver in the joiner's
+// window before the leaver's row is deleted from it. The zero Delivery is
+// ready to use.
+type Delivery[N any] struct {
 	mu       sync.Mutex
-	pending  [][]Notice
+	pending  [][]N
 	draining bool
 }
 
-// Change runs decide, which makes party changes and returns their notices,
-// then delivers them through apply once every notice decided before them is
+// Change runs decide, which makes changes and returns their notices, then
+// delivers them through apply once every notice decided before them is
 // delivered. Decisions are ordered by mu, which decide runs under, so decide
 // must not call Change itself; apply may, and the notices it decides then
 // follow the ones being applied.
@@ -24,7 +26,7 @@ type Delivery struct {
 // apply. A caller that finds another goroutine applying leaves its notices
 // to that goroutine and returns without waiting for them, so no caller ever
 // blocks on another's delivery.
-func (d *Delivery) Change(decide func() []Notice, apply func([]Notice)) {
+func (d *Delivery[N]) Change(decide func() []N, apply func([]N)) {
 	d.mu.Lock()
 	if n := decide(); len(n) > 0 {
 		d.pending = append(d.pending, n)
