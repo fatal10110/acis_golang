@@ -135,10 +135,10 @@ func (z *Effect) enter(a Actor) {
 	if z.pulsing.CompareAndSwap(false, true) {
 		z.effects().StartPulse(z)
 	}
-	enterDanger(a)
+	enterDanger(&z.Zone, a)
 }
 
-func (z *Effect) exit(a Actor) { exitDanger(a) }
+func (z *Effect) exit(a Actor) { exitDanger(&z.Zone, a) }
 
 // Enabled reports whether the pulse currently applies its effects.
 func (z *Effect) Enabled() bool {
