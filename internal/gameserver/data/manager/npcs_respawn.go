@@ -408,13 +408,21 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 	for _, minion := range minions {
 		id := minion.ObjectID()
 		n.walker.StopRouteByID(id)
+		// A private a script is still placing is not in the world yet, and
+		// a decay now would not keep it out: once placed, it is taken by
+		// its creator, which finds master gone (#5156).
+		_, placed := n.state.Object(id)
 		switch o := minion.(type) {
 		case *npc.Hostile:
 			n.ai.Remove(o)
-			o.Decay(n.state, nil)
+			if placed {
+				o.Decay(n.state, nil)
+			}
 		case *npc.Folk:
 			n.ai.Remove(o)
-			o.Decay(n.state, nil)
+			if placed {
+				o.Decay(n.state, nil)
+			}
 		}
 		minion.SetMaster(nil)
 		master.RemoveMinion(minion)

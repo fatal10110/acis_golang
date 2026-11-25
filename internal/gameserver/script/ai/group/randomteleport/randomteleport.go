@@ -136,7 +136,14 @@ func New() script.Script {
 // onTimer moves the NPC to a random place of its list. The two of Mammon
 // draw again until the place differs from where they last moved to, and
 // the Blacksmith of Mammon then shouts one of his lines.
+//
+// An NPC out of the world moves no more (#5135): its timer stops without a
+// draw, so it never takes the place a live one last moved to.
 func onTimer(s *script.Script, e script.Timer, last lastPlaces) string {
+	if e.NPC.Decayed() {
+		s.CancelTimer(e.Name, e.NPC, nil)
+		return ""
+	}
 	switch {
 	case strings.EqualFold(e.Name, tomaTimer):
 		locs := tomaLocs()
@@ -171,17 +178,25 @@ func moveFrom(s *script.Script, last *script.IntCell, n int) int {
 func onCreated(s *script.Script, e script.Created) {
 	switch e.NPC.NpcID() {
 	case masterToma:
-		s.StartTimerAtFixedRate(tomaTimer, e.NPC, nil, movePeriod, movePeriod)
+		startMove(s, tomaTimer, e.NPC)
 	case merchantOfMammon:
-		s.StartTimerAtFixedRate(momTimer, e.NPC, nil, movePeriod, movePeriod)
+		startMove(s, momTimer, e.NPC)
 	case blacksmithOfMammon:
 		shouts := bomShouts()
 		e.NPC.Shout(script.NpcString(shouts[s.Rnd(len(shouts))]))
-		s.StartTimerAtFixedRate(bomTimer, e.NPC, nil, movePeriod, movePeriod)
+		startMove(s, bomTimer, e.NPC)
 	case blacksmithOfWindRooney:
-		s.StartTimerAtFixedRate(rooneyTimer, e.NPC, nil, movePeriod, movePeriod)
+		startMove(s, rooneyTimer, e.NPC)
 	}
 
 	var base script.Hooks
 	base.Created(s, e)
+}
+
+// startMove starts the half-hourly move name of n. The move an earlier life
+// of n's spawn slot left pending, bound to that departed life, gives way to
+// this one (#5135).
+func startMove(s *script.Script, name string, n *script.NPC) {
+	s.CancelTimer(name, n, nil)
+	s.StartTimerAtFixedRate(name, n, nil, movePeriod, movePeriod)
 }

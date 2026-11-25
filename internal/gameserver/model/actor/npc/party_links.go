@@ -56,9 +56,13 @@ type PartyMember interface {
 	// SpawnedPrivates reports whether a private was ever spawned for the
 	// NPC, in this life or an earlier one, whichever party recorded it.
 	SpawnedPrivates() bool
+	// PrivatesLetGo reports whether this life of the NPC died and its
+	// death let its party's privates go, or found none to let go.
+	PrivatesLetGo() bool
 
 	links() *partyLinks
 	inParty() bool
+	letPrivatesGo()
 }
 
 var (
@@ -95,7 +99,16 @@ type partyLinks struct {
 // Hostile and Folk embed it.
 type escortLinks struct {
 	p atomic.Pointer[partyLinks]
+	// privatesLetGo is set once this life's death has let its party's
+	// privates go (partyDied). A later life is a new NPC, without it.
+	privatesLetGo atomic.Bool
 }
+
+// PrivatesLetGo reports whether this life of the NPC died and its death
+// let its party's privates go, or found none to let go.
+func (e *escortLinks) PrivatesLetGo() bool { return e.privatesLetGo.Load() }
+
+func (e *escortLinks) letPrivatesGo() { e.privatesLetGo.Store(true) }
 
 // links returns the NPC's partyLinks, making them on first use; the first
 // one published is the one every caller gets.
@@ -404,8 +417,11 @@ func propagatePartyAttacked(caller PartyMember, target attackable.Combatant, dam
 // then its master, then every private of the party but caller, dead ones
 // included. A dying master then lets its privates go: they no longer have
 // a master, while it keeps them as its privates. The party-died hooks run
-// on hostile and civilian NPCs alike.
+// on hostile and civilian NPCs alike. Once done, caller reports
+// PrivatesLetGo, so a private asked for its master before then, but linked
+// after the master let its privates go, is let go too (#5156).
 func partyDied(hooks ScriptHooks, caller PartyMember) {
+	defer caller.letPrivatesGo()
 	if !caller.inParty() {
 		return
 	}

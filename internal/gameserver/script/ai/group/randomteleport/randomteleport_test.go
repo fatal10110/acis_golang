@@ -10,9 +10,10 @@ import (
 // TestMatchesReferenceFingerprints compares the package with the reference
 // class: literals, engine calls and hook shapes. The NpcString ids the
 // Blacksmith of Mammon shouts are named constants in the reference and
-// numbers in Go.
+// numbers in Go. The move of an NPC out of the world stops (#5135), which
+// cancels a timer the reference never cancels.
 func TestMatchesReferenceFingerprints(t *testing.T) {
-	var exempt []string
+	exempt := []string{"call Quest.cancelQuestTimer"}
 	for _, id := range bomShouts() {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
