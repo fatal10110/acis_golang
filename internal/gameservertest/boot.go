@@ -841,7 +841,8 @@ func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
 }
 
 // WithSevenSignsTimer schedules the Seven Signs period changes through
-// afterFunc instead of a real timer, so a test can fire one at will. The
+// afterFunc, so a test can fire one at will. Without it Boot arms no
+// period-change timer at all. The
 // call fired runs the period change on its queue and returns once all of
 // it is done.
 func WithSevenSignsTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
@@ -2322,6 +2323,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.sevenSignsClock != nil {
 		sevenSignsClock = o.sevenSignsClock
 	}
+	// A period change is a calendar event that broadcasts to every player in
+	// the world; on a real timer it would land in whatever test happens to
+	// run across Monday 18:00. Unless a test supplies its own timer, none is
+	// armed.
+	sevenSignsTimer := o.sevenSignsTimer
+	if sevenSignsTimer == nil {
+		sevenSignsTimer = func(time.Duration, func()) *time.Timer { return nil }
+	}
 	// The Seven Signs and the festival share one service queue, as in
 	// production.
 	sevenSignsQueue := queues.NewQueue("sevensigns")
@@ -2330,7 +2339,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		fest       *festival.Manager
 	)
 	sevenSigns = sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, sevenSignsClock, sevenSignsQueue, persistWorker,
-		serviceTimer[sevensigns.Timer](sevenSignsQueue, o.sevenSignsTimer, func() { sevenSigns.WaitIdle() }))
+		serviceTimer[sevensigns.Timer](sevenSignsQueue, sevenSignsTimer, func() { sevenSigns.WaitIdle() }))
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
