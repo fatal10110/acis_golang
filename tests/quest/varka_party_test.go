@@ -12,8 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q605"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q608"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -124,7 +123,7 @@ func TestQ608MosCreditsEveryKetraAllyOfTheParty(t *testing.T) {
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{mosID: script.KindHostile},
 			[]script.Listing{{Path: q608Path}},
-			script.Catalog{q608Path: q608.New},
+			script.Catalog{q608Path: ketravarka.Q608},
 		),
 		varkaItemTemplates(headOfMosID, ketraAlliance4ID),
 	)
@@ -191,7 +190,7 @@ func TestQ605BadgeGoesToOneRandomStartedMemberOfTheParty(t *testing.T) {
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{varkaSoldierID: script.KindHostile},
 			[]script.Listing{{Path: q605Path}},
-			script.Catalog{q605Path: q605.New},
+			script.Catalog{q605Path: ketravarka.Q605},
 		),
 		varkaItemTemplates(soldierBadgeID),
 	)

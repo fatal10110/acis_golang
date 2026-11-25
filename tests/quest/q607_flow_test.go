@@ -13,7 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -50,7 +50,7 @@ func q607Scripts() gameservertest.Option {
 	return gameservertest.WithNPCScripts(
 		map[int32]script.NPCKind{kadunID: script.KindFolk, shadithID: script.KindHostile},
 		[]script.Listing{{Path: q607Path}},
-		script.Catalog{q607Path: q607.New},
+		script.Catalog{q607Path: ketravarka.Q607},
 	)
 }
 

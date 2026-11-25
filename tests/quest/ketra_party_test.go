@@ -7,9 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q611"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q612"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q613"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -57,7 +55,7 @@ func TestQ613HekatonCreditsEveryVarkaAllyOfTheParty(t *testing.T) {
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{hekatonID: script.KindHostile},
 			[]script.Listing{{Path: q613Path}},
-			script.Catalog{q613Path: q613.New},
+			script.Catalog{q613Path: ketravarka.Q613},
 		),
 		varkaItemTemplates(headOfHekatonID, varkaAlliance3ID),
 	)
@@ -130,7 +128,7 @@ func TestQ611DropGoesToOneRandomStartedMemberOfTheParty(t *testing.T) {
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{ketraSoldierID: script.KindHostile, ketraSoldier2ID: script.KindHostile},
 			[]script.Listing{{Path: q611Path}, {Path: q612Path}},
-			script.Catalog{q611Path: q611.New, q612Path: q612.New},
+			script.Catalog{q611Path: ketravarka.Q611, q612Path: ketravarka.Q612},
 		),
 		varkaItemTemplates(ketraBadgeID, ketraMolarID),
 	)

@@ -8,7 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q615"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -50,7 +50,7 @@ func q615World(t *testing.T, started bool, seedSpawned string, eyeKind script.NP
 		gameservertest.WithNPCScripts(
 			map[int32]script.NPCKind{varkaSoldierID: script.KindHostile, asefaEyeID: eyeKind},
 			[]script.Listing{{Path: q615Path}},
-			script.Catalog{q615Path: q615.New},
+			script.Catalog{q615Path: ketravarka.Q615},
 		),
 	)
 	x, y, z := w.srv.PlayerPosition(t, w.player)

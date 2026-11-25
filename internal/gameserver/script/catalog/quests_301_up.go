@@ -2,6 +2,9 @@ package catalog
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/bingo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/clanrep"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q303"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q306"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q313"
@@ -60,9 +63,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q381"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q382"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q383"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q384"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q385"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q386"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q401"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q402"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q403"
@@ -90,19 +91,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q501"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q503"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q504"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q509"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q601"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q602"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q603"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q605"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q606"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q608"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q609"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q611"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q612"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q613"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q614"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q615"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q617"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q618"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q619"
@@ -207,9 +198,9 @@ func quests301Up() script.Catalog {
 		"quest.Q381_LetsBecomeARoyalMember":            q381.New,
 		"quest.Q382_KailsMagicCoin":                    q382.New,
 		"quest.Q383_SearchingForTreasure":              q383.New,
-		"quest.Q384_WarehouseKeepersPastime":           q384.New,
+		"quest.Q384_WarehouseKeepersPastime":           bingo.Q384,
 		"quest.Q385_YokeOfThePast":                     q385.New,
-		"quest.Q386_StolenDignity":                     q386.New,
+		"quest.Q386_StolenDignity":                     bingo.Q386,
 		"quest.Q401_PathToAWarrior":                    q401.New,
 		"quest.Q402_PathToAHumanKnight":                q402.New,
 		"quest.Q403_PathToARogue":                      q403.New,
@@ -237,21 +228,21 @@ func quests301Up() script.Catalog {
 		"quest.Q501_ProofOfClanAlliance":               q501.New,
 		"quest.Q503_PursuitOfClanAmbition":             q503.New,
 		"quest.Q504_CompetitionForTheBanditStronghold": q504.New,
-		"quest.Q509_TheClansPrestige":                  q509.New,
+		"quest.Q509_TheClansPrestige":                  clanrep.Q509,
 		"quest.Q601_WatchingEyes":                      q601.New,
 		"quest.Q602_ShadowOfLight":                     q602.New,
 		"quest.Q603_DaimonTheWhiteEyed_Part1":          q603.New,
 		"quest.Q604_DaimonTheWhiteEyed_Part2":          raidaltar.Q604,
-		"quest.Q605_AllianceWithKetraOrcs":             q605.New,
-		"quest.Q606_WarWithVarkaSilenos":               q606.New,
-		"quest.Q608_SlayTheEnemyCommander":             q608.New,
-		"quest.Q609_MagicalPowerOfWater_Part1":         q609.New,
+		"quest.Q605_AllianceWithKetraOrcs":             ketravarka.Q605,
+		"quest.Q606_WarWithVarkaSilenos":               ketravarka.Q606,
+		"quest.Q608_SlayTheEnemyCommander":             ketravarka.Q608,
+		"quest.Q609_MagicalPowerOfWater_Part1":         ketravarka.Q609,
 		"quest.Q610_MagicalPowerOfWater_Part2":         raidaltar.Q610,
-		"quest.Q611_AllianceWithVarkaSilenos":          q611.New,
-		"quest.Q612_WarWithKetraOrcs":                  q612.New,
-		"quest.Q613_ProveYourCourage":                  q613.New,
-		"quest.Q614_SlayTheEnemyCommander":             q614.New,
-		"quest.Q615_MagicalPowerOfFire_Part1":          q615.New,
+		"quest.Q611_AllianceWithVarkaSilenos":          ketravarka.Q611,
+		"quest.Q612_WarWithKetraOrcs":                  ketravarka.Q612,
+		"quest.Q613_ProveYourCourage":                  ketravarka.Q613,
+		"quest.Q614_SlayTheEnemyCommander":             ketravarka.Q614,
+		"quest.Q615_MagicalPowerOfFire_Part1":          ketravarka.Q615,
 		"quest.Q616_MagicalPowerOfFire_Part2":          raidaltar.Q616,
 		"quest.Q617_GatherTheFlames":                   q617.New,
 		"quest.Q618_IntoTheFlame":                      q618.New,
