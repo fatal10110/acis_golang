@@ -70,7 +70,8 @@ func (l *GameClientLink) boardClan(live *livePlayer, command string) {
 // and message in the fourth and fifth arguments). The introduction takes
 // the leader of the clan the form names, the notice the leader of a clan:
 // any other member is refused as the management page refuses them and the
-// text is kept. The clan mail takes any member of the clan the form names.
+// text is kept. The clan mail takes the leader of the clan the form names,
+// as its form does (#5148).
 func (l *GameClientLink) boardClanWrite(live *livePlayer, args [5]string) {
 	switch {
 	case strings.EqualFold(args[0], "intro"):
@@ -87,7 +88,7 @@ func (l *GameClientLink) boardClanWrite(live *livePlayer, args [5]string) {
 		}
 	case strings.EqualFold(args[0], "mail"):
 		cl, ok := l.boardFormClan(live, args[1])
-		if !ok {
+		if !ok || !l.clanLeaderPage(live, cl) {
 			return
 		}
 		members := cl.MembersInTableOrder()

@@ -324,8 +324,9 @@ type BypassReply struct {
 // festivalGuideBypass. A castle or clan hall NPC answers its own commands
 // before the generic ones (see residenceCommand), a castle warehouse keeper
 // and a clan hall doorman their residence's chat pages, and a castle or
-// clan hall doorman lets only its owners teleport. Every other command
-// belongs to a system not in place yet.
+// clan hall doorman lets only its owners teleport. A siege messenger has no
+// command of its own: every command it gets is a generic one (#4975).
+// Every other command belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -343,10 +344,6 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if kind == clanHallManager {
 		reply.Outcome = BypassClanHallManager
-		return reply
-	}
-	// A siege messenger page links no command; see siegeMessengers.
-	if _, ok := siegeMessengers[kind]; ok {
 		return reply
 	}
 	if out, ok := f.residenceCommand(pages, kind, rules, talker, command, reply); ok {
