@@ -20,7 +20,7 @@ func TestOlympiadStoreStatus(t *testing.T) {
 	if _, found, err := store.LoadStatus(ctx); err != nil || found {
 		t.Fatalf("LoadStatus() on an empty table = found %v, err %v; want not found", found, err)
 	}
-	for _, st := range []olympiad.Status{{Cycle: 3, ValidationEnd: 1793534400000}, {Cycle: 4}} {
+	for _, st := range []olympiad.Status{{Cycle: 3, ValidationEnd: 1793534400000, End: 1793448000000, NextPoints: 1792951200000, Election: 2, Electing: true}, {Cycle: 4}} {
 		if err := store.SaveStatus(ctx, st); err != nil {
 			t.Fatalf("SaveStatus(%+v): %v", st, err)
 		}

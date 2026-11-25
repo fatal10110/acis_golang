@@ -85,11 +85,15 @@ type Store interface {
 	// matches, then wins, among those with at least minMatches matches and
 	// one win; found is false when there is none.
 	BestNoble(ctx context.Context, classID, minMatches int) (objectID int32, name string, found bool, err error)
-	// StoreElection stores an election in one transaction: every stored
-	// hero leaves the running era; unless heroes is empty, every hero item
-	// no game master owns is deleted and heroes are saved as SaveHeroes
-	// does. A failure stores none of it.
-	StoreElection(ctx context.Context, heroes map[int32]Hero) error
+	// StoreElection stores election, numbered, in one transaction: every
+	// stored hero leaves the running era; unless heroes is empty, every
+	// hero item no game master owns is deleted and heroes are saved as
+	// SaveHeroes does; the number is kept as the last election's. A
+	// failure stores none of it.
+	StoreElection(ctx context.Context, heroes map[int32]Hero, election int64) error
+	// LastElection returns the number of the last election stored, 0 for
+	// none.
+	LastElection(ctx context.Context) (int64, error)
 	// SaveHeroes inserts each hero, or updates its count and flags.
 	SaveHeroes(ctx context.Context, heroes map[int32]Hero) error
 	// AddDiaryEntry stores one diary entry made at at, in Unix milliseconds.
@@ -310,7 +314,11 @@ func (m *Manager) AddDiaryEntry(objectID int32, action, param int) {
 // running era's heroes, stored and in memory, as they were and is made
 // again, up to electionAttempts times; when all fail the era keeps them
 // (#4697). No hero claims its status while the election runs.
-func (m *Manager) Elect() {
+//
+// election numbers the election: one stored under that number or a later
+// one already is not made again, so an election a restart repeats counts
+// no hero twice (#4695).
+func (m *Manager) Elect(election int64) {
 	m.mu.Lock()
 	m.electing = true
 	m.mu.Unlock()
@@ -320,7 +328,7 @@ func (m *Manager) Elect() {
 		m.mu.Unlock()
 	}()
 	for attempt := 1; attempt <= electionAttempts; attempt++ {
-		err := m.elect()
+		err := m.elect(election)
 		if err == nil {
 			return
 		}
@@ -329,10 +337,19 @@ func (m *Manager) Elect() {
 	m.log.Error().Msg("hero: every election attempt failed; the running era keeps its heroes")
 }
 
-// elect makes one election attempt, within electionTimeout.
-func (m *Manager) elect() error {
+// elect makes one attempt at election, within electionTimeout.
+func (m *Manager) elect(election int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), electionTimeout)
 	defer cancel()
+
+	last, err := m.store.LastElection(ctx)
+	if err != nil {
+		return fmt.Errorf("read the last election: %w", err)
+	}
+	if last >= election {
+		m.log.Info().Int64("election", election).Msg("hero: election already stored")
+		return nil
+	}
 
 	type pick struct {
 		objectID int32
@@ -384,7 +401,7 @@ func (m *Manager) elect() error {
 		}
 	}
 
-	if err := m.store.StoreElection(ctx, maps.Clone(elected)); err != nil {
+	if err := m.store.StoreElection(ctx, maps.Clone(elected), election); err != nil {
 		return err
 	}
 

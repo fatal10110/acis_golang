@@ -157,6 +157,16 @@ type Status struct {
 	// ValidationEnd is when the validation period running after an
 	// Olympiad's end closes, in Unix milliseconds; zero outside one.
 	ValidationEnd int64
+	// End and NextPoints are when the running Olympiad ends and when the
+	// next weekly grant falls due, in Unix milliseconds; zero when not
+	// stored yet (#4695).
+	End, NextPoints int64
+	// Election numbers the latest Olympiad end, counting up from 1; zero
+	// before the first. Electing reports that its election and the
+	// month's standings may not be stored yet, so a restart finishes them
+	// (#4695).
+	Election int64
+	Electing bool
 }
 
 // Store persists the calendar's status and the nobles' records.
@@ -185,10 +195,11 @@ type Store interface {
 
 // Heroes elects the heroes from the stored nobles' records.
 type Heroes interface {
-	// Elect runs on the Olympiad's persistence lane, so it reads the
-	// records the Olympiad saved before it. It bounds its own database
-	// work.
-	Elect()
+	// Elect runs election, the number of an Olympiad end, once: an
+	// election stored under that number or a later one is not run again.
+	// It runs on the Olympiad's persistence lane, so it reads the records
+	// the Olympiad saved before it. It bounds its own database work.
+	Elect(election int64)
 }
 
 // step is one scheduled calendar change. The order breaks ties between
@@ -231,6 +242,10 @@ type Olympiad struct {
 	// olympiadEnd and nextPoints are Unix milliseconds.
 	olympiadEnd int64
 	nextPoints  int64
+	// election numbers the latest Olympiad end; electing reports that the
+	// steps finishing it are not queued yet.
+	election int64
+	electing bool
 	// registrationEnd is how long, from the latest scheduling, registration
 	// stays open; negative when it is not counting down.
 	registrationEnd int64
@@ -270,7 +285,8 @@ func New(cfg Config, store Store, writes Writer, out Announcer, heroes Heroes, q
 }
 
 // Restore loads the cycle number, the first when none is stored, a running
-// validation period and the nobles' records.
+// validation period, the Olympiad's end, the next weekly grant, an
+// unfinished end and the nobles' records.
 func (o *Olympiad) Restore(ctx context.Context) error {
 	st, found, err := o.store.LoadStatus(ctx)
 	if err != nil {
@@ -283,6 +299,10 @@ func (o *Olympiad) Restore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	o.run.Lock()
+	o.olympiadEnd, o.nextPoints = st.End, st.NextPoints
+	o.election, o.electing = st.Election, st.Electing
+	o.run.Unlock()
 	o.mu.Lock()
 	o.cycle = st.Cycle
 	if st.ValidationEnd != 0 {
@@ -294,10 +314,13 @@ func (o *Olympiad) Restore(ctx context.Context) error {
 	return nil
 }
 
-// Start schedules the next calendar step. A restored validation period
-// runs to its end, or opens the next cycle at once when already over;
-// otherwise the Olympiad ends at noon on the first of the next month, and
-// the period the clock is in is entered.
+// Start schedules the next calendar step. An end a restart cut short is
+// finished first. A restored validation period runs to its end, or opens
+// the next cycle at once when already over; otherwise the period the clock
+// is in is entered. The Olympiad ends when it was stored to, at noon on the
+// first of the next month when none was stored, and a stored end or weekly
+// grant the clock has passed is run at once, in the order they fell due
+// (#4695).
 func (o *Olympiad) Start() {
 	o.queue.Post(func() {
 		o.run.Lock()
@@ -309,9 +332,14 @@ func (o *Olympiad) Start() {
 		o.mu.Lock()
 		validation, validationEnd := o.period == Validation, o.periodEnd
 		o.mu.Unlock()
+		if o.electing {
+			o.finishEnd()
+		}
 		switch {
 		case !validation:
-			o.olympiadEnd = nextOlympiadEnd(now)
+			if o.olympiadEnd == 0 {
+				o.olympiadEnd = nextOlympiadEnd(now)
+			}
 			o.enterPeriod()
 		case validationEnd <= now.UnixMilli():
 			o.startCycle()
@@ -396,16 +424,23 @@ func (o *Olympiad) fire() {
 	case stepValidationEnd:
 		o.startCycle()
 	case stepNoblePoints:
-		// A grant due in the validation period adds nothing.
+		// A grant due in the validation period adds nothing. A grant
+		// made is saved with the next grant's time, so a restart
+		// neither repeats nor loses it, whatever was saved since
+		// (#4695, #4696).
 		o.nextPoints = nextNoblePointsUpdate(o.queue.Now(), o.cfg)
 		o.mu.Lock()
-		if o.period != Validation {
+		granted := o.period != Validation && len(o.nobles) > 0
+		if granted {
 			for id, n := range o.nobles {
 				n.addPoints(o.cfg.WeeklyPoints)
 				o.nobles[id] = n
 			}
 		}
 		o.mu.Unlock()
+		if granted {
+			o.saveStatus()
+		}
 	case stepRegistrationEnd:
 		o.out.Announce(NoticeRegistrationEnded, 0)
 		o.registrationEnd = -1
@@ -418,7 +453,8 @@ func (o *Olympiad) fire() {
 // schedule arms the timer for the step due soonest; ties go to the step
 // listed first. Each period's own end is a candidate only during it, the
 // Olympiad's end only outside the validation period, and the weekly grant
-// once it is set. A step the clock has passed is due at once.
+// once it is set. A step the clock has passed is due at once, the earliest
+// of them first.
 func (o *Olympiad) schedule() {
 	now := o.queue.Now().UnixMilli()
 	o.mu.Lock()
@@ -433,21 +469,24 @@ func (o *Olympiad) schedule() {
 			if period != periodEnding[s] {
 				continue
 			}
-			delay = max(periodEnd-now, 0)
+			delay = periodEnd - now
 		case stepOlympiadEnd:
 			if period == Validation {
 				continue
 			}
-			delay = max(o.olympiadEnd-now, 0)
+			delay = o.olympiadEnd - now
 		case stepNoblePoints:
 			if o.nextPoints == 0 {
 				continue
 			}
-			delay = max(o.nextPoints-now, 0)
+			delay = o.nextPoints - now
 		case stepRegistrationEnd:
+			if o.registrationEnd < 0 {
+				continue
+			}
 			delay = o.registrationEnd
 		}
-		if delay >= 0 && delay < bestDelay {
+		if delay < bestDelay {
 			best, bestDelay = s, delay
 		}
 	}
@@ -456,15 +495,16 @@ func (o *Olympiad) schedule() {
 		return
 	}
 	o.due = best
-	o.timer = o.queue.After(time.Duration(bestDelay)*time.Millisecond, o.fire)
+	o.timer = o.queue.After(time.Duration(max(bestDelay, 0))*time.Millisecond, o.fire)
 }
 
-// enterPeriod sets a weekly grant not set or passed, then enters the part
+// enterPeriod sets the weekly grant when none is set, then enters the part
 // of the running Olympiad's day the clock is in, opening the competition
-// window when inside it.
+// window when inside it. A grant the clock has passed is kept, to be made
+// at once (#4695).
 func (o *Olympiad) enterPeriod() {
 	now := o.queue.Now()
-	if o.nextPoints == 0 || o.nextPoints < now.UnixMilli() {
+	if o.nextPoints == 0 {
 		o.nextPoints = nextNoblePointsUpdate(now, o.cfg)
 	}
 	period, end := periodAt(now, o.cfg, o.olympiadEnd)
@@ -493,7 +533,7 @@ func (o *Olympiad) openCompetition() {
 
 // closeCompetition stops the window's draws, saves the status and enters
 // the next period. A match still running goes on to its end in its stadium
-// and is saved with the next status save.
+// and is saved once judged.
 func (o *Olympiad) closeCompetition() {
 	o.stopGames()
 	o.saveStatus()
@@ -540,8 +580,12 @@ func (o *Olympiad) SelectHeroes() {
 }
 
 // endOlympiad closes the running Olympiad: it stops the draws, saves the
-// records, enters the validation period, elects the heroes from the saved
-// records, saves the status and keeps the month's standings.
+// records, enters the validation period and saves the status with the end
+// marked unfinished, then elects the heroes from the saved records, keeps
+// the month's standings and saves the status with the end finished. The
+// writes land in that order on the persistence lane, so a restart after a
+// crash finds the Olympiad either still running, to end it again, or its
+// end unfinished, to finish it; the election, numbered, runs once (#4695).
 func (o *Olympiad) endOlympiad() {
 	o.stopGames()
 	o.registrationEnd = -1
@@ -550,27 +594,65 @@ func (o *Olympiad) endOlympiad() {
 	o.mu.Lock()
 	o.period, o.periodEnd = Validation, o.queue.Now().UnixMilli()+validationMillis
 	o.mu.Unlock()
+	o.election++
+	o.electing = true
+	o.saveStatus()
+	o.finishEnd()
+}
+
+// finishEnd queues the steps finishing the latest end after its first
+// status save: the election, the month's standings and the status save
+// marking the end finished.
+func (o *Olympiad) finishEnd() {
 	if o.heroes != nil {
-		heroes := o.heroes
+		heroes, election := o.heroes, o.election
 		o.queueJob("elect heroes", func(context.Context) error {
-			heroes.Elect()
+			heroes.Elect(election)
 			return nil
 		})
 	}
-	o.saveStatus()
 	o.write("keep the month's standings", func(ctx context.Context, st Store) error { return st.SnapshotMonth(ctx) })
+	o.electing = false
+	st := o.status()
+	o.write("save status", func(ctx context.Context, s Store) error { return s.SaveStatus(ctx, st) })
 }
 
-// saveStatus queues the save of the status and the nobles' records.
-func (o *Olympiad) saveStatus() {
+// status is the calendar state to store.
+func (o *Olympiad) status() Status {
+	st := Status{End: o.olympiadEnd, NextPoints: o.nextPoints, Election: o.election, Electing: o.electing}
 	o.mu.Lock()
-	st := Status{Cycle: o.cycle}
+	st.Cycle = o.cycle
 	if o.period == Validation {
 		st.ValidationEnd = o.periodEnd
 	}
 	o.mu.Unlock()
+	return st
+}
+
+// saveStatus queues the save of the status and the nobles' records.
+func (o *Olympiad) saveStatus() {
+	st := o.status()
 	o.write("save status", func(ctx context.Context, s Store) error { return s.SaveStatus(ctx, st) })
 	o.saveNobles()
+}
+
+// saveRecords queues the save of the records of ids as they stand now;
+// none held writes nothing.
+func (o *Olympiad) saveRecords(ids ...int32) {
+	o.order.Lock()
+	defer o.order.Unlock()
+	nobles := make(map[int32]Noble, len(ids))
+	o.mu.Lock()
+	for _, id := range ids {
+		if n, ok := o.nobles[id]; ok {
+			nobles[id] = n
+		}
+	}
+	o.mu.Unlock()
+	if len(nobles) == 0 {
+		return
+	}
+	o.write("save match records", func(ctx context.Context, st Store) error { return st.SaveNobles(ctx, nobles) })
 }
 
 // saveNobles queues the save of every noble's record as it stands now;
@@ -587,14 +669,18 @@ func (o *Olympiad) saveNobles() {
 	o.write("save nobles", func(ctx context.Context, st Store) error { return st.SaveNobles(ctx, nobles) })
 }
 
-// deleteNobles removes every noble's record held and queues the removal of
-// the stored ones; the held ones go even when the stored ones cannot.
+// deleteNobles removes every noble's record held, and both waiting lists
+// with them so no noble waits without a record (#5117), and queues the
+// removal of the stored records; the held ones go even when the stored
+// ones cannot.
 func (o *Olympiad) deleteNobles() {
 	o.order.Lock()
 	defer o.order.Unlock()
 	o.write("delete nobles", func(ctx context.Context, st Store) error { return st.DeleteNobles(ctx) })
 	o.mu.Lock()
 	clear(o.nobles)
+	clear(o.classed)
+	o.nonClassed = nil
 	o.mu.Unlock()
 }
 

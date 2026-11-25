@@ -42,7 +42,7 @@ func TestElectionHoldsClaims(t *testing.T) {
 		if err := store.m.Restore(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		store.m.Elect()
+		store.m.Elect(1)
 		for _, ok := range store.claimed {
 			if ok {
 				t.Fatalf("fail=%v: a claim succeeded while the election ran", fail)

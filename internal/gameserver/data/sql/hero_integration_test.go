@@ -54,8 +54,14 @@ func TestHeroStoreHeroes(t *testing.T) {
 		t.Fatalf("message = %q, %v; want kept", message, err)
 	}
 
-	if err := store.StoreElection(ctx, nil); err != nil {
+	if last, err := store.LastElection(ctx); err != nil || last != 0 {
+		t.Fatalf("LastElection() before any = %d, %v; want 0", last, err)
+	}
+	if err := store.StoreElection(ctx, nil, 7); err != nil {
 		t.Fatal(err)
+	}
+	if last, err := store.LastElection(ctx); err != nil || last != 7 {
+		t.Fatalf("LastElection() after election 7 = %d, %v; want 7", last, err)
 	}
 	if got, _ := store.LoadHeroes(ctx); slices.ContainsFunc(got, func(r hero.Row) bool { return r.Played }) || !got[1].Active {
 		t.Fatalf("LoadHeroes() after an election without heroes = %+v, want no played hero, flags otherwise kept", got)
@@ -117,7 +123,7 @@ func TestHeroStoreItemsAndDiary(t *testing.T) {
 			(302, 4, 6620, 1, 'INVENTORY', 0), (303, 5, 6612, 1, 'INVENTORY', 0)`,
 		`INSERT INTO heroes (char_id, class_id, count, played, active) VALUES (302, 90, 1, 1, 1)`,
 	)
-	if err := store.StoreElection(ctx, map[int32]hero.Hero{301: {ClassID: 88, Count: 1, Played: true}}); err != nil {
+	if err := store.StoreElection(ctx, map[int32]hero.Hero{301: {ClassID: 88, Count: 1, Played: true}}, 1); err != nil {
 		t.Fatal(err)
 	}
 	heroes, err := store.LoadHeroes(ctx)

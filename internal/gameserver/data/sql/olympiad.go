@@ -9,12 +9,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 )
 
-// olympiadCycleMemo and olympiadValidationEndMemo are the server_memo
-// variables holding the Olympiad cycle and the close of a running
-// validation period; server_memo names hold at most 20 characters.
+// The server_memo variables holding the Olympiad's status: the cycle, the
+// close of a running validation period, the Olympiad's end, the next
+// weekly grant, the latest end's number and whether that end is
+// unfinished. server_memo names hold at most 20 characters.
 const (
 	olympiadCycleMemo         = "olympiad_cycle"
 	olympiadValidationEndMemo = "olympiad_valid_end"
+	olympiadEndMemo           = "olympiad_end"
+	olympiadNextPointsMemo    = "olympiad_next_pts"
+	olympiadElectionMemo      = "olympiad_election"
+	olympiadElectingMemo      = "olympiad_electing"
 )
 
 // OlympiadStore reads and writes the Olympiad's status, kept in
@@ -30,12 +35,13 @@ func NewOlympiadStore(db *sql.DB) *OlympiadStore {
 }
 
 // LoadStatus returns the stored status, found=false when no cycle is
-// stored; a validation end not stored reads as none running. A cycle that
-// is not a 32-bit decimal integer, or a validation end not a 64-bit one,
-// is an error.
+// stored; any other variable not stored reads as zero. A cycle that is not
+// a 32-bit decimal integer, or another variable not a 64-bit one, is an
+// error.
 func (s *OlympiadStore) LoadStatus(ctx context.Context) (olympiad.Status, bool, error) {
 	var st olympiad.Status
-	rows, err := s.db.QueryContext(ctx, "SELECT var, value FROM server_memo WHERE var IN (?, ?)", olympiadCycleMemo, olympiadValidationEndMemo)
+	rows, err := s.db.QueryContext(ctx, "SELECT var, value FROM server_memo WHERE var IN (?, ?, ?, ?, ?, ?)",
+		olympiadCycleMemo, olympiadValidationEndMemo, olympiadEndMemo, olympiadNextPointsMemo, olympiadElectionMemo, olympiadElectingMemo)
 	if err != nil {
 		return st, false, fmt.Errorf("load olympiad status: %w", err)
 	}
@@ -46,19 +52,29 @@ func (s *OlympiadStore) LoadStatus(ctx context.Context) (olympiad.Status, bool, 
 		if err := rows.Scan(&name, &value); err != nil {
 			return st, false, fmt.Errorf("load olympiad status: %w", err)
 		}
-		switch name {
-		case olympiadCycleMemo:
+		if name == olympiadCycleMemo {
 			cycle, err := strconv.ParseInt(value, 10, 32)
 			if err != nil {
 				return st, false, fmt.Errorf("load olympiad cycle %q: %w", value, err)
 			}
 			st.Cycle, found = int32(cycle), true
+			continue
+		}
+		n, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return st, false, fmt.Errorf("load olympiad %s %q: %w", name, value, err)
+		}
+		switch name {
 		case olympiadValidationEndMemo:
-			end, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				return st, false, fmt.Errorf("load olympiad validation end %q: %w", value, err)
-			}
-			st.ValidationEnd = end
+			st.ValidationEnd = n
+		case olympiadEndMemo:
+			st.End = n
+		case olympiadNextPointsMemo:
+			st.NextPoints = n
+		case olympiadElectionMemo:
+			st.Election = n
+		case olympiadElectingMemo:
+			st.Electing = n != 0
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -67,12 +83,20 @@ func (s *OlympiadStore) LoadStatus(ctx context.Context) (olympiad.Status, bool, 
 	return st, found, nil
 }
 
-// SaveStatus stores the status, both variables in one statement.
+// SaveStatus stores the status, every variable in one statement.
 func (s *OlympiadStore) SaveStatus(ctx context.Context, st olympiad.Status) error {
+	electing := "0"
+	if st.Electing {
+		electing = "1"
+	}
 	if _, err := s.db.ExecContext(ctx,
-		"INSERT INTO server_memo (var, value) VALUES (?, ?), (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
+		"INSERT INTO server_memo (var, value) VALUES (?, ?), (?, ?), (?, ?), (?, ?), (?, ?), (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
 		olympiadCycleMemo, strconv.FormatInt(int64(st.Cycle), 10),
 		olympiadValidationEndMemo, strconv.FormatInt(st.ValidationEnd, 10),
+		olympiadEndMemo, strconv.FormatInt(st.End, 10),
+		olympiadNextPointsMemo, strconv.FormatInt(st.NextPoints, 10),
+		olympiadElectionMemo, strconv.FormatInt(st.Election, 10),
+		olympiadElectingMemo, electing,
 	); err != nil {
 		return fmt.Errorf("save olympiad status: %w", err)
 	}

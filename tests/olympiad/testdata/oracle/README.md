@@ -60,6 +60,13 @@ Each marked `Deviation:` in the probe and matched by the Go calendar:
   end, and the status is saved as soon as a cycle opens, so a crash in
   either keeps the calendar where it was. aCis 401 saves the old close at
   the end, and nothing when a cycle opens.
+- The status is saved before the heroes are elected, the end marked
+  unfinished, and again once the election and the month's standings are
+  stored, the end marked finished; a weekly grant that adds points saves
+  the status and the records at once. The status also keeps the Olympiad's
+  end and the next grant, so a restart neither recomputes the end nor skips
+  or repeats a grant (#4695). aCis recomputes both at start and saves
+  nothing at a grant.
 
 ## Scenarios
 
