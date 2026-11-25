@@ -179,7 +179,7 @@ func TestGMChat(t *testing.T) {
 
 // TestAnnounceManagesLoginAnnouncements pins //announce (AdminAnnouncements.java,
 // AnnouncementData.java) over login announcements: add, list, all, del and
-// their refusals, the index an addition takes after a deletion, and the
+// their refusals, the index an addition takes after a deletion (#4707), and the
 // announcements.xml every change rewrites.
 func TestAnnounceManagesLoginAnnouncements(t *testing.T) {
 	t.Parallel()
@@ -236,10 +236,13 @@ func TestAnnounceManagesLoginAnnouncements(t *testing.T) {
 	assertAnnouncementFile(t, srv,
 		`<announcement message="Welcome" critical="false" auto="false" initial_delay="0" delay="0" limit="0" />`)
 
-	// One announcement is held, so the next takes index 1 and replaces
-	// "Welcome".
-	assertList(t, exchange(t, gm, encodeBuildCmd("announce add false Goodbye")), listedAnnouncement("1", "Goodbye", "false", "false"))
+	// The next takes an index never handed out, so "Welcome" stays (#4707;
+	// the reference reuses index 1 and replaces it).
+	assertList(t, exchange(t, gm, encodeBuildCmd("announce add false Goodbye")),
+		listedAnnouncement("1", "Welcome", "false", "false"),
+		listedAnnouncement("2", "Goodbye", "false", "false"))
 	assertAnnouncementFile(t, srv,
+		`<announcement message="Welcome" critical="false" auto="false" initial_delay="0" delay="0" limit="0" />`,
 		`<announcement message="Goodbye" critical="false" auto="false" initial_delay="0" delay="0" limit="0" />`)
 }
 
