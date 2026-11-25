@@ -188,9 +188,10 @@ func (hs *Halls) endAuctionLocked(h *hall) {
 			hs.startAuctionLocked(h)
 			return
 		}
-		// Parity exception (#5018): an unsold sale is dropped, its end
-		// date cleared and the hall taken off the listing, rather than
-		// left listed with no end armed; the deposit stays spent.
+		// Parity exception (#5018, #5356): an unsold sale is dropped,
+		// its end date cleared and the hall taken off the listing,
+		// rather than left listed with no end armed; the deposit stays
+		// spent.
 		seller, _ := hs.clans.Get(h.ownerID)
 		hs.tellClan(seller, Notice{Kind: NoticeNotSold})
 		hs.resetAuctionLocked(h)

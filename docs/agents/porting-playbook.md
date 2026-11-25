@@ -87,7 +87,7 @@ line the party keeps the leader who just disconnected. Go promotes the first rem
 regardless (`party.Registry.Leave`); the party duel is cancelled in both. Pinned by
 `TestDisconnectingLeaderHandsOverToDuelingMember` (`internal/gameserver/party`).
 
-**Parity exception: an unsold clan hall sale is dropped** (#5018). The reference keeps the seller and
+**Parity exception: an unsold clan hall sale is dropped** (#5018, #5356). The reference keeps the seller and
 the end date of a sale that ended without a bid, arms no new end and leaves the hall listed. Go tells
 the selling clan the hall was not sold, then drops the sale, clears the end date and takes the hall
 off the listing (`clanhall.Halls.endAuctionLocked`, also reached by the admin auction end). The
@@ -209,6 +209,80 @@ with nothing taken (`inventory.Service.Sell`). Pinned by `TestMerchantRefusesGML
 queues the enchanted item's `InventoryUpdate` on the GM's inventory, so the target's client gets none.
 Go queues it on the owner's inventory (`network` admin enchant). Pinned by
 `TestAdminEnchantSelectedPlayerInventoryUpdate` (`tests/admin`).
+
+**Parity exception: an oversized mail counts toward the daily limit** (#5010). The reference fails
+the whole batch on a mail wider than its columns (message over 3000, recipients over 200), so nothing
+is filed and nothing counts. Go delivers it to its recipients for the run, files no sent-box copy and
+counts it against the 10-a-day limit like a stored mail (`bbs.Mailbox.Send`), so the limit cannot be
+dodged with unstorable mail. Pinned by `TestUnstoredSendsCountForADay` (`internal/gameserver/bbs`).
+
+**Parity exception: a malformed petition type is answered with `ActionFailed`** (#5010). The reference
+throws on a type outside the petition types and the client gets nothing. Go logs the refusal and
+sends `ActionFailed` so the petition window is not left waiting (`network` petition submit). Pinned
+by `TestPetitionSubmit` (`tests/petition`).
+
+**Parity exception: the GM petition window strips link words** (#5010). The reference shows the
+player-written petition text and feedback raw. Go strips link words from both before they reach a
+GM's window (`network` admin petition page, `commons.StripLinkWords`). Pinned by
+`TestPetitionTextCannotCarryLinks` (`tests/petition`).
+
+**Parity exception: the petition save is one transaction, with feedback cut to 512** (#5010). The
+reference empties the petition tables and then inserts row by row, so one over-long feedback loses
+every petition at shutdown. Go cuts a feedback to the 512 characters its column holds and saves in
+one transaction, so a failed save leaves the previous rows in place (`sql.PetitionStore.Save`).
+Pinned by `TestPetitionSaveIsOneTransaction` (`tests/petition`).
+
+**Parity exception: a wedding accept re-checks the spouses and takes payment first** (#5010). The
+reference makes the couple first and ignores a failed adena deduction, so a spouse short of adena
+marries for free and a requester who asked two players ends up in two couples. Go refuses a spouse
+married since the request, takes both payments before the couple exists and refunds one when the
+other fails (`wedding.Manager.marry`). Pinned by `TestWeddingAcceptRechecksSpouses` (`tests/wedding`).
+
+**Parity exception: `//siege end` then `//siege start` runs one countdown** (#5016). The reference
+does not stop the siege clock at the end, so a siege started again within the old clock's wait gets
+every countdown message twice. Go stops the clock with the siege and the new siege arms its own
+(`siege.Siege.endLocked`). Pinned by `TestAdminSiegeRestartRunsOneCountdown` (`tests/admin`).
+
+**Parity exception: Rainbow Springs passes over a surplus clan whose leader is away** (#5022). With
+more than four clans registered, the reference fails on a clan left over whose leader is offline or
+which no longer exists, before telling it, and stops choosing: no countdown, no game and no next
+date until a restart. Go passes such a clan over without a word and goes on with the four chosen
+(`rainbowspringschateau` `setFinalAttackers`). Pinned by
+`TestRainbowSpringsPassesOverSurplusClanWithLeaderAway` (`tests/clan`).
+
+**Parity exception: a hall siege date set anew at boot stores the real owner** (#5022). The
+reference sets a past siege date anew and writes the hall row before it restores the owner, so the
+row stores no owner and a second restart in that window frees the hall. Go restores the owner first
+(`clanhall.Halls` restore). Pinned by `TestHallSiegeDateSetAnewAtBoot` (`tests/clan`).
+
+**Parity exception: one festival schedule runs after a boot in the recruiting period** (#5024,
+#5026). The reference starts a festival schedule at boot and, as the overdue recruiting end begins
+the competition, a second one without cancelling the first, so two run every cycle until a restart;
+a schedule still in its signup loop at the competition end likewise survives into the next
+competition. Go cancels the running schedule, signup loop included, before it starts another
+(`festival.Manager.CompetitionBegun`); a festival already under way runs to its end and takes its
+party back out. Pinned by `TestBootInRecruitingRunsOneSchedule`,
+`TestNoticeKeepsCountingFromCompetitionEndToNextCompetition` and
+`TestReplacingSignupEndsEmptyWhileTheFestivalRuns` (`internal/gameserver/festival`).
+
+**Parity exception: the hero election dethrones outgoing heroes by object id** (#5027). The reference
+finds an outgoing hero online by the name recorded at the last election, so after a rename the hero
+keeps its status, skills and items until it relogs, or another character holding the old name is
+dethroned instead. Go reaches the outgoing heroes by object id (`hero.Manager.Elect`). Pinned by
+`TestHeroElectionDethronesRenamedHero` (`tests/olympiad`).
+
+**Parity exception: a party duel cancelled by a party edit stops ticking** (#5029). The reference
+ends the duel but keeps its one-second task running, so later ticks can teleport the players again,
+start the duel on players already out of it, or end it a second time with another tie message,
+`ExDuelEnd` and restore. Go ends it once and its next tick finds it gone (`duel.Manager.PartyEdit`).
+Pinned by `TestPartyDuelEditCancels` (`tests/duel`).
+
+**Parity exception: the scheme buffer keeps an unoffered skill out of the fee and opens the page**
+(#5033, #5034). The reference adds any skill id the editor names and then fails on it computing the
+fee, so `support` and `deletescheme` answer nothing and `createscheme` opens no page until a restart.
+Go adds no skill the buffer does not offer, drops one on load, and leaves one out of the fee, so the
+schemes page always opens (`schemebuffer.Manager.fee`). Pinned by
+`TestSchemeBufferUnofferedSkillKeepsPagesAnswering` (`tests/npcs`).
 
 ## 4. Design the native Go shape
 

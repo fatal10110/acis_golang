@@ -91,7 +91,9 @@ func (m *Manager) waitIdleLocked(ctx context.Context) {
 
 // CompetitionBegun starts a new festival schedule in place of any running
 // one and counts a new festival cycle. A festival under way runs to its
-// end alongside it.
+// end alongside it. The schedule it replaces is cancelled first, a cycle
+// still in its signup period included, so one schedule ever runs, after a
+// boot in the recruiting period too (parity exception, #5024).
 func (m *Manager) CompetitionBegun() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

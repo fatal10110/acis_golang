@@ -414,6 +414,9 @@ func (m *Manager) elect(election int64) error {
 	online := m.online
 	m.mu.Unlock()
 	if online != nil {
+		// Outgoing heroes are reached by object id, never by a name, so a
+		// hero renamed since its election is still dethroned and no other
+		// character is (parity exception, #5027).
 		for _, id := range outgoing {
 			online.Dethrone(id)
 		}

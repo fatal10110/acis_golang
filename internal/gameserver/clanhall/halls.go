@@ -297,6 +297,9 @@ func (hs *Halls) Restore(ctx context.Context) error {
 				hs.log.Warn().Int32("hall_id", row.ID).Int32("clan_id", row.OwnerID).Msg("clanhall: owner is no clan; the hall stays free")
 			}
 		}
+		// The owner is restored before the siege date, so a date set
+		// anew at boot stores the hall's real owner (parity exception,
+		// #5022).
 		if h.siege != nil && h.auction == nil {
 			hs.restoreSiegeDateLocked(h, row.EndDate)
 		}

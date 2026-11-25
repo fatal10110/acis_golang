@@ -210,7 +210,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 		{"%responders%", d.Responders},
 		// Player-written text reaches a GM's window with its link words
 		// stripped, never raw: a petition must not plant a working link
-		// in front of a GM.
+		// in front of a GM (parity exception, #5010).
 		{"%content%", commons.StripLinkWords(commons.HTMLValue(d.Content))},
 	} {
 		html = strings.ReplaceAll(html, r.key, r.value)
@@ -221,7 +221,8 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	case petition.Closed:
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", petitionFeedback)
 		html = strings.ReplaceAll(html, "%rate%", d.Rate.Desc())
-		// Feedback is player-written too: stripped like %content%.
+		// Feedback is player-written too: stripped like %content%
+		// (parity exception, #5010).
 		html = strings.ReplaceAll(html, "%feedback%", commons.StripLinkWords(commons.HTMLValue(d.Feedback)))
 	default:
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", "")

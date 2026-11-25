@@ -275,7 +275,8 @@ func (f *fight[P]) defeat(p P) {
 
 // PartyEdit cancels the party duel p is in, as any change to the members
 // of a duelling party does, and returns it. A one-on-one duel, or p in no
-// duel, is left alone.
+// duel, is left alone. The cancelled duel is over: its next tick finds it
+// gone and does nothing, so it ends once (parity exception, #5029).
 func (m *Manager[P]) PartyEdit(p P) (View[P], bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

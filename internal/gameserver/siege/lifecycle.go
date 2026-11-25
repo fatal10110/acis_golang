@@ -284,6 +284,9 @@ func (s *Siege) endLocked(fx *effects) {
 	}
 	e := s.e
 	castleID := s.castle.ID
+	// The clock stops with the siege, so a siege started again right
+	// after runs one countdown, never a second one left over from the
+	// siege that ended (parity exception, #5016).
 	s.clockGen++
 	if s.clock != nil {
 		s.clock.Stop()
