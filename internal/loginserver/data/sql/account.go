@@ -28,7 +28,9 @@ func NewAccountStore(db *sql.DB) *AccountStore {
 // if no such row exists. The row is matched under the table's collation,
 // which may treat other spellings (for instance accented ones) as equal to
 // the stored login; the returned account always carries the stored login,
-// so every spelling of one account resolves to one key (#5046).
+// so every spelling of one account resolves to one key (#5046). A caller
+// that must accept only the exact name compares it with the returned login
+// (#5464).
 func (s *AccountStore) Account(ctx context.Context, login string) (model.Account, error) {
 	var stored, password string
 	var accessLevel, lastServer int
