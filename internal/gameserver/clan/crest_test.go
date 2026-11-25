@@ -6,6 +6,7 @@ import (
 	"time"
 
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/rs/zerolog"
 )
 
@@ -38,7 +39,7 @@ func TestSetCrestSkipsStoredCrestID(t *testing.T) {
 	leader := inClan(leaderID, "Lead", 1)
 
 	image := bytes.Repeat([]byte{0x02}, 256)
-	if _, got := s.SetCrest(leader, datacache.PledgeCrest, image, files, time.Now()); got != CrestRegistered {
+	if got := uploadCrest(t, s, leader, image, files); got != CrestRegistered {
 		t.Fatalf("upload = %v, want CrestRegistered", got)
 	}
 	cl, _ := table.Get(1)
@@ -52,13 +53,66 @@ func TestSetCrestSkipsStoredCrestID(t *testing.T) {
 		t.Fatalf("stored crest_id = %d, want 501", got)
 	}
 
-	if _, got := s.SetCrest(leader, datacache.PledgeCrest, nil, files, time.Now()); got != CrestDeleted {
+	if _, got, _ := s.SetCrest(leader, datacache.PledgeCrest, nil, files, time.Now()); got != CrestDeleted {
 		t.Fatalf("deletion = %v, want CrestDeleted", got)
 	}
 	if files.Has(datacache.PledgeCrest, 501) || cl.Info().CrestID != 0 || store.crests[[2]int32{1, int32(datacache.PledgeCrest)}] != 0 {
 		t.Fatal("deletion left the crest image, id or column")
 	}
-	if _, got := s.SetCrest(leader, datacache.PledgeCrest, nil, files, time.Now()); got != CrestIgnored {
+	if _, got, _ := s.SetCrest(leader, datacache.PledgeCrest, nil, files, time.Now()); got != CrestIgnored {
 		t.Fatalf("deleting no crest = %v, want CrestIgnored", got)
+	}
+}
+
+// uploadCrest uploads image as leader's clan's pledge crest the way the
+// upload request does: accepted, stored, then committed.
+func uploadCrest(t *testing.T, s *Service, leader *player.Character, image []byte, files *datacache.Crests) CrestResult {
+	t.Helper()
+	_, got, up := s.SetCrest(leader, datacache.PledgeCrest, image, files, time.Now())
+	if got != CrestPending {
+		return got
+	}
+	if !s.StoreCrest(up, files) {
+		t.Fatal("crest image not stored")
+	}
+	_, got = s.CommitCrest(leader, up, files, time.Now())
+	return got
+}
+
+// TestCommitCrestChecksGatesAgain refuses an accepted and stored image when
+// the clan began dissolving before it was committed: the clan keeps its
+// crest, no column is queued and the stored image is removed.
+func TestCommitCrestChecksGatesAgain(t *testing.T) {
+	const leaderID = 77
+	table := NewTable()
+	table.Restore(Snapshot{
+		Clans:   []Row{{ID: 1, Name: "Crested", Level: 3, LeaderID: leaderID}},
+		Members: []MemberRow{{ClanID: 1, Member: Member{ObjectID: leaderID, Name: "Lead"}}},
+	}, time.Now(), 1)
+	store := newFakeStore()
+	files := datacache.NewCrestsIn(t.TempDir())
+	s := NewService(table, store, nil, &seqIDs{next: 500}, DefaultConfig(), nil, zerolog.Nop())
+	leader := inClan(leaderID, "Lead", 1)
+
+	_, got, up := s.SetCrest(leader, datacache.PledgeCrest, bytes.Repeat([]byte{0x02}, 256), files, time.Now())
+	if got != CrestPending {
+		t.Fatalf("upload = %v, want CrestPending", got)
+	}
+	if !s.StoreCrest(up, files) || !files.Has(datacache.PledgeCrest, int(up.ID)) {
+		t.Fatal("accepted image not stored")
+	}
+	cl, _ := table.Get(1)
+	cl.mu.Lock()
+	cl.dissolvingExpiry = time.Now().Add(time.Hour).UnixMilli()
+	cl.mu.Unlock()
+
+	if _, got := s.CommitCrest(leader, up, files, time.Now()); got != CrestDissolving {
+		t.Fatalf("commit = %v, want CrestDissolving", got)
+	}
+	if cl.Info().CrestID != 0 || len(store.crests) != 0 {
+		t.Fatalf("crest id %d, columns %v after a refused commit, want none", cl.Info().CrestID, store.crests)
+	}
+	if files.Has(datacache.PledgeCrest, int(up.ID)) {
+		t.Fatal("refused image kept")
 	}
 }

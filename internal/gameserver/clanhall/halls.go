@@ -120,10 +120,10 @@ type Bank interface {
 	// write that lands the change.
 	ReturnAdena(clanID int32, adena int) Landing
 	// RestoreWarehouse reads clan clanID's warehouse into memory when it is
-	// not there yet. The lease calls it before taking the halls' lock, so
-	// that TakeAdena under the lock finds the warehouse in memory and no call
-	// on the halls waits on the database.
-	RestoreWarehouse(clanID int32)
+	// not there yet, reporting false when it cannot be read. The lease calls
+	// it before taking the halls' lock, so that TakeAdena under the lock finds
+	// the warehouse in memory and no call on the halls waits on the database.
+	RestoreWarehouse(clanID int32) bool
 }
 
 // NoticeKind names a message every online member of a clan is told.
@@ -481,6 +481,10 @@ func (hs *Halls) stopFeeLocked(h *hall) {
 	}
 }
 
+// feeRetryMs is how long a lease payment that could not read the owner's
+// warehouse waits before it tries again.
+const feeRetryMs = 60_000
+
 // payFee charges h's weekly lease to its owner when its paid term ends.
 // A free hall charges nothing, and an owner that is no clan any more loses
 // the hall. A paid lease extends the term by a week; the adena it takes is
@@ -490,19 +494,28 @@ func (hs *Halls) stopFeeLocked(h *hall) {
 // day's grace, the owner's members told the lease is due, then, unpaid
 // again, takes the hall, the members told it is lost. gen is the
 // generation the payment's timer was armed with.
+//
+// The owner's warehouse is read before the lock is taken. A read that fails
+// charges nothing and tries the payment again feeRetryMs later, with the
+// term unchanged: taking the fee would read the warehouse under the lock,
+// and an unpaid term would cost the owner its hall.
 func (hs *Halls) payFee(h *hall, gen uint64) {
 	hs.mu.Lock()
 	ownerID, due := h.ownerID, h.feeGen == gen && h.fee != nil
 	hs.mu.Unlock()
-	// The owner's warehouse is read outside the lock. An owner changed
-	// meanwhile rearmed or stopped the timer, so the check below drops this
-	// payment.
+	// An owner changed meanwhile rearmed or stopped the timer, so the check
+	// below drops this payment.
+	restored := true
 	if due && ownerID != 0 && h.data.Lease > 0 && hs.bank != nil {
-		hs.bank.RestoreWarehouse(ownerID)
+		restored = hs.bank.RestoreWarehouse(ownerID)
 	}
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	if h.feeGen != gen || h.fee == nil {
+		return
+	}
+	if !restored {
+		hs.scheduleFeeLocked(h, feeRetryMs)
 		return
 	}
 	h.fee = nil

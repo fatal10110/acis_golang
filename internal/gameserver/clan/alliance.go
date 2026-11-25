@@ -426,43 +426,65 @@ func (s *Service) DismissAllyClan(c *player.Character, clanName string, now time
 // SetAllyCrest replaces the crest of the alliance c's clan leads with
 // data, or deletes it when data is empty, on every clan of the alliance.
 // Only the leader of the leading clan may; anyone else's upload, a delete
-// of a crest that is not set, and an image not stored are ignored. The new
-// image is stored in files under a fresh id before the clans point at it;
-// the replaced image is removed from files once the leading clan's column
-// write has landed. It returns the alliance's clans.
-func (s *Service) SetAllyCrest(c *player.Character, data []byte, files *datacache.Crests) ([]*Clan, CrestResult) {
+// of a crest that is not set, and an image not stored are ignored. A delete
+// is done here and returns the alliance's clans. A new image is only
+// accepted (CrestPending): the caller stores it with StoreCrest, then
+// CommitAllyCrest points the clans at it. The replaced image is removed
+// from files once the leading clan's column write has landed.
+func (s *Service) SetAllyCrest(c *player.Character, data []byte, files *datacache.Crests) ([]*Clan, CrestResult, CrestUpload) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
-		return nil, CrestIgnored
+		return nil, CrestIgnored, CrestUpload{}
 	}
 	s.allyMu.Lock()
 	defer s.allyMu.Unlock()
-	allyID := cl.AllyID()
-	if allyID == 0 || cl.id != allyID || !cl.IsLeader(c.ID) {
-		return nil, CrestIgnored
+	if !leadsAllianceLocked(cl, c) {
+		return nil, CrestIgnored, CrestUpload{}
 	}
-	result := CrestRegistered
-	var id int32
 	if len(data) == 0 {
 		if cl.Info().AllyCrestID == 0 {
-			return nil, CrestIgnored
+			return nil, CrestIgnored, CrestUpload{}
 		}
-		result = CrestDeleted
-	} else {
-		if !datacache.AllyCrest.Fits(data) {
-			// Refused before an object id is drawn for it (#5148).
-			return nil, CrestIgnored
-		}
-		var ok bool
-		if id, ok = s.newCrestID(datacache.AllyCrest, files); !ok {
-			return nil, CrestIgnored
-		}
-		if err := files.Save(datacache.AllyCrest, int(id), data); err != nil {
-			s.log.Warn().Err(err).Int32("clan_id", cl.id).Msg("clan: alliance crest not saved")
-			return nil, CrestIgnored
-		}
+		return s.pointAllyCrestLocked(cl, 0, files), CrestDeleted, CrestUpload{}
 	}
-	allies := s.table.Allies(allyID)
+	if !datacache.AllyCrest.Fits(data) {
+		// Refused before an object id is drawn for it (#5148).
+		return nil, CrestIgnored, CrestUpload{}
+	}
+	id, ok := s.newCrestID(datacache.AllyCrest, files)
+	if !ok {
+		return nil, CrestIgnored, CrestUpload{}
+	}
+	return nil, CrestPending, CrestUpload{Type: datacache.AllyCrest, ID: id, Data: data, clanID: cl.id}
+}
+
+// CommitAllyCrest points every clan of the alliance c's clan leads at up,
+// which SetAllyCrest accepted and StoreCrest stored, and returns them. A
+// c that no longer leads the alliance of the clan up was accepted for is
+// ignored, and the image removed from files.
+func (s *Service) CommitAllyCrest(c *player.Character, up CrestUpload, files *datacache.Crests) ([]*Clan, CrestResult) {
+	cl, ok := s.ClanOf(c)
+	s.allyMu.Lock()
+	defer s.allyMu.Unlock()
+	if !ok || cl.id != up.clanID || !leadsAllianceLocked(cl, c) {
+		s.discardCrest(up, files)
+		return nil, CrestIgnored
+	}
+	return s.pointAllyCrestLocked(cl, up.ID, files), CrestRegistered
+}
+
+// leadsAllianceLocked reports whether c leads cl and cl leads an alliance;
+// allyMu is held.
+func leadsAllianceLocked(cl *Clan, c *player.Character) bool {
+	allyID := cl.AllyID()
+	return allyID != 0 && cl.id == allyID && cl.IsLeader(c.ID)
+}
+
+// pointAllyCrestLocked points every clan of the alliance cl leads at the
+// alliance crest id, queueing the leading clan's column, and returns them;
+// allyMu is held.
+func (s *Service) pointAllyCrestLocked(cl *Clan, id int32, files *datacache.Crests) []*Clan {
+	allies := s.table.Allies(cl.id)
 	for _, member := range allies {
 		member.mu.Lock()
 		if member == cl {
@@ -474,7 +496,7 @@ func (s *Service) SetAllyCrest(c *player.Character, data []byte, files *datacach
 		}
 		member.mu.Unlock()
 	}
-	return allies, result
+	return allies
 }
 
 // AllyInfo is an alliance as its information window shows it.

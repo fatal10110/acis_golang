@@ -171,7 +171,9 @@ func (c *Crests) Has(typ CrestType, id int) bool {
 
 // Save stores data as the typ crest id, on disk and in memory, replacing
 // any crest of that family and id. Nothing is saved when data is not
-// exactly the family's size or the file cannot be written.
+// exactly the family's size or the file cannot be written. The file is
+// written before c's lock is taken, so a slow disk holds up no reader; the
+// crest is in memory once it is on disk.
 func (c *Crests) Save(typ CrestType, id int, data []byte) error {
 	spec, ok := typ.spec()
 	if !ok {
@@ -185,39 +187,43 @@ func (c *Crests) Save(typ CrestType, id int, data []byte) error {
 		return fmt.Errorf("save crest %s: no crest directory", name)
 	}
 	data = append([]byte(nil), data...)
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if err := os.WriteFile(filepath.Join(c.dir, name), data, 0o644); err != nil {
 		return fmt.Errorf("save crest %s: %w", name, err)
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	key := crestKey{typ, id}
 	c.byKey[key] = data
 	c.touchLocked(key)
 	return nil
 }
 
-// Remove deletes the typ crest id from memory and disk; nothing happens
-// when it does not exist.
+// Remove deletes the typ crest id from disk and memory; nothing happens
+// when it does not exist. The file is deleted before c's lock is taken, so
+// a slow disk holds up no reader, and a reload meanwhile cannot read it back.
+// A file that cannot be deleted keeps the crest in memory too.
 func (c *Crests) Remove(typ CrestType, id int) error {
 	spec, ok := typ.spec()
 	if c == nil || !ok {
 		return nil
 	}
+	key := crestKey{typ, id}
+	c.mu.RLock()
+	_, ok = c.byKey[key]
+	c.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	if c.dir != "" {
+		name := spec.prefix + strconv.Itoa(id) + ".dds"
+		if err := os.Remove(filepath.Join(c.dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("delete crest %s: %w", name, err)
+		}
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	key := crestKey{typ, id}
-	if _, ok := c.byKey[key]; !ok {
-		return nil
-	}
 	delete(c.byKey, key)
 	c.touchLocked(key)
-	if c.dir == "" {
-		return nil
-	}
-	name := spec.prefix + strconv.Itoa(id) + ".dds"
-	if err := os.Remove(filepath.Join(c.dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("delete crest %s: %w", name, err)
-	}
 	return nil
 }
 

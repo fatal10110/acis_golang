@@ -27,47 +27,112 @@ const (
 	CrestNotAuthorized
 	CrestDeleted
 	CrestLevelTooLow
+	// CrestPending accepts an image that is yet to be stored (StoreCrest)
+	// and committed (CommitCrest or CommitAllyCrest).
+	CrestPending
 	CrestRegistered
 )
 
+// CrestUpload is an image a crest upload accepted, under the fresh id drawn
+// for it. It is stored to disk before the clan points at it, outside every
+// lock and off the uploader's queue, so a slow disk holds up neither.
+type CrestUpload struct {
+	Type   datacache.CrestType
+	ID     int32
+	Data   []byte
+	clanID int32
+}
+
 // SetCrest replaces c's clan's pledge or large pledge crest, typ, with
-// data, or deletes it when data is empty. The new image is stored in files
-// under a fresh id before the clan points at it; the replaced image is
-// removed from files. The alliance crest is not set here.
-func (s *Service) SetCrest(c *player.Character, typ datacache.CrestType, data []byte, files *datacache.Crests, now time.Time) (*Clan, CrestResult) {
-	cl, ok := s.ClanOf(c)
-	if !ok || (typ != datacache.PledgeCrest && typ != datacache.LargePledgeCrest) {
-		return nil, CrestIgnored
-	}
-	if cl.Info().DissolvingExpiry > now.UnixMilli() {
-		return cl, CrestDissolving
-	}
-	if !cl.HasPrivilege(c.ID, PrivEditCrest) {
-		return cl, CrestNotAuthorized
+// data, or deletes it when data is empty. A delete is done here. A new
+// image is only accepted (CrestPending): the caller stores it with
+// StoreCrest, then CommitCrest points the clan at it. The replaced image is
+// removed from files once the clan's column write has landed. The alliance
+// crest is not set here.
+func (s *Service) SetCrest(c *player.Character, typ datacache.CrestType, data []byte, files *datacache.Crests, now time.Time) (*Clan, CrestResult, CrestUpload) {
+	cl, result, ok := s.crestGate(c, typ, len(data) == 0, now)
+	if !ok {
+		return cl, result, CrestUpload{}
 	}
 	if len(data) == 0 {
 		if !s.changeCrest(cl, typ, 0, files) {
-			return cl, CrestIgnored
+			return cl, CrestIgnored, CrestUpload{}
 		}
-		return cl, CrestDeleted
-	}
-	if cl.Level() < minCrestLevel {
-		return cl, CrestLevelTooLow
+		return cl, CrestDeleted, CrestUpload{}
 	}
 	if !typ.Fits(data) {
 		// Refused before an object id is drawn for it (#5148).
-		return cl, CrestIgnored
+		return cl, CrestIgnored, CrestUpload{}
 	}
 	id, ok := s.newCrestID(typ, files)
 	if !ok {
-		return cl, CrestIgnored
+		return cl, CrestIgnored, CrestUpload{}
 	}
-	if err := files.Save(typ, int(id), data); err != nil {
-		s.log.Warn().Err(err).Int32("clan_id", cl.ID()).Msg("clan: crest not saved")
-		return cl, CrestIgnored
+	return cl, CrestPending, CrestUpload{Type: typ, ID: id, Data: data, clanID: cl.id}
+}
+
+// crestGate checks c's right to set or, deleting, clear its clan's typ
+// crest, reporting the refusal when it has none.
+func (s *Service) crestGate(c *player.Character, typ datacache.CrestType, deleting bool, now time.Time) (*Clan, CrestResult, bool) {
+	cl, ok := s.ClanOf(c)
+	if !ok || (typ != datacache.PledgeCrest && typ != datacache.LargePledgeCrest) {
+		return nil, CrestIgnored, false
 	}
-	s.changeCrest(cl, typ, id, files)
+	switch {
+	case cl.Info().DissolvingExpiry > now.UnixMilli():
+		return cl, CrestDissolving, false
+	case !cl.HasPrivilege(c.ID, PrivEditCrest):
+		return cl, CrestNotAuthorized, false
+	case !deleting && cl.Level() < minCrestLevel:
+		return cl, CrestLevelTooLow, false
+	}
+	return cl, CrestPending, true
+}
+
+// StoreCrest writes up's image to files. It takes no lock of the service,
+// so it runs off the uploader's queue. A failed write is logged and
+// reported false; nothing then points at the image.
+func (s *Service) StoreCrest(up CrestUpload, files *datacache.Crests) bool {
+	if err := files.Save(up.Type, int(up.ID), up.Data); err != nil {
+		s.log.Warn().Err(err).Int32("clan_id", up.clanID).Int("crest_type", int(up.Type)).Msg("clan: crest not saved")
+		return false
+	}
+	return true
+}
+
+// CommitCrest points c's clan at up, which SetCrest accepted and
+// StoreCrest stored, checking SetCrest's gates again: one that refuses now
+// refuses the upload as SetCrest would have, and a clan that is not the one
+// up was accepted for ignores it. A refused image is removed from files.
+func (s *Service) CommitCrest(c *player.Character, up CrestUpload, files *datacache.Crests, now time.Time) (*Clan, CrestResult) {
+	cl, result, ok := s.crestGate(c, up.Type, false, now)
+	if !ok || cl.id != up.clanID {
+		s.discardCrest(up, files)
+		if ok {
+			result = CrestIgnored
+		}
+		return cl, result
+	}
+	s.changeCrest(cl, up.Type, up.ID, files)
 	return cl, CrestRegistered
+}
+
+// discardCrest removes up's stored image, which no clan points at, on the
+// clan's write lane, off the caller's queue.
+func (s *Service) discardCrest(up CrestUpload, files *datacache.Crests) {
+	remove := func() {
+		if err := files.Remove(up.Type, int(up.ID)); err != nil {
+			s.log.Error().Err(err).Int32("clan_id", up.clanID).Msg("clan: remove refused crest")
+		}
+	}
+	if s.store == nil {
+		remove()
+		return
+	}
+	s.write(up.clanID, "remove refused crest", func(context.Context, Store) error {
+		remove()
+		return nil
+	})
 }
 
 // newCrestID draws a fresh object id for a typ crest. An id may come back

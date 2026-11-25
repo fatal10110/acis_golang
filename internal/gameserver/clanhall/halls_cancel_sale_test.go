@@ -98,4 +98,4 @@ func TestCancelSaleRefundsAndTellsBidders(t *testing.T) {
 	}
 }
 
-func (b *refundBank) RestoreWarehouse(int32) {}
+func (b *refundBank) RestoreWarehouse(int32) bool { return true }

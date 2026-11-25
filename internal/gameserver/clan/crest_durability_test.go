@@ -44,7 +44,7 @@ func TestReplacedCrestRemovedAfterColumnWrite(t *testing.T) {
 	s, cl, files := crestedClanService(t, store, writes)
 	leader := inClan(77, "Lead", 1)
 
-	if _, got := s.SetCrest(leader, datacache.PledgeCrest, bytes.Repeat([]byte{0x02}, 256), files, time.Now()); got != CrestRegistered {
+	if got := uploadCrest(t, s, leader, bytes.Repeat([]byte{0x02}, 256), files); got != CrestRegistered {
 		t.Fatalf("upload = %v, want CrestRegistered", got)
 	}
 	if id := cl.Info().CrestID; id != 500 {
@@ -72,7 +72,7 @@ func TestReplacedCrestKeptWhenColumnWriteFails(t *testing.T) {
 	s, _, files := crestedClanService(t, failingCrestStore{newFakeStore()}, nil)
 	leader := inClan(77, "Lead", 1)
 
-	if _, got := s.SetCrest(leader, datacache.PledgeCrest, nil, files, time.Now()); got != CrestDeleted {
+	if _, got, _ := s.SetCrest(leader, datacache.PledgeCrest, nil, files, time.Now()); got != CrestDeleted {
 		t.Fatalf("deletion = %v, want CrestDeleted", got)
 	}
 	if !files.Has(datacache.PledgeCrest, 400) {
