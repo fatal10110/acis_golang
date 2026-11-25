@@ -21,6 +21,10 @@ const (
 	MsgEnteredRoom
 	// MsgLeftRoom: Name left the room.
 	MsgLeftRoom
+	// MsgOusted: you were ousted from the room.
+	MsgOusted
+	// MsgRoomExited: you left the room.
+	MsgRoomExited
 )
 
 // ListMode is how a room's member list is shown, as the client numbers it.
