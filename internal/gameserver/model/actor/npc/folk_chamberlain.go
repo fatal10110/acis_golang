@@ -122,15 +122,3 @@ func (f *Folk) chamberlainBypass(pages Pages, kind InstanceKind, r ResidenceTalk
 	reply.Outcome, reply.Standing = BypassChamberlain, r.ChamberlainStanding(kind)
 	return reply, true
 }
-
-// DefaultSiegePreHour is a chamberlain's siege hour choice before one is
-// made: the hour a siege starts at by default, less 12, which leaves the
-// siege date as it is.
-const DefaultSiegePreHour = 6
-
-// SiegePreHour is this chamberlain's siege hour choice, 12 hours short of
-// the hour it moves its castle's siege to.
-func (f *Folk) SiegePreHour() int { return int(f.siegePreHour.Load()) }
-
-// SetSiegePreHour makes hour this chamberlain's siege hour choice.
-func (f *Folk) SetSiegePreHour(hour int) { f.siegePreHour.Store(int32(hour)) }

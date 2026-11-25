@@ -98,7 +98,7 @@ func StartSchedule(r *Registry, queue *sim.Queue, srv Server) *Schedule {
 		now := queue.Now()
 		for _, e := range r.entries {
 			if e.sched != nil {
-				sch.tasks = append(sch.tasks, &scheduledTask{s: startScript(e.script), sc: *e.sched, next: e.sched.first(now, usWeek)})
+				sch.tasks = append(sch.tasks, &scheduledTask{s: startScript(e.script), sc: *e.sched, next: e.sched.first(now, isoWeek)})
 			}
 		}
 		sch.rescan()

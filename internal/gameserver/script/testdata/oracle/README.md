@@ -67,6 +67,8 @@ until a contract scene uses them:
   `Calendar.getInstance()` pointed at `ProbeClock`
   (`probe/net/sf/l2j/commons/probe/ProbeClock.java`), which answers as the reference
   does until the schedule scene sets an instant, zone and locale.
+  The scene's main rows run in en-GB, whose weeks are Monday-first with four minimal days:
+  the week the server keeps (#5404).
 
 ## Quest scenario traces
 

@@ -374,22 +374,41 @@ func (d chamberlainDialog) siegeChange() {
 	if !d.allowed(clan.PrivCastleSiege) {
 		return
 	}
+	if page := d.siegeDateClosedPage(); page != "" {
+		d.sendFile(page)
+		return
+	}
+	d.sendFile("siegetime3.htm")
+}
+
+// siegeDateClosedPage is the page refusing a siege date change:
+// siegetime1.htm once the registrations have ended, a day before the
+// siege; siegetime2.htm once the date is closed to change; "" while the
+// date is open to change.
+func (d chamberlainDialog) siegeDateClosedPage() string {
 	const dayMs = int64(24 * time.Hour / time.Millisecond)
 	switch {
 	case d.c.SiegeDate()-dayMs < d.l.sieges.Now().UnixMilli():
-		d.sendFile("siegetime1.htm")
+		return "siegetime1.htm"
 	case d.c.IsTimeRegistrationOver():
-		d.sendFile("siegetime2.htm")
-	default:
-		d.sendFile("siegetime3.htm")
+		return "siegetime2.htm"
 	}
+	return ""
 }
 
-// siegeTimeSet answers "siege_time_set 1 <hour>", which makes hour the
-// NPC's siege hour choice, and "siege_time_set <other>", which keeps it.
-// A choice other than the default moves the siege to 12 hours past it,
-// closing the date to change, and the siege's calendar steps on from the
-// new date, with siegetime8.htm; the default opens siegetime6.htm.
+// siegeHourKept is the "siege_time_set 1 <hour>" choice that keeps the
+// siege at its default hour: the hour less 12.
+const siegeHourKept = 6
+
+// siegeTimeSet answers "siege_time_set 1 <hour>", which moves the siege to
+// 12 hours past hour, closing the date to change, and the siege's calendar
+// steps on from the new date, with siegetime8.htm; hour 6, which keeps the
+// default, and any other "siege_time_set <choice>" open siegetime6.htm,
+// the hour choice. The choice is never kept: each command carries its own
+// hour, so no talker, castle owner or later cycle inherits another's
+// (#5114). A date closed to change refuses the command with the page
+// siege_change answers with, so a choice page kept open moves nothing
+// once the window has passed (#5114).
 func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 	if !d.allowed(clan.PrivCastleSiege) {
 		return true
@@ -398,25 +417,32 @@ func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 	if !ok {
 		return false
 	}
+	hour := siegeHourKept
 	if choice == 1 {
 		if len(rest) == 0 {
 			return false
 		}
-		hour, ok := parseInt(rest[0])
-		if !ok {
+		if hour, ok = parseInt(rest[0]); !ok {
 			return false
 		}
-		d.f.SetSiegePreHour(hour)
 	}
-	if hour := d.f.SiegePreHour(); hour != npc.DefaultSiegePreHour {
-		d.c.SetSiegeHour(hour + 12)
-		if s, ok := d.l.castleSiege(int32(d.c.ID)); ok {
-			s.DateMoved()
-		}
-		d.sendFile("siegetime8.htm")
+	if page := d.siegeDateClosedPage(); page != "" {
+		d.sendFile(page)
 		return true
 	}
-	d.sendFile("siegetime6.htm")
+	if hour == siegeHourKept {
+		d.sendFile("siegetime6.htm")
+		return true
+	}
+	// Another talker may have closed the date since the check above.
+	if !d.c.SetSiegeHour(hour + 12) {
+		d.sendFile("siegetime2.htm")
+		return true
+	}
+	if s, ok := d.l.castleSiege(int32(d.c.ID)); ok {
+		s.DateMoved()
+	}
+	d.sendFile("siegetime8.htm")
 	return true
 }
 

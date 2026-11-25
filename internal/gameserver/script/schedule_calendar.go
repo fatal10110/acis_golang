@@ -43,9 +43,9 @@ type weekRules struct {
 	minDays int
 }
 
-// usWeek is the en-US locale's week, the one the runner keeps: weeks start
-// on Sunday and a month's first week may hold a single day of it.
-var usWeek = weekRules{first: time.Sunday, minDays: 1}
+// isoWeek is the week the runner keeps (#5404): weeks start on Monday and a
+// month's first week holds at least four of its days.
+var isoWeek = weekRules{first: time.Monday, minDays: 4}
 
 // parseSchedule parses an entry's schedule attribute kind and start stamp.
 // Day names other than MON-SUN read as Monday;

@@ -132,10 +132,6 @@ type Folk struct {
 
 	// towerState is a control tower's siege and form; see folk_tower.go.
 	towerState tower
-
-	// siegePreHour is a chamberlain's siege hour choice; see
-	// SiegePreHour.
-	siegePreHour atomic.Int32
 }
 
 // NewFolk builds a civilian NPC from inst. Attach gives it the runtime it
@@ -157,7 +153,6 @@ func NewFolk(inst *Instance) (*Folk, error) {
 	f.cast.desires = ai.NewDesireQueue()
 	f.fight.aggro = attackable.NewThreatTable(f, f.now)
 	f.initCombat()
-	f.siegePreHour.Store(DefaultSiegePreHour)
 	return f, nil
 }
 
