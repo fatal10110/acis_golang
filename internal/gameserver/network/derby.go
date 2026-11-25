@@ -130,10 +130,6 @@ func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command stri
 		live.SendFrame(serverpackets.FrameSystemMessage(reply.Notice))
 	}
 	if buy := reply.Buy; buy != nil {
-		if !reduceAdena(live, buy.Price) {
-			return true
-		}
-		live.derbyPicks = derby.Picks{}
 		l.giveDerbyTicket(live, buy)
 	}
 	if redeem := reply.Redeem; redeem != nil {
@@ -149,8 +145,8 @@ func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command stri
 	return true
 }
 
-// giveDerbyTicket hands live the ticket of buy, tells live it was acquired
-// and adds its price to its lane's stake, stored off the queue.
+// giveDerbyTicket hands live the ticket of buy, paid for and staked, tells
+// live it was acquired and stores its lane's stake off the queue.
 func (l *GameClientLink) giveDerbyTicket(live *livePlayer, buy *derby.Purchase) {
 	inv := live.Inventory()
 	id, err := l.nextObjectID()
@@ -167,7 +163,6 @@ func (l *GameClientLink) giveDerbyTicket(live *livePlayer, buy *derby.Purchase) 
 	ticket.SetCustomType1(buy.Lane)
 	ticket.SetCustomType2(buy.Price / 100)
 	live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageAcquiredS1S2, int32(buy.Race), derby.TicketItemID))
-	l.derby.PlaceBet(buy.Lane, int64(buy.Price))
 	// The stake is stored off the queue (deferLookup).
 	track, lane := l.derby, buy.Lane
 	live.deferLookup(func(ctx context.Context) { track.SaveBet(ctx, lane) })
@@ -200,6 +195,10 @@ func (l *GameClientLink) redeemDerbyTicket(live *livePlayer, redeem *derby.Redem
 
 // derbyHolder reads a player's inventory for a race manager.
 type derbyHolder struct{ live *livePlayer }
+
+// Pay takes the ticket price with its notices, under the track's lock
+// (#5119).
+func (h derbyHolder) Pay(price int) bool { return reduceAdena(h.live, price) }
 
 func (h derbyHolder) Tickets() []derby.Ticket {
 	inv := h.live.Inventory()

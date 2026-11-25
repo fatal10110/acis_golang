@@ -180,21 +180,28 @@ func Choose(table *fish.Table, lureID int32, base int, roll Roll) (fish.Fish, bo
 	return table.Pick(level, typ, group, roll)
 }
 
-// CheckDelay returns how often a line baited with lureID looks for a bite
-// from f, scaled by the lure grade: low-grade lures look less often,
-// high-grade ones more. A lure no grade names returns 0: its line never
-// looks for a bite.
-func CheckDelay(lureID int32, gutsCheckTime int) time.Duration {
-	var scale float64
+// lureGrade returns how lureID's grade scales a line's look period:
+// low-grade lures look less often, high-grade ones more. ok is false for a
+// lure no grade names.
+func lureGrade(lureID int32) (scale float64, ok bool) {
 	switch {
 	case lureID == 6519 || lureID == 6522 || lureID == 6525 || lureID == 8505 || lureID == 8508 || lureID == 8511:
-		scale = 1.33
+		return 1.33, true
 	case lureID == 6520 || lureID == 6523 || lureID == 6526 || (lureID >= 8505 && lureID <= 8513) ||
 		(lureID >= 7610 && lureID <= 7613) || (lureID >= 7807 && lureID <= 7809) || PrizeLure(lureID):
-		scale = 1.00
+		return 1.00, true
 	case lureID == 6521 || lureID == 6524 || lureID == 6527:
-		scale = 0.66
-	default:
+		return 0.66, true
+	}
+	return 0, false
+}
+
+// CheckDelay returns how often a line baited with lureID looks for a bite
+// from f, scaled by the lure grade. A lure no grade names returns 0: its
+// line would never look for a bite, so CastRefusal refuses it.
+func CheckDelay(lureID int32, gutsCheckTime int) time.Duration {
+	scale, ok := lureGrade(lureID)
+	if !ok {
 		return 0
 	}
 	scaled := float32(float64(gutsCheckTime) * scale)
@@ -257,11 +264,14 @@ const (
 	RefuseInWater
 	// RefuseNoLure means no lure is on the hook.
 	RefuseNoLure
+	// RefuseUngradedLure means the lure on the hook has no grade, so its
+	// line would never get a bite (#5118).
+	RefuseUngradedLure
 )
 
 // CastRefusal returns why f may not cast a line, in the order the checks
-// run; baited reports a lure worn in the off hand.
-func CastRefusal(f Fisher, baited bool) Refusal {
+// run; lureID is the lure worn in the off hand, 0 for none.
+func CastRefusal(f Fisher, lureID int32) Refusal {
 	if _, ok := f.FishingRod(); !ok {
 		return RefuseNoRod
 	}
@@ -274,8 +284,13 @@ func CastRefusal(f Fisher, baited bool) Refusal {
 	if f.InWater() {
 		return RefuseInWater
 	}
-	if !baited {
+	if lureID == 0 {
 		return RefuseNoLure
+	}
+	// A lure the grade table does not list is refused before anything is
+	// used up or the caster is held in place (#5118).
+	if _, ok := lureGrade(lureID); !ok {
+		return RefuseUngradedLure
 	}
 	return RefuseNone
 }
