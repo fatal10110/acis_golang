@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTeleportCancelsOpenTrade pins Player.teleportTo: an accepted teleport
@@ -76,7 +77,7 @@ func TestLogoutLeavesPartnerWindowOpen(t *testing.T) {
 	h.enterAll(t)
 	h.startTrade(t)
 
-	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	h.awaitOffline(t, h.secondID)
 	assertNoTradeClose(t, drainFrames(t, h.first), "partner at logout")
 
@@ -99,7 +100,7 @@ func TestLogoutPartnerConfirmIsTargetNotFound(t *testing.T) {
 	h.enterAll(t)
 	h.startTrade(t)
 
-	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	h.awaitOffline(t, h.secondID)
 	drainUntilQuiet(t, h.first)
 
@@ -134,7 +135,7 @@ func TestRelogDoesNotRejoinDepartedTrade(t *testing.T) {
 	drainUntilQuiet(t, h.second)
 	drainUntilQuiet(t, h.first)
 
-	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeRestartResponse, "RestartResponse")
 	h.awaitOffline(t, h.secondID)
 	assertNoTradeClose(t, drainFrames(t, h.first), "partner at restart")
@@ -182,10 +183,6 @@ func TestRelogDoesNotRejoinDepartedTrade(t *testing.T) {
 			t.Fatalf("persisted rows of %d = %+v, want object %d count %d", want.owner, rows, want.object, want.count)
 		}
 	}
-}
-
-func encodeSingleOpcode(opcode byte) []byte {
-	return wire.NewPacketWriter(opcode).Bytes()
 }
 
 func (h *traders) awaitOffline(t *testing.T, objID int32) {

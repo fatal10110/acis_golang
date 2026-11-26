@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // What the scenarios of the second proof-quest group cannot show: the
@@ -82,9 +83,9 @@ func TestQ646DollGoesToARandomPartyMember(t *testing.T) {
 	srv.GiveItem(t, mate, cursedDollID, 179)
 	enterWorld(t, srv)
 	mateClient := srv.DialClient(t, "mate", 1)
-	mateClient.Send(encodeRequestGameStart(0))
+	mateClient.Send(clientwire.RequestGameStart(0))
 	readUntil(t, mateClient, serverpackets.OpcodeCharSelected)
-	mateClient.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	mateClient.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, mateClient)
 	srv.ReadQueued(t, srv.Client)
 	srv.Client.Send(encodeJoinParty("Mate"))

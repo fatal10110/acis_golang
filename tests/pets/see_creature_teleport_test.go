@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // seeWatcherID is the monster template the recording behavior is bound to.
@@ -108,7 +109,7 @@ func TestSummonArrivalTellsNearbyMonsters(t *testing.T) {
 
 	// The pet's jump is shown around its old position, which the owner
 	// left: the owner's client sees no TeleportToLocation for it.
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	h.srv.AdvanceUntil(t, "the pet lands next to its owner", func() bool {
 		px, _, _ := pet.Position()
 		return px == dest.X

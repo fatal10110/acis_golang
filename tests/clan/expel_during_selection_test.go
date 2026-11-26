@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestExpelDuringSelectionEntersClanless expels a titled member while its
@@ -89,7 +90,7 @@ func expelDuringSelection(t *testing.T, duringRestore bool) {
 		})
 	}
 	armed.Store(duringRestore)
-	lone.Send(encodeRequestGameStart(0))
+	lone.Send(clientwire.RequestGameStart(0))
 	if duringRestore {
 		<-holding
 		expel()

@@ -18,6 +18,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // augmentSkillHP is the maxHp the red augmentation skill's passive adds.
@@ -364,7 +365,7 @@ func TestAugmentRefineFlow(t *testing.T) {
 
 func logoutSmith(t *testing.T, s *smith) {
 	t.Helper()
-	s.c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	s.c.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	for {
 		frame := s.c.Read()
 		if frame[0] == serverpackets.OpcodeLeaveWorld {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestMountedRiderCannotSwitchToggle pins RequestMagicSkillUse's mount gate
@@ -61,7 +62,7 @@ func TestDismountedRiderSwitchesToggleAgain(t *testing.T) {
 	}
 	// The starving mount drops its rider in town; a request made before the
 	// landing is refused.
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	drainUntilQuiet(t, h.client)
 
 	h.client.Send(encodeRequestMagicSkillUse(riderToggleSkill))

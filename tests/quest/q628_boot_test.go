@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q628"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -148,9 +149,9 @@ func TestQ628SwampMonstersDropToAPartyMemberWithTheQuest(t *testing.T) {
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 	)
 	fc := w.srv.DialClient(t, "mate", 1)
-	fc.Send(encodeRequestGameStart(0))
+	fc.Send(clientwire.RequestGameStart(0))
 	readUntil(t, fc, serverpackets.OpcodeCharSelected)
-	fc.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	fc.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	w.srv.ReadQueued(t, fc)
 	w.srv.ReadQueued(t, w.srv.Client)
 	w.srv.Client.Send(encodeJoinParty("Mate"))

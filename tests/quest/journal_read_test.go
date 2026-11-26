@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // journalScripts are the scripts the suites boot: four real quests and a
@@ -76,14 +77,14 @@ func TestJournalLoadsAtSelectionAndAnswersQuestList(t *testing.T) {
 	before := readJournal(t, srv.DB)
 	want := []questLine{{1, 0}, {3, -0x7ffffffb}, {6, -0x7ffffffd}}
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertQuestList(t, "loading", c.Read(), want)
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	assertQuestList(t, "EnterWorld", readUntil(t, c, serverpackets.OpcodeQuestList), want)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestQuestListInGame))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestQuestListInGame))
 	assertQuestList(t, "in-game", readUntil(t, c, serverpackets.OpcodeQuestList), want)
 
 	if n := strings.Count(srv.LogText(), `"quest":"Gone"`); n != 2 {
@@ -96,7 +97,7 @@ func TestJournalLoadsAtSelectionAndAnswersQuestList(t *testing.T) {
 
 	// Back at character select, the journal changes; the next selection
 	// sees the change.
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntil(t, c, serverpackets.OpcodeCharSelectInfo)
 	srv.FlushPersistence(t)
 	if _, err := srv.DB.ExecContext(context.Background(), "DELETE FROM character_quests WHERE charId=? AND name='Q003_WillTheSealBeBroken'", objID); err != nil {
@@ -106,9 +107,9 @@ func TestJournalLoadsAtSelectionAndAnswersQuestList(t *testing.T) {
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE character_quests SET value='STARTED' WHERE charId=? AND name='Q002_WhatWomenWant' AND var='<state>'", objID); err != nil {
 		t.Fatal(err)
 	}
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertQuestList(t, "reselected", c.Read(), []questLine{{1, 0}, {2, -0x7fffffff}, {6, -0x7ffffffd}})
 }
 
@@ -128,7 +129,7 @@ func TestFailedJournalLoadRefusesSelection(t *testing.T) {
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
 	}

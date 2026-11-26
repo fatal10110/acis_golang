@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTeleportKeepsAttackStanceUntilItsTimeout: Creature.teleportTo
@@ -66,7 +67,7 @@ func TestTeleportKeepsAttackStanceUntilItsTimeout(t *testing.T) {
 	if !sawTeleport {
 		t.Fatal("teleport sent no TeleportToLocation")
 	}
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	collect()
 	for _, frame := range frames {
 		if frame[0] == serverpackets.OpcodeAutoAttackStop && wireReader(frame[1:]).ReadInt32() == objID {

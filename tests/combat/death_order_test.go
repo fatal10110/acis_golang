@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // indexOfSystemMessage finds the first SystemMessage frame at or after from
@@ -196,8 +197,8 @@ func TestMonsterKillDeathPenaltyFollowsKarmaLoss(t *testing.T) {
 			victimID := srv.SoleObjectID(t)
 			// Entering the world already underwater interleaves the swim
 			// state's frames with the EnterWorld burst, so only drain it.
-			c.Send(encodeRequestGameStart(0))
-			c.Send(encodeEnterWorld())
+			c.Send(clientwire.RequestGameStart(0))
+			c.Send(clientwire.EnterWorld())
 			drainUntilQuiet(t, c)
 			hostile := srv.SpawnHostileNPC(t)
 			drainUntilQuiet(t, c)

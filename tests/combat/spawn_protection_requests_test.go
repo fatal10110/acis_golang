@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const actedNotice = "As you acted, you are no longer under spawn protection."
@@ -42,7 +43,7 @@ func bootProtected(t *testing.T, opts ...gameservertest.Option) *gameservertest.
 // that ended the protection shows its notice among them.
 func fenceWithItemList(t *testing.T, c *scriptedClient) [][]byte {
 	t.Helper()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	var before [][]byte
 	for range 50 {
 		frame := c.ReadWithTimeout(5 * time.Second)

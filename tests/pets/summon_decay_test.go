@@ -23,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // corpseDecay is a corpse-decay task on a clock the scenario moves by hand.
@@ -155,7 +156,7 @@ func TestPetCorpseLeftByItsOwnerDecaysOffline(t *testing.T) {
 	killPet(t, h, pet)
 	drainUntilQuiet(t, observer)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if _, ok := h.srv.State.Object(pet.ObjectID()); !ok {
 		t.Fatal("pet corpse left the world with its owner, want it kept until it decays")
@@ -219,13 +220,13 @@ func TestPetCorpseWaitsForItsOwnerToComeBack(t *testing.T) {
 	h.giveToPet(t, h.seededItem(t, item.AdenaID), 40)
 	killPet(t, h, pet)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	decay.passAndTick(t, h.srv, 10*time.Minute)
 
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	frames = append(frames, drainFrames(t, h.client)...)
 	if !sawPetInfo(frames, pet.ObjectID()) {
@@ -465,7 +466,7 @@ func TestServitorCorpseLeftByItsOwnerDoesNotHoldTheSlot(t *testing.T) {
 	corpse := o.summonServitor(t)
 	o.killServitor(t, corpse)
 
-	o.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	o.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, o.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if _, ok := o.srv.State.Object(corpse.ObjectID()); !ok {
 		t.Fatal("servitor corpse left the world with its owner, want it kept until it decays")
@@ -474,9 +475,9 @@ func TestServitorCorpseLeftByItsOwnerDoesNotHoldTheSlot(t *testing.T) {
 		t.Fatal("servitor corpse still holds its departed owner's summon slot")
 	}
 
-	o.client.Send(encodeRequestGameStart(0))
+	o.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, o.client, serverpackets.OpcodeCharSelected, "CharSelected")
-	o.client.Send(encodeEnterWorld())
+	o.client.Send(clientwire.EnterWorld())
 	frames := readUntilOpcode(t, o.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	frames = append(frames, drainFrames(t, o.client)...)
 	if sawServitorPetInfo(frames, corpse.ObjectID()) {
@@ -545,11 +546,11 @@ func TestCorpseMobSkillsOnServitorCorpse(t *testing.T) {
 // relogOwner logs the owner out to character select and back into the world.
 func (h *petWorld) relogOwner(t *testing.T) {
 	t.Helper()
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	drainUntilQuiet(t, h.client)
 }
@@ -586,7 +587,7 @@ func TestPetRestoredDeadWaitsForItsOwner(t *testing.T) {
 		t.Fatalf("restored wolf carries %d adena, want none: a pet is called out empty", got)
 	}
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if _, ok := h.srv.State.Object(wolf.ObjectID()); !ok {
 		t.Fatal("restored dead wolf left the world with its owner, want it waiting for the owner")
@@ -602,9 +603,9 @@ func TestPetRestoredDeadWaitsForItsOwner(t *testing.T) {
 		t.Fatalf("adena left at PET while the owner is away = %d, want the 40 left untouched", got)
 	}
 
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	frames = append(frames, drainFrames(t, h.client)...)
 	if !sawPetInfo(frames, wolf.ObjectID()) {

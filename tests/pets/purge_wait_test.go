@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestImmediatePurgeWaitsForQueuedPetSave returns a pet while its collar's
@@ -101,7 +102,7 @@ func heldCollarAtCharacterSelect(t *testing.T, h *petWorld) (release func()) {
 		t.Fatalf("pets row while the lane is held: ok=%v err=%v, want no row yet", ok, err)
 	}
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeRestartResponse, "RestartResponse")
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	drainUntilQuiet(t, h.client)

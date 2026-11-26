@@ -20,6 +20,8 @@ jobs:
     permissions:
       # Attaches the built binaries and the datapack to the release.
       contents: write
+      # Reads the tag commit's CI result.
+      checks: read
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -28,6 +30,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ env.TAG }}
+      # A release can be published from any commit; deploy only one whose
+      # aggregate "go" check (go.yml) passed, before building or uploading.
+      - name: Require a green CI run for the tag
+        run: |
+          sha="$(git rev-parse HEAD)"
+          conclusion="$(gh api "repos/$GH_REPO/commits/$sha/check-runs?check_name=go&filter=latest" \
+            --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.completed_at) | last | .conclusion // "none"')"
+          if [ "$conclusion" != success ]; then
+            echo "::error::check go on $sha is '$conclusion', not success; refusing to deploy $TAG"
+            exit 1
+          fi
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod

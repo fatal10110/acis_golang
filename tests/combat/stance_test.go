@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestWalkAwayStopsAutoAttack pins the stance-off half of the attack flow: a
@@ -162,7 +163,7 @@ func TestAttackStanceBlocksRestartAndLogout(t *testing.T) {
 	c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	assertSystemMessageNumber(t, mustRead(t, c, "restart refusal"), serverpackets.SystemMessageCannotRestartWhileFighting)
 	reply := mustRead(t, c, "RestartResponse")
 	assertFrameOpcode(t, reply, serverpackets.OpcodeRestartResponse, "RestartResponse")

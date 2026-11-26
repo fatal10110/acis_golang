@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 func TestOwnerTeleportRejoinsSummonForNearbyWatcher(t *testing.T) {
@@ -44,7 +45,7 @@ func TestOwnerTeleportRejoinsSummonForNearbyWatcher(t *testing.T) {
 		t.Fatal("pet is not moving before Appearing")
 	}
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	ownerFrames := readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "pet teleport")
 	h.srv.Settle(t)
 	ownerFrames = append(ownerFrames, drainFrames(t, h.client)...)
@@ -132,7 +133,7 @@ func TestOwnerTeleportDropsSummonThreatInNearbyHostiles(t *testing.T) {
 		t.Fatal("pet's threat entry dropped by the owner's jump, want it kept until the pet's own")
 	}
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "pet TeleportToLocation")
 	if !monster.Knows(pet) {
 		t.Fatal("pet out of the monster's sight after the teleport; the case needs it still known")

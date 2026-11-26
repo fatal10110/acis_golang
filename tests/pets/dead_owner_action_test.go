@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestDeadOwnerPetCommandsOnlyFail pins RequestActionUse.java:84-96: a dead
@@ -35,7 +36,7 @@ func TestDeadOwnerPetCommandsOnlyFail(t *testing.T) {
 	for _, action := range []int32{15, 16, 17, 19, 21, 22, 23, 32} {
 		frames := testsupport.SyncBarrierFrames(t, h.client, func() {
 			h.client.Send(encodeRequestActionUse(action, false))
-			h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+			h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 		}, serverpackets.OpcodeItemList)
 		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
 			ops := make([]byte, len(frames))

@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Rune's dock, where runeItinerary's boat ties up, and a point on its shore
@@ -48,10 +49,10 @@ func bootPetOwnerAt(t *testing.T, at, folkAt location.Location, opts ...gameserv
 	h := &petWorld{srv: srv, client: srv.Client, ownerID: ownerID, collarID: srv.GiveItem(t, ownerID, wolfCollarID, 1), seeded: map[int32][]int32{}}
 	// The entry burst near a dock carries the boat too; it is not pinned
 	// here.
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	mustRead(t, h.client, "SSQInfo")
 	mustRead(t, h.client, "CharSelected")
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, h.client)
 	pet, _ := h.spawnWolf(t)
 	folk := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", 31031), folkAt)

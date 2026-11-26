@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestEnteringPlayerSeesOwnerThenSummonRelation pins the head of the burst a
@@ -22,10 +23,10 @@ func TestEnteringPlayerSeesOwnerThenSummonRelation(t *testing.T) {
 
 	lateID := w.srv.SeedCharacterFor(t, "player3", "Late", 1, 0).ID
 	late := w.srv.DialClient(t, "player3", 1)
-	late.Send(encodeRequestGameStart(0))
+	late.Send(clientwire.RequestGameStart(0))
 	late.Read() // SSQInfo
 	late.Read() // CharSelected
-	late.Send(encodeEnterWorld())
+	late.Send(clientwire.EnterWorld())
 	w.srv.Settle(t)
 	lateFrames := late.ReadQueued()
 	ownerFrames := w.client.ReadQueued()

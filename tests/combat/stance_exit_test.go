@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestHitAfterExitLeavesNoAttackStance pins that a hit reaching a player
@@ -37,7 +38,7 @@ func TestHitAfterExitLeavesNoAttackStance(t *testing.T) {
 	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	if reply := mustRead(t, c, "RestartResponse"); reply[0] != serverpackets.OpcodeRestartResponse || reply[1] != 1 {
 		t.Fatalf("restart reply = %x, want an accepting RestartResponse", reply)
 	}
@@ -48,11 +49,11 @@ func TestHitAfterExitLeavesNoAttackStance(t *testing.T) {
 	}
 
 	drainUntilQuiet(t, c)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if reply := mustRead(t, c, "SSQInfo"); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("relog select answered %#x, want SSQInfo", reply[0])
 	}
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, c)
 	c.Send(encodeLogout())
 	if reply := mustRead(t, c, "Logout reply"); reply[0] != serverpackets.OpcodeLeaveWorld {

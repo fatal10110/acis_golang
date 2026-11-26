@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestEnteringPlayerSeesStoreOwnerInDiscoveryOrder pins the burst a player
@@ -27,10 +28,10 @@ func TestEnteringPlayerSeesStoreOwnerInDiscoveryOrder(t *testing.T) {
 	h.srv.Settle(t)
 	drainUntilQuiet(t, h.first)
 
-	h.second.Send(encodeRequestGameStart(0))
+	h.second.Send(clientwire.RequestGameStart(0))
 	h.second.Read() // SSQInfo
 	h.second.Read() // CharSelected
-	h.second.Send(encodeEnterWorld())
+	h.second.Send(clientwire.EnterWorld())
 	h.srv.Settle(t)
 	viewerFrames := h.second.ReadQueued()
 	ownerFrames := drainFrames(t, h.first)

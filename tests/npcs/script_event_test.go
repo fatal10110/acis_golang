@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // The script-event fixture's NPC templates: a sentinel kind that both
@@ -72,7 +73,7 @@ func bootScriptEvents(t *testing.T) (*gameservertest.Server, int32, *eventLog) {
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 	)
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	enterWorld(t, srv, c)

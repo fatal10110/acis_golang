@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference ids of the chat refusals a punishment answers.
@@ -33,7 +34,7 @@ func TestChatBanFromStoredRow(t *testing.T) {
 	}
 	startInWorld(t, p.alice)
 
-	p.bobby.Send(encodeRequestGameStart(0))
+	p.bobby.Send(clientwire.RequestGameStart(0))
 	assertOpcode(t, p.bobby.Read(), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertOpcode(t, p.bobby.Read(), serverpackets.OpcodeCharSelected, "CharSelected")
 	p.bobby.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // siegeServitorCases are the servitors a siege battlefield judges: a siege
@@ -106,7 +107,7 @@ func TestSiegeSummonLeavingBattlefieldIsDismissed(t *testing.T) {
 			x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 			owner.TeleportTo(x+5_000, y, z, 0)
 			readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner teleport")
-			h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+			h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 			assertSiegeDismissal(t, h, tc.dismissed)
 			if tc.dismissed {
 				return

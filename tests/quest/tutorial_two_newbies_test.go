@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTutorialFirstStepKeepsOtherNewbiesSteps pins the owner-approved
@@ -34,9 +35,9 @@ func TestTutorialFirstStepKeepsOtherNewbiesSteps(t *testing.T) {
 	if err := srv.DB.QueryRow("SELECT obj_Id FROM characters WHERE char_name='Newbie2'").Scan(&second); err != nil {
 		t.Fatal(err)
 	}
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, c)
 
 	var firstAt, secondAt location.Location

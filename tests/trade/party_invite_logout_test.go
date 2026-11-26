@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestLogoutHoldingPartyInviteCancelsTrade pins Player.deleteMe with an
@@ -45,7 +46,7 @@ func TestLogoutHoldingPartyInviteCancelsTrade(t *testing.T) {
 			assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeAskJoinParty, "AskJoinParty")
 			clock.Add(int64(tc.elapsed))
 
-			h.second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+			h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 			h.awaitOffline(t, h.secondID)
 			frames := drainFrames(t, h.first)
 			done := indexOfOpcode(frames, serverpackets.OpcodeSendTradeDone)

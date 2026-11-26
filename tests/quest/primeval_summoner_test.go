@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/primevalsummoner"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 	"github.com/rs/zerolog"
@@ -102,9 +103,9 @@ func bootVervatoWorld(t *testing.T, adena int32) *vervatoWorld {
 	w.roles[v.vervato.ObjectID()] = "vervato"
 
 	c := w.srv.DialClient(t, "fallen", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	w.srv.ReadQueued(t, c)
 	v.fc = c
 	w.srv.ReadQueued(t, w.srv.Client)

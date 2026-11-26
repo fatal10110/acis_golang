@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: a door is a Creature, so RequestActionUse's pet attack
@@ -81,10 +82,10 @@ func bootPetDoor(t *testing.T, shots ...modelskill.Definition) (*petWorld, *summ
 	h := &petWorld{srv: srv, client: srv.Client, ownerID: ownerID, collarID: srv.GiveItem(t, ownerID, wolfCollarID, 1)}
 	// The door's status joins the entry burst, so the burst is drained
 	// rather than read frame by frame.
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, mustRead(t, h.client, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, h.client, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, h.client)
 	petActor, _ := h.spawnWolf(t)
 	gate, ok := h.srv.WorldObjects.Door(petDoorID)

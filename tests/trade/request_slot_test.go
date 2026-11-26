@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 func encodeFriendInvite(name string) []byte {
@@ -64,7 +65,7 @@ func TestLogoutHoldingFriendInviteCancelsTrade(t *testing.T) {
 
 	inviteFriend(t, carol, h.second, "TraderTwo")
 
-	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	h.awaitOffline(t, h.secondID)
 	frames := drainFrames(t, h.first)
 	done := indexOfOpcode(frames, serverpackets.OpcodeSendTradeDone)
@@ -103,7 +104,7 @@ func TestLogoutTradeCancelFollowsPartyLeave(t *testing.T) {
 	h.startTrade(t)
 	inviteFriend(t, carol, h.second, "TraderTwo")
 
-	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	h.awaitOffline(t, h.secondID)
 	frames := drainFrames(t, h.first)
 	party := indexOfOpcode(frames, serverpackets.OpcodePartySmallWindowDeleteAll)

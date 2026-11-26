@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
@@ -46,16 +47,16 @@ func bootJournal(t *testing.T, opts ...gameservertest.Option) (*gameservertest.S
 func enterWorld(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, c)
 }
 
 // restart goes back to character select.
 func restart(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelectInfo)
 }
 
@@ -268,11 +269,11 @@ func TestJournalWritesSurviveRelog(t *testing.T) {
 	}
 
 	restart(t, srv)
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelected)
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertQuestList(t, "relog", srv.Client.Read(), []questLine{{1, -0x7ffffffb}})
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, srv.Client)
 	if got := srv.QuestVars(t, objID, q001); !maps.Equal(got, want) {
 		t.Fatalf("journal after relog = %v, want %v", got, want)
@@ -289,9 +290,9 @@ func TestJournalWritesSurviveRelog(t *testing.T) {
 	if got := questRows(t, srv, objID, q001); !maps.Equal(got, map[string]string{"<state>": "COMPLETED"}) {
 		t.Fatalf("rows after the exit = %v", got)
 	}
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelected)
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertQuestList(t, "after the exit", srv.Client.Read(), []questLine{{1, 0}})
 }
 
@@ -423,12 +424,12 @@ func TestJournalWritesBeforeDetachLandBeforeReselect(t *testing.T) {
 	}
 	// The restart's detach queues its saves behind the held lane and waits
 	// for them.
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	release()
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelectInfo)
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelected)
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertQuestList(t, "reselected", srv.Client.Read(), []questLine{{1, -0x7ffffffd}})
 }
 
@@ -492,7 +493,7 @@ func TestFailedSealedDrainRefusesSelection(t *testing.T) {
 	sentLines(t, srv)
 	restart(t, srv)
 
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	if frame := srv.Client.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
 	}
@@ -505,9 +506,9 @@ func TestFailedSealedDrainRefusesSelection(t *testing.T) {
 	}
 
 	srv.FailJournalWrites(nil)
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelected)
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertQuestList(t, "after the writes landed", srv.Client.Read(), []questLine{{1, -0x7fffffff}})
 	if got := questRows(t, srv, objID, q001); !maps.Equal(got, map[string]string{"<state>": "STARTED", "<cond>": "1"}) {
 		t.Fatalf("rows = %v", got)

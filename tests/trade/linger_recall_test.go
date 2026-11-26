@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -46,7 +47,7 @@ func TestRecalledLingeringTraderLandsBeforeTradeCancel(t *testing.T) {
 	}
 	gmChar.TeleportTo(spawnX+300, spawnY, spawnZ, 0)
 	readUntil(t, gm, serverpackets.OpcodeTeleportToLocation)
-	gm.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	gm.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	readUntil(t, gm, serverpackets.OpcodeUserInfo)
 	drainAllTraders(t, h.first, h.second, gm)
 

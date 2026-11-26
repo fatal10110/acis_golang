@@ -12,16 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
 func encodeRequestCharacterCreate(name string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCharacterCreate)
 	w.WriteString(name)
@@ -38,10 +28,6 @@ func encodeRequestCharacterDelete(slot int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCharacterDelete)
 	w.WriteInt32(slot)
 	return w.Bytes()
-}
-
-func encodeSingleOpcode(opcode byte) []byte {
-	return wire.NewPacketWriter(opcode).Bytes()
 }
 
 // readUntil reads frames until one with opcode arrives and returns it.

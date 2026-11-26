@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestEnchantSelectionEndsWithTheSession pins the scroll selection living
@@ -44,7 +45,7 @@ func TestEnchantSelectionEndsWithTheSession(t *testing.T) {
 		t.Fatalf("scroll count after the relog = %d, want 1", inst.Count)
 	}
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	for {
 		reply := c.Read()
 		if len(reply) == 0 || reply[0] != serverpackets.OpcodeRestartResponse {

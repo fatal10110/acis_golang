@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // announcementsFile holds two login announcements around an automatic one
@@ -47,10 +48,10 @@ func TestEnterWorldBurstReadsLoginAnnouncements(t *testing.T) {
 		gameservertest.WithAnnouncements(announcementsFile),
 	)
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 
 	var frames [][]byte
 	for {
@@ -104,10 +105,10 @@ func TestBootAutomaticAnnouncementRepeats(t *testing.T) {
 	if srv.DrivesClock() {
 		srv.Advance(t, 2*time.Second)
 	}
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	readEnterWorldBurst(t, c)
 
 	for i := range 2 {

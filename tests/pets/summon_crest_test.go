@@ -21,6 +21,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // npcs.properties ShowSummonCrest (stock False): a summon's NpcInfo carries
@@ -156,10 +157,10 @@ func bootSummonCrest(t *testing.T, extra ...gameservertest.Option) *summonCrestW
 // past the whole burst.
 func enterLenient(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, c)
 }
 
@@ -219,7 +220,7 @@ func TestSummonCrestShownWithShowSummonCrest(t *testing.T) {
 	owner.TeleportTo(x+3000, y, z, 0)
 	readUntilOpcode(t, w.client, serverpackets.OpcodeTeleportToLocation, "owner TeleportToLocation")
 	drainUntilQuiet(t, w.client)
-	w.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	w.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	w.srv.Settle(t)
 	_, landed := framesAbout(w.client.ReadQueued(), serverpackets.OpcodeNPCInfo, id)
 	if len(landed) != 1 {

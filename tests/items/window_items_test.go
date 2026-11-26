@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -196,7 +197,7 @@ func TestUseWindowItemsOpenTheirWindow(t *testing.T) {
 		assertStillHeld(t, srv, objID, held[tt.itemID])
 	}
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestShowMiniMap))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestShowMiniMap))
 	want := []byte{serverpackets.OpcodeShowMiniMap, 0x81, 0x06, 0x00, 0x00, competitionPeriod, 0x00, 0x00, 0x00}
 	if got := c.Read(); string(got) != string(want) {
 		t.Fatalf("RequestShowMiniMap answer = %x, want %x", got, want)

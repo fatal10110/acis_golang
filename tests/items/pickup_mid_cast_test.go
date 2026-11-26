@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestMidCastPickupRunsAtCastEnd pins PlayableAI.tryToPickUp
@@ -210,7 +211,7 @@ func TestTeleportMidCastRefusesQueuedPickup(t *testing.T) {
 			if got, want := opcodesOf(jump), []byte{af, af, msc, af, af, af, af, ttl}; string(got) != string(want) {
 				t.Fatalf("teleport mid-cast with a pickup queued sent opcodes %x up to TeleportToLocation, want %x", got, want)
 			}
-			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+			c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 			srv.Advance(t, 3*time.Second)
 			for _, frame := range readUntilQuiet(t, c) {
 				switch frame[0] {

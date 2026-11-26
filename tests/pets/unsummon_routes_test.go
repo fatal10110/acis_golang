@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestRestartTakesPetOutOfWorldAndAllowsResummon covers the logout path: the
@@ -31,7 +32,7 @@ func TestRestartTakesPetOutOfWorldAndAllowsResummon(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 
 	pet.SetHP(37)
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 
 	if _, ok := h.srv.State.Summon(h.ownerID); ok {

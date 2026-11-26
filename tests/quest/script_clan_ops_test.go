@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // beastFarm is the Wild Beast Reserve, a siegable clan hall.
@@ -60,9 +61,9 @@ func TestPlayerClanLeaderAndHall(t *testing.T) {
 	})
 
 	chiefClient := srv.DialClient(t, "chief", 1)
-	chiefClient.Send(encodeRequestGameStart(0))
+	chiefClient.Send(clientwire.RequestGameStart(0))
 	readUntil(t, chiefClient, serverpackets.OpcodeCharSelected)
-	chiefClient.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	chiefClient.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, chiefClient)
 
 	run(t, srv, member, func(_ *script.Script, p *script.Player) {

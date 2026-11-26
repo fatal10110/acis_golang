@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // heldWolf is a plain script bound to the wolf's created event: on the
@@ -78,7 +79,7 @@ func TestHeldNPCHandleFollowsItsSlotAcrossARespawn(t *testing.T) {
 		gameservertest.WithNPCScripts(kinds, []script.Listing{{Path: "quest.HeldWolf"}}, script.Catalog{"quest.HeldWolf": h.script}),
 	)
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	enterWorld(t, srv, c)

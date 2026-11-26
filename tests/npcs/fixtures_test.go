@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 func TestMain(m *testing.M) {
@@ -100,16 +101,6 @@ func (w *folkWorld) talk(t *testing.T, f *npc.Folk, shift bool) [][]byte {
 	return drainFrames(t, w.c)
 }
 
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
 func encodeAction(objectID int32, at location.Location, shift bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
 	w.WriteInt32(objectID)
@@ -122,7 +113,7 @@ func encodeAction(objectID int32, at location.Location, shift bool) []byte {
 
 func startInWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}

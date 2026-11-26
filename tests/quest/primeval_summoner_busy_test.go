@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestPrimevalSummonerBusyKeepsTheSecondPayersFee (#5157): while Vervato
@@ -24,9 +25,9 @@ func TestPrimevalSummonerBusyKeepsTheSecondPayersFee(t *testing.T) {
 	second := v.srv.SeedCharacterFor(t, "second", "Second", 20, 0).ID
 	v.srv.GiveItem(t, second, item.AdenaID, vervatoFee)
 	sc := v.srv.DialClient(t, "second", 1)
-	sc.Send(encodeRequestGameStart(0))
+	sc.Send(clientwire.RequestGameStart(0))
 	readUntil(t, sc, serverpackets.OpcodeCharSelected)
-	sc.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	sc.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	v.srv.ReadQueued(t, sc)
 	v.srv.ReadQueued(t, v.srv.Client)
 

@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // The dual sword rig: the fixture's D-grade sword (template 30) carrying a
@@ -292,7 +293,7 @@ func TestEnchantRequestGates(t *testing.T) {
 	t.Run("a destroyed scroll does not block restart", func(t *testing.T) {
 		srv, _, _, _ := bootDestroyedSelection(t)
 		c := srv.Client
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 		for {
 			reply := c.Read()
 			if len(reply) == 0 || reply[0] != serverpackets.OpcodeRestartResponse {

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestSelectionAbortOnEquipRestoreReleasesThePlayer forces one selection
@@ -49,7 +50,7 @@ func TestSelectionAbortOnEquipRestoreReleasesThePlayer(t *testing.T) {
 	assertFrameOpcode(t, readSkippingEquipNoise(t, c, "equip UserInfo"), serverpackets.OpcodeUserInfo, "equip UserInfo")
 	drainUntilQuiet(t, c)
 	srv.ShadowItems.Tick()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 	if got := shadowSwordMana(t, srv, objID, sword); got != 299 {
 		t.Fatalf("mana after the first logout = %d, want 299", got)
@@ -65,7 +66,7 @@ func TestSelectionAbortOnEquipRestoreReleasesThePlayer(t *testing.T) {
 	sound := tmpl.Modifiers
 	tmpl.Modifiers = append(slices.Clone(sound), item.StatModifier{Op: item.FuncAdd, Stat: "notARealStat", Value: 1})
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeServerClose, "game start ServerClose")
 	if !c.AwaitClose(5 * time.Second) {
 		t.Fatal("aborted selection kept the connection open; the equipped item's stat restore was expected to fail")

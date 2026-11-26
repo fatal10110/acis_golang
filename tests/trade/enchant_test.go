@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // enchantWeaponD and enchantScrollD are the fixture's D-grade sword and the
@@ -110,7 +111,7 @@ func TestTradeConfirmKeepsReloggedPartnerEnchant(t *testing.T) {
 	h.enterAll(t)
 	h.startTrade(t)
 
-	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.second.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeRestartResponse, "RestartResponse")
 	h.awaitOffline(t, h.secondID)
 	drainUntilQuiet(t, h.first)

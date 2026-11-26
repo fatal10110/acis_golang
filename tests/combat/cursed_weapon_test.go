@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: CursedWeapon.java and CursedWeaponManager.java. A monster
@@ -669,10 +670,10 @@ func TestCursedWeaponHolderReturnsAndStarves(t *testing.T) {
 	c, id := srv.Client, srv.SoleObjectID(t)
 	seedHolder(t, srv, id, 61, base.Add(50*time.Hour))
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, mustRead(t, c, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, c, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	var burst [][]byte
 	for {
 		f := mustRead(t, c, "login burst")
@@ -819,10 +820,10 @@ func TestCursedWeaponHolderLifeRunsOut(t *testing.T) {
 	)
 	c, id := srv.Client, srv.SoleObjectID(t)
 	seedHolder(t, srv, id, 600, base.Add(30*time.Minute))
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	mustRead(t, c, "SSQInfo")
 	mustRead(t, c, "CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	for f := mustRead(t, c, "login burst"); f[0] != serverpackets.OpcodeSkillCoolTime; f = mustRead(t, c, "login burst") {
 	}
 	drainUntilQuiet(t, c)

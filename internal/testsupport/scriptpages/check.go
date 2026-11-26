@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,7 +23,9 @@ import (
 // full path elsewhere under data/html is outside the index and not checked.
 // A literal holding a '%', full path or not, or a short name starting with
 // '-', '.' or '/', is a fragment of a name built at run time and is not
-// checked.
+// checked, except a "-NN.htm" fragment (a dash, digits and the suffix): it
+// is the tail of an "<npcId>-NN.htm" page, so some indexed page under
+// pageDir must end with it.
 //
 // exempt lists literals that are not checked: fragments the rules above
 // cannot tell from names, and pages the script names but the datapack does
@@ -83,11 +86,11 @@ func CheckFiles(idx Index, dir, pageDir string, files []string, exempt ...string
 				unused[value] = false
 				return true
 			}
-			key, checked := pageKey(pageDir, value)
+			key, checked, found := lookup(idx, pageDir, value)
 			if !checked {
 				return true
 			}
-			if _, ok := idx[key]; !ok {
+			if !found {
 				pos := fset.Position(lit.Pos())
 				problems = append(problems, fmt.Sprintf("%s:%d: page %q is not in the script page index (looked up %s)",
 					filepath.Base(pos.Filename), pos.Line, value, key))
@@ -97,8 +100,8 @@ func CheckFiles(idx Index, dir, pageDir string, files []string, exempt ...string
 	}
 
 	for _, lit := range exempt {
-		if key, checked := pageKey(pageDir, lit); checked {
-			if _, ok := idx[key]; ok {
+		if key, checked, found := lookup(idx, pageDir, lit); checked {
+			if found {
 				problems = append(problems, fmt.Sprintf("exemption %q names indexed page %s", lit, key))
 				continue
 			}
@@ -109,6 +112,43 @@ func CheckFiles(idx Index, dir, pageDir string, files []string, exempt ...string
 	}
 	slices.Sort(problems)
 	return problems, nil
+}
+
+// lookup resolves a literal against idx: the index name it stands for,
+// whether the literal is checked at all, and whether the index holds it.
+func lookup(idx Index, pageDir, lit string) (key string, checked, found bool) {
+	if fragmentSuffix.MatchString(lit) {
+		prefix := pageDir + "/"
+		for name := range idx {
+			if rest, ok := strings.CutPrefix(name, prefix); ok && npcFragment(rest, lit) {
+				return name, true, true
+			}
+		}
+		return prefix + "<npcId>" + lit, true, false
+	}
+	key, checked = pageKey(pageDir, lit)
+	if !checked {
+		return "", false, false
+	}
+	_, found = idx[key]
+	return key, true, found
+}
+
+// fragmentSuffix matches the tail of an "<npcId>-NN.htm" page name.
+var fragmentSuffix = regexp.MustCompile(`^-[0-9]+\.html?$`)
+
+// npcFragment reports whether page is "<digits>" followed by fragment.
+func npcFragment(page, fragment string) bool {
+	id, ok := strings.CutSuffix(page, fragment)
+	if !ok || id == "" {
+		return false
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // pageKey returns the index name a page literal resolves to, and whether

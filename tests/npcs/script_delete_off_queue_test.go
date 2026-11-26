@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // stallWorld is the lifecycle fixture with the wolf and the grocer bound to
@@ -73,7 +74,7 @@ func bootStall(t *testing.T, extra ...gameservertest.Option) *stallWorld {
 	srv := gameservertest.Boot(t, opts...)
 	w.srv, w.player = srv, srv.SoleObjectID(t)
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	w.burst = enterWorld(t, srv, c)

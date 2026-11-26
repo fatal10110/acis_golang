@@ -17,6 +17,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const (
@@ -189,7 +190,7 @@ func bootChristmasTree(t *testing.T, special bool) (*petWorld, *player.Character
 	far.TeleportTo(x+400, y, z, 0)
 	readUntilOpcode(t, c, serverpackets.OpcodeTeleportToLocation, "Far teleport")
 	drainUntilQuiet(t, c)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	drainUntilQuiet(t, h.client)
 	drainUntilQuiet(t, c)
 	return h, far, c

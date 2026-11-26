@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -19,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // The beginner shots RewardNewbieShots hands out.
@@ -280,28 +280,23 @@ func clanOf(t *testing.T, level int) gameservertest.Option {
 func enterChief(t *testing.T, srv *gameservertest.Server) *testsupport.ScriptedClient {
 	t.Helper()
 	c := srv.DialClient(t, "chief", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, c)
 	srv.ReadQueued(t, srv.Client)
 	return c
 }
 
-// clanReputation reads clan 7001's stored reputation score, waiting for
-// the write to land.
+// clanReputation requires clan 7001's stored reputation score to be want once
+// the handled packets have settled and the clan write has landed.
 func clanReputation(t *testing.T, srv *gameservertest.Server, want int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	srv.Settle(t)
+	srv.FlushPersistence(t)
 	var got int
-	for {
-		if err := srv.DB.QueryRow(`SELECT reputation_score FROM clan_data WHERE clan_id = 7001`).Scan(&got); err != nil {
-			t.Fatal(err)
-		}
-		if got == want || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
+	if err := srv.DB.QueryRow(`SELECT reputation_score FROM clan_data WHERE clan_id = 7001`).Scan(&got); err != nil {
+		t.Fatal(err)
 	}
 	if got != want {
 		t.Fatalf("stored reputation = %d, want %d", got, want)

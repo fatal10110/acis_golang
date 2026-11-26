@@ -18,6 +18,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Expected exp/SP below are oracle values from the reference reward path
@@ -206,7 +207,7 @@ func TestDepartedAttackerLeavesTheFight(t *testing.T) {
 		monster := h.spawnRewardMonster(t)
 
 		monster.TakeDamage(600, onlinePlayer(t, h.srv, secondID))
-		second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+		second.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 		if !second.AwaitClose(2 * time.Second) {
 			t.Fatal("logout did not close the connection")
 		}

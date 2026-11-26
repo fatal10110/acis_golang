@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestScriptTeleportAfterTakeWaitsForTheLanding pins the owner-approved
@@ -41,12 +42,12 @@ func TestScriptTeleportAfterTakeWaitsForTheLanding(t *testing.T) {
 		t.Fatalf("entry item held = %d, want taken", n)
 	}
 
-	w.srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	w.srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	frames := w.srv.ReadQueued(t, w.srv.Client)
 	if index(frames, serverpackets.OpcodeTeleportToLocation) < 0 {
 		t.Fatalf("landing frames = %x, want the held teleport", testsupport.FrameOpcodes(frames))
 	}
-	w.srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	w.srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	w.srv.ReadQueued(t, w.srv.Client)
 	if x, y, z := w.srv.PlayerPosition(t, w.player); (location.Location{X: x, Y: y, Z: z}) != second {
 		t.Fatalf("player at %d,%d,%d, want the held destination %v", x, y, z, second)

@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestRejectedJournalWriteLosesOnlyItself sets a variable whose value is
@@ -39,7 +40,7 @@ func TestRejectedJournalWriteLosesOnlyItself(t *testing.T) {
 		t.Fatalf("log has no rejected write:\n%s", srv.LogText())
 	}
 
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelected)
 	if _, ok := srv.State.Player(objID); !ok {
 		t.Fatal("selection after the rejected write did not register the player")
@@ -99,7 +100,7 @@ func TestRejectedJournalBatchRetriesAfterOutage(t *testing.T) {
 	}
 
 	restart(t, srv)
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntil(t, srv.Client, serverpackets.OpcodeCharSelected)
 	if _, ok := srv.State.Player(objID); !ok {
 		t.Fatal("selection after the outage did not register the player")

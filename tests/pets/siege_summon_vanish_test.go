@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // assertVanished requires frames to dismiss the summon (PetDelete) and then
@@ -188,7 +189,7 @@ func teleportAndAppear(t *testing.T, h *petWorld, id int32, c *testsupport.Scrip
 	}
 	live.TeleportTo(x, y, z, 0)
 	readUntilOpcode(t, c, serverpackets.OpcodeTeleportToLocation, "teleport")
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 }
 
 // showsObject reports whether frames show objectID to their client: a

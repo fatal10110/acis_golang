@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestDBOutageCharacterListGoesOutEmpty logs an account in while the game
@@ -44,7 +45,7 @@ func TestDBOutageCharacterListGoesOutEmpty(t *testing.T) {
 		t.Fatal("no log line for the character list the database could not read")
 	}
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.ExpectNoFrame()
 
 	c.Send(encodeOutageCharacterCreate("Another"))
@@ -83,7 +84,7 @@ func TestDBOutageGameStartReturnsTheEmptyList(t *testing.T) {
 	beforeItems := outageItemRows(t, srv.DB, objID)
 
 	fault.Arm()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertCharSelectCount(t, c.Read(), 0)
 	c.ExpectNoFrame()
 	if _, inWorld := srv.State.Player(objID); inWorld {
@@ -165,7 +166,7 @@ func TestDBOutageMidSessionSavesFailSilently(t *testing.T) {
 	assertFrameOpcode(t, bc.Read(), serverpackets.OpcodeItemList, "bystander item list during the outage")
 	drainUntilQuiet(t, bc)
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	readUntilOpcode(t, c, serverpackets.OpcodeLeaveWorld)
 	c.ExpectClosed()
 	srv.FlushPersistence(t)

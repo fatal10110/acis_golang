@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Boot arms no Seven Signs period-change timer unless a test supplies one: a
@@ -25,10 +26,10 @@ func TestBootDefaultArmsNoPeriodChangeTimer(t *testing.T) {
 	)
 
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	frames := readEnterWorldBurst(t, c)
 	frames = append(frames, c.ReadQueued()...)
 	for _, f := range frames {

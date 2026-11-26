@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q501"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Proof Of Clan Alliance (Q501_ProofOfClanAlliance) is asked by the clan's
@@ -141,9 +142,9 @@ func q501Boot(t *testing.T, leader bool, cond int, vars map[string]string, holds
 func (w *q501World) enterChief(t *testing.T, party bool) {
 	t.Helper()
 	c := w.srv.DialClient(t, "chief", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	w.srv.ReadQueued(t, c)
 	w.srv.ReadQueued(t, w.srv.Client)
 	if party {
