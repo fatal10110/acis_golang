@@ -172,6 +172,17 @@ func (q *Queue) Every(d time.Duration, fn func()) *Ticker {
 	return (*Ticker)(q.arm(d, d, fn, false))
 }
 
+// EveryAfter is Every with the first tick after first instead of d. The
+// ticks stay on the grid first+k*d however late the first one is handled, as
+// a fixed-rate schedule's do, where arming Every from a timer's callback
+// would start the grid at that callback.
+func (q *Queue) EveryAfter(first, d time.Duration, fn func()) *Ticker {
+	if d <= 0 {
+		panic("sim: non-positive interval for Queue.EveryAfter")
+	}
+	return (*Ticker)(q.arm(first, d, fn, false))
+}
+
 func (q *Queue) arm(d, period time.Duration, fn func(), pastClose bool) *Timer {
 	t := &Timer{q: q, fn: fn, period: period, pastClose: pastClose}
 	q.mu.Lock()

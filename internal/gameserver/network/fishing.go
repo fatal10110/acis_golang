@@ -55,17 +55,12 @@ func (d fishingDeps) dice(n int) int {
 // fishingRun is one player's fishing line and the timers driving it, all
 // owned by the player's queue.
 type fishingRun struct {
-	stance    fishing.Stance
-	firstLook *sim.Timer
-	looks     *sim.Ticker
-	fight     *sim.Ticker
+	stance fishing.Stance
+	looks  *sim.Ticker
+	fight  *sim.Ticker
 }
 
 func (r *fishingRun) stopTimers() {
-	if r.firstLook != nil {
-		r.firstLook.Stop()
-		r.firstLook = nil
-	}
 	r.stopLooks()
 	if r.fight != nil {
 		r.fight.Stop()
@@ -192,12 +187,8 @@ func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, 
 	q := live.Queue()
 	run.stance.Wait(q.Now())
 	live.SetFishing(true)
-	run.firstLook = q.After(fishing.FirstLookDelay, func() {
-		run.firstLook = nil
-		if l.lookForFish(live) {
-			run.looks = q.Every(period, func() { l.lookForFish(live) })
-		}
-	})
+	// The looks keep the grid of the first one, however late it is handled.
+	run.looks = q.EveryAfter(fishing.FirstLookDelay, period, func() { l.lookForFish(live) })
 }
 
 // fishingLevel is the level of the fish live draws: its Fisherman's Potion
@@ -223,16 +214,15 @@ func (l *GameClientLink) night() bool {
 	return l.gameClock != nil && l.gameClock.IsNight()
 }
 
-// lookForFish looks once for a bite on live's line and reports whether the
-// wait goes on. A bite opens the fight; a wait run out ends the fishing.
-func (l *GameClientLink) lookForFish(live *livePlayer) bool {
+// lookForFish looks once for a bite on live's line. A bite opens the fight; a
+// wait run out ends the fishing.
+func (l *GameClientLink) lookForFish(live *livePlayer) {
 	sim.AssertOwner(live.Queue())
 	run := &live.fishing
 	kind, combat := run.stance.Look(live.Queue().Now(), l.night(), l.fishing.dice)
 	switch kind {
 	case fishing.LookTimeout:
 		l.endFishing(live, false)
-		return false
 	case fishing.LookBite:
 		run.stopLooks()
 		l.broadcastLiveFrame(live, func() wire.Frame {
@@ -241,9 +231,7 @@ func (l *GameClientLink) lookForFish(live *livePlayer) bool {
 		live.SendFrame(serverpackets.FramePlaySoundAt(serverpackets.Sound{Type: soundTypeMusic, File: soundBite}))
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageGotABite))
 		run.fight = live.Queue().Every(fishing.CombatTick, func() { l.fightFish(live) })
-		return false
 	}
-	return true
 }
 
 // fightFish runs one second of live's fight with its hooked fish.
