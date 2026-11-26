@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 
@@ -14,7 +15,8 @@ import (
 // bootOverrides are the types the test harness supplies in place of the
 // production provider: its seams.
 var bootOverrides = map[string]string{
-	"*sql.DB": "the pooled test database, behind any WithDBFault wrap",
+	"*sql.DB":        "the pooled test database, behind any WithDBFault wrap",
+	"zerolog.Logger": "the test's log: WithLog, the captured log, or none",
 }
 
 // notShared are the types the production graph still provides from
@@ -53,11 +55,8 @@ var notShared = []string{
 	"*merchant.Stock",
 	"*network.GameClientLink",
 	"*network.LoginStatus",
-	"*network.SessionValidator",
 	"*network.TaskEffects",
 	"*olympiad.Olympiad",
-	"*persist.Order",
-	"*persist.Worker",
 	"*petition.Manager",
 	"*raidpoint.Points",
 	"*relation.Manager",
@@ -74,11 +73,6 @@ var notShared = []string{
 	"*siege.Engine",
 	"*sim.Pool",
 	"*skill.Persistence",
-	"*sql.CoupleStore",
-	"*sql.GroundItemStore",
-	"*sql.PetitionStore",
-	"*sql.RelationStore",
-	"*sql.SpawnStore",
 	"*task.AI",
 	"*task.AttackStance",
 	"*task.Autosave",
@@ -119,7 +113,6 @@ var notShared = []string{
 	"skill.BookPolicy",
 	"task.GroundItemOptions",
 	"task.PvPFlagOptions",
-	"zerolog.Logger",
 }
 
 // TestBootBuildsFromTheProductionGraph fails when the graph the test harness
@@ -129,7 +122,7 @@ var notShared = []string{
 // unless it is listed as not shared yet.
 func TestBootBuildsFromTheProductionGraph(t *testing.T) {
 	prod := providedTypes(t, gameServerProviders(gameServerPaths{})...)
-	boot := providedTypes(t, gameservertest.BootGraph(nil))
+	boot := providedTypes(t, gameservertest.BootGraph(nil, zerolog.Nop()))
 
 	for _, typ := range sortedKeys(boot) {
 		prodCtor, inProd := prod[typ]

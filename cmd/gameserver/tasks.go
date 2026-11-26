@@ -82,24 +82,23 @@ func startSimPool(lc fx.Lifecycle, pool *sim.Pool) {
 	})
 }
 
-// provideGroundItems restores dropped items persisted at the previous
-// shutdown before the world starts, returning the store alongside so it can
-// be reused to persist state back at the next shutdown. It deliberately
-// does not clear items_on_ground itself: see startGroundItems.
-func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, pool *sql.DB, queues *sim.Pool, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
-	store := gamesql.NewGroundItemStore(pool)
+// provideGroundItems restores the dropped items persisted at the previous
+// shutdown before the world starts; the next shutdown saves them back
+// through the same store. It deliberately does not clear items_on_ground
+// itself: see startGroundItems.
+func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, store *gamesql.GroundItemStore, queues *sim.Pool, data *gameData, log zerolog.Logger) (*task.GroundItems, error) {
 	items := task.NewGroundItems(state, opts, time.Now, queues.NewQueue("ground-items"))
 
 	rows, err := store.Load(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if err := items.Load(rows, data.Items, log); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	log.Info().Int("restored_ground_items", items.Len()).Msg("ground items restored")
-	return items, store, nil
+	return items, nil
 }
 
 // startGroundItems clears the previous shutdown's items_on_ground snapshot

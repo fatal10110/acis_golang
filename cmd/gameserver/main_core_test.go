@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/app"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -70,7 +71,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 			"StopAndWait waits for one in-flight tick; the rest are in-memory, and the item and race track ticks, the only ones with database I/O, run under a context the stop cancels (TestItemInstancesStopCutsALongTickShort), so their wait is the cancellation's, kept at ItemInstanceSaveTimeout as headroom rather than its ItemInstanceTickBudget",
 		},
 		"startItemInstances":         {3 * task.ItemInstanceSaveTimeout, "ItemInstanceSaveTimeout", "drainItemInstances: save, persistence-worker drain, save"},
-		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
+		"NewPersistWorker":           {app.PersistCloseTimeout, "PersistCloseTimeout", "persistence worker's last close"},
 		"startGroundItemPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "items_on_ground save"},
 		"startSevenSigns":            {shutdownSaveTimeout, "shutdownSaveTimeout", "once stopSevenSigns stopped the period and festival timers, saves seven_signs_festival (outside seal validation), seven_signs and seven_signs_status in one budget"},
 		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, which does no I/O, then for its queued olympiad_nobles and server_memo writes and the final save on the persistence lane, each bounded by olympiad.TaskTimeout"},
@@ -141,13 +142,18 @@ func TestSystemdStopTimeoutCoversGameServerStop(t *testing.T) {
 	}
 }
 
-// stopHookRegistrars parses this package's non-test source and returns, for
-// every function containing an OnStop field, the identifiers it references.
+// stopHookRegistrars parses the non-test source of this package and of the
+// shared provider graph, and returns, for every function containing an
+// OnStop field, the identifiers it references.
 func stopHookRegistrars(t *testing.T) map[string]map[string]bool {
 	t.Helper()
-	files, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatal(err)
+	var files []string
+	for _, pattern := range []string{"*.go", "../../internal/gameserver/app/*.go"} {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, matches...)
 	}
 	fset := token.NewFileSet()
 	out := make(map[string]map[string]bool)
@@ -259,7 +265,7 @@ func TestSlowPersistCloseLeavesGroundSaveItsStopBudget(t *testing.T) {
 			return nil
 		}})
 		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
-			return closePersistOnStop(ctx, worker, budget)
+			return app.ClosePersistWorker(ctx, worker, budget)
 		}})
 		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
 			return drainItemInstances(ctx, items, worker, zerolog.Nop(), budget)

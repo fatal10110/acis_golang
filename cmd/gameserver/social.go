@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
@@ -16,14 +15,13 @@ import (
 // provideRelations loads the friend and block lists. It takes the id
 // allocator only to run after it: the allocator's boot cleanup drops the
 // relation rows of characters that no longer exist.
-func provideRelations(ctx bootContext, pool *sql.DB, _ *idfactory.Allocator, log zerolog.Logger) (*relation.Manager, *gamesql.RelationStore, error) {
-	store := gamesql.NewRelationStore(pool)
+func provideRelations(ctx bootContext, store *gamesql.RelationStore, _ *idfactory.Allocator, log zerolog.Logger) (*relation.Manager, error) {
 	rows, err := store.Load(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	log.Info().Int("relations", len(rows)).Msg("character relations loaded")
-	return relation.NewManager(rows), store, nil
+	return relation.NewManager(rows), nil
 }
 
 // startRelationPersistence writes the friend and block list changes made
@@ -45,18 +43,17 @@ func startRelationPersistence(lc fx.Lifecycle, relations *relation.Manager, stor
 // allocator's boot cleanup has dropped the petitions of characters that no
 // longer exist. A row it cannot read stops the load and is logged: the
 // petitions read before it are kept.
-func providePetitions(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, characters *gamesql.CharacterStore, gameplay gameplayConfig, log zerolog.Logger) (*petition.Manager, *gamesql.PetitionStore, error) {
-	store := gamesql.NewPetitionStore(pool)
+func providePetitions(ctx bootContext, store *gamesql.PetitionStore, ids *idfactory.Allocator, characters *gamesql.CharacterStore, gameplay gameplayConfig, log zerolog.Logger) (*petition.Manager, error) {
 	records, err := store.Load(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("couldn't load petitions")
 	}
 	names, err := characters.Names(ctx, petition.People(records))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	log.Info().Int("petitions", len(records)).Msg("petitions loaded")
-	return petition.NewManager(gameplay.Petition, ids, time.Now, records, names), store, nil
+	return petition.NewManager(gameplay.Petition, ids, time.Now, records, names), nil
 }
 
 // startPetitionPersistence writes every petition back at shutdown, after
