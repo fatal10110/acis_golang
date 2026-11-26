@@ -75,9 +75,6 @@ func FolkKind(inst *Instance) bool {
 	return ok
 }
 
-// magicAttackSpeedBase is every creature's base casting speed.
-const magicAttackSpeedBase = 333
-
 // socialInterval is the least time between two talk animations of one NPC.
 const socialInterval = 12 * time.Second
 

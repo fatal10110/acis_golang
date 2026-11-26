@@ -9,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -239,7 +240,7 @@ func (f *Folk) AttackSpeed() int {
 
 // MagicAttackSpeed returns the casting speed.
 func (f *Folk) MagicAttackSpeed() int {
-	return int(f.CalcStat(stat.MagicAttackSpeed, magicAttackSpeedBase))
+	return int(f.CalcStat(stat.MagicAttackSpeed, formulas.AttackSpeedBase))
 }
 
 // MaxHPValue returns the maximum HP in whole points.

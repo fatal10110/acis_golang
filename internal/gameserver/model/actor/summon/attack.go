@@ -6,15 +6,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -136,32 +133,10 @@ func (a *Actor) InPeaceZone() bool { return a.membership.has(zone.FlagPeace) }
 func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{TargetID: target.ObjectID()}
-	// Folding this needs the world known-list to hand out formula operands.
-	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
-	// yields attackable.Combatant, narrowed from world.Tracked, and world
-	// cannot name creature.FormulaActor because creature already depends on
-	// world. The pole and split paths draw their extra targets from that
-	// callback, so the narrowing stays here, at the one point where a
-	// combatant becomes a formula operand; see #2362.
-	other, ok := target.(creature.FormulaActor)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-	_, _, z := a.Position()
-	_, _, targetZ := other.Position()
-	behind, inFront := creature.AttackFacing(other, a)
-	if formulas.Missed(formulas.HitRate(int(a.Accuracy()), other.Against(a.ConditionActor(), nil).Evasion(), z-targetZ, a.EffectList().IsNight(), behind, inFront), a.Roll(1000)) {
-		hit.Miss = true
-		return hit
-	}
-	crit := formulas.CritSucceeds(a.Against(conditions.ActorOf(other), nil).CriticalRate(), a.Roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(a, other, crit)
-	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
-	hit.Crit = crit
-	hit.Shield = shield
-	return hit
+	return attack.ResolveHit(a, target, attack.HitRoll{
+		Accuracy: int(a.Accuracy()),
+		Night:    a.EffectList().IsNight(),
+	}, split)
 }
 
 func (a *Actor) BroadcastAttack(snapshot event.Attack) {
