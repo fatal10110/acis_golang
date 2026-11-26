@@ -187,7 +187,8 @@ func accountAccessLevel(t *testing.T, srv *gameservertest.Server, account string
 }
 
 // leftWorld requires the player called name to have left the world once the
-// handled commands have settled.
+// handled commands have settled. A kicked connection detaches after its socket
+// closes, so callers that kick wait for AwaitConnectionEnded first.
 func leftWorld(t *testing.T, srv *gameservertest.Server, name string) {
 	t.Helper()
 	srv.Settle(t)
@@ -478,6 +479,7 @@ func TestAdminBanPlayer(t *testing.T) {
 	assertTexts(t, messages(exchange(t, gm, encodeBuildCmd("ban player Player"))), "Player has been banned.")
 	expectKicked(t, user)
 	storedAccessLevel(t, srv, userID, bannedCharLevel)
+	srv.AwaitConnectionEnded(t, user) // a kick closes the socket before the detach
 	leftWorld(t, srv, "Player")
 	drain(t, gm)
 
@@ -524,6 +526,7 @@ func TestAdminBanAccount(t *testing.T) {
 	// The link handles requests in order, so the earlier offline ban was
 	// already decided.
 	accountAccessLevel(t, srv, "offline", userLevel)
+	srv.AwaitConnectionEnded(t, user) // a kick closes the socket before the detach
 	leftWorld(t, srv, "Player")
 	drain(t, gm)
 
