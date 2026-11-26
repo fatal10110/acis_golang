@@ -77,241 +77,273 @@ func (s *loginLinkState) get() *network.LoginLink {
 	return s.link.Load()
 }
 
-func provideGameClientLink(
-	cfg gameServerConfig,
-	data *gameData,
-	roster *manager.Roster,
-	items *gamesql.ItemStore,
-	shortcuts *gamesql.ShortcutStore,
-	hennas *gamesql.HennaStore,
-	recipeBooks *gamesql.RecipeBookStore,
-	macros *gamesql.MacroStore,
-	bookmarks *gamesql.BookmarkStore,
-	recommendations *gamesql.RecommendationStore,
-	quests *gamesql.QuestStore,
-	scripts *script.Registry,
-	journals *script.Quests,
-	memos *gamesql.MemoStore,
-	subclasses *gamesql.SubclassStore,
-	shops *merchant.Service,
-	html *datacache.HTML,
-	crests *datacache.Crests,
-	validator *network.SessionValidator,
-	links *loginLinkState,
-	skills *skillstate.Persistence,
-	spellbooks skill.BookPolicy,
-	state *world.State,
-	worldObjects *manager.WorldObjects,
-	ids *idfactory.Allocator,
-	ground *task.GroundItems,
-	attackStance *task.AttackStance,
-	ai *task.AI,
-	pvpFlags *task.PvPFlags,
-	decay *task.Decay,
-	pvpOptions task.PvPFlagOptions,
-	positions *task.PositionUpdates,
-	playerClock *task.PlayerClock,
-	gameClock *task.GameClock,
-	sevenSigns *sevensigns.State,
-	fest *festival.Manager,
-	signsPriest signspriest.Config,
-	olympiadState *olympiad.Olympiad,
-	heroes *hero.Manager,
-	raidPoints *raidpoint.Points,
-	cursedWeapons *cursedweapon.Manager,
-	inventoryUpdates *task.InventoryUpdates,
-	itemInstances *task.ItemInstances,
-	water *task.Water,
-	shadowItems *task.ShadowItems,
-	autosave *task.Autosave,
-	effects *network.TaskEffects,
-	effectEnv effect.Env,
-	gameplay gameplayConfig,
-	rewards manager.KillRewardConfig,
-	events *script.EventBook,
-	questRates *script.RateBook,
-	petCfg pet.Config,
-	petStore *gamesql.PetStore,
-	worker *persist.Worker,
-	itemWrites *persist.Order,
-	pool *sim.Pool,
-	relations *relation.Manager,
-	petitions *petition.Manager,
-	characters *gamesql.CharacterStore,
-	clans *clan.Service,
-	castles *castle.Manager,
-	castleManor *castlemanor.Manager,
-	sieges *siege.Engine,
-	board communityBoard,
-	announcements *announcement.Registry,
-	schemeBuffer *schemebuffer.Manager,
-	couples *wedding.Manager,
-	lotteryState *lottery.Lottery,
-	fishChamp *fishchamp.Championship,
-	derbyTrack *derby.Track,
-	fleet *boat.Fleet,
-	hallFunctions *clanhall.Functions,
-	halls *clanhall.Halls,
-	log zerolog.Logger,
-	gmAudit gmAuditLogger,
-	reloads network.DataReloads,
-	bossZones *gamesql.BossZoneStore,
-	loginStatus *network.LoginStatus,
-	countdown *shutdown.Countdown,
-	chatLog chatLogger,
-	itemLog itemLogger,
-) (*network.GameClientLink, error) {
-	playerConfig := newPlayerConfig(cfg, gameplay, pvpOptions)
+// gameClientLinkDeps is what the game client link is built from, in the
+// order the graph resolves it.
+type gameClientLinkDeps struct {
+	fx.In
+
+	Cfg              gameServerConfig
+	Data             *gameData
+	Roster           *manager.Roster
+	Items            *gamesql.ItemStore
+	Shortcuts        *gamesql.ShortcutStore
+	Hennas           *gamesql.HennaStore
+	RecipeBooks      *gamesql.RecipeBookStore
+	Macros           *gamesql.MacroStore
+	Bookmarks        *gamesql.BookmarkStore
+	Recommendations  *gamesql.RecommendationStore
+	Quests           *gamesql.QuestStore
+	Scripts          *script.Registry
+	Journals         *script.Quests
+	Memos            *gamesql.MemoStore
+	Subclasses       *gamesql.SubclassStore
+	Shops            *merchant.Service
+	HTML             *datacache.HTML
+	Crests           *datacache.Crests
+	Validator        *network.SessionValidator
+	Links            *loginLinkState
+	Skills           *skillstate.Persistence
+	Spellbooks       skill.BookPolicy
+	State            *world.State
+	WorldObjects     *manager.WorldObjects
+	IDs              *idfactory.Allocator
+	Ground           *task.GroundItems
+	AttackStance     *task.AttackStance
+	AI               *task.AI
+	PvPFlags         *task.PvPFlags
+	Decay            *task.Decay
+	PvPOptions       task.PvPFlagOptions
+	Positions        *task.PositionUpdates
+	PlayerClock      *task.PlayerClock
+	GameClock        *task.GameClock
+	SevenSigns       *sevensigns.State
+	Fest             *festival.Manager
+	SignsPriest      signspriest.Config
+	OlympiadState    *olympiad.Olympiad
+	Heroes           *hero.Manager
+	RaidPoints       *raidpoint.Points
+	CursedWeapons    *cursedweapon.Manager
+	InventoryUpdates *task.InventoryUpdates
+	ItemInstances    *task.ItemInstances
+	Water            *task.Water
+	ShadowItems      *task.ShadowItems
+	Autosave         *task.Autosave
+	Effects          *network.TaskEffects
+	EffectEnv        effect.Env
+	Gameplay         gameplayConfig
+	Rewards          manager.KillRewardConfig
+	Events           *script.EventBook
+	QuestRates       *script.RateBook
+	PetCfg           pet.Config
+	PetStore         *gamesql.PetStore
+	Worker           *persist.Worker
+	ItemWrites       *persist.Order
+	Pool             *sim.Pool
+	Relations        *relation.Manager
+	Petitions        *petition.Manager
+	Characters       *gamesql.CharacterStore
+	Clans            *clan.Service
+	Castles          *castle.Manager
+	CastleManor      *castlemanor.Manager
+	Sieges           *siege.Engine
+	Board            communityBoard
+	Announcements    *announcement.Registry
+	SchemeBuffer     *schemebuffer.Manager
+	Couples          *wedding.Manager
+	LotteryState     *lottery.Lottery
+	FishChamp        *fishchamp.Championship
+	DerbyTrack       *derby.Track
+	Fleet            *boat.Fleet
+	HallFunctions    *clanhall.Functions
+	Halls            *clanhall.Halls
+	Log              zerolog.Logger
+	GMAudit          gmAuditLogger
+	Reloads          network.DataReloads
+	BossZones        *gamesql.BossZoneStore
+	LoginStatus      *network.LoginStatus
+	Countdown        *shutdown.Countdown
+	ChatLog          chatLogger
+	ItemLog          itemLogger
+}
+
+func provideGameClientLink(d gameClientLinkDeps) (*network.GameClientLink, error) {
+	playerConfig := newPlayerConfig(d.Cfg, d.Gameplay, d.PvPOptions)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
-		Flow: network.CharacterFlowConfig{
-			Validator:   validator,
-			NoCipher:    !cfg.UseBlowfishCipher,
-			PlayerClock: playerClock,
-			Autosave:    autosave,
-		},
-		Belongings: network.BelongingsConfig{
-			Items:            items,
-			Shortcuts:        shortcuts,
-			Hennas:           hennas,
-			HennaTable:       data.Hennas,
-			RecipeBooks:      recipeBooks,
-			GroundItems:      ground,
-			InventoryUpdates: inventoryUpdates,
-			ItemInstances:    itemInstances,
-		},
-		Combat: network.CombatConfig{
-			AttackStance: attackStance,
-			AI:           ai,
-			PvPFlags:     pvpFlags,
-			HealSps:      data.HealSps,
-		},
-		Summoning: network.SummoningConfig{
-			Items:  data.SummonItems,
-			Store:  petStore,
-			Config: petCfg,
-			Decay:  decay,
-		},
-		Enchanting:    network.EnchantingConfig{ArmorSets: data.ArmorSets},
-		Effects:       effectEnv,
-		LoginLink:     links.get,
-		Roster:        roster,
-		Subclasses:    subclasses,
-		Recipes:       data.Recipes,
-		Merchant:      shops,
-		Multisells:    data.Multisells,
-		Templates:     data.Players,
-		ItemTemplates: data.Items,
-		HTML:          html,
-		Crests:        crests,
-		Skills:        skills,
-		Spellbooks:    spellbooks,
-		SkillTrees:    data.Trees,
-		CursedWeapons: data.CursedWeapons,
-		CursedRuntime: cursedWeapons,
-		World:         state,
-		NPCs:          data.NPCs,
-		Doors:         worldObjects,
-		Geo:           move.NewGeo(data.Geo, data.Finder),
-		GeoBugs:       data.GeoBugs,
-		Zones:         data.Zones,
-		IDs:           ids,
-		Fences:        fence.NewManager(data.Geo, state, ids),
-		Positions:     positions,
-		GameClock:     gameClock,
-		SevenSigns:    sevenSigns,
-		Festival:      fest,
-		SignsPriest:   &signsPriest,
-		Olympiad:      olympiadState,
-		Heroes:        heroes,
-		RaidPoints:    raidPoints,
-		Water:         water,
-		ShadowItems:   shadowItems,
+		Flow:          d.flowConfig(),
+		Belongings:    d.belongingsConfig(),
+		Combat:        d.combatConfig(),
+		Summoning:     d.summoningConfig(),
+		Enchanting:    network.EnchantingConfig{ArmorSets: d.Data.ArmorSets},
+		Effects:       d.EffectEnv,
+		LoginLink:     d.Links.get,
+		Roster:        d.Roster,
+		Subclasses:    d.Subclasses,
+		Recipes:       d.Data.Recipes,
+		Merchant:      d.Shops,
+		Multisells:    d.Data.Multisells,
+		Templates:     d.Data.Players,
+		ItemTemplates: d.Data.Items,
+		HTML:          d.HTML,
+		Crests:        d.Crests,
+		Skills:        d.Skills,
+		Spellbooks:    d.Spellbooks,
+		SkillTrees:    d.Data.Trees,
+		CursedWeapons: d.Data.CursedWeapons,
+		CursedRuntime: d.CursedWeapons,
+		World:         d.State,
+		NPCs:          d.Data.NPCs,
+		Doors:         d.WorldObjects,
+		Geo:           move.NewGeo(d.Data.Geo, d.Data.Finder),
+		GeoBugs:       d.Data.GeoBugs,
+		Zones:         d.Data.Zones,
+		IDs:           d.IDs,
+		Fences:        fence.NewManager(d.Data.Geo, d.State, d.IDs),
+		Positions:     d.Positions,
+		GameClock:     d.GameClock,
+		SevenSigns:    d.SevenSigns,
+		Festival:      d.Fest,
+		SignsPriest:   &d.SignsPriest,
+		Olympiad:      d.OlympiadState,
+		Heroes:        d.Heroes,
+		RaidPoints:    d.RaidPoints,
+		Water:         d.Water,
+		ShadowItems:   d.ShadowItems,
 
-		Persist:      worker,
-		ItemWrites:   itemWrites,
-		Queues:       pool,
-		Restarts:     data.Restarts,
-		ClanHallData: data.ClanHalls,
-		CastleData:   data.Castles,
-		Observers:    data.Observers,
-		Levels:       data.Levels,
-		Admin:        data.Admin,
-		GMAudit:      gmAudit.enabled(gameplay.Admin.GMAudit),
-		ItemLog:      itemLog.enabled(bool(gameplay.LogItems)),
-		Chat: network.ChatConfig{
-			Log:              chatLog.enabled(gameplay.Chat.LogChat),
-			WalkerProtection: gameplay.Chat.WalkerProtection,
-			GlobalDelay:      gameplay.Chat.GlobalDelay,
-			TradeDelay:       gameplay.Chat.TradeDelay,
-			HeroVoiceDelay:   gameplay.Chat.HeroVoiceDelay,
-		},
+		Persist:          d.Worker,
+		ItemWrites:       d.ItemWrites,
+		Queues:           d.Pool,
+		Restarts:         d.Data.Restarts,
+		ClanHallData:     d.Data.ClanHalls,
+		CastleData:       d.Data.Castles,
+		Observers:        d.Data.Observers,
+		Levels:           d.Data.Levels,
+		Admin:            d.Data.Admin,
+		GMAudit:          d.GMAudit.enabled(d.Gameplay.Admin.GMAudit),
+		ItemLog:          d.ItemLog.enabled(bool(d.Gameplay.LogItems)),
+		Chat:             d.chatConfig(),
 		PlayerConfig:     playerConfig,
-		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
-		ShowNPCCrest:     bool(gameplay.ShowNPCCrest),
-		ShowSummonCrest:  bool(gameplay.ShowSummonCrest),
-		Wyvern:           &gameplay.Wyvern,
-		Macros:           macros,
-		Bookmarks:        bookmarks,
-		Recommendations:  recommendations,
-		Quests:           quests,
-		Scripts:          scripts,
-		Journals:         journals,
-		Memos:            memos,
-		Teleports:        data.Teleports,
-		InstantTeleports: data.InstantTeleports,
-		FreeTeleport:     bool(gameplay.FreeTeleport),
-		ClassMaster:      gameplay.ClassMaster,
-		Log:              log,
+		DisableRaidCurse: bool(d.Gameplay.DisableRaidCurse),
+		ShowNPCCrest:     bool(d.Gameplay.ShowNPCCrest),
+		ShowSummonCrest:  bool(d.Gameplay.ShowSummonCrest),
+		Wyvern:           &d.Gameplay.Wyvern,
+		Macros:           d.Macros,
+		Bookmarks:        d.Bookmarks,
+		Recommendations:  d.Recommendations,
+		Quests:           d.Quests,
+		Scripts:          d.Scripts,
+		Journals:         d.Journals,
+		Memos:            d.Memos,
+		Teleports:        d.Data.Teleports,
+		InstantTeleports: d.Data.InstantTeleports,
+		FreeTeleport:     bool(d.Gameplay.FreeTeleport),
+		ClassMaster:      d.Gameplay.ClassMaster,
+		Log:              d.Log,
 
-		Augmentations:       data.Augmentations,
-		AugmentationChances: gameplay.AugmentationChances,
-		Manor:               manorConfig(gameplay.Manor, data),
-		Fish:                data.Fish,
+		Augmentations:       d.Data.Augmentations,
+		AugmentationChances: d.Gameplay.AugmentationChances,
+		Manor:               manorConfig(d.Gameplay.Manor, d.Data),
+		Fish:                d.Data.Fish,
 
-		Relations:      relations,
-		Characters:     characters,
-		Clans:          clans,
-		Castles:        castles,
-		CastleManor:    castleManor,
-		Sieges:         sieges,
-		AccessLevels:   characters,
-		CharacterEdits: characters,
-		Punishments:    characters,
-		Petitions:      petitions,
+		Relations:      d.Relations,
+		Characters:     d.Characters,
+		Clans:          d.Clans,
+		Castles:        d.Castles,
+		CastleManor:    d.CastleManor,
+		Sieges:         d.Sieges,
+		AccessLevels:   d.Characters,
+		CharacterEdits: d.Characters,
+		Punishments:    d.Characters,
+		Petitions:      d.Petitions,
 
-		Board:               board.Config,
-		Mailbox:             board.Mailbox,
-		Forums:              board.Forums,
-		Favorites:           board.Favorites,
-		ShowServerNews:      board.ShowServerNews,
-		Announcements:       announcements,
-		SchemeBuffer:        schemeBuffer,
-		Wedding:             couples,
-		Lottery:             lotteryState,
-		FishingChampionship: fishChamp,
-		Derby:               derbyTrack,
-		Boats:               fleet,
+		Board:               d.Board.Config,
+		Mailbox:             d.Board.Mailbox,
+		Forums:              d.Board.Forums,
+		Favorites:           d.Board.Favorites,
+		ShowServerNews:      d.Board.ShowServerNews,
+		Announcements:       d.Announcements,
+		SchemeBuffer:        d.SchemeBuffer,
+		Wedding:             d.Couples,
+		Lottery:             d.LotteryState,
+		FishingChampionship: d.FishChamp,
+		Derby:               d.DerbyTrack,
+		Boats:               d.Fleet,
 
-		ClanHallFunctions: hallFunctions,
-		ClanHalls:         halls,
+		ClanHallFunctions: d.HallFunctions,
+		ClanHalls:         d.Halls,
 
-		Reloads:     reloads,
-		KillRewards: rewards.Settings,
-		Events:      events,
-		QuestRates:  questRates,
-		BossZones:   bossZones,
+		Reloads:     d.Reloads,
+		KillRewards: d.Rewards.Settings,
+		Events:      d.Events,
+		QuestRates:  d.QuestRates,
+		BossZones:   d.BossZones,
 
-		Shutdown:    countdown,
-		LoginStatus: loginStatus,
+		Shutdown:    d.Countdown,
+		LoginStatus: d.LoginStatus,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if effects != nil {
-		effects.SetShadowItemExpiry(link.ExpireShadowItem)
+	if d.Effects != nil {
+		d.Effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	}
-	worldObjects.SetRegenSettings(link.PlayerRules())
+	d.WorldObjects.SetRegenSettings(link.PlayerRules())
 	return link, nil
+}
+
+// flowConfig is the character flow part of the link config.
+func (d *gameClientLinkDeps) flowConfig() network.CharacterFlowConfig {
+	return network.CharacterFlowConfig{
+		Validator:   d.Validator,
+		NoCipher:    !d.Cfg.UseBlowfishCipher,
+		PlayerClock: d.PlayerClock,
+		Autosave:    d.Autosave,
+	}
+}
+
+// belongingsConfig is the item, shortcut, henna and recipe part of the link
+// config.
+func (d *gameClientLinkDeps) belongingsConfig() network.BelongingsConfig {
+	return network.BelongingsConfig{
+		Items:            d.Items,
+		Shortcuts:        d.Shortcuts,
+		Hennas:           d.Hennas,
+		HennaTable:       d.Data.Hennas,
+		RecipeBooks:      d.RecipeBooks,
+		GroundItems:      d.Ground,
+		InventoryUpdates: d.InventoryUpdates,
+		ItemInstances:    d.ItemInstances,
+	}
+}
+
+// combatConfig is the combat part of the link config.
+func (d *gameClientLinkDeps) combatConfig() network.CombatConfig {
+	return network.CombatConfig{
+		AttackStance: d.AttackStance,
+		AI:           d.AI,
+		PvPFlags:     d.PvPFlags,
+		HealSps:      d.Data.HealSps,
+	}
+}
+
+// summoningConfig is the pet and servitor part of the link config.
+func (d *gameClientLinkDeps) summoningConfig() network.SummoningConfig {
+	return network.SummoningConfig{
+		Items:  d.Data.SummonItems,
+		Store:  d.PetStore,
+		Config: d.PetCfg,
+		Decay:  d.Decay,
+	}
+}
+
+// chatConfig is the chat part of the link config.
+func (d *gameClientLinkDeps) chatConfig() network.ChatConfig {
+	return network.ChatConfig{
+		Log:              d.ChatLog.enabled(d.Gameplay.Chat.LogChat),
+		WalkerProtection: d.Gameplay.Chat.WalkerProtection,
+		GlobalDelay:      d.Gameplay.Chat.GlobalDelay,
+		TradeDelay:       d.Gameplay.Chat.TradeDelay,
+		HeroVoiceDelay:   d.Gameplay.Chat.HeroVoiceDelay,
+	}
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig, worker *persist.Worker, log zerolog.Logger) (*skillstate.Persistence, error) {

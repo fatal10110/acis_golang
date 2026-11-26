@@ -31,7 +31,22 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if live == nil {
 		return nil
 	}
+	// The steps run in this order; each helper says why its steps sit where
+	// they do.
 	owners := []int32{live.ObjectID()}
+	l.stopLiveActivity(live)
+	canceledTrade := l.closeLiveSessionState(live)
+	l.enqueueLiveCharacterSave(live)
+	l.stopLiveTracking(live)
+	owners = append(owners, l.settleLiveBelongings(live)...)
+	l.dropLiveAttackStance(live)
+	l.leaveLiveWorld(live, canceledTrade)
+	l.finishLiveDetach(live)
+	return owners
+}
+
+// stopLiveActivity ends what live was doing while it is still placed.
+func (l *GameClientLink) stopLiveActivity(live *livePlayer) {
 	// A player leaving from the loading screen still holds the effects its
 	// selection restored: they replay first, so the ticks due since then run
 	// and the saves below carry what they did.
@@ -44,6 +59,12 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// The selection is dropped while live is still placed, so its
 	// neighborhood gets TargetUnselected before live's DeleteObject.
 	live.forgetTarget(live.Target())
+}
+
+// closeLiveSessionState closes the session's open requests, windows and
+// timers before the saves are enqueued. It returns the trade cancel to
+// announce once live has left its party.
+func (l *GameClientLink) closeLiveSessionState(live *livePlayer) tradebook.CancelResult {
 	// Leaving while holding a request still to answer, of any kind,
 	// cancels the open trade; otherwise it stays open on the partner's
 	// side. The session closes here, before the saves below, so the partner
@@ -86,31 +107,42 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		live.stopPunishTimer(true)
 		l.storePunishment(live)
 	}
+	return canceledTrade
+}
 
-	if l.roster != nil || l.skills != nil {
-		roster, skills, log := l.roster, l.skills, l.log
-		character := live.Character
-		charState := live.characterSaveState()
-		l.gmOffLeaveState(live, &charState)
-		if at, ok := l.festivalDeparture(live); ok {
-			charState.Location = at
-		}
-		skillState := skills.SaveState(character)
-		l.persist.Enqueue(live.ObjectID(), func() {
-			// One budget for the whole character save, not one per store,
-			// started when the job runs rather than when it was queued.
-			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-			defer cancel()
-			if roster != nil {
-				if err := roster.SaveOffline(ctx, charState); err != nil {
-					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player")
-				}
-			}
-			if err := skills.Save(ctx, skillState); err != nil {
-				log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player skill state")
-			}
-		})
+// enqueueLiveCharacterSave enqueues the character row and skill state saves
+// on live's lane.
+func (l *GameClientLink) enqueueLiveCharacterSave(live *livePlayer) {
+	if l.roster == nil && l.skills == nil {
+		return
 	}
+	roster, skills, log := l.roster, l.skills, l.log
+	character := live.Character
+	charState := live.characterSaveState()
+	l.gmOffLeaveState(live, &charState)
+	if at, ok := l.festivalDeparture(live); ok {
+		charState.Location = at
+	}
+	skillState := skills.SaveState(character)
+	l.persist.Enqueue(live.ObjectID(), func() {
+		// One budget for the whole character save, not one per store,
+		// started when the job runs rather than when it was queued.
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if roster != nil {
+			if err := roster.SaveOffline(ctx, charState); err != nil {
+				log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player")
+			}
+		}
+		if err := skills.Save(ctx, skillState); err != nil {
+			log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player skill state")
+		}
+	})
+}
+
+// stopLiveTracking takes live off the boat it rides and out of the tasks
+// and zones that track it.
+func (l *GameClientLink) stopLiveTracking(live *livePlayer) {
 	// A passenger leaves its boat silently once its save has taken the
 	// dock's shore as its position.
 	dropBoat(live)
@@ -135,6 +167,12 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.zones != nil && live.zoneActor != nil {
 		live.zoneActor.remove(l.zones)
 	}
+}
+
+// settleLiveBelongings settles live's summon, flushes its items and
+// despawns it. It returns the further container owners whose lanes received
+// saves.
+func (l *GameClientLink) settleLiveBelongings(live *livePlayer) []int32 {
 	if l.world != nil {
 		// A living summon leaves with its owner; a corpse stays until it
 		// decays or its owner comes back for it. Either way a pet is
@@ -156,28 +194,39 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if inv := live.Character.Inventory(); inv != nil {
 		l.flushItemPersistence(inv)
 	}
-	owners = append(owners, l.releaseStorage(live)...)
+	owners := l.releaseStorage(live)
 	l.gms.Remove(live)
 	if l.world != nil {
 		l.world.Despawn(live)
 	}
-	if l.combat.attackStance != nil {
-		// Unconditional, whatever live.Stop left of the in-combat flag, and
-		// only once live is despawned, under its stance lock: a hit landing
-		// from another goroutine either refreshed the entry before this, or
-		// finds live gone and leaves it untracked. Left behind, the sweep
-		// would re-post its expiry to the owner's queue, which q.Close below
-		// has shut, so nothing would ever remove it.
-		//
-		// The removal is silent: observers of a player leaving the world
-		// get no AutoAttackStop, only its DeleteObject. A stance that
-		// expired while a dropped connection lingered sent its own.
-		func() {
-			live.stanceMu.Lock()
-			defer live.stanceMu.Unlock()
-			l.combat.attackStance.Remove(live)
-		}()
+	return owners
+}
+
+// dropLiveAttackStance removes live from the attack stance task once it is
+// despawned.
+func (l *GameClientLink) dropLiveAttackStance(live *livePlayer) {
+	if l.combat.attackStance == nil {
+		return
 	}
+	// Unconditional, whatever live.Stop left of the in-combat flag, and
+	// only once live is despawned, under its stance lock: a hit landing
+	// from another goroutine either refreshed the entry before this, or
+	// finds live gone and leaves it untracked. Left behind, the sweep
+	// would re-post its expiry to the owner's queue, which q.Close below
+	// has shut, so nothing would ever remove it.
+	//
+	// The removal is silent: observers of a player leaving the world
+	// get no AutoAttackStop, only its DeleteObject. A stance that
+	// expired while a dropped connection lingered sent its own.
+	func() {
+		live.stanceMu.Lock()
+		defer live.stanceMu.Unlock()
+		l.combat.attackStance.Remove(live)
+	}()
+}
+
+// leaveLiveWorld runs while live is out of sight but still listed online.
+func (l *GameClientLink) leaveLiveWorld(live *livePlayer, canceledTrade tradebook.CancelResult) {
 	// Out of sight, still listed online: out of its party and the
 	// Olympiad's waiting list, then the trade cancel decided above, then
 	// its friends told it left.
@@ -191,6 +240,11 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.world.RemovePlayer(live)
 	}
 	l.leaveClanOnLogout(live)
+}
+
+// finishLiveDetach cuts live off from the effect sweep, its session and its
+// queue.
+func (l *GameClientLink) finishLiveDetach(live *livePlayer) {
 	// Stop the periodic effect sweep from reaching this character's list:
 	// it left world.State above, but a still-held buff/debuff keeps the
 	// list registered with task.Effects (see effect.List.Untrack) until
@@ -202,7 +256,6 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// Timers still armed on the queue are cancelled, and later posts to it
 	// (another actor's command, a straggling tick) are dropped.
 	live.Queue().Close()
-	return owners
 }
 
 // LivePlayerPersistWait bounds how long a connection waits for a detached
