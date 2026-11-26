@@ -356,15 +356,15 @@ func onMyDying(s *script.Script, e script.MyDying) {
 	}
 	switch e.NPC.NpcID() {
 	case 20550:
-		if st.Cond() == 4 && s.DropItems(p, pureMithrilOre, 1, 10, 500000) && p.ItemCount(wyrmTalon) >= 20 && p.ItemCount(antSoldierAcid) >= 20 {
+		if st.Cond() == 4 && s.DropItems(p, pureMithrilOre, 1, 10, 500000) && othersCollected(p, oreGoals(), pureMithrilOre) {
 			st.SetCond(5)
 		}
 	case 20176:
-		if st.Cond() == 4 && s.DropItems(p, wyrmTalon, 1, 20, 500000) && p.ItemCount(pureMithrilOre) >= 10 && p.ItemCount(antSoldierAcid) >= 20 {
+		if st.Cond() == 4 && s.DropItems(p, wyrmTalon, 1, 20, 500000) && othersCollected(p, oreGoals(), wyrmTalon) {
 			st.SetCond(5)
 		}
 	case 20082, 20084, 20086, 20087, 20088:
-		if st.Cond() == 4 && s.DropItems(p, antSoldierAcid, 1, 20, 800000) && p.ItemCount(pureMithrilOre) >= 10 && p.ItemCount(wyrmTalon) >= 20 {
+		if st.Cond() == 4 && s.DropItems(p, antSoldierAcid, 1, 20, 800000) && othersCollected(p, oreGoals(), antSoldierAcid) {
 			st.SetCond(5)
 		}
 	case 20233:
@@ -399,4 +399,22 @@ func onMyDying(s *script.Script, e script.MyDying) {
 			}
 		}
 	}
+}
+
+// itemGoal is a quest item and the count a collecting cond needs of it.
+type itemGoal struct{ item, count int32 }
+
+func oreGoals() []itemGoal {
+	return []itemGoal{{wyrmTalon, 20}, {antSoldierAcid, 20}, {pureMithrilOre, 10}}
+}
+
+// othersCollected reports whether p holds at least the goal count of every
+// item of goals except dropped, the item the kill just dropped.
+func othersCollected(p *script.Player, goals []itemGoal, dropped int32) bool {
+	for _, g := range goals {
+		if g.item != dropped && p.ItemCount(g.item) < g.count {
+			return false
+		}
+	}
+	return true
 }

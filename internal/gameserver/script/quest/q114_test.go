@@ -10,10 +10,12 @@ import (
 // TestQ114MatchesReferenceFingerprints compares the package with the reference
 // class: literals, engine calls and hook shapes. The NpcString ids of the
 // golem's lines and of the stone's screen message are named constants in
-// the reference.
+// the reference. The reference also offers 32047-08.htm on a talk2 variable
+// nothing sets, a branch the port drops.
 func TestQ114MatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check("q114", []string{"quest.Q114_ResurrectionOfAnOldManager"},
-		"number 11450", "number 11451", "number 11452", "number 11453")
+		"number 11450", "number 11451", "number 11452", "number 11453",
+		`string "talk2"`, `string "32047-08.htm"`)
 	if err != nil {
 		t.Fatal(err)
 	}

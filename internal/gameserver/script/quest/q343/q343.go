@@ -4,6 +4,8 @@
 package q343
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -66,7 +68,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {cema},
 			script.EventTalked:     {cema, icarus, marsha, trumpin},
-			script.EventMyDying:    {20563, 20564, 20565, 20566},
+			script.EventMyDying:    slices.Sorted(maps.Keys(drops())),
 		},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
 	}

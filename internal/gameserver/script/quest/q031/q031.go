@@ -42,6 +42,18 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"31555-04.htm": 3,
+		"31661-01.htm": 4,
+		"31662-01.htm": 5,
+		"31663-01.htm": 6,
+		"31664-01.htm": 7,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -58,21 +70,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(2)
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, krorinJournal, 1)
-	case strings.EqualFold(e.Name, "31555-04.htm"):
-		st.SetCond(3)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31661-01.htm"):
-		st.SetCond(4)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31662-01.htm"):
-		st.SetCond(5)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31663-01.htm"):
-		st.SetCond(6)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31664-01.htm"):
-		st.SetCond(7)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31555-07.htm"):
 		// #5183: the reward pays only in the state its page is offered in.
 		if st.Status() != questlog.StatusStarted || st.Cond() != 7 || !p.HasItem(krorinJournal) {
@@ -83,6 +80,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.RewardExpAndSp(p, 130000, 0)
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }

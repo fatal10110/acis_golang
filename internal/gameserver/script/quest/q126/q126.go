@@ -44,6 +44,31 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"32115-10.htm": 2,
+		"32119-02.htm": 3,
+		"32119-09.htm": 4,
+		"32119-11.htm": 5,
+		"32120-07.htm": 6,
+		"32120-09.htm": 7,
+		"32120-11.htm": 8,
+		"32121-07.htm": 9,
+		"32121-10.htm": 10,
+		"32121-15.htm": 11,
+		"32122-03.htm": 12,
+		"32122-15.htm": 13,
+		"32122-18.htm": 14,
+		"32122-90.htm": 18,
+		"32109-02.htm": 19,
+		"32115-21.htm": 21,
+		"32115-28.htm": 22,
+		"32114-08.htm": 23,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -56,66 +81,12 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetStatus(questlog.StatusStarted)
 		st.SetCond(1)
 		s.PlaySound(p, script.SoundAccept)
-	case strings.EqualFold(e.Name, "32115-10.htm"):
-		st.SetCond(2)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32119-02.htm"):
-		st.SetCond(3)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32119-09.htm"):
-		st.SetCond(4)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32119-11.htm"):
-		st.SetCond(5)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32120-07.htm"):
-		st.SetCond(6)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32120-09.htm"):
-		st.SetCond(7)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32120-11.htm"):
-		st.SetCond(8)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32121-07.htm"):
-		st.SetCond(9)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32121-10.htm"):
-		st.SetCond(10)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32121-15.htm"):
-		st.SetCond(11)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32122-03.htm"):
-		st.SetCond(12)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32122-15.htm"):
-		st.SetCond(13)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32122-18.htm"):
-		st.SetCond(14)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32122-87.htm"):
 		s.GiveItems(p, bonePowder, 1)
-	case strings.EqualFold(e.Name, "32122-90.htm"):
-		st.SetCond(18)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32109-02.htm"):
-		st.SetCond(19)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32109-19.htm"):
 		st.SetCond(20)
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, bonePowder, 1)
-	case strings.EqualFold(e.Name, "32115-21.htm"):
-		st.SetCond(21)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32115-28.htm"):
-		st.SetCond(22)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32114-08.htm"):
-		st.SetCond(23)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32114-09.htm"):
 		// #5183: the reward pays only in the state its page is offered in.
 		if st.Status() != questlog.StatusStarted || st.Cond() != 23 {
@@ -199,6 +170,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			st.Set("MI_2", strconv.Itoa(1))
 		}
 		htmltext = getSongTri(s, p, st)
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }

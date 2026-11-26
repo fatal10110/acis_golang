@@ -4,6 +4,8 @@
 package q325
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
@@ -65,7 +67,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {curtis},
 			script.EventTalked:     {curtis, varsak, samed},
-			script.EventMyDying:    {20026, 20029, 20035, 20042, 20045, 20051, 20457, 20458, 20514, 20515},
+			script.EventMyDying:    slices.Sorted(maps.Keys(droplist())),
 		},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
 	}

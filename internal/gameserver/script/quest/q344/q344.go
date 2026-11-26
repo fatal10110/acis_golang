@@ -3,6 +3,8 @@
 package q344
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -55,7 +57,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {gilmore},
 			script.EventTalked:     {gilmore, rodemai, orven, garvarentz, kaien},
-			script.EventMyDying:    {20236, 20237, 20238, 20239, 20240, 20272, 20273, 20274, 20275, 20276},
+			script.EventMyDying:    slices.Sorted(maps.Keys(chances())),
 		},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
 	}

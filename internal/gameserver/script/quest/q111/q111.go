@@ -49,6 +49,18 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"32115-002.htm": 3,
+		"32113-009.htm": 4,
+		"32116-005.htm": 8,
+		"32115-004.htm": 9,
+		"32115-006.htm": 10,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -61,12 +73,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetStatus(questlog.StatusStarted)
 		st.SetCond(1)
 		s.PlaySound(p, script.SoundAccept)
-	case strings.EqualFold(e.Name, "32115-002.htm"):
-		st.SetCond(3)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32113-009.htm"):
-		st.SetCond(4)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32113-018.htm"):
 		st.SetCond(6)
 		s.PlaySound(p, script.SoundMiddle)
@@ -75,15 +81,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	case strings.EqualFold(e.Name, "32116-003.htm"):
 		st.SetCond(7)
 		s.PlaySound(p, "EtcSound.elcroki_song_full")
-	case strings.EqualFold(e.Name, "32116-005.htm"):
-		st.SetCond(8)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32115-004.htm"):
-		st.SetCond(9)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32115-006.htm"):
-		st.SetCond(10)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32116-007.htm"):
 		// #5183: the reward pays only in the state its page is offered in.
 		if st.Status() != questlog.StatusStarted || st.Cond() != 12 || !p.HasItem(practiceTrap) {
@@ -95,6 +92,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.RewardItems(p, 57, 1022636)
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }
@@ -186,22 +191,32 @@ func onMyDying(s *script.Script, e script.MyDying) {
 			st.SetCond(5)
 		}
 	case 22200, 22201, 22202, 22219:
-		if st.Cond() == 10 && s.DropItems(p, claw, 1, 10, 650000) {
-			if p.ItemCount(bone) >= 10 && p.ItemCount(skin) >= 10 {
-				st.SetCond(11)
-			}
+		if st.Cond() == 10 && s.DropItems(p, claw, 1, 10, 650000) && othersCollected(p, partGoals(), claw) {
+			st.SetCond(11)
 		}
 	case 22208, 22209, 22210, 22221:
-		if st.Cond() == 10 && s.DropItems(p, skin, 1, 10, 650000) {
-			if p.ItemCount(claw) >= 10 && p.ItemCount(bone) >= 10 {
-				st.SetCond(11)
-			}
+		if st.Cond() == 10 && s.DropItems(p, skin, 1, 10, 650000) && othersCollected(p, partGoals(), skin) {
+			st.SetCond(11)
 		}
 	case 22203, 22204, 22205, 22220:
-		if st.Cond() == 10 && s.DropItems(p, bone, 1, 10, 650000) {
-			if p.ItemCount(claw) >= 10 && p.ItemCount(skin) >= 10 {
-				st.SetCond(11)
-			}
+		if st.Cond() == 10 && s.DropItems(p, bone, 1, 10, 650000) && othersCollected(p, partGoals(), bone) {
+			st.SetCond(11)
 		}
 	}
+}
+
+// itemGoal is a quest item and the count a collecting cond needs of it.
+type itemGoal struct{ item, count int32 }
+
+func partGoals() []itemGoal { return []itemGoal{{bone, 10}, {skin, 10}, {claw, 10}} }
+
+// othersCollected reports whether p holds at least the goal count of every
+// item of goals except dropped, the item the kill just dropped.
+func othersCollected(p *script.Player, goals []itemGoal, dropped int32) bool {
+	for _, g := range goals {
+		if g.item != dropped && p.ItemCount(g.item) < g.count {
+			return false
+		}
+	}
+	return true
 }

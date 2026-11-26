@@ -13,12 +13,12 @@ const tutorialQuest = "Tutorial"
 // tutorialPages is the datapack directory of the tutorial window's pages.
 const tutorialPages = "data/html/script/feature/Tutorial/"
 
-// TutorialEvent runs the event hook of c's tutorial quest with the event
-// name and no NPC, when c has a state in that quest; otherwise nothing
+// TutorialEvent runs the event hook of c's tutorial quest with e's name and
+// no NPC, when c has a state in that quest; otherwise nothing
 // happens. The tutorial client requests and the game's tutorial triggers
 // raise it, on the goroutine they run on. What the hook answers is shown to
 // c with no NPC.
-func (r *Registry) TutorialEvent(c *player.Character, name string) {
+func (r *Registry) TutorialEvent(c *player.Character, e player.TutorialEvent) {
 	st := c.Quests().State(tutorialQuest)
 	if st == nil {
 		return
@@ -27,7 +27,7 @@ func (r *Registry) TutorialEvent(c *player.Character, name string) {
 	if s == nil {
 		return
 	}
-	res := r.answer(s, hookEvent, func() string { return s.Hooks.Event(s, Event{Name: name, Player: PlayerOf(c)}) })
+	res := r.answer(s, hookEvent, func() string { return s.Hooks.Event(s, Event{Name: string(e), Player: PlayerOf(c)}) })
 	s.show(c, nil, res)
 }
 

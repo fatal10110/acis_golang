@@ -22,10 +22,13 @@ const kahman = 31554
 // Items.
 const fangOfStakato = 8085
 
+// reward is one choice: the fangs it costs and the item and count it gives.
+type reward struct{ fangs, itemID, count int32 }
+
 // rewards returns the price in fangs, the item and its count the page picks
 // by index.
-func rewards() [][]int32 {
-	return [][]int32{
+func rewards() []reward {
+	return []reward{
 		{12, 4042, 1},
 		{6, 4043, 1},
 		{6, 4044, 1},
@@ -82,11 +85,11 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		if err != nil {
 			panic(err)
 		}
-		reward := rewards()[index]
-		if e.Player.ItemCount(fangOfStakato) >= reward[0] {
+		r := rewards()[index]
+		if e.Player.ItemCount(fangOfStakato) >= r.fangs {
 			htmltext = "31554-09.htm"
-			s.TakeItems(e.Player, fangOfStakato, reward[0])
-			s.RewardItems(e.Player, reward[1], reward[2])
+			s.TakeItems(e.Player, fangOfStakato, r.fangs)
+			s.RewardItems(e.Player, r.itemID, r.count)
 		} else {
 			htmltext = "31554-06.htm"
 		}

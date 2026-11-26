@@ -61,6 +61,17 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"32052-06.htm": 9,
+		"31963-04.htm": 10,
+		"31963-05.htm": 11,
+		"31963-07.htm": 12,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -122,18 +133,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, stolenSecretBox, -1)
 		s.GiveItems(p, secondPassCertificate, 1)
 		s.GiveItems(p, secretBox, 1)
-	case strings.EqualFold(e.Name, "32052-06.htm"):
-		st.SetCond(9)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31963-04.htm"):
-		st.SetCond(10)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31963-05.htm"):
-		st.SetCond(11)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31963-07.htm"):
-		st.SetCond(12)
-		s.PlaySound(p, script.SoundMiddle)
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }

@@ -19,9 +19,12 @@ const karuda = 32017
 // Items.
 const cursedGraveGoods = 8089
 
+// reward is an item and the count of it one choice gives.
+type reward struct{ itemID, count int32 }
+
 // rewards returns the item and its count the page picks by index.
-func rewards() [][]int32 {
-	return [][]int32{
+func rewards() []reward {
+	return []reward{
 		{1878, 18},
 		{1879, 7},
 		{1880, 4},
@@ -67,8 +70,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		}
 		htmltext = "32017-07.htm"
 		s.TakeItems(e.Player, cursedGraveGoods, -1)
-		reward := rewards()[index]
-		s.GiveItems(e.Player, reward[0], reward[1])
+		r := rewards()[index]
+		s.GiveItems(e.Player, r.itemID, r.count)
 
 		s.PlaySound(e.Player, script.SoundFinish)
 		st.Exit(true)
