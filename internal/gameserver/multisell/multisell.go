@@ -227,7 +227,7 @@ func (s *Service) Choose(c *player.Character, list *modelmultisell.List, npcID i
 
 	// newIDs counts the instances the products create: each unit of a
 	// non-stackable product, and one stack of each stackable one c does not
-	// hold.
+	// hold. Clan reputation creates no item.
 	slots, weight, newIDs := 0, 0, 0
 	newStacks := map[int32]bool{}
 	for _, p := range entry.Products {
@@ -239,7 +239,7 @@ func (s *Service) Choose(c *player.Character, list *modelmultisell.List, npcID i
 			newIDs += p.Count * amount
 		} else if inv.ItemByTemplateID(p.ItemID) == nil {
 			slots++
-			if !newStacks[p.ItemID] {
+			if p.ItemID != clanReputationID && !newStacks[p.ItemID] {
 				newStacks[p.ItemID] = true
 				newIDs++
 			}
