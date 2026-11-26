@@ -126,7 +126,7 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 		return nil, err
 	}
 	_ = f.conn.SetReadDeadline(time.Now().Add(frameInFlight))
-	payload, err := wire.ReadFrame(io.MultiReader(bytes.NewReader(first[:]), f.conn))
+	payload, err := ReadFrame(io.MultiReader(bytes.NewReader(first[:]), f.conn))
 	if err != nil {
 		// Formatted, not wrapped: a caller that tolerates a timeout must
 		// not find one in here, however it inspects the error, because the

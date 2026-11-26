@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/rs/zerolog"
 )
@@ -39,7 +39,7 @@ func TestBootCleanupStopsOnExpiredContextInsteadOfMaskingIt(t *testing.T) {
 	defer cancel()
 	<-ctx.Done()
 
-	if _, err := idfactory.New(ctx, db, log); err == nil {
+	if _, err := objectids.NewAllocator(ctx, db, log); err == nil {
 		t.Fatal("New() error = nil, want context deadline exceeded")
 	}
 

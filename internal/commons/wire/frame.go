@@ -106,15 +106,6 @@ func frameBytes(payload []byte) []byte {
 	return frame
 }
 
-// ReadFrame reads one length-prefixed frame from r and returns its payload
-// in a fresh allocation. The header is a little-endian uint16 giving the
-// total frame length, header included; the payload is the header size
-// shorter than that. Connection read loops should use a FrameReader
-// instead, which reuses one payload buffer across frames.
-func ReadFrame(r io.Reader) ([]byte, error) {
-	return (&FrameReader{r: r}).ReadFrame()
-}
-
 // FrameReader reads length-prefixed frames from one reader, reusing a
 // single payload buffer across calls so a connection's read loop costs no
 // allocation per frame once the buffer has grown to the connection's usual

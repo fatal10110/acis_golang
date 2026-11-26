@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 
@@ -61,7 +61,7 @@ func TestClientLinkAcceptFilterRefusesBurstBeforeInit(t *testing.T) {
 	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := wire.ReadFrame(conn); err != nil {
+	if _, err := testsupport.ReadFrame(conn); err != nil {
 		t.Fatalf("another host: read Init frame: %v", err)
 	}
 

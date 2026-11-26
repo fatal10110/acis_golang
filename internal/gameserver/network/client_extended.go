@@ -74,11 +74,8 @@ func (l *GameClientLink) handleRequestManorList(_ context.Context, cs *connState
 // A refused list answers nothing, as specified: the
 // setting window's submit leaves no client action
 // pending.
-func (l *GameClientLink) handleRequestSetSeed(_ context.Context, cs *connState, req clientpackets.RequestSetSeed) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.requestSetSeed(cs.live, req) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestSetSeed(live *livePlayer, req clientpackets.RequestSetSeed) {
+	l.requestSetSeed(live, req)
 }
 
 // handleRequestExPledgeCrestLarge sends a large clan crest.
@@ -94,11 +91,8 @@ func (l *GameClientLink) handleRequestExPledgeCrestLarge(_ context.Context, cs *
 }
 
 // handleRequestGetBossRecord sends the player's raid boss points.
-func (l *GameClientLink) handleRequestGetBossRecord(_ context.Context, cs *connState, _ clientpackets.RequestGetBossRecord) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.sendBossRecord(cs.live) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestGetBossRecord(live *livePlayer, _ clientpackets.RequestGetBossRecord) {
+	l.sendBossRecord(live)
 }
 
 // handleRequestCursedWeaponList sends the cursed weapon ids in hash order;
@@ -127,9 +121,6 @@ func (l *GameClientLink) handleRequestDuelSurrender(_ context.Context, cs *connS
 // party-matching waiting list. The request carries no body; leaving the
 // waiting list answers nothing, the client having closed its window
 // already.
-func (l *GameClientLink) handleRequestExitPartyMatchingWaitingRoom(_ context.Context, cs *connState, _ struct{}) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.rooms.RemoveWaiting(cs.live) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestExitPartyMatchingWaitingRoom(live *livePlayer) {
+	l.rooms.RemoveWaiting(live)
 }

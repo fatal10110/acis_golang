@@ -12,57 +12,45 @@ import (
 
 // handleAction selects the clicked object, or acts on it when it is
 // already selected.
-func (l *GameClientLink) handleAction(ctx context.Context, cs *connState, req clientpackets.Action) error {
-	if cs.live == nil {
-		return nil
+func (l *GameClientLink) handleAction(ctx context.Context, live *livePlayer, req clientpackets.Action) {
+	// A plain click on the already-selected object acts on it
+	// (attack, sit, pick up), exactly like an attack request —
+	// the client sends this second click expecting the action
+	// to resolve, and locks its own input until Attack or
+	// ActionFailed answers it.
+	if refuseObserverAction(live) {
+		return
 	}
-	onLive(cs.live, func() {
-		// A plain click on the already-selected object acts on it
-		// (attack, sit, pick up), exactly like an attack request —
-		// the client sends this second click expecting the action
-		// to resolve, and locks its own input until Attack or
-		// ActionFailed answers it.
-		if refuseObserverAction(cs.live) {
-			return
-		}
-		// A player holding a request it has not answered may click
-		// nothing: ActionFailed alone, before the object is resolved.
-		if l.holdsActiveRequester(cs.live) {
-			cs.live.SendFrame(serverpackets.FrameActionFailed())
-			return
-		}
-		if l.refuseFrozenDuellist(cs.live, req.ObjectID) {
-			return
-		}
-		selected := cs.live.Target() != nil && cs.live.Target().ObjectID() == req.ObjectID
-		l.handleTargetAction(ctx, cs.live, req.ObjectID, selected, false, req.Shift)
-	})
-	return nil
+	// A player holding a request it has not answered may click
+	// nothing: ActionFailed alone, before the object is resolved.
+	if l.holdsActiveRequester(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if l.refuseFrozenDuellist(live, req.ObjectID) {
+		return
+	}
+	selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
+	l.handleTargetAction(ctx, live, req.ObjectID, selected, false, req.Shift)
 }
 
 // handleAttackRequest attacks the selected object, or selects another one.
-func (l *GameClientLink) handleAttackRequest(ctx context.Context, cs *connState, req clientpackets.AttackRequest) error {
-	if cs.live == nil {
-		return nil
+func (l *GameClientLink) handleAttackRequest(ctx context.Context, live *livePlayer, req clientpackets.AttackRequest) {
+	// A player out of control may send no attack request at all: the
+	// whole packet is refused before the object is resolved, ahead of
+	// the observer refusal, so it neither selects, picks up nor
+	// interacts.
+	if liveOutOfControl(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
 	}
-	onLive(cs.live, func() {
-		// A player out of control may send no attack request at all: the
-		// whole packet is refused before the object is resolved, ahead of
-		// the observer refusal, so it neither selects, picks up nor
-		// interacts.
-		if liveOutOfControl(cs.live) {
-			cs.live.SendFrame(serverpackets.FrameActionFailed())
-			return
-		}
-		if refuseObserverAttack(cs.live) {
-			return
-		}
-		// A forced attack is an attack request on the object already
-		// selected; on any other object it only selects it.
-		selected := cs.live.Target() != nil && cs.live.Target().ObjectID() == req.ObjectID
-		l.handleTargetAction(ctx, cs.live, req.ObjectID, selected, selected, req.Shift)
-	})
-	return nil
+	if refuseObserverAttack(live) {
+		return
+	}
+	// A forced attack is an attack request on the object already
+	// selected; on any other object it only selects it.
+	selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
+	l.handleTargetAction(ctx, live, req.ObjectID, selected, selected, req.Shift)
 }
 
 // handleLogout takes the player out of the world and closes the connection,
@@ -121,23 +109,14 @@ func (l *GameClientLink) handleMoveBackwardToLocation(_ context.Context, cs *con
 
 // handleCannotMoveAnymore stops the player's walk where the server-side
 // walk stands.
-func (l *GameClientLink) handleCannotMoveAnymore(_ context.Context, cs *connState, _ clientpackets.CannotMoveAnymore) error {
-	if cs.live == nil {
-		return nil
-	}
-	onLive(cs.live, func() { l.stopLivePlayer(cs.live) })
-	return nil
+func (l *GameClientLink) handleCannotMoveAnymore(live *livePlayer, _ clientpackets.CannotMoveAnymore) {
+	l.stopLivePlayer(live)
 }
 
 // handleValidatePosition reconciles the client's idea of the player's
 // position with the server's.
-func (l *GameClientLink) handleValidatePosition(_ context.Context, cs *connState, req clientpackets.ValidatePosition) error {
-	if cs.live != nil {
-		onLive(cs.live, func() {
-			l.validateLivePlayerPosition(cs.live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, req.BoatID)
-		})
-	}
-	return nil
+func (l *GameClientLink) handleValidatePosition(live *livePlayer, req clientpackets.ValidatePosition) {
+	l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, req.BoatID)
 }
 
 // handleRequestItemList sends the inventory window.
@@ -202,21 +181,13 @@ func (l *GameClientLink) handleUseItem(_ context.Context, cs *connState, req cli
 }
 
 // handleRequestUnEquipItem takes off what a body slot holds.
-func (l *GameClientLink) handleRequestUnEquipItem(_ context.Context, cs *connState, req clientpackets.UnequipItem) error {
-	if cs.live == nil {
-		return nil
-	}
-	onLive(cs.live, func() { l.unequipItem(cs.live, req.BodySlot) })
-	return nil
+func (l *GameClientLink) handleRequestUnEquipItem(live *livePlayer, req clientpackets.UnequipItem) {
+	l.unequipItem(live, req.BodySlot)
 }
 
 // handleRequestDestroyItem destroys inventory items.
-func (l *GameClientLink) handleRequestDestroyItem(_ context.Context, cs *connState, req clientpackets.RequestDestroyItem) error {
-	if cs.live == nil {
-		return nil
-	}
-	onLive(cs.live, func() { l.destroyLiveItem(cs.live, req.ObjectID, int(req.Count)) })
-	return nil
+func (l *GameClientLink) handleRequestDestroyItem(live *livePlayer, req clientpackets.RequestDestroyItem) {
+	l.destroyLiveItem(live, req.ObjectID, int(req.Count))
 }
 
 // handleRequestRecipeItemMakeSelf crafts a recipe for the player itself.
@@ -234,19 +205,13 @@ func (l *GameClientLink) handleRequestRecipeItemMakeSelf(_ context.Context, cs *
 }
 
 // handleRequestHennaItemList sends the dyes the player can draw.
-func (l *GameClientLink) handleRequestHennaItemList(_ context.Context, cs *connState, _ clientpackets.RequestHennaItemList) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.sendHennaEquipList(cs.live) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestHennaItemList(live *livePlayer, _ clientpackets.RequestHennaItemList) {
+	l.sendHennaEquipList(live)
 }
 
 // handleRequestHennaUnequipList sends the dyes the player can remove.
-func (l *GameClientLink) handleRequestHennaUnequipList(_ context.Context, cs *connState, _ clientpackets.RequestHennaUnequipList) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { sendHennaUnequipList(cs.live) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestHennaUnequipList(live *livePlayer, _ clientpackets.RequestHennaUnequipList) {
+	sendHennaUnequipList(live)
 }
 
 // handleMultiSellChoose makes a multisell exchange.
@@ -262,12 +227,8 @@ func (l *GameClientLink) handleMultiSellChoose(_ context.Context, cs *connState,
 }
 
 // handleRequestEnchantItem enchants an item with the scroll in use.
-func (l *GameClientLink) handleRequestEnchantItem(ctx context.Context, cs *connState, req clientpackets.RequestEnchantItem) error {
-	if cs.live == nil {
-		return nil
-	}
-	onLive(cs.live, func() { l.enchantLiveItem(ctx, cs.live, req) })
-	return nil
+func (l *GameClientLink) handleRequestEnchantItem(ctx context.Context, live *livePlayer, req clientpackets.RequestEnchantItem) {
+	l.enchantLiveItem(ctx, live, req)
 }
 
 // handleRequestSkillList sends the player's skill list.
@@ -293,49 +254,43 @@ func (l *GameClientLink) handleRequestSkillList(_ context.Context, cs *connState
 }
 
 // handleRequestActionUse runs an action-bar command.
-func (l *GameClientLink) handleRequestActionUse(ctx context.Context, cs *connState, req clientpackets.RequestActionUse) error {
-	if cs.live == nil {
-		return nil
+func (l *GameClientLink) handleRequestActionUse(ctx context.Context, live *livePlayer, req clientpackets.RequestActionUse) {
+	// A dead or out-of-control player is only released, whatever the
+	// action; a fake-dead one too, unless it sits or stands.
+	if (live.FakeDead() && req.ActionID != actionSitStand) || live.Dead() || liveOutOfControl(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
 	}
-	onLive(cs.live, func() {
-		// A dead or out-of-control player is only released, whatever the
-		// action; a fake-dead one too, unless it sits or stands.
-		if (cs.live.FakeDead() && req.ActionID != actionSitStand) || cs.live.Dead() || liveOutOfControl(cs.live) {
-			cs.live.SendFrame(serverpackets.FrameActionFailed())
+	if refuseObserverActionUse(live) {
+		return
+	}
+	switch req.ActionID {
+	case actionSitStand:
+		l.requestChangeWaitType(live, !live.Standing())
+	case actionWalkRun:
+		// A rider keeps its stance. The specified answer is
+		// nothing, and the toggle leaves no client action
+		// pending, so silence is the matching answer.
+		if live.Mounted() {
 			return
 		}
-		if refuseObserverActionUse(cs.live) {
+		l.changeLiveMoveType(live, !live.Running())
+	case actionMountDismount:
+		l.actionMountDismount(live)
+	default:
+		if l.storeActionUse(live, req.ActionID) {
 			return
 		}
-		switch req.ActionID {
-		case actionSitStand:
-			l.requestChangeWaitType(cs.live, !cs.live.Standing())
-		case actionWalkRun:
-			// A rider keeps its stance. The specified answer is
-			// nothing, and the toggle leaves no client action
-			// pending, so silence is the matching answer.
-			if cs.live.Mounted() {
-				return
-			}
-			l.changeLiveMoveType(cs.live, !cs.live.Running())
-		case actionMountDismount:
-			l.actionMountDismount(cs.live)
-		default:
-			if l.storeActionUse(cs.live, req.ActionID) {
-				return
-			}
-			if !l.handleSummonActionUse(ctx, cs.live, req) {
-				// An action-bar command no handler claims must still
-				// answer the client — it locks its input until the
-				// action resolves. The log keeps the gap visible
-				// instead of silently dropped.
-				l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", cs.live.ObjectID()).
-					Msg("game client: action-bar command not implemented yet")
-				cs.live.SendFrame(serverpackets.FrameActionFailed())
-			}
+		if !l.handleSummonActionUse(ctx, live, req) {
+			// An action-bar command no handler claims must still
+			// answer the client — it locks its input until the
+			// action resolves. The log keeps the gap visible
+			// instead of silently dropped.
+			l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", live.ObjectID()).
+				Msg("game client: action-bar command not implemented yet")
+			live.SendFrame(serverpackets.FrameActionFailed())
 		}
-	})
-	return nil
+	}
 }
 
 // handleRequestSocialAction plays a social animation. Every request first
@@ -357,32 +312,23 @@ func (l *GameClientLink) handleRequestSocialAction(_ context.Context, cs *connSt
 }
 
 // handleRequestChangeMoveType switches between walking and running.
-func (l *GameClientLink) handleRequestChangeMoveType(_ context.Context, cs *connState, req clientpackets.RequestChangeMoveType) error {
-	if cs.live != nil {
-		onLive(cs.live, func() {
-			// A rider keeps its stance; silent for the same reasons
-			// as the action-bar toggle above.
-			if cs.live.Mounted() {
-				return
-			}
-			l.changeLiveMoveType(cs.live, req.Run)
-		})
+func (l *GameClientLink) handleRequestChangeMoveType(live *livePlayer, req clientpackets.RequestChangeMoveType) {
+	// A rider keeps its stance; silent for the same reasons
+	// as the action-bar toggle above.
+	if live.Mounted() {
+		return
 	}
-	return nil
+	l.changeLiveMoveType(live, req.Run)
 }
 
 // handleRequestChangeWaitType sits the player down or stands it up.
-func (l *GameClientLink) handleRequestChangeWaitType(_ context.Context, cs *connState, req clientpackets.RequestChangeWaitType) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.requestChangeWaitType(cs.live, req.Stand) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestChangeWaitType(live *livePlayer, req clientpackets.RequestChangeWaitType) {
+	l.requestChangeWaitType(live, req.Stand)
 }
 
 // handleRequestLinkHTML opens a linked HTML page.
-func (l *GameClientLink) handleRequestLinkHTML(_ context.Context, cs *connState, req clientpackets.RequestLinkHTML) error {
-	onLive(cs.live, func() { l.requestLinkHTML(cs.live, req) })
-	return nil
+func (l *GameClientLink) handleRequestLinkHTML(live *livePlayer, req clientpackets.RequestLinkHTML) {
+	l.requestLinkHTML(live, req)
 }
 
 // handleRequestBypassToServer runs a bypass command.
@@ -423,53 +369,33 @@ func (l *GameClientLink) handleRequestBypassToServer(ctx context.Context, cs *co
 
 // handleAppearing completes a teleport once the client has loaded the
 // destination.
-func (l *GameClientLink) handleAppearing(_ context.Context, cs *connState, _ clientpackets.Appearing) error {
-	if cs.live != nil {
-		onLive(cs.live, func() {
-			deferred := l.completeLivePlayerTeleport(cs.live)
-			cs.live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(cs.live)))
-			for _, teleport := range deferred {
-				teleport()
-			}
-		})
+func (l *GameClientLink) handleAppearing(live *livePlayer, _ clientpackets.Appearing) {
+	deferred := l.completeLivePlayerTeleport(live)
+	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+	for _, teleport := range deferred {
+		teleport()
 	}
-	return nil
 }
 
 // handleObserverReturn ends observation mode.
-func (l *GameClientLink) handleObserverReturn(_ context.Context, cs *connState, _ clientpackets.ObserverReturn) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.observerReturn(cs.live) })
-	}
-	return nil
+func (l *GameClientLink) handleObserverReturn(live *livePlayer, _ clientpackets.ObserverReturn) {
+	l.observerReturn(live)
 }
 
 // handleStartRotating shows the player turning around.
-func (l *GameClientLink) handleStartRotating(_ context.Context, cs *connState, req clientpackets.StartRotating) error {
-	if cs.live == nil {
-		return nil
-	}
-	onLive(cs.live, func() {
-		l.broadcastLiveFrame(cs.live, func() wire.Frame {
-			return serverpackets.FrameStartRotation(cs.live.ObjectID(), int(req.Degree), int(req.Side), 0)
-		})
+func (l *GameClientLink) handleStartRotating(live *livePlayer, req clientpackets.StartRotating) {
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameStartRotation(live.ObjectID(), int(req.Degree), int(req.Side), 0)
 	})
-	return nil
 }
 
 // handleFinishRotating shows the end of the player's turn to everyone around.
 // The degree is the client's claim and only echoed: the server-side heading,
 // which every behind and front check reads, is left as it was.
-func (l *GameClientLink) handleFinishRotating(_ context.Context, cs *connState, req clientpackets.FinishRotating) error {
-	if cs.live == nil {
-		return nil
-	}
-	onLive(cs.live, func() {
-		l.broadcastLiveFrame(cs.live, func() wire.Frame {
-			return serverpackets.FrameStopRotation(cs.live.ObjectID(), int(req.Degree), 0)
-		})
+func (l *GameClientLink) handleFinishRotating(live *livePlayer, req clientpackets.FinishRotating) {
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameStopRotation(live.ObjectID(), int(req.Degree), 0)
 	})
-	return nil
 }
 
 // handleRequestRestart takes the player out of the world and back to
@@ -522,41 +448,33 @@ func (l *GameClientLink) handleSendTimeCheck(_ context.Context, cs *connState, _
 
 // handleRequestPackageItemList sends the items that can be sent as a
 // package.
-func (l *GameClientLink) handleRequestPackageItemList(_ context.Context, cs *connState, req clientpackets.RequestPackageSendableItemList) error {
-	onLive(cs.live, func() { l.sendPackageSendableItemList(cs.live, req.ObjectID) })
-	return nil
+func (l *GameClientLink) handleRequestPackageItemList(live *livePlayer, req clientpackets.RequestPackageSendableItemList) {
+	l.sendPackageSendableItemList(live, req.ObjectID)
 }
 
 // handleRequestPetUseItem uses an item of the pet's inventory.
-func (l *GameClientLink) handleRequestPetUseItem(ctx context.Context, cs *connState, req clientpackets.RequestPetUseItem) error {
-	onLive(cs.live, func() { l.petUseItem(ctx, cs.live, req) })
-	return nil
+func (l *GameClientLink) handleRequestPetUseItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetUseItem) {
+	l.petUseItem(ctx, live, req)
 }
 
 // handleRequestGiveItemToPet moves items to the pet's inventory.
-func (l *GameClientLink) handleRequestGiveItemToPet(ctx context.Context, cs *connState, req clientpackets.RequestGiveItemToPet) error {
-	onLive(cs.live, func() { l.giveItemToPet(ctx, cs.live, req) })
-	return nil
+func (l *GameClientLink) handleRequestGiveItemToPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGiveItemToPet) {
+	l.giveItemToPet(ctx, live, req)
 }
 
 // handleRequestGetItemFromPet moves items out of the pet's inventory.
-func (l *GameClientLink) handleRequestGetItemFromPet(ctx context.Context, cs *connState, req clientpackets.RequestGetItemFromPet) error {
-	onLive(cs.live, func() { l.getItemFromPet(ctx, cs.live, req) })
-	return nil
+func (l *GameClientLink) handleRequestGetItemFromPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGetItemFromPet) {
+	l.getItemFromPet(ctx, live, req)
 }
 
 // handleRequestPetGetItem has the pet pick up a ground item.
-func (l *GameClientLink) handleRequestPetGetItem(ctx context.Context, cs *connState, req clientpackets.RequestPetGetItem) error {
-	onLive(cs.live, func() { l.petGetItem(ctx, cs.live, req) })
-	return nil
+func (l *GameClientLink) handleRequestPetGetItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetGetItem) {
+	l.petGetItem(ctx, live, req)
 }
 
 // serveTradeDone confirms or cancels the open trade.
-func (l *GameClientLink) serveTradeDone(ctx context.Context, cs *connState, req clientpackets.TradeDone) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.handleTradeDone(ctx, cs.live, req) })
-	}
-	return nil
+func (l *GameClientLink) serveTradeDone(ctx context.Context, live *livePlayer, req clientpackets.TradeDone) {
+	l.handleTradeDone(ctx, live, req)
 }
 
 // serveRequestChangePetName names the player's pet.
@@ -599,11 +517,8 @@ func (l *GameClientLink) handleRequestBuyProcure(_ context.Context, cs *connStat
 //
 // The request carries no body; with no player in the world
 // nothing answers, as the specified handler does.
-func (l *GameClientLink) handleRequestShowMiniMap(_ context.Context, cs *connState, _ struct{}) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.showMiniMap(cs.live, serverpackets.RegularMapID) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestShowMiniMap(live *livePlayer) {
+	l.showMiniMap(live, serverpackets.RegularMapID)
 }
 
 // serveSay2 sends a chat message.
@@ -616,34 +531,22 @@ func (l *GameClientLink) serveSay2(_ context.Context, cs *connState, req clientp
 }
 
 // handleRequestUserCommand runs a numbered user command.
-func (l *GameClientLink) handleRequestUserCommand(_ context.Context, cs *connState, req clientpackets.RequestUserCommand) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.requestUserCommand(cs.live, req.CommandID) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestUserCommand(live *livePlayer, req clientpackets.RequestUserCommand) {
+	l.requestUserCommand(live, req.CommandID)
 }
 
 // handleRequestQuestListInGame sends the player's quest list.
-func (l *GameClientLink) handleRequestQuestListInGame(_ context.Context, cs *connState, _ struct{}) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { cs.live.SendFrame(questListFrame(cs.live.Character)) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestQuestListInGame(live *livePlayer) {
+	live.SendFrame(questListFrame(live.Character))
 }
 
 // handleRequestQuestAbort abandons a quest.
-func (l *GameClientLink) handleRequestQuestAbort(_ context.Context, cs *connState, req clientpackets.RequestQuestAbort) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.abortQuest(cs.live, req.QuestID) })
-	}
-	return nil
+func (l *GameClientLink) handleRequestQuestAbort(live *livePlayer, req clientpackets.RequestQuestAbort) {
+	l.abortQuest(live, req.QuestID)
 }
 
 // handleTutorialEvent passes a tutorial window event to the tutorial
 // script by name.
-func (l *GameClientLink) handleTutorialEvent(_ context.Context, cs *connState, req clientpackets.TutorialEvent) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.tutorialRequest(cs.live, req.Name) })
-	}
-	return nil
+func (l *GameClientLink) handleTutorialEvent(live *livePlayer, req clientpackets.TutorialEvent) {
+	l.tutorialRequest(live, req.Name)
 }

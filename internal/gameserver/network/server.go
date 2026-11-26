@@ -22,8 +22,9 @@ const ShutdownCloseGrace = 2 * time.Second
 // cancellation it waits up to ShutdownCloseGrace for the handlers before
 // closing the remaining connections. The zero logger disables logging.
 func Serve(ctx context.Context, ln net.Listener, handle func(ctx context.Context, conn *Conn), log zerolog.Logger) error {
+	rejects := newFrameRejectReporter(log, time.Now)
 	return netutil.AcceptLoopWithCloseGrace(ctx, ln, func(raw net.Conn) {
-		conn := newConn(raw, log)
+		conn := newConn(raw, log, rejects)
 		defer conn.Close()
 		handle(ctx, conn)
 	}, ShutdownCloseGrace, log)

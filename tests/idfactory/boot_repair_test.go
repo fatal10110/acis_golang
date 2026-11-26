@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/rs/zerolog"
 )
@@ -23,7 +23,7 @@ func seedRepairSchema(t *testing.T, db *sql.DB) {
 
 func bootRepair(t *testing.T, db *sql.DB) {
 	t.Helper()
-	if _, err := idfactory.New(context.Background(), db, zerolog.Nop()); err != nil {
+	if _, err := objectids.NewAllocator(context.Background(), db, zerolog.Nop()); err != nil {
 		t.Fatalf("boot allocator: %v", err)
 	}
 }
