@@ -3,8 +3,17 @@ package player
 import (
 	"sync/atomic"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
+
+// TitleMaxLength is the longest title kept, in UTF-16 code units.
+const TitleMaxLength = 16
+
+// CutTitle cuts title to the longest title kept.
+func CutTitle(title string) string {
+	return commons.UTF16Cut(title, TitleMaxLength)
+}
 
 // clanState is the character's side of its clan membership. A clan
 // operation another player runs (an expulsion, a leader's level-up) and the

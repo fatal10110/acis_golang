@@ -59,6 +59,23 @@ func (s *Service) GrantTitle(c *player.Character, name, title string) (*Clan, Me
 	return cl, m, TitleMember
 }
 
+// SetTitle gives c title, cut to the longest title kept; it runs on c's
+// queue, and the title reaches the character row with c's next save.
+func SetTitle(c *player.Character, title string) {
+	c.SetTitle(player.CutTitle(title))
+}
+
+// SetMemberTitle is SetTitle for a title another member of the clan
+// clanID gave c. One that left that clan before its queue got here keeps
+// its title, and false is reported.
+func SetMemberTitle(c *player.Character, clanID int32, title string) bool {
+	if c.ClanID() != clanID {
+		return false
+	}
+	SetTitle(c, title)
+	return true
+}
+
 // ValidTitle reports whether title holds only the characters a given
 // title may: ASCII letters and digits, the space and !@#$&()-`.+,/". The
 // length is not bounded here, so a title of any length passes; it is cut

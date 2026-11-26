@@ -23,7 +23,8 @@ func (l *GameClientLink) requestGiveNickName(live *livePlayer, req clientpackets
 	cl, m, grant := l.clanService().GrantTitle(live.Character, req.Name, req.Title)
 	switch grant {
 	case clan.TitleSelf:
-		l.giveTitle(live, req.Title)
+		clan.SetTitle(live.Character, req.Title)
+		l.showTitleChanged(live)
 		return
 	case clan.TitleMember:
 	default:
@@ -39,7 +40,8 @@ func (l *GameClientLink) requestGiveNickName(live *livePlayer, req clientpackets
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
 	case target == live:
-		l.giveTitle(live, req.Title)
+		clan.SetTitle(live.Character, req.Title)
+		l.showTitleChanged(live)
 		return
 	}
 	// The giver's message goes first, so it precedes the TitleUpdate the
@@ -48,20 +50,15 @@ func (l *GameClientLink) requestGiveNickName(live *livePlayer, req clientpackets
 		serverpackets.TextParam(m.Name), serverpackets.TextParam(req.Title)))
 	clanID := cl.ID()
 	postLive(target, func() {
-		// A member that left the clan before its queue got here keeps its
-		// title.
-		if target.ClanID() == clanID {
-			l.giveTitle(target, req.Title)
+		if clan.SetMemberTitle(target.Character, clanID, req.Title) {
+			l.showTitleChanged(target)
 		}
 	})
 }
 
-// giveTitle sets live's title to title, cut to 16 characters, on live's
-// queue: live is told its title changed, and it and the players around it
-// see the new title. It reaches the character row with live's next save.
-func (l *GameClientLink) giveTitle(live *livePlayer, title string) {
-	title = trimTitle(title)
-	live.SetTitle(title)
+// showTitleChanged tells live, on its queue, that its title changed, and
+// shows the new title to it and the players around it.
+func (l *GameClientLink) showTitleChanged(live *livePlayer) {
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTitleChanged))
 	l.broadcastTitleInfo(live)
 }

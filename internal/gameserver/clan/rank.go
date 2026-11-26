@@ -40,7 +40,7 @@ func (s *Service) SetMemberGrade(c *player.Character, name string, grade int) (*
 	case !ok, target.PledgeType == SubunitAcademy, grade < minMemberGrade, grade > maxMemberGrade:
 		cl.mu.Unlock()
 		return nil, Member{}, GradeIgnored
-	case cl.memberPrivilegesLocked(c.ID)&int32(PrivManageRanks) == 0, target.ObjectID == cl.leaderID:
+	case !cl.hasPrivilegeLocked(c.ID, PrivManageRanks), target.ObjectID == cl.leaderID:
 		// The leader keeps grade 0: no one may regrade it (#5106).
 		cl.mu.Unlock()
 		return nil, Member{}, GradeNotAuthorized

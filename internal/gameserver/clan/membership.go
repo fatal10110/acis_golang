@@ -146,7 +146,7 @@ func (s *Service) CheckJoin(cl *Clan, inviterID int32, target *player.Character,
 func (cl *Clan) checkJoinLocked(inviterID int32, target *player.Character, blocksInviter bool, pledgeType int, now time.Time) JoinRefusal {
 	nowMs := now.UnixMilli()
 	switch {
-	case cl.destroyed, cl.memberPrivilegesLocked(inviterID)&int32(PrivInvite) == 0:
+	case cl.destroyed, !cl.hasPrivilegeLocked(inviterID, PrivInvite):
 		return JoinNotAuthorized
 	case inviterID == target.ID:
 		return JoinInviteSelf

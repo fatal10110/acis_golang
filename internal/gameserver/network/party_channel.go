@@ -122,38 +122,31 @@ func (l *GameClientLink) requestChannelPartyMembers(live *livePlayer, req client
 	live.SendFrame(serverpackets.FrameExMPCCShowPartyMemberInfo(rows))
 }
 
-// Command channel authority: the clan level its former must lead, the
-// clan skill that is authority enough, and the item that otherwise is.
-const (
-	channelClanLevel    = 5
-	clanImperiumSkillID = 391
-	strategyGuideItemID = 8871
-)
-
-// commandChannelAuthority reports whether live may form a command channel,
-// telling it why not: only the leader of a clan of level 5 or more may,
-// and then by holding Clan Imperium or a Strategy Guide. With pay set, the
-// guide is destroyed as the channel forms; otherwise holding one is
+// commandChannelAuthority reports whether live may form a command channel
+// (party.FormAuthority), telling it why not. With pay set, the Strategy
+// Guide is destroyed as the channel forms; otherwise holding one is
 // enough.
 func (l *GameClientLink) commandChannelAuthority(live *livePlayer, pay bool) bool {
-	cl, ok := l.clanService().ClanOf(live.Character)
-	if !ok || !cl.IsLeader(live.ObjectID()) || cl.Level() < channelClanLevel {
+	var ledClanLevel int
+	if cl, ok := l.clanService().ClanOf(live.Character); ok && cl.IsLeader(live.ObjectID()) {
+		ledClanLevel = cl.Level()
+	}
+	guide := func(itemID int32) bool {
+		inv := live.Inventory()
+		return inv != nil && inv.ItemByTemplateID(itemID) != nil
+	}
+	if pay {
+		guide = func(itemID int32) bool { return destroyHeldItems(live, itemID, 1) }
+	}
+	switch party.FormAuthority(live, ledClanLevel, guide) {
+	case party.ChannelNotClanLeader:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCommandChannelOnlyByLevel5ClanLeader))
 		return false
-	}
-	if live.HasSkill(clanImperiumSkillID) {
-		return true
-	}
-	var held bool
-	if pay {
-		held = destroyHeldItems(live, strategyGuideItemID, 1)
-	} else if inv := live.Inventory(); inv != nil {
-		held = inv.ItemByTemplateID(strategyGuideItemID) != nil
-	}
-	if !held {
+	case party.ChannelNoStrategyGuide:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotLongerSetupCommandChannel))
+		return false
 	}
-	return held
+	return true
 }
 
 const (

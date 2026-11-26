@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -215,7 +216,7 @@ func (l *GameClientLink) adminSetTitle(gm *livePlayer, title string, hasTitle bo
 		return
 	}
 	onPlayer(gm, target, func() {
-		title := trimTitle(title)
+		title := player.CutTitle(title)
 		target.SetTitle(title)
 		l.broadcastTitleInfo(target)
 		sendText(gm, "You successfully set your target's title to "+title+".")
