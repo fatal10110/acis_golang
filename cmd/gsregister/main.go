@@ -23,6 +23,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -213,7 +214,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, names *manager.Server
 			// the registered lines, never alongside them: telling the
 			// operator to install a file that does not exist would only
 			// surface later as a refused game server.
-			if err := model.WriteHexIDFile(filepath.Join(dir, filename), id, key, time.Now()); err != nil {
+			if err := link.WriteHexIDFile(filepath.Join(dir, filename), id, key, time.Now()); err != nil {
 				fmt.Fprintf(out, "Failed to save hex ID to '%s' file: %v\n", filename, err)
 				continue
 			}

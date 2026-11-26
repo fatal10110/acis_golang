@@ -52,7 +52,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
-	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
@@ -345,24 +345,24 @@ func onlineAccounts(state *world.State) []string {
 // world as the online roster, in as many messages as it needs. A failed
 // hexid write is logged and keeps the link.
 func onLoginLink(links *loginLinkState, status *network.LoginStatus, state *world.State, hexIDPath string, hexID []byte, log zerolog.Logger) func(*network.LoginLink) {
-	return func(link *network.LoginLink) {
-		links.set(link)
-		status.Registered(link.ServerName)
-		if err := model.WriteHexIDFile(hexIDPath, int(link.ServerID), hexID, time.Now()); err != nil {
+	return func(ll *network.LoginLink) {
+		links.set(ll)
+		status.Registered(ll.ServerName)
+		if err := link.WriteHexIDFile(hexIDPath, int(ll.ServerID), hexID, time.Now()); err != nil {
 			log.Error().Err(err).Str("path", hexIDPath).Msg("save hexid")
 		}
 		if accounts := onlineAccounts(state); len(accounts) > 0 {
-			if err := link.SendPlayerInGame(accounts); err != nil {
+			if err := ll.SendPlayerInGame(accounts); err != nil {
 				log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")
 			} else {
 				log.Info().Int("accounts", len(accounts)).Msg("online roster sent to loginserver")
 			}
 		}
 		go func() {
-			<-link.Done()
-			links.clear(link)
+			<-ll.Done()
+			links.clear(ll)
 		}()
-		log.Info().Int("server_id", int(link.ServerID)).Str("name", link.ServerName).Msg("linked to loginserver")
+		log.Info().Int("server_id", int(ll.ServerID)).Str("name", ll.ServerName).Msg("linked to loginserver")
 	}
 }
 

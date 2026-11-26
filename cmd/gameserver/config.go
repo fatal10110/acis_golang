@@ -26,7 +26,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
-	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
 )
 
@@ -1073,19 +1072,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if hexProps == nil {
 		return gameServerConfig{}, fmt.Errorf("missing hexid properties")
 	}
-	serverIDText, ok := hexProps.Lookup("ServerID")
-	if !ok {
-		return gameServerConfig{}, fmt.Errorf("missing ServerID in hexid file")
-	}
-	serverID, err := strconv.ParseInt(serverIDText, 10, 32)
-	if err != nil {
-		return gameServerConfig{}, fmt.Errorf("parse ServerID in hexid file: %w", err)
-	}
-	hexIDText, ok := hexProps.Lookup("HexID")
-	if !ok {
-		return gameServerConfig{}, fmt.Errorf("missing HexID in hexid file")
-	}
-	hexID, err := model.ParseHexKey(hexIDText)
+	serverID, hexID, err := link.HexIDFromProperties(hexProps)
 	if err != nil {
 		return gameServerConfig{}, err
 	}
@@ -1133,7 +1120,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		AcceptFilter: acceptFilter,
 		LoginAddr:    net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
 		Auth: network.LoginServerAuth{
-			ServerID:          int(serverID),
+			ServerID:          serverID,
 			AcceptAlternateID: serverProps.Bool("AcceptAlternateID", true),
 			HexID:             hexID,
 			HostName:          host,

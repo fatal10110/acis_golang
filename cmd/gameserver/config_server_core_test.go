@@ -10,7 +10,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/link"
-	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
 func TestGameServerConfigFromProperties(t *testing.T) {
@@ -78,7 +77,7 @@ HexID = -7fff
 		status.Pvp == nil || *status.Pvp {
 		t.Errorf("Auth.InitialStatus = %+v, want GMOnly clock/brackets age/test on and pvp off", status)
 	}
-	wantHex, err := model.ParseHexKey("-7fff")
+	wantHex, err := link.ParseHexKey("-7fff")
 	if err != nil {
 		t.Fatalf("ParseHexKey: %v", err)
 	}
