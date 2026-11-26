@@ -28,3 +28,9 @@ func assertDrainer(q *Queue) {
 		panic("sim: state of queue " + q.name() + " touched while another goroutine drains it")
 	}
 }
+
+func assertNoDrain() {
+	if q, ok := drainers.Load(goid()); ok {
+		panic("sim: a task of queue " + q.(*Queue).name() + " waits on a queue")
+	}
+}

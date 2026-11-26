@@ -28,21 +28,32 @@ func (c *Character) SummonServitor(def modelskill.Definition) {
 // is bound to a pet that is out: it may not leave c's inventory by trade,
 // drop, destroy, sale, deposit, parcel or a hand-over to the pet itself.
 func (c *Character) ControlItemInUse(objectID int32) bool {
-	if c == nil || objectID == 0 {
+	if objectID == 0 {
 		return false
 	}
-	if objectID == c.MountObjectID() {
-		return true
+	mount, pet := c.ControlItemsInUse()
+	return objectID == mount || objectID == pet
+}
+
+// ControlItemsInUse returns the control items ControlItemInUse reports as
+// they stand now: its mount's and that of the pet it has out, each 0 when
+// there is none.
+func (c *Character) ControlItemsInUse() (mount, pet int32) {
+	if c == nil {
+		return 0, 0
 	}
+	mount = c.MountObjectID()
 	if c.world == nil {
-		return false
+		return mount, 0
 	}
 	obj, ok := c.world.Summon(c.ObjectID())
 	if !ok {
-		return false
+		return mount, 0
 	}
-	controlled, ok := obj.(controlledSummon)
-	return ok && controlled.ControlItemID() == objectID
+	if controlled, ok := obj.(controlledSummon); ok {
+		pet = controlled.ControlItemID()
+	}
+	return mount, pet
 }
 
 // controlledSummon is a summon called up by an item: a pet.

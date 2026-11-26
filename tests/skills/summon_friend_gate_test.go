@@ -85,13 +85,13 @@ type summonWorld struct {
 // bootSummonWorld logs a caster knowing every summon skill and its friend in
 // next to each other, both holding summonFriendHeldItemCount of the consume
 // item.
-func bootSummonWorld(t *testing.T) summonWorld {
+func bootSummonWorld(t *testing.T, opts ...gameservertest.Option) summonWorld {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter(summonCasterName, summonFriendLevel, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, summonFriendSkills())),
-	)
+	}, opts...)...)
 	w := summonWorld{srv: srv, caster: srv.Client, casterID: srv.SoleObjectID(t)}
 	for _, def := range summonFriendSkills() {
 		seedKnownSkill(t, srv, w.casterID, int(def.ID), 1)

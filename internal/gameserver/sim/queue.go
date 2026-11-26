@@ -335,6 +335,14 @@ func AssertOwner(q *Queue) {
 	assertDrainer(q)
 }
 
+// AssertNotOnQueue panics, in the simdebug build, when the caller runs one
+// of any queue's tasks, or work RunOwned runs as a queue's owner. A helper
+// that posts to a queue and waits for the task calls it: on its own queue
+// the caller would wait on itself, and on another it holds a worker for the
+// wait, deadlocking when that queue waits back. The production build checks
+// nothing.
+func AssertNotOnQueue() { assertNoDrain() }
+
 // Attribute names fn, in place of the task itself, as the work q's running
 // task does in the pool's log lines for that task. A task that wraps the
 // work it was posted for in a closure of its own calls it, so a slow-task

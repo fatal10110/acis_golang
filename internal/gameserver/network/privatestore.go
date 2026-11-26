@@ -209,10 +209,11 @@ func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID, templateID
 // storeTrader is live as one side of a store deal.
 func (l *GameClientLink) storeTrader(live *livePlayer) privatestore.Trader {
 	scroll := l.enchanting.scrolls.Active(live.ObjectID())
+	mount, pet := live.ControlItemsInUse()
 	return privatestore.Trader{
 		Inv: live.Inventory(),
 		Bound: func(objectID int32) bool {
-			return objectID == scroll || live.ControlItemInUse(objectID)
+			return objectID == scroll || (objectID != 0 && (objectID == mount || objectID == pet))
 		},
 		Casting: live.CastingNow(),
 	}
