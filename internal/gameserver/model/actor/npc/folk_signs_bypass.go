@@ -19,11 +19,11 @@ import (
 func (f *Folk) signsPriestBypass(pages Pages, kind InstanceKind, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
 	var own sevensigns.Cabal
 	switch kind {
-	case "DawnPriest":
+	case KindDawnPriest:
 		own = sevensigns.Dawn
-	case "DuskPriest":
+	case KindDuskPriest:
 		own = sevensigns.Dusk
-	case "SignsPriest":
+	case KindSignsPriest:
 	default:
 		return reply, false
 	}
@@ -64,7 +64,7 @@ func (f *Folk) signsPriestBypass(pages Pages, kind InstanceKind, talker Talker, 
 	case strings.HasPrefix(command, "SevenSigns"):
 		reply.Outcome, reply.DawnPriest = BypassSevenSigns, own == sevensigns.Dawn
 		return reply, true
-	case kind == "SignsPriest" && strings.HasPrefix(command, "Chat"):
+	case kind == KindSignsPriest && strings.HasPrefix(command, "Chat"):
 		val := 0
 		if arg, ok := commandChars(command, 5, -1); ok {
 			if n, err := strconv.ParseInt(arg, 10, 32); err == nil {

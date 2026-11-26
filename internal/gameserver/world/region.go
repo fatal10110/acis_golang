@@ -192,7 +192,7 @@ func (r *Region) appendMatchingExcept(out []Tracked, except int32, keep func(Tra
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for _, o := range r.objects {
-		if o.ObjectID() != except && keep(o) {
+		if keep(o) && o.ObjectID() != except {
 			out = append(out, o)
 		}
 	}

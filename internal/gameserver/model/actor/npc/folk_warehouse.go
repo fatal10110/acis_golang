@@ -5,9 +5,9 @@ import "strings"
 // warehouseKinds are the NPCs a warehouse deposit or withdrawal may be made
 // at.
 var warehouseKinds = map[InstanceKind]struct{}{
-	"WarehouseKeeper":       {},
-	"CastleWarehouseKeeper": {},
-	"ClanHallManagerNpc":    {},
+	KindWarehouseKeeper:       {},
+	KindCastleWarehouseKeeper: {},
+	KindClanHallManagerNpc:    {},
 }
 
 // Warehouse reports whether f keeps warehouses: a deposit or withdrawal

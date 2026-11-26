@@ -351,24 +351,17 @@ type Npcs struct {
 	// none.
 	scripts npc.ScriptHooks
 	// pickUps takes the ground items live NPCs pick up out of the world;
-	// nil leaves them on the ground. Set once, before any spawn.
+	// nil leaves them on the ground. Fixed at construction.
 	pickUps npc.GroundTaker
 	// guarded resolves the siege a siege guard defends, and the one a
-	// control tower stands for; nil gives none. Set once, before any spawn.
+	// control tower stands for; nil gives none. Fixed at construction.
 	guarded func(*npc.Instance) npc.GuardedSiege
 	// owners resolves the clan owning the residence an NPC serves; nil
-	// gives none. Set once, before any spawn.
+	// gives none. Fixed at construction.
 	owners func(*npc.Instance) int32
 	// regen answers the base regeneration multipliers of every NPC; nil
-	// gives the shipped ones. Set once, before any spawn.
+	// gives the shipped ones. Fixed at construction.
 	regen npc.RegenSettings
-}
-
-// SetGroundTaker makes t take the ground items the NPCs spawned from now on
-// pick up out of the world. Call it before SpawnOnStart.
-func (n *Npcs) SetGroundTaker(t npc.GroundTaker) {
-	n.pickUps = t
-	n.folk.Ground = t
 }
 
 // SetLimits puts l in force for every NPC of the population, the ones in
@@ -377,37 +370,62 @@ func (n *Npcs) SetLimits(l npc.Limits) {
 	n.limits.Set(l)
 }
 
-// SetRegenSettings makes every NPC spawned from now on read its base
-// regeneration multipliers from s. Call it before SpawnOnStart.
-func (n *Npcs) SetRegenSettings(s npc.RegenSettings) {
-	n.regen = s
-	n.folk.Regen = s
-}
-
-// SetGuardedSieges makes resolve give each siege guard spawned from now on
-// the siege it defends, and each control tower the siege of its castle,
-// nil for none. Call it before SpawnOnStart.
-func (n *Npcs) SetGuardedSieges(resolve func(*npc.Instance) npc.GuardedSiege) {
-	n.guarded = resolve
-}
-
-// SetResidenceOwners makes owner give each NPC spawned from now on
-// the clan owning the residence it serves, read at each use. Call it before
-// SpawnOnStart.
-func (n *Npcs) SetResidenceOwners(owner func(*npc.Instance) int32) {
-	n.owners = owner
-}
-
-// NewNpcs builds a population that raises no script hook and spawns it at
-// once, as SpawnOnStart does: every "on start" maker's qualifying entries,
-// respecting persisted dead/alive data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, makers MakerBehaviors, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	n, err := newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, npc.DefaultLimits(), 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, makers, nil, zoneIndexes...)
-	if err != nil {
-		return nil, err
-	}
-	n.SpawnOnStart()
-	return n, nil
+// NpcsConfig is what NewNpcs builds a population from. Spawns, Templates,
+// Geo, World, IDs, Decay, Respawn, AI, Positions, Items, Ground, Walker,
+// Effects.Activity, Queues and Makers are required; the rest may be left
+// zero.
+type NpcsConfig struct {
+	Spawns    *Spawns
+	Templates *npc.Table
+	Geo       move.Geo
+	World     *world.State
+	IDs       idAllocator
+	Decay     *task.Decay
+	Respawn   *task.Respawn
+	AI        *task.AI
+	Positions *task.PositionUpdates
+	Items     *item.Table
+	Ground    groundPlacer
+	Rewards   KillRewardConfig
+	// Now is the clock; nil reads time.Now.
+	Now func() time.Time
+	Log zerolog.Logger
+	// CastDefs and CastEffects wire a live hostile NPC's AI casts; nil
+	// CastDefs leaves it with nothing to cast.
+	CastDefs    actorcast.Definitions
+	CastEffects actorcast.EffectHandlers
+	Walker      *task.Walker
+	// NewSink builds the sink a hostile NPC shows itself through, and
+	// NewFolkSink the one of a civilian NPC.
+	NewSink     func(*npc.Hostile) event.Sink
+	NewFolkSink func(*npc.Folk) event.Sink
+	// Limits are the buff-slot base and drift range of every NPC.
+	Limits              npc.Limits
+	RandomWalkRate      int
+	MaxGeoPathFailCount int
+	RaidMultipliers     npc.RaidMultipliers
+	AIConfig            npc.AIConfig
+	// SpawnEvents is the SpawnEvents list.
+	SpawnEvents []string
+	Effects     effect.Env
+	// Queues gives each live NPC the queue its work runs on.
+	Queues Queues
+	Makers MakerBehaviors
+	// Scripts raises the script hooks of every live NPC; nil raises none.
+	Scripts npc.ScriptHooks
+	Zones   *zone.Index
+	// GroundTaker takes the ground items live NPCs pick up out of the
+	// world; nil leaves them on the ground.
+	GroundTaker npc.GroundTaker
+	// GuardedSieges gives a siege guard the siege it defends, and a control
+	// tower the siege of its castle; nil gives none.
+	GuardedSieges func(*npc.Instance) npc.GuardedSiege
+	// ResidenceOwners gives an NPC the clan owning the residence it serves,
+	// read at each use; nil gives none.
+	ResidenceOwners func(*npc.Instance) int32
+	// Regen answers the base regeneration multipliers of every NPC; nil
+	// gives the shipped ones.
+	Regen npc.RegenSettings
 }
 
 // Queues creates the queue one live NPC's work runs on; id names it in logs.
@@ -415,17 +433,14 @@ type Queues interface {
 	NewQueue(id string) *sim.Queue
 }
 
-// NewNpcsWithMaxBuffsAmount builds live NPCs with the limits (buff-slot
-// base and drift range), RandomWalkRate and raid base multipliers, each running its work on a
-// queue from queues. newFolkSink builds the sink a civilian NPC shows its
-// movement and status through. events is the SpawnEvents list. scripts
-// raises the script hooks of every live NPC. Nothing spawns until
-// SpawnOnStart: the caller wires what the hooks reach first.
-func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, limits npc.Limits, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, limits, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, events, effects, queues, makers, scripts, zoneIndexes...)
-}
-
-func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, limits npc.Limits, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
+// NewNpcs builds the NPC population of cfg, each live NPC running its work
+// on a queue from cfg.Queues. Nothing spawns until SpawnOnStart: the caller
+// wires what the hooks reach first.
+func NewNpcs(cfg NpcsConfig) (*Npcs, error) {
+	spawns, templates, geo, state := cfg.Spawns, cfg.Templates, cfg.Geo, cfg.World
+	ids, decay, respawnTask, ai, positions := cfg.IDs, cfg.Decay, cfg.Respawn, cfg.AI, cfg.Positions
+	items, ground, walker, newSink, effects := cfg.Items, cfg.Ground, cfg.Walker, cfg.NewSink, cfg.Effects
+	queues, makers, now, log := cfg.Queues, cfg.Makers, cfg.Now, cfg.Log
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -482,20 +497,17 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	if now == nil {
 		now = time.Now
 	}
-	var zones *zone.Index
-	if len(zoneIndexes) != 0 {
-		zones = zoneIndexes[0]
-	}
+	zones := cfg.Zones
 
 	n := &Npcs{
 		templates:           templates,
 		effects:             effects,
 		effectOpts:          []effect.Option{effect.WithEnv(effects)},
-		randomWalkRate:      randomWalkRate,
-		maxGeoPathFailCount: maxGeoPathFailCount,
-		settings:            npc.NewHostileSettings(aiConfig, raidMultipliers),
-		limits:              npc.NewLimitBook(limits),
-		events:              newSpawnEvents(events),
+		randomWalkRate:      cfg.RandomWalkRate,
+		maxGeoPathFailCount: cfg.MaxGeoPathFailCount,
+		settings:            npc.NewHostileSettings(cfg.AIConfig, cfg.RaidMultipliers),
+		limits:              npc.NewLimitBook(cfg.Limits),
+		events:              newSpawnEvents(cfg.SpawnEvents),
 		geo:                 geo,
 		state:               state,
 		ids:                 ids,
@@ -505,7 +517,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		positions:           positions,
 		items:               items,
 		ground:              ground,
-		rewards:             rewards,
+		rewards:             cfg.Rewards,
 		spawns:              spawns,
 		now:                 now,
 		log:                 log,
@@ -514,10 +526,14 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		zones:               zones,
 		queues:              queues,
 		makers:              makers,
-		scripts:             scripts,
+		scripts:             cfg.Scripts,
+		pickUps:             cfg.GroundTaker,
+		guarded:             cfg.GuardedSieges,
+		owners:              cfg.ResidenceOwners,
+		regen:               cfg.Regen,
 		makerQueue:          queues.NewQueue("makers"),
-		castDefs:            castDefs,
-		castEffects:         castEffects,
+		castDefs:            cfg.CastDefs,
+		castEffects:         cfg.CastEffects,
 		slot:                make(map[task.SlotID]slotInfo),
 		privates:            make(map[*npc.Scratch]map[task.SlotID]struct{}),
 		live:                make(map[int32]task.SlotID),
@@ -528,20 +544,22 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		Geo:                 geo,
 		Positions:           positions,
 		Queues:              queues,
-		NewSink:             newFolkSink,
+		NewSink:             cfg.NewFolkSink,
+		Ground:              cfg.GroundTaker,
+		Regen:               cfg.Regen,
 		Zones:               zones,
-		Skills:              castDefs,
-		CastEffects:         castEffects,
+		Skills:              cfg.CastDefs,
+		CastEffects:         cfg.CastEffects,
 		AI:                  ai,
 		Items:               items,
 		Decay:               decay,
 		Effects:             effects,
-		MaxGeoPathFailCount: maxGeoPathFailCount,
+		MaxGeoPathFailCount: cfg.MaxGeoPathFailCount,
 		Log:                 &n.log,
-		Scripts:             scripts,
+		Scripts:             cfg.Scripts,
 		Remover:             n,
 		Spawns:              n,
-		SeeRange:            aiConfig.SeeRange,
+		SeeRange:            cfg.AIConfig.SeeRange,
 	}
 	return n, nil
 }

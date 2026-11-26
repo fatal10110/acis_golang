@@ -1,26 +1,12 @@
 package network
 
 import (
-	"math"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 )
-
-// partyLootEligible accepts a member that may take units of itemID from
-// origin under a random or by-turn loot rule: alive, not leaving the world,
-// with room for all of them, and within partyRange of origin, body to body
-// in 3D. units is how many a non-stackable arrives as: the whole count under
-// the multiple item drop rule, else one (#5098).
-func partyLootEligible(partyRange int, itemID int32, units int, origin party.LootOrigin) func(*livePlayer) bool {
-	return func(m *livePlayer) bool {
-		inv := m.Inventory()
-		return !m.Dead() && !m.Detaching() && inv != nil && inv.ValidateCapacityByItemID(itemID, units) && party.InRange(partyRange, origin, m)
-	}
-}
 
 // partyMembers returns the members of p's party, or false outside one.
 func (l *GameClientLink) partyMembers(p *livePlayer) ([]*livePlayer, bool) {
@@ -31,25 +17,11 @@ func (l *GameClientLink) partyMembers(p *livePlayer) ([]*livePlayer, bool) {
 	return view.Members, ok
 }
 
-// shareAdena splits adena evenly among members within party range of
-// origin whose adena is not already at its cap and that are not leaving
-// the world; the remainder of the division is lost. Each one hears what it
-// earned, even nothing.
+// shareAdena pays each member within party range of origin its share of
+// adena (party.AdenaShares). Each one hears what it earned, even nothing.
 func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin party.LootOrigin) {
-	partyRange := l.killRewards.PartyRange()
-	var rewarded []*livePlayer
-	for _, m := range members {
-		inv := m.Inventory()
-		if inv == nil || m.Detaching() || inv.Adena() == math.MaxInt32 || !party.InRange(partyRange, origin, m) {
-			continue
-		}
-		rewarded = append(rewarded, m)
-	}
-	if len(rewarded) == 0 {
-		return
-	}
-	share := adena / len(rewarded)
-	for _, m := range rewarded {
+	takers, share := party.AdenaShares(members, adena, origin, l.killRewards.PartyRange())
+	for _, m := range takers {
 		if share < 1 {
 			m.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, 0))
 			continue
@@ -110,7 +82,7 @@ func (l *GameClientLink) lootForParty(picker *livePlayer, itemID int32, count in
 	if rewards.MultipleItemDrop {
 		units = count
 	}
-	looter, members, ok := l.parties.Looter(picker.ObjectID(), spoil, partyLootEligible(rewards.PartyRange, itemID, units, origin))
+	looter, members, ok := l.parties.Looter(picker.ObjectID(), spoil, party.LootEligible[*livePlayer](rewards.PartyRange, itemID, units, origin))
 	if !ok {
 		return false
 	}

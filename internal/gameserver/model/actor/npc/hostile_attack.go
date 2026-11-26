@@ -37,7 +37,7 @@ func (h *Hostile) DisableCoreAI(disabled bool) {
 // or a crowd-control / death / teleport lock. Fear is not included; it is an
 // out-of-control state, not a movement lock.
 func (h *Hostile) MovementDisabled() bool {
-	return hostileKind(h.Instance) == "HalishaChest" || !h.Instance.Template.CanMove ||
+	return hostileKind(h.Instance) == KindHalishaChest || !h.Instance.Template.CanMove ||
 		h.AlikeDead() || h.Stunned() ||
 		h.ImmobileUntilAttacked() || h.Rooted() || h.Sleeping() ||
 		h.Paralyzed() || h.Immobilized() || h.Teleporting()

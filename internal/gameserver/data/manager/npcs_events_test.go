@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -84,12 +83,32 @@ func newEventsFixtureAt(t *testing.T, table *spawn.Table, templates *npc.Table, 
 	f.respawn, _ = task.NewRespawn(respawns, now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, now, f.state)
 	var err error
-	f.npcs, err = newNpcs(NewSpawns(table, nil), templates, fakeGeo{}, f.state, &sequentialIDs{}, decay, f.respawn,
-		task.NewAI(f.state, zerolog.Nop()), task.NewPositionUpdates(f.state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, now, zerolog.Nop(),
-		nil, actorcast.EffectHandlers{}, walker, nil, nil, npc.DefaultLimits(), 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), events,
-		effect.Env{Activity: task.NewEffects()}, f.queues, testMakers(), nil)
+	f.npcs, err = NewNpcs(NpcsConfig{
+		Spawns:          NewSpawns(table, nil),
+		Templates:       templates,
+		Geo:             fakeGeo{},
+		World:           f.state,
+		IDs:             &sequentialIDs{},
+		Decay:           decay,
+		Respawn:         f.respawn,
+		AI:              task.NewAI(f.state, zerolog.Nop()),
+		Positions:       task.NewPositionUpdates(f.state),
+		Items:           item.NewTable(nil),
+		Ground:          &recordingGround{},
+		Now:             now,
+		Log:             zerolog.Nop(),
+		Walker:          walker,
+		Limits:          npc.DefaultLimits(),
+		RandomWalkRate:  30,
+		RaidMultipliers: npc.DefaultRaidMultipliers(),
+		AIConfig:        npc.DefaultAIConfig(),
+		SpawnEvents:     events,
+		Effects:         effect.Env{Activity: task.NewEffects()},
+		Queues:          f.queues,
+		Makers:          testMakers(),
+	})
 	if err != nil {
-		t.Fatalf("newNpcs() error: %v", err)
+		t.Fatalf("NewNpcs() error: %v", err)
 	}
 	f.npcs.SpawnOnStart()
 	return f

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -111,8 +110,25 @@ func spawnWalkerTestNPC(t *testing.T, routes route.WalkerRoutes) (*npc.Hostile, 
 	}
 
 	clock := npcQueues()
-	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, clock, testMakers())
+	npcs, err := newStartedNpcs(NpcsConfig{
+		Spawns:    spawns,
+		Templates: templates,
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       ids,
+		Decay:     decay,
+		Respawn:   respawnTask,
+		AI:        ai,
+		Positions: positions,
+		Items:     items,
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    clock,
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -224,7 +240,26 @@ func TestNpcMovementCapsAtWaterSurface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers(), zones)
+	_, err = newStartedNpcs(NpcsConfig{
+		Spawns:    NewSpawns(table, nil),
+		Templates: walkerTestTemplate(),
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       &sequentialIDs{},
+		Decay:     decay,
+		Respawn:   respawn,
+		AI:        task.NewAI(state, zerolog.Nop()),
+		Positions: task.NewPositionUpdates(state),
+		Items:     item.NewTable(nil),
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    npcQueues(),
+		Makers:    testMakers(),
+		Zones:     zones,
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -277,8 +312,25 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 		t.Fatalf("NewWalker() error: %v", err)
 	}
 
-	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers())
+	npcs, err := newStartedNpcs(NpcsConfig{
+		Spawns:    spawns,
+		Templates: templates,
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       ids,
+		Decay:     decay,
+		Respawn:   respawnTask,
+		AI:        ai,
+		Positions: positions,
+		Items:     items,
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    npcQueues(),
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -372,8 +424,25 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	}
 
 	clock := npcQueues()
-	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, clock, testMakers()); err != nil {
+	if _, err := newStartedNpcs(NpcsConfig{
+		Spawns:    spawns,
+		Templates: templates,
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       ids,
+		Decay:     decay,
+		Respawn:   respawnTask,
+		AI:        ai,
+		Positions: positions,
+		Items:     items,
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    clock,
+		Makers:    testMakers(),
+	}); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
@@ -87,7 +88,7 @@ func TestPartyLootEligible(t *testing.T) {
 	full.Inventory().SetLimiter(slotLimit(0))
 	far := newTestLivePlayer(t, 100, capture) // 9900 from the origin
 
-	eligible := partyLootEligible(1500, 20, 1, origin)
+	eligible := party.LootEligible[*livePlayer](1500, 20, 1, origin)
 	for _, tc := range []struct {
 		what string
 		m    *livePlayer
@@ -103,7 +104,7 @@ func TestPartyLootEligible(t *testing.T) {
 		}
 	}
 
-	if !partyLootEligible(-1, 20, 1, origin)(far) {
+	if !party.LootEligible[*livePlayer](-1, 20, 1, origin)(far) {
 		t.Error("a far member is passed over with an unlimited party range")
 	}
 }

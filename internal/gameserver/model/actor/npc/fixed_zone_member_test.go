@@ -93,7 +93,7 @@ func TestFixedNPCsCrossWaterWithTheirView(t *testing.T) {
 				t.Fatal(err)
 			}
 			sink := &recordingSink{}
-			ep.Attach(Runtime{World: world.New(), Sink: sink})
+			ep.Attach(EffectPointRuntime{World: world.New(), Sink: sink})
 			ep.SetZones(ix)
 			ep.Spawn(10, 10, 0, 0)
 			if !water.Core().Inside(ep.zones) || !ep.InsideZone(zone.FlagWater) {

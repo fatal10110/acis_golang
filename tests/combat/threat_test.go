@@ -103,7 +103,7 @@ func TestThreatRefreshDropsLostAttackers(t *testing.T) {
 	f.owner.AddDamage(f.second, 40, 60)
 
 	visible := map[int32]bool{f.second.ObjectID(): true}
-	f.owner.Refresh(func(c attackable.Combatant) bool { return visible[c.ObjectID()] })
+	f.owner.RefreshZeroDead(func(c attackable.Combatant) bool { return visible[c.ObjectID()] })
 
 	if _, ok := f.owner.Get(f.first); ok {
 		t.Fatal("lost attacker kept in threat table after refresh")

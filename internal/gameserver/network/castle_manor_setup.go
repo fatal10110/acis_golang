@@ -66,13 +66,13 @@ func (l *GameClientLink) bypassManorMenu(live *livePlayer, command string) {
 		return
 	}
 	switch kind := f.Instance.Kind; kind {
-	case "ManorManagerNpc":
+	case npc.KindManorManagerNpc:
 		l.manorManagerMenu(live, f, command)
-	case "CastleChamberlain", "WyvernManagerNpc":
+	case npc.KindCastleChamberlain, npc.KindWyvernManagerNpc:
 		l.chamberlainManorMenu(live, f, kind, command)
-	case "Auctioneer":
+	case npc.KindAuctioneer:
 		l.auctioneerBypass(live, f, command)
-	case "Merchant", "Fisherman", "Gatekeeper", "WarehouseKeeper", "CastleWarehouseKeeper", "DungeonGatekeeper", "CastleBlacksmith":
+	case npc.KindMerchant, npc.KindFisherman, npc.KindGatekeeper, npc.KindWarehouseKeeper, npc.KindCastleWarehouseKeeper, npc.KindDungeonGatekeeper, npc.KindCastleBlacksmith:
 		reply, file := l.folkReply(live, f, command)
 		if reply.Outcome == npc.BypassUnported {
 			// No command of these dialogs reads a manor window.
@@ -146,7 +146,7 @@ func (l *GameClientLink) manorManagerMenu(live *livePlayer, f *npc.Folk, command
 // wyvern manager); see
 // chamberlainManorWindows for the rest.
 func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, kind npc.InstanceKind, command string) {
-	if kind == "WyvernManagerNpc" && live.currentFolk.Load() != f {
+	if kind == npc.KindWyvernManagerNpc && live.currentFolk.Load() != f {
 		// Kept with the wyvern manager's own gate: a civilian NPC becomes
 		// the current one as it is selected, so its target always passes.
 		return

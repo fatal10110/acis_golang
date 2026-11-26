@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -95,11 +94,28 @@ func TestMortalFolkDecaysAndRespawnsThroughItsSlot(t *testing.T) {
 	respawn, _ := task.NewRespawn(due, clock)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, clock, state)
 	queues := npcQueues()
-	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "Folk", Name: "Huge Cursed Pig", Level: 1, HPMax: 100, CorpseTime: 7},
-		{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", Level: 1, HPMax: 100, CorpseTime: 7, Undying: true},
-	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, clock, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues, testMakers())
+	npcs, err := newStartedNpcs(NpcsConfig{
+		Spawns: NewSpawns(table, nil),
+		Templates: npc.NewTable([]*npc.Template{
+			{ID: 1, TemplateID: 1, Type: "Folk", Name: "Huge Cursed Pig", Level: 1, HPMax: 100, CorpseTime: 7},
+			{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", Level: 1, HPMax: 100, CorpseTime: 7, Undying: true},
+		}),
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       &sequentialIDs{},
+		Decay:     decay,
+		Respawn:   respawn,
+		AI:        task.NewAI(state, zerolog.Nop()),
+		Positions: task.NewPositionUpdates(state),
+		Items:     item.NewTable(nil),
+		Ground:    &recordingGround{},
+		Now:       clock,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    queues,
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

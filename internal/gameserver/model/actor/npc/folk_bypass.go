@@ -330,26 +330,26 @@ type BypassReply struct {
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
-	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
+	reply := BypassReply{LeadingActionFailed: kind == KindDungeonGatekeeper}
 	if out, ok := f.dungeonGatekeeperCommand(pages, kind, talker, command, reply); ok {
 		return out
 	}
-	if kind == weddingManager {
+	if kind == KindWeddingManagerNpc {
 		reply.Outcome = BypassWedding
 		return reply
 	}
-	if kind == auctioneer {
+	if kind == KindAuctioneer {
 		reply.Outcome = BypassAuction
 		return reply
 	}
-	if kind == clanHallManager {
+	if kind == KindClanHallManagerNpc {
 		reply.Outcome = BypassClanHallManager
 		return reply
 	}
 	if out, ok := f.residenceCommand(pages, kind, rules, talker, command, reply); ok {
 		return out
 	}
-	if kind == "OlympiadManagerNpc" {
+	if kind == KindOlympiadManagerNpc {
 		switch {
 		case strings.HasPrefix(command, "OlympiadNoble"):
 			return f.olympiadNobleCommand(pages, talker, command, reply)
@@ -363,7 +363,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if out, ok := f.festivalGuideBypass(pages, kind, talker, command, reply); ok {
 		return out
 	}
-	if _, ok := classmaster.ParseCommand(command); kind == "ClassMaster" && ok {
+	if _, ok := classmaster.ParseCommand(command); kind == KindClassMaster && ok {
 		reply.Outcome = BypassClassMaster
 		return reply
 	}
@@ -375,7 +375,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		reply.Outcome = BypassClan
 		return reply
 	}
-	if kind == "SchemeBuffer" && schemebuffer.Command(command) {
+	if kind == KindSchemeBuffer && schemebuffer.Command(command) {
 		reply.Outcome = BypassSchemeBuffer
 		return reply
 	}
@@ -388,7 +388,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		reply.Outcome, reply.HTML = BypassKarmaRefused, page
 		return reply
 	}
-	if kind == "Fisherman" {
+	if kind == KindFisherman {
 		if strings.HasPrefix(command, "FishSkillList") {
 			reply.Outcome = BypassFishSkillList
 			return reply
@@ -403,7 +403,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassFishingReward
 			return reply
 		}
-		if page, refused := f.pkRefusal(pages, folkChats["Merchant"], rules, karma); refused {
+		if page, refused := f.pkRefusal(pages, folkChats[KindMerchant], rules, karma); refused {
 			reply.Outcome, reply.HTML = BypassKarmaRefused, page
 			return reply
 		}
@@ -416,7 +416,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 		return reply
 	}
-	if kind == "SymbolMaker" {
+	if kind == KindSymbolMaker {
 		switch command {
 		case "Draw":
 			reply.Outcome = BypassHennaDraw
@@ -426,11 +426,11 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 	}
-	if (kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper") && talker.Trading {
+	if (kind == KindWarehouseKeeper || kind == KindCastleWarehouseKeeper) && talker.Trading {
 		reply.Outcome = BypassAlreadyTrading
 		return reply
 	}
-	reply.CancelEnchant = kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper"
+	reply.CancelEnchant = kind == KindWarehouseKeeper || kind == KindCastleWarehouseKeeper
 	if reply.CancelEnchant {
 		if cmd := warehouseCommand(command); cmd != WarehouseNoCommand {
 			reply.Outcome, reply.Warehouse = BypassWarehouse, cmd
@@ -446,7 +446,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return shop
 		}
 	}
-	if kind == "Adventurer" {
+	if kind == KindAdventurer {
 		if out, ok := f.adventurerCommand(pages, command, reply); ok {
 			return out
 		}
@@ -532,7 +532,7 @@ func (f *Folk) dialogCommand(pages Pages, kind InstanceKind, chat folkChat, talk
 			return reply, true
 		}
 		reply.Outcome = BypassChatWindow
-		if kind == "OlympiadManagerNpc" {
+		if kind == KindOlympiadManagerNpc {
 			reply.HTML = f.olympiadChat(pages, dialog.Val, talker.Noble, talker.Hero, talker.InactiveHero)
 		} else {
 			reply.HTML = f.chatPage(pages, chat, dialog.Val)
@@ -554,7 +554,7 @@ func (f *Folk) dialogCommand(pages Pages, kind InstanceKind, chat folkChat, talk
 // wyvern manager past their own dialogs.
 func merchantKind(kind InstanceKind) bool {
 	switch kind {
-	case "Merchant", "Fisherman", "ManorManagerNpc", "CastleChamberlain", "WyvernManagerNpc":
+	case KindMerchant, KindFisherman, KindManorManagerNpc, KindCastleChamberlain, KindWyvernManagerNpc:
 		return true
 	}
 	return false

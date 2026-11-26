@@ -2,7 +2,6 @@ package attackable
 
 import (
 	"slices"
-	"sync"
 	"time"
 )
 
@@ -14,10 +13,6 @@ const maxThreatValue = 999999999
 // most hated one's hate.
 const randomizeHateBonus = 200
 
-// reconsiderHateBonus is the flat hate a reconsidered target gains when no
-// attacker was most hated.
-const reconsiderHateBonus = 2000
-
 // Threat is one attacker's accumulated standing against a ThreatTable's
 // owner: the damage it has dealt and the hate weight driving target
 // selection, both capped at maxThreatValue, plus when it last dealt damage.
@@ -28,29 +23,29 @@ type Threat struct {
 	Timestamp time.Time
 }
 
+func (e *Threat) bind(attacker Combatant) { e.Attacker = attacker }
+func (e *Threat) attacker() Combatant     { return e.Attacker }
+func (e *Threat) hateRef() *float64       { return &e.Hate }
+
 // ThreatTable accumulates per-attacker damage and hate for one NPC and
 // selects the most hated attacker as its melee target. A ThreatTable never
 // builds threat between two siege guards, and reports no most-hated
-// attacker while its owner is alike dead.
-//
-// mu guards entries. An attacker's hit adds threat from the attacker's queue
-// while the owner's AI reads it.
+// attacker while its owner is alike dead. It is safe for concurrent use.
 //
 // A nil table is an empty one: it holds no threat and every method but
 // AddDamage reads nothing from it and changes nothing.
 type ThreatTable struct {
-	owner Combatant
+	t table[Threat, *Threat]
 	// now stamps Threat.Timestamp.
 	now func() time.Time
-
-	mu      sync.RWMutex
-	entries map[int32]*Threat
 }
 
 // NewThreatTable returns an empty ThreatTable for owner whose timestamps
 // read now.
 func NewThreatTable(owner Combatant, now func() time.Time) *ThreatTable {
-	return &ThreatTable{owner: owner, now: now, entries: make(map[int32]*Threat)}
+	t := &ThreatTable{now: now}
+	t.t.init(owner)
+	return t
 }
 
 // AddDamage records damage dealt and hate raised by attacker. Both are
@@ -60,53 +55,16 @@ func NewThreatTable(owner Combatant, now func() time.Time) *ThreatTable {
 // or an attacker that is a siege guard attacking another siege guard, is a
 // no-op.
 func (t *ThreatTable) AddDamage(attacker Combatant, damage, hate float64) {
-	if attacker == nil {
+	if t.t.ignores(attacker) {
 		return
 	}
-	if t.owner.SiegeGuard() && attacker.SiegeGuard() {
-		return
-	}
+	t.t.mu.Lock()
+	defer t.t.mu.Unlock()
 
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	e, ok := t.entries[attacker.ObjectID()]
-	if !ok {
-		e = &Threat{Attacker: attacker}
-		t.entries[attacker.ObjectID()] = e
-	}
+	e := t.t.entryLocked(attacker)
 	e.Damage = min(e.Damage+damage, maxThreatValue)
 	e.Hate = min(e.Hate+hate, maxThreatValue)
 	e.Timestamp = t.now()
-}
-
-// MostHated returns the attacker with the highest positive hate, or ok
-// false if the table is empty, the owner is alike dead, or no attacker has
-// positive hate.
-func (t *ThreatTable) MostHated() (threat Threat, ok bool) {
-	if t == nil {
-		return Threat{}, false
-	}
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	if len(t.entries) == 0 || t.owner.AlikeDead() {
-		return Threat{}, false
-	}
-
-	var best *Threat
-	for _, e := range t.entries {
-		if e.Hate <= 0 {
-			continue
-		}
-		if best == nil || e.Hate > best.Hate {
-			best = e
-		}
-	}
-	if best == nil {
-		return Threat{}, false
-	}
-	return *best, true
 }
 
 // RandomizeAttack is attack randomization: among
@@ -122,28 +80,20 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 	if t == nil {
 		return false
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.t.mu.Lock()
+	defer t.t.mu.Unlock()
 
-	if len(t.entries) < 2 || t.owner.AlikeDead() {
+	if len(t.t.entries) < 2 || t.t.owner.AlikeDead() {
 		return false
 	}
 
-	var mostHated *Threat
-	for _, e := range t.entries {
-		if e.Hate <= 0 {
-			continue
-		}
-		if mostHated == nil || e.Hate > mostHated.Hate {
-			mostHated = e
-		}
-	}
+	mostHated := t.t.mostHatedLocked(true)
 	if mostHated == nil {
 		return false
 	}
 
 	var candidates []*Threat
-	for _, e := range t.entries {
+	for _, e := range t.t.entries {
 		if e == mostHated || e.Hate <= 0 {
 			continue
 		}
@@ -167,80 +117,29 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 	return true
 }
 
-// ReconsiderTarget is in-range target reconsideration: used
-// when the owner can no longer act on its current target (e.g. an
-// immobilize state) and must pick a replacement from its own hate list.
-// Among attackers with positive hate other than the current most-hated,
-// passing both inRange and valid, it picks the lowest-ObjectID candidate
-// (Go map iteration order is random, so entries are sorted for a
-// reproducible pick instead of taking iteration's "first").
-//
-// If a most-hated attacker exists, its hate is zeroed and previousMostHated
-// reports it so the caller can drop its queued attack desire; the chosen
-// candidate's own hate is left unchanged — the most-hated's hate is read
-// for the add only after it was already stopped in the same sequence, so
-// the add is always zero. This is not a missed transfer to fix; it is the
-// exact specified order, reproduced as coded. If no most-hated exists
-// (empty hate list or an alike-dead owner, the most-hated lookup's own dead
-// check),
-// the candidate instead gets a flat +2000 hate and previousMostHated is
-// nil.
-//
-// Reports found false when the table has fewer than two entries or no
-// candidate passes both filters.
-func (t *ThreatTable) ReconsiderTarget(inRange func(Combatant) bool, valid func(Combatant) bool) (previousMostHated, chosen Combatant, found bool) {
+// StopHate zeroes target's hate without dropping its entry, so its damage
+// and identity are preserved for reward calculation. It is a no-op if
+// target is not in the table.
+func (t *ThreatTable) StopHate(target Combatant) {
 	if t == nil {
-		return nil, nil, false
+		return
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.t.mu.Lock()
+	defer t.t.mu.Unlock()
 
-	if len(t.entries) < 2 {
-		return nil, nil, false
+	if e, ok := t.t.entries[target.ObjectID()]; ok {
+		e.Hate = 0
 	}
+}
 
-	var mostHated *Threat
-	if !t.owner.AlikeDead() {
-		for _, e := range t.entries {
-			if e.Hate <= 0 {
-				continue
-			}
-			if mostHated == nil || e.Hate > mostHated.Hate {
-				mostHated = e
-			}
-		}
+// MostHated returns the attacker with the highest positive hate, or ok
+// false if the table is empty, the owner is alike dead, or no attacker has
+// positive hate.
+func (t *ThreatTable) MostHated() (threat Threat, ok bool) {
+	if t == nil {
+		return Threat{}, false
 	}
-
-	var candidates []*Threat
-	for _, e := range t.entries {
-		if mostHated != nil && e == mostHated {
-			continue
-		}
-		if e.Hate <= 0 {
-			continue
-		}
-		if !inRange(e.Attacker) || !valid(e.Attacker) {
-			continue
-		}
-		candidates = append(candidates, e)
-	}
-	if len(candidates) == 0 {
-		return nil, nil, false
-	}
-	slices.SortFunc(candidates, func(a, b *Threat) int {
-		return int(a.Attacker.ObjectID() - b.Attacker.ObjectID())
-	})
-	picked := candidates[0]
-	picked.Timestamp = t.now()
-
-	if mostHated == nil {
-		picked.Hate = min(picked.Hate+reconsiderHateBonus, maxThreatValue)
-		return nil, picked.Attacker, true
-	}
-
-	prevAttacker := mostHated.Attacker
-	mostHated.Hate = 0
-	return prevAttacker, picked.Attacker, true
+	return t.t.mostHated(true)
 }
 
 // Hate returns the owner's hate against target, or 0 if target is not in
@@ -249,14 +148,7 @@ func (t *ThreatTable) Hate(target Combatant) float64 {
 	if t == nil {
 		return 0
 	}
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	e, ok := t.entries[target.ObjectID()]
-	if !ok {
-		return 0
-	}
-	return e.Hate
+	return t.t.hate(target)
 }
 
 // Get returns target's full entry, or ok false if target is not in the
@@ -265,29 +157,7 @@ func (t *ThreatTable) Get(target Combatant) (threat Threat, ok bool) {
 	if t == nil {
 		return Threat{}, false
 	}
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	e, ok := t.entries[target.ObjectID()]
-	if !ok {
-		return Threat{}, false
-	}
-	return *e, true
-}
-
-// StopHate zeroes target's hate without dropping its entry, so its damage
-// and identity are preserved for reward calculation. It is a no-op if
-// target is not in the table.
-func (t *ThreatTable) StopHate(target Combatant) {
-	if t == nil {
-		return
-	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if e, ok := t.entries[target.ObjectID()]; ok {
-		e.Hate = 0
-	}
+	return t.t.get(target)
 }
 
 // ReduceAllHate subtracts amount from every entry's hate. Unlike AddDamage,
@@ -297,33 +167,28 @@ func (t *ThreatTable) ReduceAllHate(amount float64) {
 	if t == nil {
 		return
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for _, e := range t.entries {
-		e.Hate -= amount
-	}
+	t.t.reduceAll(amount)
 }
 
-// Refresh drops attackers the owner no longer sees and stops hate for
-// dead-equivalent attackers while preserving their damage. It returns the
-// attackers whose queued target desires should be removed.
-func (t *ThreatTable) Refresh(visible func(Combatant) bool) []Combatant {
+// RefreshZeroDead drops attackers the owner no longer sees and stops hate
+// for dead-equivalent attackers while preserving their damage. It returns
+// the attackers whose queued target desires should be removed.
+func (t *ThreatTable) RefreshZeroDead(visible func(Combatant) bool) []Combatant {
 	if t == nil {
 		return nil
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.t.mu.Lock()
+	defer t.t.mu.Unlock()
 
 	var changed []Combatant
-	for id, e := range t.entries {
+	for id, e := range t.t.entries {
 		if e.Attacker.AlikeDead() {
 			e.Hate = 0
 			changed = append(changed, e.Attacker)
 			continue
 		}
 		if visible != nil && !visible(e.Attacker) {
-			delete(t.entries, id)
+			delete(t.t.entries, id)
 			changed = append(changed, e.Attacker)
 		}
 	}
@@ -335,12 +200,7 @@ func (t *ThreatTable) ZeroHate() {
 	if t == nil {
 		return
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for _, e := range t.entries {
-		e.Hate = 0
-	}
+	t.t.zeroAll()
 }
 
 // Remove drops target's entry entirely.
@@ -348,10 +208,7 @@ func (t *ThreatTable) Remove(target Combatant) {
 	if t == nil {
 		return
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	delete(t.entries, target.ObjectID())
+	t.t.remove(target)
 }
 
 // Clear drops every entry.
@@ -359,10 +216,7 @@ func (t *ThreatTable) Clear() {
 	if t == nil {
 		return
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	clear(t.entries)
+	t.t.clear()
 }
 
 // IsEmpty reports whether the table has no entries.
@@ -370,10 +224,7 @@ func (t *ThreatTable) IsEmpty() bool {
 	if t == nil {
 		return true
 	}
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	return len(t.entries) == 0
+	return t.t.len() == 0
 }
 
 // Snapshot returns a copy of every entry, in no particular order.
@@ -381,12 +232,5 @@ func (t *ThreatTable) Snapshot() []Threat {
 	if t == nil {
 		return nil
 	}
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	out := make([]Threat, 0, len(t.entries))
-	for _, e := range t.entries {
-		out = append(out, *e)
-	}
-	return out
+	return t.t.snapshot()
 }

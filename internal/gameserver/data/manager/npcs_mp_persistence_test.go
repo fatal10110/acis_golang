@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -60,8 +59,25 @@ func bootMPTestNpcs(t *testing.T, spawns *Spawns, templates *npc.Table) (*Npcs, 
 		t.Fatalf("NewWalker() error: %v", err)
 	}
 
-	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers())
+	npcs, err := newStartedNpcs(NpcsConfig{
+		Spawns:    spawns,
+		Templates: templates,
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       ids,
+		Decay:     decay,
+		Respawn:   respawnTask,
+		AI:        ai,
+		Positions: positions,
+		Items:     items,
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    npcQueues(),
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

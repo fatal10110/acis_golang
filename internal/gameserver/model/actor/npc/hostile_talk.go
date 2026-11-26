@@ -17,9 +17,9 @@ var silentGuards = map[int]bool{
 // friendly monster. Any other hostile NPC answers an interact with nothing.
 func (h *Hostile) Talks() bool {
 	switch hostileKind(h.Instance) {
-	case "Guard":
+	case KindGuard:
 		return !silentGuards[h.NpcID()]
-	case "FriendlyMonster":
+	case KindFriendlyMonster:
 		return true
 	}
 	return false
@@ -34,7 +34,7 @@ func (h *Hostile) ChatPage(val int, exists func(file string) bool) string {
 	if val != 0 {
 		name += "-" + strconv.Itoa(val)
 	}
-	if hostileKind(h.Instance) == "Guard" {
+	if hostileKind(h.Instance) == KindGuard {
 		return "data/html/guard/" + name + ".htm"
 	}
 	if file := "data/html/default/" + name + ".htm"; exists(file) {

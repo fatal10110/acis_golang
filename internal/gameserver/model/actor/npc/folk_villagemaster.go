@@ -12,20 +12,20 @@ import (
 // villageMasterRaces are the races each race-bound village master teaches.
 // A master absent here teaches every race.
 var villageMasterRaces = map[InstanceKind][]player.Race{
-	"VillageMasterDElf":    {player.RaceDarkElf},
-	"VillageMasterDwarf":   {player.RaceDwarf},
-	"VillageMasterOrc":     {player.RaceOrc},
-	"VillageMasterFighter": {player.RaceHuman, player.RaceElf},
-	"VillageMasterMystic":  {player.RaceHuman, player.RaceElf},
-	"VillageMasterPriest":  {player.RaceHuman, player.RaceElf},
+	KindVillageMasterDElf:    {player.RaceDarkElf},
+	KindVillageMasterDwarf:   {player.RaceDwarf},
+	KindVillageMasterOrc:     {player.RaceOrc},
+	KindVillageMasterFighter: {player.RaceHuman, player.RaceElf},
+	KindVillageMasterMystic:  {player.RaceHuman, player.RaceElf},
+	KindVillageMasterPriest:  {player.RaceHuman, player.RaceElf},
 }
 
 // villageMasterTypes are the teaching lines the fighter, mystic and priest
 // masters each keep to.
 var villageMasterTypes = map[InstanceKind]player.ClassType{
-	"VillageMasterFighter": player.ClassTypeFighter,
-	"VillageMasterMystic":  player.ClassTypeMystic,
-	"VillageMasterPriest":  player.ClassTypePriest,
+	KindVillageMasterFighter: player.ClassTypeFighter,
+	KindVillageMasterMystic:  player.ClassTypeMystic,
+	KindVillageMasterPriest:  player.ClassTypePriest,
 }
 
 // VillageMaster reports whether f is a village master of any kind.

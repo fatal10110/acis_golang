@@ -51,7 +51,7 @@ func (l HateList) CleanAll() { l.h.AI().CleanAllHates() }
 
 // StopHate drops c from the list. Its desires stay. A nil c panics.
 func (l HateList) StopHate(c Creature) {
-	l.h.AI().HatesIfBuilt().StopHate(mustCombatant(c, "stop the hate of a missing creature"))
+	l.h.AI().HatesIfBuilt().Remove(mustCombatant(c, "stop the hate of a missing creature"))
 }
 
 // AddDefault adds the hate an NPC gives a creature it notices: 300 when the

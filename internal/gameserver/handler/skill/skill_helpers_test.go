@@ -328,7 +328,7 @@ func (d *disablerFake) ReduceAllAggroHate(amount float64) { d.aggro.ReduceAllHat
 func (d *disablerFake) StopAggroHate(attacker attackable.Combatant) {
 	d.aggro.StopHate(attacker)
 }
-func (d *disablerFake) StopHateList(attacker attackable.Combatant) { d.hate.StopHate(attacker) }
+func (d *disablerFake) StopHateList(attacker attackable.Combatant) { d.hate.Remove(attacker) }
 func (d *disablerFake) ClearAggroTables() {
 	d.aggro.Clear()
 	d.hate.Clear()

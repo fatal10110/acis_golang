@@ -3,7 +3,7 @@ package npc
 // FestivalMonster reports whether h is one of the Festival of Darkness's
 // monsters.
 func (h *Hostile) FestivalMonster() bool {
-	return hostileKind(h.Instance) == "FestivalMonster"
+	return hostileKind(h.Instance) == KindFestivalMonster
 }
 
 // OfferingBonus is how many blood offerings a kill of h is worth, as a

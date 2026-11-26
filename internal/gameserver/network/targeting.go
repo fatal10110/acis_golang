@@ -172,7 +172,7 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 // every click with ActionFailed alone.
 func christmasTree(target world.Tracked) bool {
 	d, ok := target.(*npc.Decoration)
-	return ok && d.Instance.Kind == npc.ChristmasTree
+	return ok && d.Instance.Kind == npc.KindChristmasTree
 }
 
 // interactsWith reports whether a click on the selected hostile NPC h is an

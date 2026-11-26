@@ -44,7 +44,7 @@ func (s *Server) SpawnHostileNPC(t *testing.T) *npc.Hostile {
 // construction path.
 func (s *Server) SpawnHostileNPCAt(t *testing.T, at location.Location) *npc.Hostile {
 	t.Helper()
-	return s.SpawnHostileNPCKindAt(t, "Monster", at)
+	return s.SpawnHostileNPCKindAt(t, string(npc.KindMonster), at)
 }
 
 // SpawnHostileNPCKindAt seeds a parked hostile NPC of the given instance
@@ -289,7 +289,7 @@ func AttackingHostileTemplate() *npc.Template {
 	return &npc.Template{
 		ID:         100,
 		TemplateID: 100,
-		Type:       "Monster",
+		Type:       string(npc.KindMonster),
 		Level:      1,
 		HPMax:      1000,
 		// PAtk deals roughly 20 damage against the
@@ -452,7 +452,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, geo move.Geo) *npc.Hostile {
 	t.Helper()
 	tmpl := inst.Template
-	inst.Kind = npc.InstanceKind(tmpl.Type)
+	inst.Kind = tmpl.Kind()
 	statRef := &movingHostileStatRef{}
 	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, s.npcLiveOptions()...)
 	if err != nil {

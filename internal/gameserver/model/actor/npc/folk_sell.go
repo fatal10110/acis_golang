@@ -9,12 +9,12 @@ import (
 // players and thank them with a <npcId>-sold.htm page: every merchant-type
 // NPC. A mercenary manager buys too but has no such page.
 var soldPageDirs = map[InstanceKind]string{
-	"Merchant":           "merchant",
-	"Fisherman":          "fisherman",
-	"CastleChamberlain":  "merchant",
-	"ManorManagerNpc":    "merchant",
-	"ClanHallManagerNpc": "merchant",
-	"WyvernManagerNpc":   "merchant",
+	KindMerchant:           "merchant",
+	KindFisherman:          "fisherman",
+	KindCastleChamberlain:  "merchant",
+	KindManorManagerNpc:    "merchant",
+	KindClanHallManagerNpc: "merchant",
+	KindWyvernManagerNpc:   "merchant",
 }
 
 // BuysItems reports whether players may sell items to f: a merchant-type
@@ -22,7 +22,7 @@ var soldPageDirs = map[InstanceKind]string{
 func (f *Folk) BuysItems() bool {
 	kind := hostileKind(f.Instance)
 	_, ok := soldPageDirs[kind]
-	return ok || kind == "MercenaryManagerNpc"
+	return ok || kind == KindMercenaryManagerNpc
 }
 
 // SoldPage is the page f shows a player who just sold it items, with
