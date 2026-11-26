@@ -241,7 +241,7 @@ func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testi
 		{ID: 4049, SkillType: "MDAM", Offensive: true, Power: 10},
 		{ID: 4050, SkillType: "DRAIN", Offensive: true, Magic: true, Power: 10},
 	} {
-		t.Run(def.SkillType, func(t *testing.T) {
+		t.Run(string(def.SkillType), func(t *testing.T) {
 			owner := &fakeCubicShotOwner{fakeCubicEffectCaster: fakeCubicEffectCaster{id: 1}, blessed: true}
 			target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil)}
 

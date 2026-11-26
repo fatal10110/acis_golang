@@ -45,7 +45,7 @@ func combatDoorTemplate(kind door.Kind) *door.Template {
 	return tmpl
 }
 
-func doorSkill(id int32, skillType string, offensive bool, power int) modelskill.Definition {
+func doorSkill(id int32, skillType modelskill.SkillType, offensive bool, power int) modelskill.Definition {
 	return modelskill.Definition{
 		ID: modelskill.ID(id), Level: 1, Activation: modelskill.ActivationActive,
 		Target: modelskill.TargetOne, SkillType: skillType, Power: float32(power), Offensive: offensive,

@@ -80,19 +80,11 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 // tree first. An item's func has no owning skill: its attached <cond> is
 // tested with none.
 func itemModifierCondition(mod item.StatModifier) (Condition, conditions.Condition, error) {
-	var gate Condition
-	if mod.Condition != nil {
-		c := conditions.ItemCondition(*mod.Condition)
-		g, err := funcCondition(&c)
-		if err != nil {
-			return nil, nil, err
-		}
-		gate = g
+	gate, err := gateOf(conditions.CompiledItemNode(mod.Condition))
+	if err != nil {
+		return nil, nil, err
 	}
-	if mod.AttachCondition == nil {
-		return gate, nil, nil
-	}
-	attach, err := conditions.Compile(conditions.ItemCondition(mod.AttachCondition.Root))
+	attach, err := conditions.CompiledItemUse(mod.AttachCondition)
 	return gate, attach, err
 }
 

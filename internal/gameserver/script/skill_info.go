@@ -47,9 +47,9 @@ func (k SkillInfo) Power(c Creature) float64 {
 		return power
 	}
 	switch k.def.SkillType {
-	case "DEATHLINK":
+	case skill.SkillTypeDeathLink:
 		return power * math.Pow(1.7165-c.HPRatio(), 2) * 0.577
-	case "FATAL":
+	case skill.SkillTypeFatal:
 		return power + power*math.Pow(1.7165-c.HPRatio(), 3.5)*0.577
 	}
 	return power

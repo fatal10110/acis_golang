@@ -17,7 +17,7 @@ const deniedStrikeSkill = 47
 
 // deniedStrike is deniedStrikeSkill as skillType, strong enough to kill
 // the fixture monster were its damage let through.
-func deniedStrike(skillType string) modelskill.Definition {
+func deniedStrike(skillType modelskill.SkillType) modelskill.Definition {
 	return modelskill.Definition{
 		ID: deniedStrikeSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		Offensive: true, CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,

@@ -1,7 +1,6 @@
 package skill
 
 import (
-	"strings"
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -333,7 +332,7 @@ type Definitions interface {
 
 // Handler applies one skill action to already-resolved targets.
 type Handler interface {
-	Types() []string
+	Types() []modelskill.SkillType
 	Use(Cast)
 }
 
@@ -488,7 +487,7 @@ type resultHandler interface {
 
 // Registry maps skill type names to their handlers.
 type Registry struct {
-	entries map[string]Handler
+	entries map[modelskill.SkillType]Handler
 	// magicFailures is the server's MagicFailures switch, shared with the
 	// magic damage handlers and read by the cubic damage path (UseCubic).
 	magicFailures *magicFailureSwitch
@@ -513,7 +512,7 @@ func (r *Registry) SetMagicFailures(on bool) {
 
 // NewRegistry returns a registry populated with handlers.
 func NewRegistry(handlers ...Handler) *Registry {
-	r := &Registry{entries: make(map[string]Handler)}
+	r := &Registry{entries: make(map[modelskill.SkillType]Handler)}
 	for _, h := range handlers {
 		r.Register(h)
 	}
@@ -613,10 +612,10 @@ func (r *Registry) Register(h Handler) {
 		return
 	}
 	if r.entries == nil {
-		r.entries = make(map[string]Handler)
+		r.entries = make(map[modelskill.SkillType]Handler)
 	}
 	for _, skillType := range h.Types() {
-		key := skillTypeKey(skillType)
+		key := skillType.Normalized()
 		if key != "" {
 			r.entries[key] = h
 		}
@@ -624,11 +623,11 @@ func (r *Registry) Register(h Handler) {
 }
 
 // Handler returns the handler for skillType.
-func (r *Registry) Handler(skillType string) (Handler, bool) {
+func (r *Registry) Handler(skillType modelskill.SkillType) (Handler, bool) {
 	if r == nil {
 		return nil, false
 	}
-	h, ok := r.entries[skillTypeKey(skillType)]
+	h, ok := r.entries[skillType.Normalized()]
 	return h, ok
 }
 
@@ -660,13 +659,11 @@ func (r *Registry) UseResult(cast Cast) (Result, bool) {
 	return reported, true
 }
 
-func skillTypeKey(skillType string) string {
-	return strings.ToUpper(strings.TrimSpace(skillType))
-}
-
 type dummyHandler struct{}
 
-func (dummyHandler) Types() []string { return []string{"DUMMY", "BEAST_FEED"} }
+func (dummyHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeDummy, modelskill.SkillTypeBeastFeed}
+}
 
 func (dummyHandler) Use(Cast) {}
 

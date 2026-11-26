@@ -16,7 +16,9 @@ type fusionHandler struct {
 	defs Definitions
 }
 
-func (fusionHandler) Types() []string { return []string{"FUSION"} }
+func (fusionHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeFusion}
+}
 
 // Use starts a fusion channel: each target already carrying a live effect owned
 // by the cast skill's TriggeredID grows it via List.IncreaseForce, capped at

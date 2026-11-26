@@ -370,7 +370,7 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 	affected := formulas.MagicAffected(formulas.MagicAffectedInput{
 		MAtk:     versus.MAtk(),
 		MDef:     defending.MDef(),
-		VulnMul:  SkillVulnerability(target, def.SkillType, def),
+		VulnMul:  SkillVulnerability(target, string(def.SkillType), def),
 		Defended: def.Activation == modelskill.ActivationActive && def.Offensive,
 	}, gaussianOf(attacker))
 	return formulas.ManaDamageInput{
@@ -380,7 +380,7 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 		TargetMaxMp:     maxMP,
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
-		VulnMul:         SkillVulnerability(target, def.SkillType, def),
+		VulnMul:         SkillVulnerability(target, string(def.SkillType), def),
 		Affected:        affected,
 	}, true
 }
@@ -718,7 +718,7 @@ func ResolveHealInput(def modelskill.Definition, proficiency, mAtk float64, scal
 	return formulas.HealInput{
 		Power:       float64(def.Power),
 		Proficiency: proficiency,
-		Static:      SkillTypeKey(def.SkillType) == "HEAL_STATIC",
+		Static:      SkillTypeKey(string(def.SkillType)) == string(modelskill.SkillTypeHealStatic),
 		MAtk:        int(mAtk),
 		Scaling:     scaling,
 	}

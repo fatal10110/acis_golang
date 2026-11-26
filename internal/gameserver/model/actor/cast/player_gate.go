@@ -128,7 +128,7 @@ func playerStateBlocksCast(caster *player.Character, def *modelskill.Definition,
 
 func fishingSkill(def *modelskill.Definition) bool {
 	switch def.SkillType {
-	case "FISHING", "PUMPING", "REELING":
+	case modelskill.SkillTypeFishing, modelskill.SkillTypePumping, modelskill.SkillTypeReeling:
 		return true
 	}
 	return false

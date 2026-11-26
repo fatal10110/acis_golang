@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -95,7 +96,7 @@ func (l *GameClientLink) npcSkillContent(t *npc.Template) string {
 		var name string
 		if def, ok := l.skills.Definition(ref); ok {
 			name = def.Name
-			if def.SkillType == "NOTDONE" {
+			if def.SkillType == modelskill.SkillTypeNotDone {
 				name = `<font color="777777">` + name + "</font>"
 			}
 		}

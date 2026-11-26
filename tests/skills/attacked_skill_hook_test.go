@@ -54,7 +54,7 @@ func (l *attackedLog) snapshot() []string {
 func TestSkillCastRaisesAttacked(t *testing.T) {
 	t.Parallel()
 	const npcID = int32(20030)
-	cast := func(id modelskill.ID, skillType string, debuff bool, aggro int, power float32) modelskill.Definition {
+	cast := func(id modelskill.ID, skillType modelskill.SkillType, debuff bool, aggro int, power float32) modelskill.Definition {
 		return modelskill.Definition{
 			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,

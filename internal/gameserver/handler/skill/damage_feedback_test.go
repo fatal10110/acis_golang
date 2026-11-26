@@ -202,8 +202,10 @@ func TestManadamReportsMissBeforeLaterResist(t *testing.T) {
 
 type interleavedMessageHandler struct{}
 
-func (interleavedMessageHandler) Types() []string { return []string{"ORDER_TEST"} }
-func (interleavedMessageHandler) Use(Cast)        {}
+func (interleavedMessageHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{"ORDER_TEST"}
+}
+func (interleavedMessageHandler) Use(Cast) {}
 func (interleavedMessageHandler) UseResult(cast Cast) Result {
 	result := Result{messages: cast.messages, AttackFailed: 1}
 	result.record(AttackFailedMessage{})
@@ -397,10 +399,10 @@ func TestPhysicalSkillsReportDamageAfterTheHit(t *testing.T) {
 	}
 	blow := formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}
 	for _, tc := range []struct {
-		skillType string
+		skillType modelskill.SkillType
 		pcrit     bool
 	}{{"PDAM", false}, {"CHARGEDAM", false}, {"BLOW", true}} {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			target := &skillTarget{
 				fakeActor: fakeActor{objectID: 2}, hp: 5000,
 				physicalInput: pdam, physicalOK: true, blowInput: blow, blowOK: true,
@@ -429,10 +431,10 @@ func TestCounteredSkillReportsCounterDamageToTheDefender(t *testing.T) {
 	}
 	blow := formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}
 	for _, tc := range []struct {
-		skillType string
+		skillType modelskill.SkillType
 		pcrit     bool
 	}{{"PDAM", false}, {"CHARGEDAM", false}, {"BLOW", true}} {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			caster := &skillTarget{fakeActor: fakeActor{objectID: 1}, hp: 5000, isPlayer: true}
 			defender := &counteringSkillTarget{skillTarget: &skillTarget{
 				fakeActor: fakeActor{objectID: 2}, hp: 5000, isPlayer: true,

@@ -105,8 +105,8 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	calcs := a.statCalc.calcs
 	a.statCalc.mu.RUnlock()
 	removed := false
-	for _, calc := range calcs {
-		if calc != nil && calc.RemoveOwner(owner) > 0 {
+	for s := range owner.OwnedStats() {
+		if calc := calcs[s]; calc != nil && calc.RemoveOwner(owner) > 0 {
 			removed = true
 		}
 	}

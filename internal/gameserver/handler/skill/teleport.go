@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 type jumpCaster interface {
@@ -14,7 +15,9 @@ type jumpCaster interface {
 
 type instantJumpHandler struct{}
 
-func (instantJumpHandler) Types() []string { return []string{"INSTANT_JUMP"} }
+func (instantJumpHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeInstantJump}
+}
 
 // Use repositions the caster 25 units behind the first target, facing the
 // same direction the target faces, then broadcasts the new position.
@@ -57,7 +60,9 @@ type teleportTarget interface {
 
 type getPlayerHandler struct{}
 
-func (getPlayerHandler) Types() []string { return []string{"GET_PLAYER"} }
+func (getPlayerHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeGetPlayer}
+}
 
 // Use pulls every resolved target to the caster's position. The live game
 // resolves each target to its acting player (a pet or summon target pulls

@@ -24,19 +24,52 @@ const KeyLevels = 256
 // heroSkillIDs are the skills a character earns by holding hero status.
 var heroSkillIDs = map[ID]bool{395: true, 396: true, 1374: true, 1375: true, 1376: true}
 
-// offensiveSkillTypes are the raw "skillType" tags whose effect is
+// offensiveSkillTypes are the "skillType" tags whose effect is
 // inherently harmful to the target, used to default Definition.Offensive
 // when a level's data doesn't say so explicitly.
-var offensiveSkillTypes = map[string]bool{
-	"PDAM": true, "MDAM": true, "CPDAMPERCENT": true, "DOT": true, "BLEED": true,
-	"POISON": true, "AGGDAMAGE": true, "DEBUFF": true, "AGGDEBUFF": true, "STUN": true,
-	"ROOT": true, "CONFUSION": true, "ERASE": true, "BLOW": true, "FATAL": true,
-	"FEAR": true, "DRAIN": true, "SLEEP": true, "CHARGEDAM": true, "DEATHLINK": true,
-	"MANADAM": true, "MDOT": true, "MUTE": true, "SOULSHOT": true, "SPIRITSHOT": true,
-	"SPOIL": true, "WEAKNESS": true, "SWEEP": true, "PARALYZE": true, "DRAIN_SOUL": true,
-	"AGGREDUCE": true, "CANCEL": true, "MAGE_BANE": true, "WARRIOR_BANE": true,
-	"AGGREMOVE": true, "AGGREDUCE_CHAR": true, "BEAST_FEED": true, "BETRAY": true,
-	"DELUXE_KEY_UNLOCK": true, "SOW": true, "HARVEST": true, "INSTANT_JUMP": true,
+var offensiveSkillTypes = map[SkillType]bool{
+	SkillTypePDam:            true,
+	SkillTypeMDam:            true,
+	SkillTypeCPDamPercent:    true,
+	SkillTypeDOT:             true,
+	SkillTypeBleed:           true,
+	SkillTypePoison:          true,
+	SkillTypeAggDamage:       true,
+	SkillTypeDebuff:          true,
+	SkillTypeAggDebuff:       true,
+	SkillTypeStun:            true,
+	SkillTypeRoot:            true,
+	SkillTypeConfusion:       true,
+	SkillTypeErase:           true,
+	SkillTypeBlow:            true,
+	SkillTypeFatal:           true,
+	SkillTypeFear:            true,
+	SkillTypeDrain:           true,
+	SkillTypeSleep:           true,
+	SkillTypeChargeDam:       true,
+	SkillTypeDeathLink:       true,
+	SkillTypeManaDam:         true,
+	SkillTypeMDOT:            true,
+	SkillTypeMute:            true,
+	SkillTypeSoulshot:        true,
+	SkillTypeSpiritshot:      true,
+	SkillTypeSpoil:           true,
+	SkillTypeWeakness:        true,
+	SkillTypeSweep:           true,
+	SkillTypeParalyze:        true,
+	SkillTypeDrainSoul:       true,
+	SkillTypeAggReduce:       true,
+	SkillTypeCancel:          true,
+	SkillTypeMageBane:        true,
+	SkillTypeWarriorBane:     true,
+	SkillTypeAggRemove:       true,
+	SkillTypeAggReduceChar:   true,
+	SkillTypeBeastFeed:       true,
+	SkillTypeBetray:          true,
+	SkillTypeDeluxeKeyUnlock: true,
+	SkillTypeSow:             true,
+	SkillTypeHarvest:         true,
+	SkillTypeInstantJump:     true,
 }
 
 // Definition holds one level's static data for one skill: its timing,
@@ -120,10 +153,10 @@ type Definition struct {
 	MagicLevel  int
 	LevelDepend int
 
-	// SkillType is the raw effect-classification tag the skill carries. The
-	// loader rejects an unknown one (see KnownSkillType); the skill handler
+	// SkillType is the effect-classification tag the skill carries. The
+	// loader rejects an unknown one (see ParseSkillType); the skill handler
 	// registry dispatches on it.
-	SkillType string
+	SkillType SkillType
 
 	BaseCritRate int
 	AggroPoints  int
@@ -355,7 +388,7 @@ type DefinitionAttrs struct {
 	MagicLevel  int
 	LevelDepend int
 
-	SkillType string
+	SkillType SkillType
 
 	AggroPoints int
 
@@ -453,17 +486,17 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 	return d
 }
 
-// isTypeOffensive reports whether skillType is one of the raw effect tags
+// isTypeOffensive reports whether skillType is one of the effect tags
 // that is inherently harmful to its target, used to default a level's
 // Offensive field when its data doesn't say so explicitly.
-func isTypeOffensive(skillType string) bool {
+func isTypeOffensive(skillType SkillType) bool {
 	return offensiveSkillTypes[skillType]
 }
 
 // IsDamage reports whether d is a skill type that deals damage.
 func (d Definition) IsDamage() bool {
 	switch d.SkillType {
-	case "PDAM", "MDAM", "DRAIN", "BLOW", "CPDAMPERCENT", "DEATHLINK", "CHARGEDAM", "FATAL", "SIGNET_CASTTIME":
+	case SkillTypePDam, SkillTypeMDam, SkillTypeDrain, SkillTypeBlow, SkillTypeCPDamPercent, SkillTypeDeathLink, SkillTypeChargeDam, SkillTypeFatal, SkillTypeSignetCastTime:
 		return true
 	}
 	return false
@@ -473,7 +506,7 @@ func (d Definition) IsDamage() bool {
 // physical damage, blow, stun and charge-damage skill types.
 func (d Definition) UsesSoulShot() bool {
 	switch d.SkillType {
-	case "BLOW", "PDAM", "STUN", "CHARGEDAM":
+	case SkillTypeBlow, SkillTypePDam, SkillTypeStun, SkillTypeChargeDam:
 		return true
 	}
 	return false
@@ -488,8 +521,8 @@ func (d Definition) UsesSpiritShot() bool {
 // defaultBaseCritRate is the BaseCritRate a level defaults to when its data
 // doesn't set one explicitly: a physical-damage or blow skill always has a
 // chance to critical, everything else has none.
-func defaultBaseCritRate(skillType string) int {
-	if skillType == "PDAM" || skillType == "BLOW" {
+func defaultBaseCritRate(skillType SkillType) int {
+	if skillType == SkillTypePDam || skillType == SkillTypeBlow {
 		return 0
 	}
 	return -1

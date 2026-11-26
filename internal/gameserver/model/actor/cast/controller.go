@@ -896,7 +896,7 @@ func (c *Controller) CurrentSkillIsMagic() bool {
 // registration where damage on a live FUSION cast reads as non-fusion.
 func (c *Controller) InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool {
 	c.mu.RLock()
-	fusion := c.casting && c.current.SkillType == "FUSION"
+	fusion := c.casting && c.current.SkillType == modelskill.SkillTypeFusion
 	c.mu.RUnlock()
 	return c.InterruptOnDamage(c.Now(), DamageInterrupt{
 		Damage:       damage,
@@ -960,7 +960,7 @@ func ReuseKey(def *modelskill.Definition) int32 {
 // starts, keeps the template hit time, cool time and reuse unscaled, and
 // takes nothing for the skill's consume item, which it only has to hold.
 func FusionTimeline(def *modelskill.Definition) bool {
-	return def.SkillType == "FUSION" || def.SkillType == "SIGNET_CASTTIME"
+	return def.SkillType == modelskill.SkillTypeFusion || def.SkillType == modelskill.SkillTypeSignetCastTime
 }
 
 // Cast timing constants, in milliseconds unless noted.

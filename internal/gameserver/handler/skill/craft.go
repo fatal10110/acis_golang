@@ -1,5 +1,7 @@
 package skill
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 // RecipeBookOpened asks for the caster's dwarven or common recipe book page
 // to be shown.
 type RecipeBookOpened struct{ Dwarven bool }
@@ -10,7 +12,9 @@ type CraftWhileOperatingMessage struct{}
 
 type craftHandler struct{}
 
-func (craftHandler) Types() []string { return []string{"COMMON_CRAFT", "DWARVEN_CRAFT"} }
+func (craftHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeCommonCraft, modelskill.SkillTypeDwarvenCraft}
+}
 
 // Use opens a player caster's recipe book on the page the skill names.
 func (craftHandler) Use(cast Cast) {
@@ -22,5 +26,5 @@ func (craftHandler) Use(cast Cast) {
 		cast.record(CraftWhileOperatingMessage{})
 		return
 	}
-	cast.record(RecipeBookOpened{Dwarven: skillTypeKey(cast.Skill.SkillType) == "DWARVEN_CRAFT"})
+	cast.record(RecipeBookOpened{Dwarven: cast.Skill.SkillType.Normalized() == modelskill.SkillTypeDwarvenCraft})
 }

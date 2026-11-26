@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -63,18 +64,18 @@ func (c *Character) notePvPAttack(target attackable.Combatant, byServitor bool) 
 }
 
 // NotePvPSkillTargets records a resolved skill cast against targets.
-func (c *Character) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+func (c *Character) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType) {
 	c.notePvPSkillTargets(targets, offensive, skillType, false)
 }
 
 // NoteServitorPvPSkillTargets records a skill c's summon cast against
 // targets: it flags c as c's own cast would. c and its own summon never
 // flag it.
-func (c *Character) NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+func (c *Character) NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType) {
 	c.notePvPSkillTargets(targets, offensive, skillType, true)
 }
 
-func (c *Character) notePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string, byServitor bool) {
+func (c *Character) notePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType, byServitor bool) {
 	for _, target := range targets {
 		if offensive {
 			c.notePvPAttack(target, byServitor)
@@ -86,14 +87,16 @@ func (c *Character) notePvPSkillTargets(targets []attackable.Combatant, offensiv
 	}
 }
 
-func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType string) bool {
+func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType modelskill.SkillType) bool {
 	if c.InPvPZone() {
 		return false
 	}
 	if victim := actingCharacter(target); victim != nil {
 		return victim != c && (victim.PvPFlagState() != task.PvPFlagNone || victim.Karma() > 0)
 	}
-	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
+	switch skillType {
+	case modelskill.SkillTypeSummon, modelskill.SkillTypeBeastFeed, modelskill.SkillTypeUnlock,
+		modelskill.SkillTypeUnlockSpecial, modelskill.SkillTypeDeluxeKeyUnlock:
 		return false
 	}
 	// A civilian NPC is no attackable NPC.

@@ -120,7 +120,7 @@ type Owner interface {
 	NoteServitorPvPAttack(target attackable.Combatant)
 	// NoteServitorPvPSkillTargets flags the owner for a skill its summon
 	// cast on targets.
-	NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
+	NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType)
 	// Invul reports whether the owner is invulnerable.
 	Invul() bool
 	// HP and MaxHPValue are the owner's current and maximum HP.

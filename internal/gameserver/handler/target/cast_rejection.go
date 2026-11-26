@@ -53,7 +53,7 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 // whose final target is not Monster-family (a Guard, SiegeGuard,
 // FriendlyMonster, door or playable), whatever its target type admits.
 func monsterOnlySkillRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
-	if target == nil || skill == nil || (skill.SkillType != "SPOIL" && skill.SkillType != "DRAIN_SOUL") {
+	if target == nil || skill == nil || (skill.SkillType != modelskill.SkillTypeSpoil && skill.SkillType != modelskill.SkillTypeDrainSoul) {
 		return CastRejectNone
 	}
 	if caster == nil || caster.Kind() != actor.KindPlayer || target.MonsterKind() {
@@ -159,7 +159,7 @@ type lootSharer interface {
 // sweep skips this gate. A monster that cannot name its spoiler refuses the
 // sweep.
 func sweepOwnershipRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
-	if skill == nil || skill.SkillType != "SWEEP" || caster.Kind() != actor.KindPlayer || !target.MonsterKind() {
+	if skill == nil || skill.SkillType != modelskill.SkillTypeSweep || caster.Kind() != actor.KindPlayer || !target.MonsterKind() {
 		return CastRejectNone
 	}
 	if !target.Spoiled() {

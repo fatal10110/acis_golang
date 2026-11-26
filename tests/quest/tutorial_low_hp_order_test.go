@@ -94,7 +94,7 @@ func bootLowHP(t *testing.T, defs ...modelskill.Definition) (*gameservertest.Ser
 
 // selfSkill is a self-targeted active skill of type skillType, with a fixed
 // half-second cast.
-func selfSkill(skillType string) modelskill.Definition {
+func selfSkill(skillType modelskill.SkillType) modelskill.Definition {
 	return modelskill.Definition{
 		ID: lowHPSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 500, StaticHitTime: true, StaticReuse: true, SkillType: skillType,

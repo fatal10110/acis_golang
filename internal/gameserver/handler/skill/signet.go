@@ -75,14 +75,16 @@ type signetHandler struct {
 	log           zerolog.Logger
 }
 
-func (signetHandler) Types() []string { return []string{"SIGNET", "SIGNET_CASTTIME"} }
+func (signetHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSignet, modelskill.SkillTypeSignetCastTime}
+}
 
 func (h signetHandler) Use(cast Cast) {
 	if alikeDead(cast.Caster) || h.templates == nil || h.ids == nil || h.world == nil {
 		return
 	}
 
-	if skillTypeKey(cast.Skill.SkillType) == "SIGNET_CASTTIME" {
+	if cast.Skill.SkillType.Normalized() == modelskill.SkillTypeSignetCastTime {
 		h.useCasttime(cast)
 		return
 	}

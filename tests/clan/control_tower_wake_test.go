@@ -28,7 +28,7 @@ const (
 // towerWakeSkills adds a stun and a hold-until-attacked, each cast on one
 // target with no cost, to the tower effect skills.
 func towerWakeSkills() []modelskill.Definition {
-	def := func(id int, skillType string, effect modelskill.EffectTemplate) modelskill.Definition {
+	def := func(id int, skillType modelskill.SkillType, effect modelskill.EffectTemplate) modelskill.Definition {
 		return modelskill.Definition{
 			ID: modelskill.ID(id), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			Offensive: true, SkillType: skillType, Power: 100, CastRange: 900, HitTime: 500,

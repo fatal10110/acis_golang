@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
@@ -210,7 +211,7 @@ func TestSkillPowerFor(t *testing.T) {
 	// DEATHLINK power*(1.7165-hpRatio)^2*0.577, FATAL power+power*(1.7165-hpRatio)^3.5*0.577.
 	const power = 100.0
 	tests := []struct {
-		skillType string
+		skillType modelskill.SkillType
 		hpRatio   float64
 		want      float64
 	}{

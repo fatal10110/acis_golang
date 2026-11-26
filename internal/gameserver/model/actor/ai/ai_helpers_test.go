@@ -315,7 +315,7 @@ type recordingCast struct {
 	desireFail bool
 	stopsMove  bool
 	castRange  int
-	skillType  string
+	skillType  skill.SkillType
 	// final, when set, is every request's final target; noFinal drops
 	// every request as having none.
 	final   attackable.Combatant
@@ -331,11 +331,11 @@ type recordingCast struct {
 	onStop func()
 }
 
-func (c *recordingCast) Disabled() bool               { return c.disabled }
-func (c *recordingCast) CastingNow() bool             { return c.casting }
-func (c *recordingCast) Range(ref skill.Ref) int      { return c.castRange }
-func (c *recordingCast) StopsMovement(skill.Ref) bool { return c.stopsMove }
-func (c *recordingCast) SkillType(skill.Ref) string   { return c.skillType }
+func (c *recordingCast) Disabled() bool                      { return c.disabled }
+func (c *recordingCast) CastingNow() bool                    { return c.casting }
+func (c *recordingCast) Range(ref skill.Ref) int             { return c.castRange }
+func (c *recordingCast) StopsMovement(skill.Ref) bool        { return c.stopsMove }
+func (c *recordingCast) SkillType(skill.Ref) skill.SkillType { return c.skillType }
 
 func (c *recordingCast) CanAttempt(target attackable.Combatant, ref skill.Ref) bool {
 	return c.canAttempt

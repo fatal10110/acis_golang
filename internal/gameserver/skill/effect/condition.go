@@ -13,10 +13,12 @@ import (
 // conditions.Compile) gates nothing. Returns (nil, nil) when it does not
 // gate, matching every unconditional stat func today.
 func funcCondition(direct *modelskill.Condition) (Condition, error) {
-	if direct == nil {
-		return nil, nil
-	}
-	c, err := conditions.Compile(*direct)
+	return gateOf(conditions.CompiledNode(direct))
+}
+
+// gateOf wraps a compiled func predicate as a Condition, nil when it holds
+// no condition.
+func gateOf(c conditions.Condition, err error) (Condition, error) {
 	if err != nil || c == nil {
 		return nil, err
 	}
@@ -26,10 +28,7 @@ func funcCondition(direct *modelskill.Condition) (Condition, error) {
 // attachCondition compiles the <cond> block attached to a func's enclosing
 // <for>/<effect> group, or nil when there is none or it holds no condition.
 func attachCondition(attach *modelskill.ConditionClause) (conditions.Condition, error) {
-	if attach == nil {
-		return nil, nil
-	}
-	return conditions.Compile(attach.Root)
+	return conditions.CompiledClause(attach)
 }
 
 // conditionGate adapts a built condition into a Condition: it resolves
@@ -110,7 +109,7 @@ func Admits(effector, effected Actor, meta Skill, tmpl modelskill.EffectTemplate
 	if tmpl.AttachCondition == nil {
 		return true
 	}
-	cond, err := conditions.Compile(tmpl.AttachCondition.Root)
+	cond, err := conditions.CompiledClause(tmpl.AttachCondition)
 	if err != nil {
 		return false
 	}

@@ -88,7 +88,9 @@ func (l *GameClientLink) takeCastleAfterCanCast(live *livePlayer, def modelskill
 // then turning to it.
 type takeCastleHandler struct{ l *GameClientLink }
 
-func (takeCastleHandler) Types() []string { return []string{"TAKE_CASTLE"} }
+func (takeCastleHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeTakeCastle}
+}
 
 func (h takeCastleHandler) Use(c skillhandler.Cast) {
 	if c.Caster == nil || c.Caster.Kind() != actor.KindPlayer || len(c.Targets) == 0 {

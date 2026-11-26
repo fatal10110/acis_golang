@@ -58,7 +58,7 @@ func summonFriendSkills() []modelskill.Definition {
 			ID: modelskill.ID(id), Level: 1, Activation: modelskill.ActivationActive, Target: target,
 			HitTime: 500, StaticHitTime: true, StaticReuse: true, CastRange: 600,
 			MPConsume: summonFriendMPConsume, ItemConsumeID: int(summonCasterItemID), ItemConsumeCount: 1,
-			SkillType: typ,
+			SkillType: modelskill.SkillType(typ),
 		}
 		if targetItem > 0 {
 			extra := *d.Extra()

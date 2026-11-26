@@ -83,7 +83,7 @@ func (a *Actor) NotePvPAttack(target attackable.Combatant) {
 
 // NotePvPSkillTargets flags the owner for a skill this summon cast on
 // targets, as the owner's own cast would.
-func (a *Actor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+func (a *Actor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType) {
 	if owner := a.currentOwner(); owner != nil {
 		owner.NoteServitorPvPSkillTargets(targets, offensive, skillType)
 	}
