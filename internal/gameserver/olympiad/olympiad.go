@@ -32,13 +32,7 @@ import (
 )
 
 // TaskTimeout bounds one database write.
-const TaskTimeout = 10 * time.Second
-
-// writeLane is the persistence owner every Olympiad write is queued under:
-// one lane keeps the writes in the order the calendar made them, so a
-// truncate never lands after the records saved behind it, and no player's
-// saves wait behind them.
-const writeLane = persist.ServiceOwner
+const TaskTimeout = persist.ServiceTaskTimeout
 
 // Period is the part of the calendar the Olympiad is in.
 type Period int
@@ -369,7 +363,11 @@ func (o *Olympiad) Stop(ctx context.Context) {
 	if o.writes == nil {
 		return
 	}
-	if err := o.writes.Flush(ctx, writeLane); err != nil {
+	// Every write goes through persist.ServiceWrite on persist.ServiceOwner:
+	// one lane keeps them in the order the calendar made them, so a truncate
+	// never lands after the records saved behind it, and flushing that lane
+	// waits for all of them.
+	if err := o.writes.Flush(ctx, persist.ServiceOwner); err != nil {
 		o.log.Error().Err(err).Msg("olympiad: wait for the final save")
 	}
 }
@@ -606,7 +604,7 @@ func (o *Olympiad) endOlympiad() {
 func (o *Olympiad) finishEnd() {
 	if o.heroes != nil {
 		heroes, election := o.heroes, o.election
-		o.queueJob("elect heroes", func(context.Context) error {
+		persist.ServiceWrite(o.writes, o.log, "olympiad: elect heroes", func(context.Context) error {
 			heroes.Elect(election)
 			return nil
 		})
@@ -688,7 +686,7 @@ func (o *Olympiad) deleteNobles() {
 // without a writer. Each write gets TaskTimeout.
 func (o *Olympiad) write(what string, fn func(context.Context, Store) error) {
 	store := o.store
-	o.queueJob(what, func(ctx context.Context) error { return fn(ctx, store) })
+	persist.ServiceWrite(o.writes, o.log, "olympiad: "+what, func(ctx context.Context) error { return fn(ctx, store) })
 }
 
 // writeLanded is write, returning a channel that receives fn's result once
@@ -696,7 +694,7 @@ func (o *Olympiad) write(what string, fn func(context.Context, Store) error) {
 func (o *Olympiad) writeLanded(what string, fn func(context.Context, Store) error) <-chan error {
 	store := o.store
 	landed := make(chan error, 1)
-	if !o.queueJob(what, func(ctx context.Context) error {
+	if !persist.ServiceWrite(o.writes, o.log, "olympiad: "+what, func(ctx context.Context) error {
 		err := fn(ctx, store)
 		landed <- err
 		return err
@@ -723,27 +721,4 @@ func awaitLanded(ctx context.Context, landed <-chan error) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-// queueJob queues fn on the Olympiad's persistence lane, or runs it at once
-// without a writer, reporting false when the writer refused it. Each job
-// gets TaskTimeout.
-func (o *Olympiad) queueJob(what string, fn func(context.Context) error) bool {
-	log := o.log
-	job := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
-		defer cancel()
-		if err := fn(ctx); err != nil {
-			log.Error().Err(err).Msg("olympiad: " + what)
-		}
-	}
-	if o.writes == nil {
-		job()
-		return true
-	}
-	if !o.writes.Enqueue(writeLane, job) {
-		log.Error().Msg("olympiad: " + what + ": write dropped")
-		return false
-	}
-	return true
 }

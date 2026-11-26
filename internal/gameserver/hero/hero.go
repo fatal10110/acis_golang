@@ -23,21 +23,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// taskTimeout bounds one queued database write.
-const taskTimeout = 10 * time.Second
-
 // An election makes up to electionAttempts attempts, each bounded by
 // electionTimeout: its reads and its transaction are some 35 statements.
 const (
 	electionAttempts = 3
 	electionTimeout  = time.Minute
 )
-
-// writeLane is the persistence owner every hero write is queued under. It
-// is the Olympiad's lane too, so an election reads the nobles' records the
-// Olympiad saved just before it, and a later activation lands after the
-// election's own writes.
-const writeLane = persist.ServiceOwner
 
 // The heroes_diary actions.
 const (
@@ -424,22 +415,10 @@ func (m *Manager) elect(election int64) error {
 	return nil
 }
 
-// write queues fn on the heroes' persistence lane, or runs it at once
-// without a writer. Each write gets taskTimeout.
+// write queues fn on the game-wide services' persistence lane, or runs it
+// at once without a writer. It is the Olympiad's lane too, so an election
+// reads the nobles' records the Olympiad saved just before it, and a later
+// activation lands after the election's own writes.
 func (m *Manager) write(what string, fn func(context.Context) error) {
-	log := m.log
-	job := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
-		defer cancel()
-		if err := fn(ctx); err != nil {
-			log.Error().Err(err).Msg("hero: " + what)
-		}
-	}
-	if m.writes == nil {
-		job()
-		return
-	}
-	if !m.writes.Enqueue(writeLane, job) {
-		log.Error().Msg("hero: " + what + ": write dropped")
-	}
+	persist.ServiceWrite(m.writes, m.log, "hero: "+what, fn)
 }

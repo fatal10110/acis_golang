@@ -26,12 +26,7 @@ import (
 )
 
 // TaskTimeout bounds one database read or write.
-const TaskTimeout = 10 * time.Second
-
-// writeLane is the persistence owner every lottery write is queued under:
-// one lane keeps them in the order they were made, and no player's saves
-// wait behind them.
-const writeLane = persist.ServiceOwner
+const TaskTimeout = persist.ServiceTaskTimeout
 
 const (
 	minuteMillis = int64(time.Minute / time.Millisecond)
@@ -413,7 +408,9 @@ func (l *Lottery) finish() {
 			}
 		})
 	}
-	if !l.writes.Enqueue(writeLane, job) {
+	// The read shares persist.ServiceWrite's lane, persist.ServiceOwner, so
+	// it runs behind every ticket write already queued.
+	if !l.writes.Enqueue(persist.ServiceOwner, job) {
 		l.log.Error().Int32("round", round).Msg("lottery: read tickets: job dropped")
 	}
 }
@@ -489,19 +486,6 @@ func (l *Lottery) after(delayMillis int64, step func()) {
 // write queues fn on the lottery's persistence lane, or runs it at once
 // without a writer. Each write gets TaskTimeout.
 func (l *Lottery) write(what string, fn func(context.Context, Store) error) {
-	store, log := l.store, l.log
-	job := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
-		defer cancel()
-		if err := fn(ctx, store); err != nil {
-			log.Error().Err(err).Msg("lottery: " + what)
-		}
-	}
-	if l.writes == nil {
-		job()
-		return
-	}
-	if !l.writes.Enqueue(writeLane, job) {
-		log.Error().Msg("lottery: " + what + ": write dropped")
-	}
+	store := l.store
+	persist.ServiceWrite(l.writes, l.log, "lottery: "+what, func(ctx context.Context) error { return fn(ctx, store) })
 }
