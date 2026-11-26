@@ -38,7 +38,7 @@ func TestDataReplaceSwapsBothTables(t *testing.T) {
 	if old.HasAccess("admin_reload", gm) {
 		t.Fatal("level 7 still reloads after the replace")
 	}
-	if !old.Defines("admin_kick") || old.CommandCount() != 2 || old.MasterLevel() != 8 || old.DefinesLevel(7) {
-		t.Fatalf("replaced data: kick %v, commands %d, master %d, level 7 %v", old.Defines("admin_kick"), old.CommandCount(), old.MasterLevel(), old.DefinesLevel(7))
+	if !old.Defines("admin_kick") || len(old.Commands()) != 2 || old.MasterLevel() != 8 || old.DefinesLevel(7) {
+		t.Fatalf("replaced data: kick %v, commands %d, master %d, level 7 %v", old.Defines("admin_kick"), len(old.Commands()), old.MasterLevel(), old.DefinesLevel(7))
 	}
 }

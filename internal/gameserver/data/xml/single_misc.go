@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -406,20 +407,20 @@ type announcementFile struct {
 	Entries []attrsElement `xml:"announcement"`
 }
 
-func LoadAnnouncements(path string) ([]admin.Announcement, error) {
+func LoadAnnouncements(path string) ([]announcement.Announcement, error) {
 	var doc announcementFile
 	if err := readXML(path, &doc); err != nil {
 		return nil, fmt.Errorf("announcements: %w", err)
 	}
 
-	announcements := make([]admin.Announcement, 0, len(doc.Entries))
+	announcements := make([]announcement.Announcement, 0, len(doc.Entries))
 	for _, el := range doc.Entries {
 		a := newAttrValues(foldAttrs(el.Attrs), "admin: announcement")
 		message := a.strDefault("message", "")
 		if message == "" {
 			continue
 		}
-		announcement := admin.Announcement{
+		announcement := announcement.Announcement{
 			Message:  message,
 			Critical: a.boolDefault("critical", false),
 			Auto:     a.boolDefault("auto", false),

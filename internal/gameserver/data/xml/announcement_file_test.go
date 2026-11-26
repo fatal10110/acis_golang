@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/rs/zerolog"
 )
 
@@ -16,7 +16,7 @@ import (
 func TestAnnouncementFileRoundTrip(t *testing.T) {
 	t.Parallel()
 	file := AnnouncementFile{Path: filepath.Join(t.TempDir(), "announcements.xml"), Log: zerolog.Nop()}
-	list := []admin.Announcement{
+	list := []announcement.Announcement{
 		{Message: "Welcome", Critical: true},
 		{Message: "Vote", Auto: true, InitialDelay: 5, Delay: 60, Limit: 3},
 		{Message: "Forever", Auto: true, InitialDelay: -1, Delay: 10, Limit: -2},
@@ -40,7 +40,7 @@ func TestAnnouncementFileRoundTrip(t *testing.T) {
 func TestAnnouncementFileEscapes(t *testing.T) {
 	t.Parallel()
 	file := AnnouncementFile{Path: filepath.Join(t.TempDir(), "announcements.xml"), Log: zerolog.Nop()}
-	list := []admin.Announcement{
+	list := []announcement.Announcement{
 		{Message: "Welcome"},
 		{Message: "Say \"hi\" & <b>bold</b> it's &amp; a\ttab\r\nline"},
 		{Message: "Vote", Auto: true, InitialDelay: 5, Delay: 60, Limit: 3},
@@ -58,14 +58,14 @@ func TestAnnouncementFileEscapes(t *testing.T) {
 
 	// A character XML cannot hold is saved as U+FFFD rather than breaking
 	// the file.
-	if err := file.Save([]admin.Announcement{{Message: "bell\x07"}}); err != nil {
+	if err := file.Save([]announcement.Announcement{{Message: "bell\x07"}}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	if got, err := file.Load(); err != nil || len(got) != 1 || got[0].Message != "bell\uFFFD" {
 		t.Fatalf("Load(control character) = %+v, %v, want bell\uFFFD", got, err)
 	}
 
-	plain := []admin.Announcement{{Message: "Server  news $1 it's > 5", Critical: true}}
+	plain := []announcement.Announcement{{Message: "Server  news $1 it's > 5", Critical: true}}
 	want := announcementHeader + "<list> \n" +
 		`<announcement message="Server  news $1 it's > 5" critical="true" auto="false" initial_delay="0" delay="0" limit="0" /> ` + "\n</list>"
 	if got := FormatAnnouncements(plain); got != want {

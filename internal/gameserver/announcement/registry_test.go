@@ -7,20 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
 
 // fakeStore serves list on Load and records every Save.
 type fakeStore struct {
-	list  []admin.Announcement
-	saved [][]admin.Announcement
+	list  []Announcement
+	saved [][]Announcement
 }
 
-func (s *fakeStore) Load() ([]admin.Announcement, error) { return slices.Clone(s.list), nil }
+func (s *fakeStore) Load() ([]Announcement, error) { return slices.Clone(s.list), nil }
 
-func (s *fakeStore) Save(list []admin.Announcement) error {
+func (s *fakeStore) Save(list []Announcement) error {
 	s.saved = append(s.saved, slices.Clone(list))
 	return nil
 }
@@ -64,8 +63,8 @@ func newTestRegistry(t *testing.T, store Store) (*Registry, *sim.Inline, *record
 	return r, clock, rec
 }
 
-func auto(msg string, initial, delay, limit int) admin.Announcement {
-	return admin.Announcement{Message: msg, Auto: true, InitialDelay: initial, Delay: delay, Limit: limit}
+func auto(msg string, initial, delay, limit int) Announcement {
+	return Announcement{Message: msg, Auto: true, InitialDelay: initial, Delay: delay, Limit: limit}
 }
 
 func assertTimes(t *testing.T, rec *recorder, msg string, want ...int) {
@@ -82,7 +81,7 @@ func TestAddRefusesFloodingSchedules(t *testing.T) {
 	store := &fakeStore{}
 	r, clock, rec := newTestRegistry(t, store)
 	for _, c := range []struct {
-		a    admin.Announcement
+		a    Announcement
 		want error
 	}{
 		{auto("zero", 5, 0, 0), ErrDelay},
@@ -90,7 +89,7 @@ func TestAddRefusesFloodingSchedules(t *testing.T) {
 		{auto("negative", 5, -10, 0), ErrDelay},
 		{auto("negative limit", 5, 10, -2), ErrLimit},
 		{auto("", 5, 10, 0), ErrEmptyMessage},
-		{admin.Announcement{}, ErrEmptyMessage},
+		{Announcement{}, ErrEmptyMessage},
 	} {
 		if err := r.Add(c.a); !errors.Is(err, c.want) {
 			t.Errorf("Add(%+v) = %v, want %v", c.a, err, c.want)
@@ -104,11 +103,11 @@ func TestAddRefusesFloodingSchedules(t *testing.T) {
 		t.Fatalf("a timer is armed for %v, want none", at)
 	}
 
-	login := admin.Announcement{Message: "login", Auto: false, Delay: -1, Limit: -1}
+	login := Announcement{Message: "login", Auto: false, Delay: -1, Limit: -1}
 	if err := r.Add(login); err != nil {
 		t.Fatalf("Add(%+v) = %v, want nil", login, err)
 	}
-	if got, want := r.List(), []Indexed{{Index: 0, Announcement: admin.Announcement{Message: "login"}}}; !slices.Equal(got, want) {
+	if got, want := r.List(), []Indexed{{Index: 0, Announcement: Announcement{Message: "login"}}}; !slices.Equal(got, want) {
 		t.Fatalf("List() = %+v, want %+v", got, want)
 	}
 }
@@ -117,7 +116,7 @@ func TestAddRefusesFloodingSchedules(t *testing.T) {
 // or a negative limit (#5126), so no schedule without pause starts; the
 // rest are indexed from 0 in file order.
 func TestLoadSkipsFloodingSchedules(t *testing.T) {
-	store := &fakeStore{list: []admin.Announcement{
+	store := &fakeStore{list: []Announcement{
 		auto("zero", 0, 0, 0),
 		auto("zero limited", 0, 0, 5),
 		auto("kept", 5, 10, 0),
@@ -128,7 +127,7 @@ func TestLoadSkipsFloodingSchedules(t *testing.T) {
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	want := []Indexed{{Index: 0, Announcement: auto("kept", 5, 10, 0)}, {Index: 1, Announcement: admin.Announcement{Message: "login"}}}
+	want := []Indexed{{Index: 0, Announcement: auto("kept", 5, 10, 0)}, {Index: 1, Announcement: Announcement{Message: "login"}}}
 	if got := r.List(); !slices.Equal(got, want) {
 		t.Fatalf("List() = %+v, want %+v", got, want)
 	}
@@ -199,7 +198,7 @@ func TestRestartAutoStartsSchedulesOver(t *testing.T) {
 func TestIndexNeverReusedAfterDelete(t *testing.T) {
 	store := &fakeStore{}
 	r, clock, rec := newTestRegistry(t, store)
-	r.Add(admin.Announcement{Message: "login"})
+	r.Add(Announcement{Message: "login"})
 	r.Add(auto("deleted", 10, 10, 0))
 	r.Add(auto("kept", 10, 10, 0))
 	r.Add(auto("top", 10, 10, 0))
@@ -210,7 +209,7 @@ func TestIndexNeverReusedAfterDelete(t *testing.T) {
 	r.Add(auto("added", 5, 20, 0))
 
 	want := []Indexed{
-		{Index: 0, Announcement: admin.Announcement{Message: "login"}},
+		{Index: 0, Announcement: Announcement{Message: "login"}},
 		{Index: 2, Announcement: auto("kept", 10, 10, 0)},
 		{Index: 4, Announcement: auto("added", 5, 20, 0)},
 	}
@@ -218,7 +217,7 @@ func TestIndexNeverReusedAfterDelete(t *testing.T) {
 		t.Fatalf("List() = %+v, want %+v", got, want)
 	}
 	r.Save()
-	wantSaved := []admin.Announcement{{Message: "login"}, auto("kept", 10, 10, 0), auto("added", 5, 20, 0)}
+	wantSaved := []Announcement{{Message: "login"}, auto("kept", 10, 10, 0), auto("added", 5, 20, 0)}
 	if got := store.saved[len(store.saved)-1]; !slices.Equal(got, wantSaved) {
 		t.Fatalf("last save = %+v, want %+v", got, wantSaved)
 	}
@@ -250,16 +249,16 @@ func TestIndexNeverReusedAfterDelete(t *testing.T) {
 func TestLoadRestartsIndexes(t *testing.T) {
 	store := &fakeStore{}
 	r, _, _ := newTestRegistry(t, store)
-	r.Add(admin.Announcement{Message: "first"})
-	r.Add(admin.Announcement{Message: "second"})
+	r.Add(Announcement{Message: "first"})
+	r.Add(Announcement{Message: "second"})
 	r.Delete(0)
 	r.Save()
 	store.list = store.saved[len(store.saved)-1]
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	r.Add(admin.Announcement{Message: "third"})
-	want := []Indexed{{Index: 0, Announcement: admin.Announcement{Message: "second"}}, {Index: 1, Announcement: admin.Announcement{Message: "third"}}}
+	r.Add(Announcement{Message: "third"})
+	want := []Indexed{{Index: 0, Announcement: Announcement{Message: "second"}}, {Index: 1, Announcement: Announcement{Message: "third"}}}
 	if got := r.List(); !slices.Equal(got, want) {
 		t.Fatalf("List() = %+v, want %+v", got, want)
 	}
@@ -268,7 +267,7 @@ func TestLoadRestartsIndexes(t *testing.T) {
 // Loading again stops the schedules of the announcements it drops before
 // starting the ones read anew.
 func TestLoadAgainStopsDroppedSchedules(t *testing.T) {
-	store := &fakeStore{list: []admin.Announcement{auto("old", 5, 10, 0), auto("old limited", 5, 10, 5)}}
+	store := &fakeStore{list: []Announcement{auto("old", 5, 10, 0), auto("old limited", 5, 10, 5)}}
 	r, clock, rec := newTestRegistry(t, store)
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
@@ -277,7 +276,7 @@ func TestLoadAgainStopsDroppedSchedules(t *testing.T) {
 	assertTimes(t, rec, "old", 5, 15)
 	assertTimes(t, rec, "old limited", 5, 15)
 
-	store.list = []admin.Announcement{auto("new", 5, 10, 0)}
+	store.list = []Announcement{auto("new", 5, 10, 0)}
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}

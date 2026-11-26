@@ -4,21 +4,19 @@ import (
 	"slices"
 	"sync"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
 
 // fileStore is a store whose Save rewrites what Load reads, as the
 // announcement file is. Each hook, when set, runs inside the matching call.
 type fileStore struct {
 	mu     sync.Mutex
-	list   []admin.Announcement
+	list   []Announcement
 	saves  int
 	onLoad func()
 	onSave func()
 }
 
-func (s *fileStore) Load() ([]admin.Announcement, error) {
+func (s *fileStore) Load() ([]Announcement, error) {
 	if s.onLoad != nil {
 		s.onLoad()
 	}
@@ -27,7 +25,7 @@ func (s *fileStore) Load() ([]admin.Announcement, error) {
 	return slices.Clone(s.list), nil
 }
 
-func (s *fileStore) Save(list []admin.Announcement) error {
+func (s *fileStore) Save(list []Announcement) error {
 	if s.onSave != nil {
 		s.onSave()
 	}
@@ -38,7 +36,7 @@ func (s *fileStore) Save(list []admin.Announcement) error {
 	return nil
 }
 
-func (s *fileStore) held() ([]admin.Announcement, int) {
+func (s *fileStore) held() ([]Announcement, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return slices.Clone(s.list), s.saves
@@ -52,7 +50,7 @@ func TestSaveWritesOutsideTheLock(t *testing.T) {
 	inSave, release := make(chan struct{}), make(chan struct{})
 	store := &fileStore{}
 	r, _, _ := newTestRegistry(t, store)
-	r.Add(admin.Announcement{Message: "first"})
+	r.Add(Announcement{Message: "first"})
 	store.onSave = func() {
 		store.onSave = nil
 		close(inSave)
@@ -65,10 +63,10 @@ func TestSaveWritesOutsideTheLock(t *testing.T) {
 	}()
 	<-inSave
 
-	if got := r.Login(); !slices.Equal(got, []admin.Announcement{{Message: "first"}}) {
+	if got := r.Login(); !slices.Equal(got, []Announcement{{Message: "first"}}) {
 		t.Fatalf("Login() during a save = %+v, want first", got)
 	}
-	if err := r.Add(admin.Announcement{Message: "second"}); err != nil {
+	if err := r.Add(Announcement{Message: "second"}); err != nil {
 		t.Fatalf("Add during a save: %v", err)
 	}
 	if got := len(r.List()); got != 2 {
@@ -76,12 +74,12 @@ func TestSaveWritesOutsideTheLock(t *testing.T) {
 	}
 	close(release)
 	<-saved
-	if list, _ := store.held(); !slices.Equal(list, []admin.Announcement{{Message: "first"}}) {
+	if list, _ := store.held(); !slices.Equal(list, []Announcement{{Message: "first"}}) {
 		t.Fatalf("file after the first save = %+v, want first", list)
 	}
 
 	r.Save()
-	want := []admin.Announcement{{Message: "first"}, {Message: "second"}}
+	want := []Announcement{{Message: "first"}, {Message: "second"}}
 	if list, saves := store.held(); !slices.Equal(list, want) || saves != 2 {
 		t.Fatalf("file after the second save = %+v in %d saves, want %+v in 2", list, saves, want)
 	}
@@ -97,11 +95,11 @@ func TestSaveWritesOutsideTheLock(t *testing.T) {
 func TestLoadKeepsChangesMadeBeforeIt(t *testing.T) {
 	store := &fileStore{}
 	r, _, _ := newTestRegistry(t, store)
-	r.Add(admin.Announcement{Message: "unsaved"})
+	r.Add(Announcement{Message: "unsaved"})
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	if got := r.Login(); !slices.Equal(got, []admin.Announcement{{Message: "unsaved"}}) {
+	if got := r.Login(); !slices.Equal(got, []Announcement{{Message: "unsaved"}}) {
 		t.Fatalf("Login() after Load = %+v, want the unsaved change", got)
 	}
 
@@ -114,12 +112,12 @@ func TestLoadKeepsChangesMadeBeforeIt(t *testing.T) {
 	loaded := make(chan error)
 	go func() { loaded <- r.Load() }()
 	<-inLoad
-	r.Add(admin.Announcement{Message: "during"})
+	r.Add(Announcement{Message: "during"})
 	close(release)
 	if err := <-loaded; err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	want := []admin.Announcement{{Message: "unsaved"}, {Message: "during"}}
+	want := []Announcement{{Message: "unsaved"}, {Message: "during"}}
 	if got := r.Login(); !slices.Equal(got, want) {
 		t.Fatalf("Login() after a change during Load = %+v, want %+v", got, want)
 	}

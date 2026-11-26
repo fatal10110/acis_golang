@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/rs/zerolog"
 )
 
@@ -27,7 +27,7 @@ type AnnouncementFile struct {
 // warning; a file that is not well-formed XML, or holds a malformed
 // schedule value, is an error, so that a broken file is never read as an
 // empty one.
-func (f AnnouncementFile) Load() ([]admin.Announcement, error) {
+func (f AnnouncementFile) Load() ([]announcement.Announcement, error) {
 	list, err := LoadAnnouncements(f.Path)
 	if err == nil {
 		return list, nil
@@ -42,7 +42,7 @@ func (f AnnouncementFile) Load() ([]admin.Announcement, error) {
 // Save rewrites the file with list, in order. The new content is written
 // to a temporary file beside it and then renamed over it, so a save cut
 // short leaves the previous file whole.
-func (f AnnouncementFile) Save(list []admin.Announcement) error {
+func (f AnnouncementFile) Save(list []announcement.Announcement) error {
 	tmp, err := os.CreateTemp(filepath.Dir(f.Path), "."+filepath.Base(f.Path)+".*")
 	if err != nil {
 		return err
@@ -65,7 +65,7 @@ func (f AnnouncementFile) Save(list []admin.Announcement) error {
 }
 
 // FormatAnnouncements is the announcement file holding list.
-func FormatAnnouncements(list []admin.Announcement) string {
+func FormatAnnouncements(list []announcement.Announcement) string {
 	var b strings.Builder
 	b.WriteString(announcementHeader)
 	b.WriteString("<list> \n")

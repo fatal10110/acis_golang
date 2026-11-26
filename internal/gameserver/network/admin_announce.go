@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
 
 // adminAnnounce answers //announce <list|all|all_auto|add|add_auto|del>.
@@ -58,7 +57,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		if len(args) < 2 {
 			return false
 		}
-		l.addAnnouncement(gm, admin.Announcement{Message: args[1], Critical: parseFlag(args[0])})
+		l.addAnnouncement(gm, announcement.Announcement{Message: args[1], Critical: parseFlag(args[0])})
 		return l.listAnnouncements(gm)
 	case "add_auto":
 		if len(tokens) < 3 {
@@ -76,7 +75,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 			}
 			numbers[i] = int(n)
 		}
-		l.addAnnouncement(gm, admin.Announcement{
+		l.addAnnouncement(gm, announcement.Announcement{
 			Message:      args[5],
 			Critical:     parseFlag(args[0]),
 			Auto:         parseFlag(args[1]),
@@ -102,7 +101,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 }
 
 // addAnnouncement adds a, telling gm why when it is refused.
-func (l *GameClientLink) addAnnouncement(gm *livePlayer, a admin.Announcement) {
+func (l *GameClientLink) addAnnouncement(gm *livePlayer, a announcement.Announcement) {
 	switch err := l.announcements.Add(a); {
 	case err == nil:
 		l.saveAnnouncements(gm)

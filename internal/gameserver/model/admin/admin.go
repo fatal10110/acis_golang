@@ -30,17 +30,6 @@ type Command struct {
 	Description string
 }
 
-// Announcement is one announcement. InitialDelay, Delay and Limit apply only
-// to an automatic one.
-type Announcement struct {
-	Message      string
-	Critical     bool
-	Auto         bool
-	InitialDelay int
-	Delay        int
-	Limit        int
-}
-
 // Data is the access-level and admin-command tables. //reload admin
 // replaces them in place with Replace: every method call reads one
 // snapshot, the old tables or the new ones, never a mix.
@@ -94,11 +83,6 @@ func (d *Data) load() *tables {
 	return d.cur.Load()
 }
 
-func (d *Data) AccessLevel(level int) (AccessLevel, bool) {
-	value, ok := d.load().accessLevels[level]
-	return value, ok
-}
-
 // defaultAccessLevel is the user level the attribute defaults describe, for a
 // server running without an access-level table.
 var defaultAccessLevel = AccessLevel{AllowTransaction: true, GiveDamage: true}
@@ -138,6 +122,3 @@ func (t *tables) command(name string) (Command, bool) {
 func (d *Data) Commands() []Command {
 	return d.load().ordered
 }
-
-func (d *Data) AccessLevelCount() int { return len(d.load().accessLevels) }
-func (d *Data) CommandCount() int     { return len(d.load().commands) }
