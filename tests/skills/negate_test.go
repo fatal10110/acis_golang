@@ -31,7 +31,7 @@ func negateSeed(id modelskill.ID, skillType, effectType string, abnormal, effect
 		Activation:    modelskill.ActivationActive,
 		Target:        modelskill.TargetSelf,
 		StaticHitTime: true,
-		SkillType:     skillType,
+		SkillType:     modelskill.SkillType(skillType),
 		Debuff:        true,
 		AbnormalLevel: abnormal,
 		Effects: []modelskill.EffectTemplate{{

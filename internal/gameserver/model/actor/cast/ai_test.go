@@ -351,7 +351,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	def.Radius = 900
 	def.SkillType = "DUMMYCAST"
 
-	rec := &recordingSkillHandler{skillTypes: []string{"DUMMYCAST"}}
+	rec := &recordingSkillHandler{skillTypes: []modelskill.SkillType{"DUMMYCAST"}}
 	selected := &fakeCastCreature{id: 2, x: 10, kind: modelactor.KindPlayer}
 	bystander := &fakeCastCreature{id: 3, x: 20, kind: modelactor.KindPlayer}
 	caster, events := newAICaster(t, 1, selected, bystander)

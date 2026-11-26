@@ -21,7 +21,7 @@ func (r *Registry) UseCubic(cast Cast, mAtk float64) (Result, bool) {
 		return Result{}, false
 	}
 	switch skillTypeKey(cast.Skill.SkillType) {
-	case "PARALYZE", "STUN", "ROOT", "AGGDAMAGE", "MDAM", "POISON", "DEBUFF", "DOT", "DRAIN":
+	case modelskill.SkillTypeParalyze, modelskill.SkillTypeStun, modelskill.SkillTypeRoot, modelskill.SkillTypeAggDamage, modelskill.SkillTypeMDam, modelskill.SkillTypePoison, modelskill.SkillTypeDebuff, modelskill.SkillTypeDOT, modelskill.SkillTypeDrain:
 	default:
 		return r.UseResult(cast)
 	}
@@ -43,13 +43,13 @@ func (r *Registry) UseCubic(cast Cast, mAtk float64) (Result, bool) {
 
 func (r *Registry) useCubicOn(cast Cast, target Creature, mAtk float64, result *Result) {
 	switch skillTypeKey(cast.Skill.SkillType) {
-	case "PARALYZE", "STUN", "ROOT", "AGGDAMAGE":
+	case modelskill.SkillTypeParalyze, modelskill.SkillTypeStun, modelskill.SkillTypeRoot, modelskill.SkillTypeAggDamage:
 		cubicDisable(cast, target, mAtk)
-	case "MDAM":
+	case modelskill.SkillTypeMDam:
 		cubicMdam(cast, target, mAtk, r.magicFailures.enabled(), result)
-	case "POISON", "DEBUFF", "DOT":
+	case modelskill.SkillTypePoison, modelskill.SkillTypeDebuff, modelskill.SkillTypeDOT:
 		cubicContinuous(cast, target, mAtk, result)
-	case "DRAIN":
+	case modelskill.SkillTypeDrain:
 		cubicDrain(cast, target, r.magicFailures.enabled(), result)
 	}
 }
@@ -87,7 +87,7 @@ func cubicDisable(cast Cast, target Creature, mAtk float64) {
 	if !cubicLands(cast, target, mAtk, bss, shield) {
 		return
 	}
-	if skillTypeKey(cast.Skill.SkillType) == "AGGDAMAGE" && target.Attackable() {
+	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeAggDamage && target.Attackable() {
 		target.NotifyAggression(cast.Caster, int(150*float64(cast.Skill.Power)/float64(target.Level()+7)))
 	}
 	landCubicEffects(cast, target)

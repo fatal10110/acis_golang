@@ -15,8 +15,8 @@ func (d Definition) LandingPower() float64 {
 	if d.Extra().EffectPower > 0 {
 		return float64(d.Extra().EffectPower)
 	}
-	switch strings.ToUpper(strings.TrimSpace(d.SkillType)) {
-	case "PDAM", "MDAM":
+	switch normalizedSkillType(d.SkillType) {
+	case SkillTypePDam, SkillTypeMDam:
 		return 20
 	}
 	if d.Power <= 0 || d.Power > 100 {
@@ -38,11 +38,16 @@ func (d Definition) LandingEffectType() string {
 	if d.Extra().EffectType != "" {
 		return d.Extra().EffectType
 	}
-	switch strings.ToUpper(strings.TrimSpace(d.SkillType)) {
-	case "PDAM":
-		return "STUN"
-	case "MDAM":
-		return "PARALYZE"
+	switch normalizedSkillType(d.SkillType) {
+	case SkillTypePDam:
+		return string(SkillTypeStun)
+	case SkillTypeMDam:
+		return string(SkillTypeParalyze)
 	}
-	return d.SkillType
+	return string(d.SkillType)
+}
+
+// normalizedSkillType is t upper-cased and trimmed.
+func normalizedSkillType(t SkillType) SkillType {
+	return SkillType(strings.ToUpper(strings.TrimSpace(string(t))))
 }

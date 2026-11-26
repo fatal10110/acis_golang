@@ -3,6 +3,8 @@ package formulas
 import (
 	"math"
 	"strings"
+
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // clampDamage enforces the floor every damage formula in this file shares:
@@ -84,9 +86,9 @@ func PhysicalAttackDamage(in PhysicalAttackInput) float64 {
 
 // SkillPowerScalesWithHP reports whether SkillPowerFor scales skillType's
 // power by the caster's HP ratio: DEATHLINK and FATAL do.
-func SkillPowerScalesWithHP(skillType string) bool {
-	switch strings.ToUpper(strings.TrimSpace(skillType)) {
-	case "DEATHLINK", "FATAL":
+func SkillPowerScalesWithHP(skillType modelskill.SkillType) bool {
+	switch normalizedSkillType(skillType) {
+	case modelskill.SkillTypeDeathLink, modelskill.SkillTypeFatal:
 		return true
 	default:
 		return false
@@ -96,11 +98,11 @@ func SkillPowerScalesWithHP(skillType string) bool {
 // SkillPowerFor returns the caster-relative skill power physical, magic, and
 // mana damage formulas consume. DEATHLINK and FATAL grow as the caster's
 // HP ratio falls; every other skill type returns power unchanged.
-func SkillPowerFor(skillType string, power, hpRatio float64) float64 {
-	switch strings.ToUpper(strings.TrimSpace(skillType)) {
-	case "DEATHLINK":
+func SkillPowerFor(skillType modelskill.SkillType, power, hpRatio float64) float64 {
+	switch normalizedSkillType(skillType) {
+	case modelskill.SkillTypeDeathLink:
 		return power * math.Pow(1.7165-hpRatio, 2) * 0.577
-	case "FATAL":
+	case modelskill.SkillTypeFatal:
 		return power + (power * math.Pow(1.7165-hpRatio, 3.5) * 0.577)
 	default:
 		return power
@@ -380,4 +382,9 @@ func ManaDamage(in ManaDamageInput) float64 {
 	damage *= in.VulnMul
 
 	return damage
+}
+
+// normalizedSkillType is t upper-cased and trimmed.
+func normalizedSkillType(t modelskill.SkillType) modelskill.SkillType {
+	return modelskill.SkillType(strings.ToUpper(strings.TrimSpace(string(t))))
 }

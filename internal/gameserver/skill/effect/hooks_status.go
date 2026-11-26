@@ -236,7 +236,7 @@ func chameleonRestStart(e *Effect) bool {
 // tick alive and the target stays seated, reusing the same lack-MP
 // handling as the other mana-drain ticks in this file.
 func chameleonRestAction(e *Effect) bool {
-	if e.Skill.SkillType != "CONT" {
+	if e.Skill.SkillType != modelskill.SkillTypeCont {
 		return false
 	}
 	if player, ok := asPlayer(e.Effected); ok && player.Standing() {

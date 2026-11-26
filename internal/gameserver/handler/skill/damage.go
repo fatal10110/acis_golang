@@ -122,7 +122,9 @@ func landReflected(cast Cast, reflector effect.Actor) {
 
 type pdamHandler struct{}
 
-func (pdamHandler) Types() []string { return []string{"PDAM", "FATAL"} }
+func (pdamHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypePDam, modelskill.SkillTypeFatal}
+}
 
 func (h pdamHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -208,7 +210,9 @@ func killSuicideCaster(cast Cast) {
 
 type chargeDamHandler struct{}
 
-func (chargeDamHandler) Types() []string { return []string{"CHARGEDAM"} }
+func (chargeDamHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeChargeDam}
+}
 
 func (chargeDamHandler) Use(cast Cast) {
 	chargeDamHandler{}.UseResult(cast)
@@ -281,7 +285,9 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 // MagicFailures switch.
 type mdamHandler struct{ magicFailures *magicFailureSwitch }
 
-func (mdamHandler) Types() []string { return []string{"MDAM", "DEATHLINK"} }
+func (mdamHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeMDam, modelskill.SkillTypeDeathLink}
+}
 
 func (h mdamHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -363,7 +369,9 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 // the HP it drains. magicFailures is the server's MagicFailures switch.
 type drainHandler struct{ magicFailures *magicFailureSwitch }
 
-func (drainHandler) Types() []string { return []string{"DRAIN"} }
+func (drainHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeDrain}
+}
 
 func (h drainHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -492,7 +500,9 @@ func applyDrainEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, bss 
 
 type blowHandler struct{}
 
-func (blowHandler) Types() []string { return []string{"BLOW"} }
+func (blowHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeBlow}
+}
 
 func (h blowHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -644,7 +654,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	if result == nil || failure == formulas.MagicFailureNone {
 		return
 	}
-	drain := skillTypeKey(cast.Skill.SkillType) == "DRAIN"
+	drain := skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeDrain
 	switch failure {
 	case formulas.MagicFailureHalf:
 		if drain {
@@ -821,7 +831,9 @@ func landRolledDamageEffects(cast Cast, target effect.Actor, shield formulas.Shi
 
 type manaDamageHandler struct{}
 
-func (manaDamageHandler) Types() []string { return []string{"MANADAM"} }
+func (manaDamageHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeManaDam}
+}
 
 func (h manaDamageHandler) Use(cast Cast) {
 	h.UseResult(cast)

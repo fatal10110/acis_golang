@@ -18,7 +18,9 @@ type creatureSummonRuntime interface {
 
 type summonCreatureHandler struct{}
 
-func (summonCreatureHandler) Types() []string { return []string{"SUMMON_CREATURE"} }
+func (summonCreatureHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSummonCreature}
+}
 
 func (summonCreatureHandler) Use(cast Cast) {
 	caster, ok := cast.Caster.(creatureSummonRuntime)
@@ -59,7 +61,9 @@ type SummonFriendRefused struct {
 
 type summonFriendHandler struct{}
 
-func (summonFriendHandler) Types() []string { return []string{"SUMMON_FRIEND", "SUMMON_PARTY"} }
+func (summonFriendHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSummonFriend, modelskill.SkillTypeSummonParty}
+}
 
 func (summonFriendHandler) Use(cast Cast) {
 	caster, ok := cast.Caster.(summonFriendCaster)
@@ -71,7 +75,7 @@ func (summonFriendHandler) Use(cast Cast) {
 		return
 	}
 
-	if skillTypeKey(cast.Skill.SkillType) == "SUMMON_PARTY" {
+	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeSummonParty {
 		party, ok := cast.Caster.(summonPartyProvider)
 		if !ok {
 			return

@@ -1,5 +1,7 @@
 package skill
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 import "time"
 
 // NPCPlacer places one NPC of template npcID at (x, y) on the ground below
@@ -13,7 +15,9 @@ func NewSpawn(place NPCPlacer) Handler { return spawnHandler{place: place} }
 
 type spawnHandler struct{ place NPCPlacer }
 
-func (spawnHandler) Types() []string { return []string{"SPAWN"} }
+func (spawnHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSpawn}
+}
 
 // Use places the skill's NPC where a living caster stands, facing the way
 // it faces, for the skill's despawn delay.

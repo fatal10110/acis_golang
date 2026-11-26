@@ -698,7 +698,7 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 	}
 
 	// Only a CREATE_ITEM skill reads its item ids, and it must name them.
-	if attrs.SkillType == "CREATE_ITEM" {
+	if attrs.SkillType == skill.SkillTypeCreateItem {
 		attrs.CreateItemIDs = attrInt32Array(a, "create_item_id")
 	}
 
@@ -756,12 +756,13 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 
 // attrSkillType reads a level's required skillType, which must name a skill
 // type exactly as written.
-func attrSkillType(a *attrValues) string {
+func attrSkillType(a *attrValues) skill.SkillType {
 	name := a.str("skillType")
-	if a.err == nil && !skill.KnownSkillType(name) {
+	t, ok := skill.ParseSkillType(name)
+	if a.err == nil && !ok {
 		a.fail(fmt.Errorf("attribute %q: unknown skill type %q", "skillType", name))
 	}
-	return name
+	return t
 }
 
 // parseCommaInts parses a comma-separated list of integers.

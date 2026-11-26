@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -43,8 +44,8 @@ type chestTarget interface {
 
 type unlockHandler struct{}
 
-func (unlockHandler) Types() []string {
-	return []string{"UNLOCK", "UNLOCK_SPECIAL", "DELUXE_KEY_UNLOCK"}
+func (unlockHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeUnlock, modelskill.SkillTypeUnlockSpecial, modelskill.SkillTypeDeluxeKeyUnlock}
 }
 
 // Use opens a door or chest target for a player caster. The UNLOCKABLE
@@ -72,7 +73,7 @@ func (unlockHandler) Use(cast Cast) {
 }
 
 func useOnDoor(cast Cast, target doorTarget) {
-	special := skillTypeKey(cast.Skill.SkillType) == "UNLOCK_SPECIAL"
+	special := skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeUnlockSpecial
 	if !target.Unlockable() && !special {
 		cast.record(DoorUnlockUnableMessage{})
 		return
@@ -110,7 +111,7 @@ func useOnChest(cast Cast, target chestTarget) {
 	}
 
 	var opens bool
-	if skillTypeKey(cast.Skill.SkillType) == "DELUXE_KEY_UNLOCK" {
+	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeDeluxeKeyUnlock {
 		regular := int(cast.Skill.ID) == regularUnlockKeySkillID
 		rate := formulas.ChestUnlockDeluxeKeyRate(target.Level(), cast.Skill.Level, regular)
 		opens = rnd.Get(100) < rate

@@ -1,48 +1,241 @@
 package skill
 
-// skillTypeNames is every skill classification tag a data file may name, as
-// a level's skillType or an effect template's effectType.
-var skillTypeNames = map[string]bool{
+// SkillType is a skill classification tag: a level's skillType or an
+// effect template's effectType. The loader accepts only the tags below
+// (see ParseSkillType), written in upper case; Go code compares through
+// these constants.
+type SkillType string
+
+// The skill classification tags.
+const (
 	// Damage
-	"PDAM": true, "FATAL": true, "MDAM": true, "CPDAMPERCENT": true, "MANADAM": true,
-	"DOT": true, "MDOT": true, "DRAIN_SOUL": true, "DRAIN": true, "DEATHLINK": true,
-	"BLOW": true, "SIGNET": true, "SIGNET_CASTTIME": true, "SEED": true, "REAL_DAMAGE": true,
+	SkillTypePDam           SkillType = "PDAM"
+	SkillTypeFatal          SkillType = "FATAL"
+	SkillTypeMDam           SkillType = "MDAM"
+	SkillTypeCPDamPercent   SkillType = "CPDAMPERCENT"
+	SkillTypeManaDam        SkillType = "MANADAM"
+	SkillTypeDOT            SkillType = "DOT"
+	SkillTypeMDOT           SkillType = "MDOT"
+	SkillTypeDrainSoul      SkillType = "DRAIN_SOUL"
+	SkillTypeDrain          SkillType = "DRAIN"
+	SkillTypeDeathLink      SkillType = "DEATHLINK"
+	SkillTypeBlow           SkillType = "BLOW"
+	SkillTypeSignet         SkillType = "SIGNET"
+	SkillTypeSignetCastTime SkillType = "SIGNET_CASTTIME"
+	SkillTypeSeed           SkillType = "SEED"
+	SkillTypeRealDamage     SkillType = "REAL_DAMAGE"
+
 	// Disablers
-	"BLEED": true, "POISON": true, "STUN": true, "ROOT": true, "CONFUSION": true,
-	"FEAR": true, "SLEEP": true, "MUTE": true, "PARALYZE": true, "WEAKNESS": true,
-	// HP, MP, CP
-	"HEAL": true, "MANAHEAL": true, "COMBATPOINTHEAL": true, "HOT": true, "MPHOT": true,
-	"BALANCE_LIFE": true, "HEAL_STATIC": true, "MANARECHARGE": true, "HEAL_PERCENT": true,
-	"MANAHEAL_PERCENT": true, "GIVE_SP": true,
+	SkillTypeBleed     SkillType = "BLEED"
+	SkillTypePoison    SkillType = "POISON"
+	SkillTypeStun      SkillType = "STUN"
+	SkillTypeRoot      SkillType = "ROOT"
+	SkillTypeConfusion SkillType = "CONFUSION"
+	SkillTypeFear      SkillType = "FEAR"
+	SkillTypeSleep     SkillType = "SLEEP"
+	SkillTypeMute      SkillType = "MUTE"
+	SkillTypeParalyze  SkillType = "PARALYZE"
+	SkillTypeWeakness  SkillType = "WEAKNESS"
+
+	// HP, MP and CP
+	SkillTypeHeal            SkillType = "HEAL"
+	SkillTypeManaHeal        SkillType = "MANAHEAL"
+	SkillTypeCombatPointHeal SkillType = "COMBATPOINTHEAL"
+	SkillTypeHOT             SkillType = "HOT"
+	SkillTypeMPHOT           SkillType = "MPHOT"
+	SkillTypeBalanceLife     SkillType = "BALANCE_LIFE"
+	SkillTypeHealStatic      SkillType = "HEAL_STATIC"
+	SkillTypeManaRecharge    SkillType = "MANARECHARGE"
+	SkillTypeHealPercent     SkillType = "HEAL_PERCENT"
+	SkillTypeManaHealPercent SkillType = "MANAHEAL_PERCENT"
+	SkillTypeGiveSP          SkillType = "GIVE_SP"
+
 	// Aggro
-	"AGGDAMAGE": true, "AGGREDUCE": true, "AGGREMOVE": true, "AGGREDUCE_CHAR": true, "AGGDEBUFF": true,
+	SkillTypeAggDamage     SkillType = "AGGDAMAGE"
+	SkillTypeAggReduce     SkillType = "AGGREDUCE"
+	SkillTypeAggRemove     SkillType = "AGGREMOVE"
+	SkillTypeAggReduceChar SkillType = "AGGREDUCE_CHAR"
+	SkillTypeAggDebuff     SkillType = "AGGDEBUFF"
+
 	// Fishing
-	"FISHING": true, "PUMPING": true, "REELING": true,
+	SkillTypeFishing SkillType = "FISHING"
+	SkillTypePumping SkillType = "PUMPING"
+	SkillTypeReeling SkillType = "REELING"
+
 	// Misc
-	"UNLOCK": true, "UNLOCK_SPECIAL": true, "DELUXE_KEY_UNLOCK": true, "ENCHANT_ARMOR": true,
-	"ENCHANT_WEAPON": true, "SOULSHOT": true, "SPIRITSHOT": true, "SIEGE_FLAG": true,
-	"TAKE_CASTLE": true, "SOW": true, "HARVEST": true, "GET_PLAYER": true, "DUMMY": true,
-	"INSTANT_JUMP": true,
+	SkillTypeUnlock          SkillType = "UNLOCK"
+	SkillTypeUnlockSpecial   SkillType = "UNLOCK_SPECIAL"
+	SkillTypeDeluxeKeyUnlock SkillType = "DELUXE_KEY_UNLOCK"
+	SkillTypeEnchantArmor    SkillType = "ENCHANT_ARMOR"
+	SkillTypeEnchantWeapon   SkillType = "ENCHANT_WEAPON"
+	SkillTypeSoulshot        SkillType = "SOULSHOT"
+	SkillTypeSpiritshot      SkillType = "SPIRITSHOT"
+	SkillTypeSiegeFlag       SkillType = "SIEGE_FLAG"
+	SkillTypeTakeCastle      SkillType = "TAKE_CASTLE"
+	SkillTypeSow             SkillType = "SOW"
+	SkillTypeHarvest         SkillType = "HARVEST"
+	SkillTypeGetPlayer       SkillType = "GET_PLAYER"
+	SkillTypeDummy           SkillType = "DUMMY"
+	SkillTypeInstantJump     SkillType = "INSTANT_JUMP"
+
 	// Creation
-	"COMMON_CRAFT": true, "DWARVEN_CRAFT": true, "CREATE_ITEM": true, "EXTRACTABLE": true,
-	"EXTRACTABLE_FISH": true,
+	SkillTypeCommonCraft     SkillType = "COMMON_CRAFT"
+	SkillTypeDwarvenCraft    SkillType = "DWARVEN_CRAFT"
+	SkillTypeCreateItem      SkillType = "CREATE_ITEM"
+	SkillTypeExtractable     SkillType = "EXTRACTABLE"
+	SkillTypeExtractableFish SkillType = "EXTRACTABLE_FISH"
+
 	// Summons
-	"SUMMON": true, "FEED_PET": true, "STRIDER_SIEGE_ASSAULT": true, "ERASE": true,
-	"BETRAY": true, "SPAWN": true,
+	SkillTypeSummon              SkillType = "SUMMON"
+	SkillTypeFeedPet             SkillType = "FEED_PET"
+	SkillTypeStriderSiegeAssault SkillType = "STRIDER_SIEGE_ASSAULT"
+	SkillTypeErase               SkillType = "ERASE"
+	SkillTypeBetray              SkillType = "BETRAY"
+	SkillTypeSpawn               SkillType = "SPAWN"
+
 	// Cancel
-	"CANCEL": true, "MAGE_BANE": true, "WARRIOR_BANE": true, "NEGATE": true, "CANCEL_DEBUFF": true,
-	"BUFF": true, "DEBUFF": true, "PASSIVE": true, "CONT": true, "RESURRECT": true,
-	"CHARGEDAM": true, "LUCK": true, "RECALL": true, "TELEPORT": true, "SUMMON_FRIEND": true,
-	"SUMMON_PARTY": true, "SUMMON_CREATURE": true, "REFLECT": true, "SPOIL": true, "SWEEP": true,
-	"FAKE_DEATH": true, "BEAST_FEED": true, "FUSION": true, "CHANGE_APPEARANCE": true,
-	// Skill is done within the core.
-	"COREDONE": true,
-	// Unimplemented
-	"NOTDONE": true,
+	SkillTypeCancel       SkillType = "CANCEL"
+	SkillTypeMageBane     SkillType = "MAGE_BANE"
+	SkillTypeWarriorBane  SkillType = "WARRIOR_BANE"
+	SkillTypeNegate       SkillType = "NEGATE"
+	SkillTypeCancelDebuff SkillType = "CANCEL_DEBUFF"
+
+	// Other
+	SkillTypeBuff             SkillType = "BUFF"
+	SkillTypeDebuff           SkillType = "DEBUFF"
+	SkillTypePassive          SkillType = "PASSIVE"
+	SkillTypeCont             SkillType = "CONT"
+	SkillTypeResurrect        SkillType = "RESURRECT"
+	SkillTypeChargeDam        SkillType = "CHARGEDAM"
+	SkillTypeLuck             SkillType = "LUCK"
+	SkillTypeRecall           SkillType = "RECALL"
+	SkillTypeTeleport         SkillType = "TELEPORT"
+	SkillTypeSummonFriend     SkillType = "SUMMON_FRIEND"
+	SkillTypeSummonParty      SkillType = "SUMMON_PARTY"
+	SkillTypeSummonCreature   SkillType = "SUMMON_CREATURE"
+	SkillTypeReflect          SkillType = "REFLECT"
+	SkillTypeSpoil            SkillType = "SPOIL"
+	SkillTypeSweep            SkillType = "SWEEP"
+	SkillTypeFakeDeath        SkillType = "FAKE_DEATH"
+	SkillTypeBeastFeed        SkillType = "BEAST_FEED"
+	SkillTypeFusion           SkillType = "FUSION"
+	SkillTypeChangeAppearance SkillType = "CHANGE_APPEARANCE"
+
+	// COREDONE: the skill is done within the core; NOTDONE: unimplemented.
+	SkillTypeCoreDone SkillType = "COREDONE"
+	SkillTypeNotDone  SkillType = "NOTDONE"
+)
+
+// skillTypes is every tag ParseSkillType accepts.
+var skillTypes = map[SkillType]bool{
+	SkillTypePDam:                true,
+	SkillTypeFatal:               true,
+	SkillTypeMDam:                true,
+	SkillTypeCPDamPercent:        true,
+	SkillTypeManaDam:             true,
+	SkillTypeDOT:                 true,
+	SkillTypeMDOT:                true,
+	SkillTypeDrainSoul:           true,
+	SkillTypeDrain:               true,
+	SkillTypeDeathLink:           true,
+	SkillTypeBlow:                true,
+	SkillTypeSignet:              true,
+	SkillTypeSignetCastTime:      true,
+	SkillTypeSeed:                true,
+	SkillTypeRealDamage:          true,
+	SkillTypeBleed:               true,
+	SkillTypePoison:              true,
+	SkillTypeStun:                true,
+	SkillTypeRoot:                true,
+	SkillTypeConfusion:           true,
+	SkillTypeFear:                true,
+	SkillTypeSleep:               true,
+	SkillTypeMute:                true,
+	SkillTypeParalyze:            true,
+	SkillTypeWeakness:            true,
+	SkillTypeHeal:                true,
+	SkillTypeManaHeal:            true,
+	SkillTypeCombatPointHeal:     true,
+	SkillTypeHOT:                 true,
+	SkillTypeMPHOT:               true,
+	SkillTypeBalanceLife:         true,
+	SkillTypeHealStatic:          true,
+	SkillTypeManaRecharge:        true,
+	SkillTypeHealPercent:         true,
+	SkillTypeManaHealPercent:     true,
+	SkillTypeGiveSP:              true,
+	SkillTypeAggDamage:           true,
+	SkillTypeAggReduce:           true,
+	SkillTypeAggRemove:           true,
+	SkillTypeAggReduceChar:       true,
+	SkillTypeAggDebuff:           true,
+	SkillTypeFishing:             true,
+	SkillTypePumping:             true,
+	SkillTypeReeling:             true,
+	SkillTypeUnlock:              true,
+	SkillTypeUnlockSpecial:       true,
+	SkillTypeDeluxeKeyUnlock:     true,
+	SkillTypeEnchantArmor:        true,
+	SkillTypeEnchantWeapon:       true,
+	SkillTypeSoulshot:            true,
+	SkillTypeSpiritshot:          true,
+	SkillTypeSiegeFlag:           true,
+	SkillTypeTakeCastle:          true,
+	SkillTypeSow:                 true,
+	SkillTypeHarvest:             true,
+	SkillTypeGetPlayer:           true,
+	SkillTypeDummy:               true,
+	SkillTypeInstantJump:         true,
+	SkillTypeCommonCraft:         true,
+	SkillTypeDwarvenCraft:        true,
+	SkillTypeCreateItem:          true,
+	SkillTypeExtractable:         true,
+	SkillTypeExtractableFish:     true,
+	SkillTypeSummon:              true,
+	SkillTypeFeedPet:             true,
+	SkillTypeStriderSiegeAssault: true,
+	SkillTypeErase:               true,
+	SkillTypeBetray:              true,
+	SkillTypeSpawn:               true,
+	SkillTypeCancel:              true,
+	SkillTypeMageBane:            true,
+	SkillTypeWarriorBane:         true,
+	SkillTypeNegate:              true,
+	SkillTypeCancelDebuff:        true,
+	SkillTypeBuff:                true,
+	SkillTypeDebuff:              true,
+	SkillTypePassive:             true,
+	SkillTypeCont:                true,
+	SkillTypeResurrect:           true,
+	SkillTypeChargeDam:           true,
+	SkillTypeLuck:                true,
+	SkillTypeRecall:              true,
+	SkillTypeTeleport:            true,
+	SkillTypeSummonFriend:        true,
+	SkillTypeSummonParty:         true,
+	SkillTypeSummonCreature:      true,
+	SkillTypeReflect:             true,
+	SkillTypeSpoil:               true,
+	SkillTypeSweep:               true,
+	SkillTypeFakeDeath:           true,
+	SkillTypeBeastFeed:           true,
+	SkillTypeFusion:              true,
+	SkillTypeChangeAppearance:    true,
+	SkillTypeCoreDone:            true,
+	SkillTypeNotDone:             true,
 }
 
-// KnownSkillType reports whether name is a skill classification tag. The
-// match is exact: tags are written in upper case.
+// ParseSkillType returns the tag name spells, and false when name is no
+// skill classification tag. The match is exact: tags are written in upper
+// case.
+func ParseSkillType(name string) (SkillType, bool) {
+	t := SkillType(name)
+	return t, skillTypes[t]
+}
+
+// KnownSkillType reports whether name is a skill classification tag (see
+// ParseSkillType).
 func KnownSkillType(name string) bool {
-	return skillTypeNames[name]
+	_, ok := ParseSkillType(name)
+	return ok
 }

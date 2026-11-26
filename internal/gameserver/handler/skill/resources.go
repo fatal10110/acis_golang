@@ -21,7 +21,9 @@ type healHandler struct {
 	healSps *modelskill.HealSpsTable
 }
 
-func (healHandler) Types() []string { return []string{"HEAL", "HEAL_STATIC"} }
+func (healHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeHeal, modelskill.SkillTypeHealStatic}
+}
 
 func (h healHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -54,7 +56,7 @@ func (h healHandler) UseResult(cast Cast) Result {
 	}
 	// Heal's own discharge skips a static heal and a potion; any spend for
 	// those comes from the BUFF pass above.
-	if skillTypeKey(cast.Skill.SkillType) != "HEAL_STATIC" && !cast.Skill.Potion {
+	if skillTypeKey(cast.Skill.SkillType) != modelskill.SkillTypeHealStatic && !cast.Skill.Potion {
 		spendSpiritshot(cast, bsps)
 	}
 	return result
@@ -66,7 +68,9 @@ type healPercentHandler struct {
 	buff continuousHandler
 }
 
-func (healPercentHandler) Types() []string { return []string{"HEAL_PERCENT", "MANAHEAL_PERCENT"} }
+func (healPercentHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeHealPercent, modelskill.SkillTypeManaHealPercent}
+}
 
 func (h healPercentHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -74,7 +78,7 @@ func (h healPercentHandler) Use(cast Cast) {
 
 func (h healPercentHandler) UseResult(cast Cast) Result {
 	result := h.buff.UseResult(cast)
-	isHP := skillTypeKey(cast.Skill.SkillType) == "HEAL_PERCENT"
+	isHP := skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeHealPercent
 	for _, obj := range cast.Targets {
 		target, ok := asCreature(obj)
 		if !ok || !target.CanBeHealed() {
@@ -95,7 +99,9 @@ func (h healPercentHandler) UseResult(cast Cast) Result {
 
 type manaHealHandler struct{}
 
-func (manaHealHandler) Types() []string { return []string{"MANAHEAL", "MANARECHARGE"} }
+func (manaHealHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeManaHeal, modelskill.SkillTypeManaRecharge}
+}
 
 func (manaHealHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
@@ -104,7 +110,7 @@ func (manaHealHandler) Use(cast Cast) {
 			continue
 		}
 		mp := float64(cast.Skill.Power)
-		if skillTypeKey(cast.Skill.SkillType) == "MANARECHARGE" {
+		if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeManaRecharge {
 			mp = target.RechargeMP(mp)
 		}
 		restored := target.AddMP(mp)
@@ -127,7 +133,9 @@ type combatPointHealHandler struct {
 	buff continuousHandler
 }
 
-func (combatPointHealHandler) Types() []string { return []string{"COMBATPOINTHEAL"} }
+func (combatPointHealHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeCombatPointHeal}
+}
 
 func (h combatPointHealHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -198,7 +206,9 @@ func notifyRestoredTo(notifier Player, target, caster Actor, amount float64, res
 
 type cpDamagePercentHandler struct{}
 
-func (cpDamagePercentHandler) Types() []string { return []string{"CPDAMPERCENT"} }
+func (cpDamagePercentHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeCPDamPercent}
+}
 
 func (h cpDamagePercentHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -248,7 +258,9 @@ type balanceLifeHandler struct {
 	buff continuousHandler
 }
 
-func (balanceLifeHandler) Types() []string { return []string{"BALANCE_LIFE"} }
+func (balanceLifeHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeBalanceLife}
+}
 
 func (h balanceLifeHandler) Use(cast Cast) {
 	h.UseResult(cast)
@@ -298,7 +310,9 @@ func (h balanceLifeHandler) UseResult(cast Cast) Result {
 
 type giveSPHandler struct{}
 
-func (giveSPHandler) Types() []string { return []string{"GIVE_SP"} }
+func (giveSPHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeGiveSP}
+}
 
 func (giveSPHandler) Use(cast Cast) {
 	sp := int(cast.Skill.Power)
@@ -314,7 +328,9 @@ func (giveSPHandler) Use(cast Cast) {
 
 type realDamageHandler struct{}
 
-func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
+func (realDamageHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeRealDamage}
+}
 
 // Use takes the skill's power straight off each live creature target's HP,
 // a door's included. It is not a hit: CP, invulnerability, damage

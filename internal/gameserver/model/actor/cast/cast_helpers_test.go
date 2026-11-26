@@ -119,12 +119,12 @@ func (k effectsKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Actor, _ i
 // it hands off to. What the production handlers then do to their targets
 // is covered by the handler/skill tests and tests/skills.
 type recordingSkillHandler struct {
-	skillTypes []string
+	skillTypes []modelskill.SkillType
 	calls      []handlerskill.Cast
 	result     handlerskill.Result
 }
 
-func (h *recordingSkillHandler) Types() []string { return h.skillTypes }
+func (h *recordingSkillHandler) Types() []modelskill.SkillType { return h.skillTypes }
 
 func (h *recordingSkillHandler) Use(c handlerskill.Cast) { h.calls = append(h.calls, c) }
 
@@ -133,8 +133,8 @@ func (h *recordingSkillHandler) UseResult(c handlerskill.Cast) handlerskill.Resu
 	return h.result
 }
 
-func newEffectHandlers(known skilltarget.Known, skillType string, rec *recordingSkillHandler) EffectHandlers {
-	rec.skillTypes = []string{skillType}
+func newEffectHandlers(known skilltarget.Known, skillType modelskill.SkillType, rec *recordingSkillHandler) EffectHandlers {
+	rec.skillTypes = []modelskill.SkillType{skillType}
 	return EffectHandlers{
 		Targets: skilltarget.NewRegistry(known),
 		Skills:  handlerskill.NewRegistry(rec),
@@ -326,7 +326,7 @@ var (
 	_ AICaster    = (*fakeCastCreature)(nil)
 )
 
-func (*fakeCastCreature) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+func (*fakeCastCreature) NotePvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {}
 
 func (*fakeCastCreature) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
 	return false

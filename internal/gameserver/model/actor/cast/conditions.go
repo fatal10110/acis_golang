@@ -46,7 +46,7 @@ type boatRider interface {
 
 // ServitorSummon reports whether def summons a servitor rather than a cubic.
 func ServitorSummon(def *modelskill.Definition) bool {
-	return def.SkillType == "SUMMON" && !def.IsCubic
+	return def.SkillType == modelskill.SkillTypeSummon && !def.IsCubic
 }
 
 // HasSummon reports whether the player has a summon in the world. A pet
@@ -77,7 +77,7 @@ func (a PlayerActor) AttackingNow() bool {
 
 // olympiadRestricted reports whether def is barred from Olympiad matches.
 func olympiadRestricted(def *modelskill.Definition) bool {
-	return def.HeroSkill || def.SkillType == "RESURRECT"
+	return def.HeroSkill || def.SkillType == modelskill.SkillTypeResurrect
 }
 
 // ActingPlayerInOlympiad reports whether the player is in Olympiad mode.

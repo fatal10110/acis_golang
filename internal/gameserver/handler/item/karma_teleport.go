@@ -9,15 +9,15 @@ import (
 // isTeleportOrRecallSkillType reports whether skillType is the TELEPORT or
 // RECALL classification that the item-use gate checks against every skill
 // the item attaches.
-func isTeleportOrRecallSkillType(skillType string) bool {
-	return skillType == "TELEPORT" || skillType == "RECALL"
+func isTeleportOrRecallSkillType(skillType modelskill.SkillType) bool {
+	return skillType == modelskill.SkillTypeTeleport || skillType == modelskill.SkillTypeRecall
 }
 
 // isRecallSkillType reports whether skillType is the RECALL classification
 // that the direct-cast gate checks; unlike the item-use gate, a direct cast
 // does not also gate TELEPORT.
-func isRecallSkillType(skillType string) bool {
-	return skillType == "RECALL"
+func isRecallSkillType(skillType modelskill.SkillType) bool {
+	return skillType == modelskill.SkillTypeRecall
 }
 
 // karmaBlocksTeleport reports whether the KarmaPlayerCanTeleport setting
@@ -45,6 +45,6 @@ func ItemBlockedByKarmaTeleport(tmpl *modelitem.Template, defs actorcast.Definit
 
 // RecallCastBlockedByKarma reports whether a positive-karma actor is blocked
 // from directly casting a RECALL skill.
-func RecallCastBlockedByKarma(skillType string, karma int, karmaPlayerCanTeleport bool) bool {
+func RecallCastBlockedByKarma(skillType modelskill.SkillType, karma int, karmaPlayerCanTeleport bool) bool {
 	return isRecallSkillType(skillType) && karmaBlocksTeleport(karma, karmaPlayerCanTeleport)
 }

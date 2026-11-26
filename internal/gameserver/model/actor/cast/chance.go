@@ -147,7 +147,7 @@ func (p *ChanceProcs) skillHitProcs(caster any, def modelskill.Definition) func(
 		return nil
 	}
 	switch def.SkillType {
-	case "FUSION", "COMMON_CRAFT", "DWARVEN_CRAFT":
+	case modelskill.SkillTypeFusion, modelskill.SkillTypeCommonCraft, modelskill.SkillTypeDwarvenCraft:
 		return nil
 	}
 	var cast, taken chanceEvents
@@ -357,7 +357,7 @@ func (p *ChanceProcs) castChanceSkill(owner chanceOwner, ownHit bool, def *model
 	}
 	if def.Extra().TriggeredID > 0 {
 		triggered, ok := p.definition(def.Extra().TriggeredID, def.Extra().TriggeredLevel)
-		if !ok || triggered.SkillType == "NOTDONE" {
+		if !ok || triggered.SkillType == modelskill.SkillTypeNotDone {
 			return
 		}
 		def = triggered
@@ -374,7 +374,7 @@ func (p *ChanceProcs) castEffectTrigger(owner chanceOwner, ownerHit bool, e *eff
 		return
 	}
 	def, ok := p.definition(e.Template.TriggeredID, e.Template.TriggeredLevel)
-	if !ok || def.SkillType == "NOTDONE" {
+	if !ok || def.SkillType == modelskill.SkillTypeNotDone {
 		return
 	}
 	var caster chanceCaster = owner

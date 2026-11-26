@@ -1,5 +1,7 @@
 package skill
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 
 // appearanceChanger is a player whose face and hair a skill can change.
@@ -11,7 +13,9 @@ type appearanceChanger interface {
 // skill lands on.
 type appearanceHandler struct{}
 
-func (appearanceHandler) Types() []string { return []string{"CHANGE_APPEARANCE"} }
+func (appearanceHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeChangeAppearance}
+}
 
 // Use gives every player target the skill's face, hair color and hair
 // style, each one the skill leaves negative unchanged, and shows it anew to

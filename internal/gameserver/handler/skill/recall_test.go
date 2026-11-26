@@ -77,7 +77,7 @@ func recall(caster Creature, def modelskill.Definition, targets ...Actor) {
 // recallType, town by default, for TELEPORT as for RECALL.
 func TestRecallSendsTargetsByRecallType(t *testing.T) {
 	for _, tc := range []struct {
-		skillType string
+		skillType modelskill.SkillType
 		recall    modelskill.RecallType
 	}{
 		{"RECALL", modelskill.RecallTown},

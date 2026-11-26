@@ -218,7 +218,7 @@ func negateStart(e *Effect) bool {
 // negateTypeMatches reports whether candidate's classification (its own
 // skill type, or its resolved effect type) matches negType.
 func negateTypeMatches(candidate Skill, negType string) bool {
-	if strings.EqualFold(candidate.SkillType, negType) {
+	if strings.EqualFold(string(candidate.SkillType), negType) {
 		return true
 	}
 	return candidate.EffectType != "" && strings.EqualFold(candidate.EffectType, negType)

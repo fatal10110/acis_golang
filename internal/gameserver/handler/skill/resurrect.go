@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
@@ -11,7 +12,9 @@ var _ player.Reviver = (*player.Character)(nil)
 
 type resurrectHandler struct{}
 
-func (resurrectHandler) Types() []string { return []string{"RESURRECT"} }
+func (resurrectHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeResurrect}
+}
 
 // Use resurrects the resolved targets at the caster's revive power (the
 // skill's power scaled by the caster's WIT). A player caster asks first: a

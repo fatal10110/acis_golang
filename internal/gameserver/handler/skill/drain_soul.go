@@ -1,5 +1,7 @@
 package skill
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 
 // enhanceWeaponQuest is the quest whose started state lets a soul crystal's
@@ -21,7 +23,9 @@ type soulAbsorber interface {
 
 type drainSoulHandler struct{}
 
-func (drainSoulHandler) Types() []string { return []string{"DRAIN_SOUL"} }
+func (drainSoulHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeDrainSoul}
+}
 
 // Use registers a living player caster with its quest started as an
 // absorber of its first target, when that target is a living monster

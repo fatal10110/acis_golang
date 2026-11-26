@@ -558,7 +558,7 @@ func (*pickupTestOwner) ClearReviveOffer()                          {}
 func (*pickupTestOwner) ReviveOffer() (bool, bool)                  { return false, false }
 func (*pickupTestOwner) InDuel() bool                               { return false }
 func (*pickupTestOwner) NoteServitorPvPAttack(attackable.Combatant) {}
-func (*pickupTestOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
+func (*pickupTestOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {
 }
 
 // TestPetLevelConditionReadsIntegerLiterals: the reference reads a <player

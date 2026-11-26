@@ -68,7 +68,7 @@ type SkillCaster interface {
 	// whether it blocked the skill.
 	TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Actor) bool
 	// NotePvPSkillTargets records a resolved cast's targets for PvP flagging.
-	NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
+	NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType)
 }
 
 // ApplyEffectsResult resolves def's affected target set from caster and the
@@ -207,7 +207,7 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 	}
 	if def.Offensive {
 		switch def.SkillType {
-		case "AGGREDUCE", "AGGREMOVE", "AGGREDUCE_CHAR":
+		case modelskill.SkillTypeAggReduce, modelskill.SkillTypeAggRemove, modelskill.SkillTypeAggReduceChar:
 		default:
 			for _, target := range affected {
 				target.RecordAttacker(castCaster)
@@ -251,7 +251,7 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 // corpse-mob skill landed on, a harvest excepted, and returns the ids of the
 // corpses it removed. A corpse with no pending decay stays.
 func consumeCorpses(corpses CorpseDecayer, def modelskill.Definition, targets []skilltarget.Actor) []int32 {
-	if corpses == nil || def.SkillType == "HARVEST" {
+	if corpses == nil || def.SkillType == modelskill.SkillTypeHarvest {
 		return nil
 	}
 	switch def.Target {

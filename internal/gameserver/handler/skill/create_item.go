@@ -18,7 +18,9 @@ type PreparedForReuseMessage struct {
 // caster. Without ids it cannot create items and does nothing.
 type createItemHandler struct{ ids objectIDAllocator }
 
-func (createItemHandler) Types() []string { return []string{"CREATE_ITEM"} }
+func (createItemHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeCreateItem}
+}
 
 // Use picks one of the skill's item ids and a count at random and creates
 // them in a living player caster's inventory, named in chat as picked up.
