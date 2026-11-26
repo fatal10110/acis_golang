@@ -99,8 +99,11 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 		live, ok := l.livePlayerByID(m.ObjectID)
 		if !m.Online || !ok {
 			// A member whose selection already loaded what it wears keeps
-			// it, and takes the leave as it enters the world.
-			if !m.Entering {
+			// it, and takes the leave as it enters the world. So does one
+			// listed online but out of the world on its way out, whose last
+			// inventory save stored it worn: the leave was handed to it
+			// (clan.Service.Leave).
+			if !m.Online && !m.Entering {
 				l.unequipLeaverCirclets(cl, m.ObjectID)
 			}
 			continue

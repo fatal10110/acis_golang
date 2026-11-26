@@ -10,13 +10,17 @@ import (
 // their row is read until they enter the world or the selection ends. Such
 // a character is offline to its clan, so a removal in that span stores the
 // leave on its row only; the removal is kept here for the character the
-// selection already loaded. mu may be taken while a clan's mu is held,
-// never the other way round.
+// selection already loaded. It also keeps the removals handed to members
+// leaving the world (handOffLocked) until they are marked offline. mu may
+// be taken while a clan's mu is held, never the other way round.
 type entries struct {
 	mu sync.Mutex
 	// departed maps each character in flight to the removal it took, nil
 	// while it took none.
 	departed map[int32]*RemovalRow
+	// leaving maps each member removed on its way out of the world to the
+	// removal handed to it.
+	leaving map[int32]handOff
 }
 
 // begin puts objectID in flight, forgetting any removal kept before.
