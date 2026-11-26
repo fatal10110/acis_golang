@@ -111,16 +111,46 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	rewards.RaidKills = link
 	rewards.Channels = link
 	rewards.CursedWeapons = link
-	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, link.HostileCastEffects(), walker, link.HostileSinks(state, attackStance), link.FolkSinks(state, attackStance), npcLimits(gameplay), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, gameplay.SpawnEvents, effects, pool, makers, scripts, data.Zones)
+	npcs, err := manager.NewNpcs(manager.NpcsConfig{
+		Spawns:              spawns,
+		Templates:           data.NPCs,
+		Geo:                 move.NewGeo(data.Geo, data.Finder),
+		World:               state,
+		IDs:                 ids,
+		Decay:               decay,
+		Respawn:             respawnTask,
+		AI:                  ai,
+		Positions:           positions,
+		Items:               data.Items,
+		Ground:              ground,
+		Rewards:             rewards,
+		Now:                 time.Now,
+		Log:                 log,
+		CastDefs:            data.Skills,
+		CastEffects:         link.HostileCastEffects(),
+		Walker:              walker,
+		NewSink:             link.HostileSinks(state, attackStance),
+		NewFolkSink:         link.FolkSinks(state, attackStance),
+		Limits:              npcLimits(gameplay),
+		RandomWalkRate:      int(gameplay.RandomWalkRate),
+		MaxGeoPathFailCount: int(gameplay.MaxGeoPathFailCount),
+		RaidMultipliers:     gameplay.RaidMultipliers,
+		AIConfig:            gameplay.NpcAI,
+		SpawnEvents:         gameplay.SpawnEvents,
+		Effects:             effects,
+		Queues:              pool,
+		Makers:              makers,
+		Scripts:             scripts,
+		GroundTaker:         link,
+		GuardedSieges:       link.GuardedSiege,
+		ResidenceOwners:     link.NPCResidenceOwner,
+		Regen:               link.PlayerRules(),
+		Zones:               data.Zones,
+	})
 	if err != nil {
 		return nil, err
 	}
-	npcs.SetGroundTaker(link)
-	npcs.SetGuardedSieges(link.GuardedSiege)
-	npcs.SetResidenceOwners(link.NPCResidenceOwner)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
-	npcs.SetRegenSettings(link.PlayerRules())
 	decayHooks.SetRespawnHook(npcs.RespawnHook)
 	respawnHooks.SetHook(npcs.Respawn)
 	spawner.Bind(npcs)

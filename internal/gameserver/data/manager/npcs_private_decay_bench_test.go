@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -29,11 +28,28 @@ func BenchmarkMasterDecaySweep(b *testing.B) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, clock)
 	respawn, _ := task.NewRespawn(&respawnInto{}, clock)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, clock, state)
-	npcs, err := NewNpcs(NewSpawns(&spawn.Table{}, nil), npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, Privates: []npc.PrivateEntry{{NpcID: 2, Weight: 3, RespawnDelay: 240 * time.Second}}},
-		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
-	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, clock, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers())
+	npcs, err := newStartedNpcs(NpcsConfig{
+		Spawns: NewSpawns(&spawn.Table{}, nil),
+		Templates: npc.NewTable([]*npc.Template{
+			{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, Privates: []npc.PrivateEntry{{NpcID: 2, Weight: 3, RespawnDelay: 240 * time.Second}}},
+			{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
+		}),
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       &sequentialIDs{},
+		Decay:     decay,
+		Respawn:   respawn,
+		AI:        task.NewAI(state, zerolog.Nop()),
+		Positions: task.NewPositionUpdates(state),
+		Items:     item.NewTable(nil),
+		Ground:    &recordingGround{},
+		Now:       clock,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    npcQueues(),
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		b.Fatalf("NewNpcs() error: %v", err)
 	}
