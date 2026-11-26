@@ -346,8 +346,7 @@ func seeSpell(s *script.Script, e script.SeeSpell) {
 			if intention == script.IntentionAttack {
 				if k := s.Skill(e.Skill); k.AggroPoints() > 0 || k.Power(n) > 0 || k.Offensive() {
 					skillPower := max(max(float64(k.AggroPoints()), k.Power(n)), 20)
-					hateRatio := defaultnpc.HateRatio(n, caster)
-					hateRatio = ((1.0 * skillPower) / float64(n.Level()+7)) + ((hateRatio / 100) * ((1.0 * skillPower) / float64(n.Level()+7)))
+					hateRatio := damageHate(n, skillPower, defaultnpc.HateRatio(n, caster))
 					n.AddAttackDesire(caster, hateRatio*150)
 				}
 			}

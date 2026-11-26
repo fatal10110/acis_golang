@@ -85,13 +85,10 @@ func OrfenPrivateRaikelLeos() script.Script {
 			return base.Timer(s, e)
 		},
 		OnAttacked: func(_ *script.Script, e script.Attacked) {
-			if e.Attacker.Level() > e.NPC.Level()+8 {
-				e.NPC.AddCastDesire(e.Attacker, skill.Ref{ID: 4515, Level: 1}, 1000000)
-			}
+			raidCurse(e.NPC, e.Attacker)
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {
-			if e.Caster.Level() > e.NPC.Level()+8 {
-				e.NPC.AddCastDesire(e.Caster, skill.Ref{ID: 4215, Level: 1}, 1000000)
+			if raidMute(e.NPC, e.Caster) {
 				return
 			}
 			base.SeeSpell(s, e)
