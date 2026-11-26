@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // adminEnchant answers //enchant <slot> <level>: the item the selected
