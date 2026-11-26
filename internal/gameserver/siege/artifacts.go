@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // Engrave records that cl engraved the ruler on artifactID, one of the
@@ -26,7 +27,7 @@ func (s *Siege) Engrave(cl *clan.Clan, artifactID int32, seize func() (told func
 		return false
 	}
 	taken := false
-	s.runLifecycle(func(fx *effects) {
+	s.runLifecycle(func(fx *sim.Effects) {
 		if s.status != StatusInProgress {
 			return
 		}
@@ -44,7 +45,7 @@ func (s *Siege) Engrave(cl *clan.Clan, artifactID int32, seize func() (told func
 			return
 		}
 		if told != nil {
-			fx.add(told)
+			fx.Add(told)
 		}
 		taken = true
 	})
@@ -55,9 +56,9 @@ func (s *Siege) Engrave(cl *clan.Clan, artifactID int32, seize func() (told func
 // SideAttacker for the attackers, SideDefender for the owner and the
 // defenders.
 func (s *Siege) Tell(m Message, sides ...Side) {
-	var fx effects
+	var fx sim.Effects
 	s.e.mu.Lock()
 	s.tellLocked(&fx, m, sides...)
 	s.e.mu.Unlock()
-	fx.run()
+	fx.Run()
 }

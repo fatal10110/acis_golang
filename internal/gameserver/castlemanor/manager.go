@@ -295,7 +295,7 @@ func (m *Manager) Start(queue *sim.Queue, effects Effects) {
 	m.queue, m.effects = queue, effects
 	now := queue.Now()
 	m.status = statusAt(m.cfg, now)
-	var payouts []func()
+	var payouts sim.Effects
 	missed := !m.lastRollover.IsZero() && m.rolloverDueLocked(now)
 	if missed {
 		payouts = m.rolloverLocked(now)
@@ -310,9 +310,7 @@ func (m *Manager) Start(queue *sim.Queue, effects Effects) {
 	m.log.Info().Stringer("mode", m.status).Time("next_change", m.nextChange).Bool("missed_rollover", missed).Msg("manor: started")
 	m.mu.Unlock()
 
-	for _, pay := range payouts {
-		pay()
-	}
+	payouts.Run()
 	if missed {
 		m.queueSave()
 	}
@@ -460,7 +458,7 @@ func (m *Manager) changeMode() {
 		m.mu.Unlock()
 		return
 	}
-	var payouts []func()
+	var payouts sim.Effects
 	save := false
 	switch m.status {
 	case StatusApproved:
@@ -476,7 +474,7 @@ func (m *Manager) changeMode() {
 		for _, c := range m.castles.All() {
 			if owner, ok := m.ownerLocked(c); ok && m.effects != nil {
 				leader, sink := owner.LeaderID(), m.effects
-				payouts = append(payouts, func() { sink.TellManorUpdated(leader) })
+				payouts.Add(func() { sink.TellManorUpdated(leader) })
 			}
 		}
 		m.status = StatusModifiable
@@ -490,9 +488,7 @@ func (m *Manager) changeMode() {
 	status := m.status
 	m.mu.Unlock()
 
-	for _, pay := range payouts {
-		pay()
-	}
+	payouts.Run()
 	if save {
 		m.queueSave()
 	}
@@ -513,9 +509,9 @@ func (m *Manager) changeMode() {
 // treasury, and lists the treasury cannot pay for do not go live, leaving
 // both periods empty. Lists that go live start with every amount at its
 // start amount, and the next period starts over from fresh copies of them.
-func (m *Manager) rolloverLocked(now time.Time) []func() {
+func (m *Manager) rolloverLocked(now time.Time) sim.Effects {
 	m.lastRollover = now
-	var out []func()
+	var out sim.Effects
 	sink := m.effects
 	for _, c := range m.castles.All() {
 		owner, ok := m.ownerLocked(c)
@@ -539,7 +535,7 @@ func (m *Manager) rolloverLocked(now time.Time) []func() {
 				}
 				if seed, ok := m.seeds.SeedByCrop(int(crop.ID)); ok && count > 0 && sink != nil {
 					clanID, itemID := owner.ID(), int32(seed.MatureID)
-					out = append(out, func() { sink.AddToClanWarehouse(clanID, itemID, int(count)) })
+					out.Add(func() { sink.AddToClanWarehouse(clanID, itemID, int(count)) })
 				}
 			}
 			if left > 0 {
@@ -549,7 +545,7 @@ func (m *Manager) rolloverLocked(now time.Time) []func() {
 				refund += int64(left * crop.Price)
 			}
 		}
-		out = append(out, func() { c.RiseSeedIncome(refund) })
+		out.Add(func() { c.RiseSeedIncome(refund) })
 
 		production, procure := restocked(p.productionNext), restockedCrops(p.procureNext)
 		if cost := m.listCost(production, procure, false); cost > 0 && !c.EditTreasury(-cost, true) {

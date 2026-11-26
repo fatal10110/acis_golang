@@ -12,8 +12,12 @@ import (
 // the in-game hour off the game time in minutes (60), which the port reads
 // directly; and it arms the siege's later start on the thread pool, which
 // the port arms as the hall's siege step (Hall.ArmStart).
+//
+// The reference names the top-damage clan by its own lookup, which the
+// port makes through Script.TopDamageClan.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{"script.siegablehall.FortressOfTheDead"},
+		"call ClanTable.getClan", "call Clan.getClanId",
 		"number 64", "number 1010624", "number 1010625", "number 1010636", "number 1010637", "number 1010638",
 		"number 60", "call ThreadPool.schedule",
 	)

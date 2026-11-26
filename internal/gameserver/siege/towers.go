@@ -1,18 +1,21 @@
 package siege
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/castle"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+)
 
 // Tower is one of the castle's control towers.
 type Tower = castle.Tower
 
 // towersLocked has step taken by each of the castle's control towers, in
 // castles.xml order, once the engine's lock is released.
-func (s *Siege) towersLocked(fx *effects, step func(Tower)) {
+func (s *Siege) towersLocked(fx *sim.Effects, step func(Tower)) {
 	towers := s.castle.Towers()
 	if len(towers) == 0 {
 		return
 	}
-	fx.add(func() {
+	fx.Add(func() {
 		for _, t := range towers {
 			step(t)
 		}

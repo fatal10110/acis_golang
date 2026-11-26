@@ -10,8 +10,12 @@ import (
 // FortressOfResistance class. The reference names the hall (21) by its
 // constant, which the port writes as its id, and formats the siege date
 // with a Java date pattern, which the port writes as Go's layout.
+//
+// The reference names the top-damage clan by its own lookup, which the
+// port makes through Script.TopDamageClan.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{"script.siegablehall.FortressOfResistance"},
+		"call ClanTable.getClan", "call Clan.getClanId",
 		"number 21", `string "yyyy-MM-dd HH:mm:ss"`, `string "2006-01-02 15:04:05"`,
 	)
 	if err != nil {
