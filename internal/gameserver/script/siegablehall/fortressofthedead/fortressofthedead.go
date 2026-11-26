@@ -38,7 +38,7 @@ const lidiaSelfCast = 4997
 func New() script.Script {
 	// damage is, per attacking clan, the damage it dealt Lidia this siege,
 	// each sum a counter the attacked hook adds to.
-	damage := &script.IntMapCell[*script.IntCell]{}
+	damage := &script.ClanDamage{}
 	base := script.Hooks{}.Named("ClanHallSiege")
 	return script.Script{
 		Dir: "siegablehall",
@@ -51,7 +51,7 @@ func New() script.Script {
 		},
 		BindHall: func(s *script.Script) {
 			s.BindHallSiege(fortressOfDead, script.HallSiegeHooks{
-				Winner: func(*script.Hall) int32 { return s.TopDamageClan(damage) },
+				Winner: func(*script.Hall) int32 { return s.LiveClanID(damage.Top()) },
 				Start: func(h *script.Hall, b script.HallBase) {
 					// The siege must start at night.
 					if hoursLeft := s.GameHour(); hoursLeft < 0 || hoursLeft > 6 {
@@ -87,7 +87,7 @@ func New() script.Script {
 				}
 				if p := script.ActingPlayer(e.Attacker); p != nil {
 					if clanID := p.ClanID(); clanID != 0 && slices.Contains(h.Attackers(), clanID) {
-						script.AddClanDamage(damage, clanID, int(e.Damage))
+						damage.Add(clanID, int(e.Damage))
 					}
 				}
 				if n := e.NPC; !n.InMyTerritory() {

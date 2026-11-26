@@ -14,7 +14,7 @@ import (
 // the port arms as the hall's siege step (Hall.ArmStart).
 //
 // The reference names the top-damage clan by its own lookup, which the
-// port makes through Script.TopDamageClan.
+// port makes through Script.LiveClanID.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{"script.siegablehall.FortressOfTheDead"},
 		"call ClanTable.getClan", "call Clan.getClanId",

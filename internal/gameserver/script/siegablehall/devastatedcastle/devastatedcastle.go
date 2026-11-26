@@ -58,7 +58,7 @@ func level1(id skill.ID) skill.Ref { return skill.Ref{ID: id, Level: 1} }
 func New() script.Script {
 	// damage is, per attacking clan, the damage it dealt Gustav this
 	// siege, each sum a counter the attacked hook adds to.
-	damage := &script.IntMapCell[*script.IntCell]{}
+	damage := &script.ClanDamage{}
 	// speller is the last healer or buffer whose spell Dietrich saw.
 	speller := &script.PlayerCell{}
 	base := script.Hooks{}.Named("ClanHallSiege")
@@ -75,7 +75,7 @@ func New() script.Script {
 		},
 		BindHall: func(s *script.Script) {
 			s.BindHallSiege(devastatedCastle, script.HallSiegeHooks{
-				Winner: func(*script.Hall) int32 { return s.TopDamageClan(damage) },
+				Winner: func(*script.Hall) int32 { return s.LiveClanID(damage.Top()) },
 				SpawnNPCs: func(*script.Hall) {
 					s.Spawner().StartSpawnTime("agit_defend_warfare_start", "34")
 				},
@@ -107,7 +107,7 @@ func New() script.Script {
 				}
 				if p := script.ActingPlayer(e.Attacker); p != nil {
 					if clanID := p.ClanID(); clanID != 0 && slices.Contains(h.Attackers(), clanID) {
-						script.AddClanDamage(damage, clanID, int(e.Damage))
+						damage.Add(clanID, int(e.Damage))
 					}
 				}
 				base.Attacked(s, e)

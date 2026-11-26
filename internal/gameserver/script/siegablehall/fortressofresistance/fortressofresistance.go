@@ -41,7 +41,7 @@ func ddMagicLevel1() skill.Ref { return skill.Ref{ID: ddMagic, Level: 1} }
 func New() script.Script {
 	// damage is, per clan, the damage it dealt Nurka this siege, each sum a
 	// counter the attacked hook adds to.
-	damage := &script.IntMapCell[*script.IntCell]{}
+	damage := &script.ClanDamage{}
 	base := script.Hooks{}.Named("ClanHallSiege")
 	return script.Script{
 		Dir: "siegablehall",
@@ -56,7 +56,7 @@ func New() script.Script {
 		},
 		BindHall: func(s *script.Script) {
 			s.BindHallSiege(fortressOfResistance, script.HallSiegeHooks{
-				Winner: func(*script.Hall) int32 { return s.TopDamageClan(damage) },
+				Winner: func(*script.Hall) int32 { return s.LiveClanID(damage.Top()) },
 				SpawnNPCs: func(h *script.Hall) {
 					s.Spawner().StartSpawnTime(spawnTime(h), "21")
 				},
@@ -84,7 +84,7 @@ func New() script.Script {
 				}
 				if p := script.ActingPlayer(e.Attacker); p != nil {
 					if clanID := p.ClanID(); clanID != 0 {
-						script.AddClanDamage(damage, clanID, int(e.Damage))
+						damage.Add(clanID, int(e.Damage))
 					}
 				}
 				base.Attacked(s, e)
