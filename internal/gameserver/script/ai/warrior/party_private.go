@@ -37,6 +37,23 @@ func deadMaster(n *script.NPC) bool {
 	return master != nil && master.Dead()
 }
 
+// masterGone reports whether n has no master, or a dead one. A warrior
+// private leaves the world on it, so one without a master leaves too;
+// a wizard private leaves only on deadMaster.
+func masterGone(n *script.NPC) bool {
+	master := n.Master()
+	return master == nil || master.Dead()
+}
+
+// followMaster has n follow its living master, or wander without one.
+func followMaster(n *script.NPC) {
+	if master := n.Master(); master != nil && !master.Dead() {
+		n.AddFollowDesire(master, 50)
+	} else {
+		n.AddWanderDesire(5, 5)
+	}
+}
+
 // PartyPrivateHooks are PartyPrivateWarrior's hooks, which its children
 // derive theirs from.
 func PartyPrivateHooks() script.Hooks {
@@ -53,8 +70,7 @@ func PartyPrivateHooks() script.Hooks {
 					n.RemoveAllAttackDesire()
 				}
 			case strings.EqualFold(e.Name, "1006"):
-				master := n.Master()
-				if master == nil || master.Dead() {
+				if masterGone(n) {
 					if i := n.Intention(); i != script.IntentionAttack && i != script.IntentionCast {
 						s.Spawner().DecayMe(n)
 						return ""
@@ -64,12 +80,7 @@ func PartyPrivateHooks() script.Hooks {
 			return base.Timer(s, e)
 		},
 		OnNoDesire: func(_ *script.Script, e script.NoDesire) {
-			n := e.NPC
-			if master := n.Master(); master != nil && !master.Dead() {
-				n.AddFollowDesire(master, 50)
-			} else {
-				n.AddWanderDesire(5, 5)
-			}
+			followMaster(e.NPC)
 		},
 		OnCreated: func(s *script.Script, e script.Created) {
 			s.StartTimerAtFixedRate("1005", e.NPC, nil, 120000*time.Millisecond, 120000*time.Millisecond)
@@ -109,7 +120,7 @@ func PartyPrivateHooks() script.Hooks {
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if n.Dead() || e.EventID != 10002 || !n.HasMaster() {
+			if n.Dead() || e.EventID != eventMasterTarget || !n.HasMaster() {
 				return
 			}
 			master, _ := s.Object(e.Arg1).(*script.NPC)

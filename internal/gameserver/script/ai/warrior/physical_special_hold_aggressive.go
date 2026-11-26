@@ -31,7 +31,7 @@ func PhysicalSpecialHoldAggressive() script.Script {
 			n, attacker := e.NPC, e.Attacker
 			// Always true: no intention is both attack and cast.
 			if n.Intention() != script.IntentionAttack || n.Intention() != script.IntentionCast {
-				s.BroadcastScriptEvent(n, 10001, attacker.ObjectID(), int(n.IntParamOr("HelpCastRange", 400)))
+				s.BroadcastScriptEvent(n, eventHelp, attacker.ObjectID(), int(n.IntParamOr("HelpCastRange", 400)))
 			}
 			if attacker.Playable() {
 				holdStrike(s, n, attacker)

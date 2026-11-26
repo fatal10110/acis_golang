@@ -28,11 +28,7 @@ func fiendArcherHooks() script.Hooks {
 			if attacker.Playable() {
 				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
 				hateList := n.HateList()
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*100)+300)
-				} else {
-					hateList.Add(attacker, f0*100)
-				}
+				addHate(hateList, attacker, f0*100)
 				if !hateList.Empty() {
 					castOrAttack(n, attacker, npc.SkillTypeWFiendArcher, true)
 				}

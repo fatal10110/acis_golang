@@ -98,7 +98,7 @@ func heartEvent(s *script.Script, e script.Event) string {
 				c2Value := c2.DBValue()
 
 				switch {
-				case (c0Value == 0 || c0Value == 1) && (c1Value == 0 || c1Value == 1) && (c2Value == 0 || c2Value == 1):
+				case (c0Value == stageAsleep || c0Value == stageWoken) && (c1Value == stageAsleep || c1Value == stageWoken) && (c2Value == stageAsleep || c2Value == stageWoken):
 					if player.HasItem(portalStone) {
 						s.TakeItems(player, portalStone, 1)
 
@@ -124,7 +124,7 @@ func heartEvent(s *script.Script, e script.Event) string {
 					} else {
 						htmltext = "13001-04.htm"
 					}
-				case c0Value == 2 || c0Value == 3 || c1Value == 2 || c1Value == 3 || c2Value == 2 || c2Value == 3:
+				case c0Value == stageMovingIn || c0Value == stageFighting || c1Value == stageMovingIn || c1Value == stageFighting || c2Value == stageMovingIn || c2Value == stageFighting:
 					htmltext = "13001-03.htm"
 				}
 			} else {

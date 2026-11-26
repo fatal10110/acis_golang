@@ -46,11 +46,7 @@ func FiendArcherRunAway() script.Script {
 			if attacker.Playable() {
 				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
 				hateList := n.HateList()
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*100)+300)
-				} else {
-					hateList.Add(attacker, f0*100)
-				}
+				addHate(hateList, attacker, f0*100)
 				if !hateList.Empty() {
 					castOrAttack(n, attacker, npc.SkillTypeWFiendArcher, true)
 				}
@@ -73,7 +69,7 @@ func FiendArcherRunAway() script.Script {
 				if n.Int(script.SlotIntAI3) == 2 && n.Intention() != script.IntentionAttack {
 					if c := n.Slot(script.SlotCreature0); c != nil {
 						n.AddAttackDesire(c, 1000)
-						s.BroadcastScriptEvent(n, 10000, c.ObjectID(), 400)
+						s.BroadcastScriptEvent(n, eventFleeHelp, c.ObjectID(), 400)
 					}
 					n.SetInt(script.SlotIntAI3, 3)
 				}

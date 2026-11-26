@@ -124,7 +124,7 @@ func HereticPriestAggressive() script.Script {
 			if n.IntParam("Hold") == 0 {
 				n.RemoveAllAttackDesire()
 				n.AddMoveToDesire(n.SpawnLocation(), 100)
-				s.BroadcastScriptEvent(n, eventHereticHome, 0, int(n.IntParamOr("DistNoDesire", 500)))
+				s.BroadcastScriptEvent(n, eventWalkHome, 0, int(n.IntParamOr("DistNoDesire", 500)))
 			}
 		},
 	})}

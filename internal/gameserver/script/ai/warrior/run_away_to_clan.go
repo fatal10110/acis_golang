@@ -72,7 +72,7 @@ func runAwayToClanHooks() script.Hooks {
 				n.AddWanderDesire(5, 50)
 				n.SetInt(script.SlotIntAI0, 2)
 				if c0 := n.Slot(script.SlotCreature0); c0 != nil {
-					s.BroadcastScriptEvent(n, 10000, c0.ObjectID(), 400)
+					s.BroadcastScriptEvent(n, eventFleeHelp, c0.ObjectID(), 400)
 				}
 			case 3:
 				if arrivedAt(n.SpawnLocation(), e) {
@@ -98,7 +98,7 @@ func runAwayToClanHooks() script.Hooks {
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if n.Dead() || e.EventID != 10000 || n.Intention() == script.IntentionAttack {
+			if n.Dead() || e.EventID != eventFleeHelp || n.Intention() == script.IntentionAttack {
 				return
 			}
 			if c := s.Object(e.Arg1); c != nil {

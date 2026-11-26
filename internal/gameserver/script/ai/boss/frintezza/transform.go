@@ -47,15 +47,15 @@ func FollowerOfFrintezzaTransform() script.Script {
 				s.GlobalMemo().Set(bossmemo.FrintezzaTransform, int(n.ObjectID()))
 			}
 			if !n.DBLoaded() {
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				if c1 := memoNPC(s, bossmemo.Frintezza); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-				n.SetDBValue(5)
+				n.SetDBValue(stageFirstForm)
 				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-			} else if n.DBValue() == 7 {
+			} else if n.DBValue() == stageTransform {
 				stage := int32(7)
 				if n.HPRatio() < 0.75 {
 					stage = 30021
@@ -123,13 +123,13 @@ func FollowerOfFrintezzaTransform() script.Script {
 				s.StartTimer("1001", n, nil, 2000*time.Millisecond)
 				s.StartTimer("1001", n, nil, 7000*time.Millisecond)
 			} else if e.Arg1 == 0 {
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				n.RemoveAllDesire()
 				n.SetInt(npc.IntQuest2, 0)
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
 				n.SetHeading(16384)
-				n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+				n.TeleportTo(parked())
 			}
 			base.ScriptEvent(s, e)
 		},
@@ -174,8 +174,8 @@ func FollowerOfFrintezzaTransform() script.Script {
 				s.StartTimer("2003", n, nil, 6000*time.Millisecond)
 			case strings.EqualFold(e.Name, "3000"):
 				if n.Int(script.SlotIntAI0) == 7 {
-					if s.ElapsedTicks(n.Int(npc.IntQuest1)) > 15*60 {
-						n.SetDBValue(0)
+					if s.ElapsedTicks(n.Int(npc.IntQuest1)) > idleLimit {
+						n.SetDBValue(stageSealed)
 						if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 							s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
 						}
@@ -185,7 +185,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 						n.RemoveAllDesire()
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 						n.SetHeading(16384)
-						n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+						n.TeleportTo(parked())
 						n.SetInt(npc.IntQuest2, 0)
 						n.SetInt(npc.IntQuest3, 0)
 						n.SetInt(npc.IntQuest4, 0)

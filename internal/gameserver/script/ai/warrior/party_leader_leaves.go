@@ -33,7 +33,7 @@ func PartyLeaderBombSpawn() script.Script {
 			if n.Dead() {
 				return
 			}
-			if e.EventID == 10000 {
+			if e.EventID == eventFleeHelp {
 				if n.Intention() != script.IntentionAttack {
 					if c0 := s.Object(e.Arg1); c0 != nil {
 						n.AddAttackDesire(c0, 1000)

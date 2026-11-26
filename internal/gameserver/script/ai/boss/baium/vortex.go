@@ -46,7 +46,7 @@ func vortexEvent(s *script.Script, e script.Event) string {
 		case player.Flying():
 			htmltext = "31862-05.htm"
 		case c0 != nil && !c0.Dead():
-			if c0.(*script.NPC).DBValue() == 0 {
+			if c0.(*script.NPC).DBValue() == stageAsleep {
 				if player.HasItem(bloodedFabric) {
 					s.TakeItems(player, bloodedFabric, 1)
 					player.TeleportTo(script.Loc{X: 114077, Y: 15882, Z: 10078}, 0)

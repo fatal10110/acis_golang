@@ -66,11 +66,7 @@ func PartyLeaderSaintAggressive() script.Script {
 			hateList := n.HateList()
 			if attacker.Playable() {
 				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*100)+300)
-				} else {
-					hateList.Add(attacker, f0*100)
-				}
+				addHate(hateList, attacker, f0*100)
 			}
 			if attacker.Playable() {
 				switch {

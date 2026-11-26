@@ -44,18 +44,9 @@ func partyLeaderHooks() script.Hooks {
 			n := e.NPC
 			hateList := n.HateList()
 			if strings.EqualFold(e.Name, "1002") {
-				hateList.Refresh()
-				hateList.RemoveIfOutOfRange(1000)
+				refreshHate(hateList)
 			} else if strings.EqualFold(e.Name, "1003") {
-				if n.Muted() {
-					s.StartTimer("1003", n, nil, 10000*time.Millisecond)
-				} else {
-					n.RemoveAllAttackDesire()
-					n.SetInt(script.SlotIntAI0, 0)
-					if mostHated := hateList.MostHated(); mostHated != nil {
-						s.Attacked(s, script.Attacked{NPC: n, Attacker: mostHated, Damage: 100})
-					}
-				}
+				silenceRetry(s, n, nil, hateList)
 			}
 			return base.Timer(s, e)
 		},
@@ -64,16 +55,9 @@ func partyLeaderHooks() script.Hooks {
 			hateList := n.HateList()
 			if attacker.Playable() {
 				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*100)+300)
-				} else {
-					hateList.Add(attacker, f0*100)
-				}
+				addHate(hateList, attacker, f0*100)
 			}
-			if n.Muted() {
-				n.SetInt(script.SlotIntAI0, 1)
-				s.StartTimer("1003", n, nil, 10000*time.Millisecond)
-			}
+			waitOutSilence(s, n)
 			if n.Int(script.SlotIntAI2) == 0 {
 				if int32(s.Rnd(100)) < n.IntParam("SummonPrivateRate") {
 					defaultnpc.CreatePrivates(s, n)
@@ -105,7 +89,7 @@ func partyLeaderHooks() script.Hooks {
 						f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
 						hateList.Add(attacker, (f0*1000)+300)
 						n.SetInt(script.SlotFlag, attacker.ObjectID())
-						s.BroadcastScriptEvent(n, 10002, n.ObjectID(), 300)
+						s.BroadcastScriptEvent(n, eventMasterTarget, n.ObjectID(), 300)
 					}
 				}
 			}
@@ -117,11 +101,7 @@ func partyLeaderHooks() script.Hooks {
 				hateList := called.HateList()
 				f0 := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, target))
 				weightPoint := float64(caller.Int(script.SlotWeightPoint))
-				if hateList.Empty() {
-					hateList.Add(target, (((f0*float64(e.Damage))*weightPoint)*10)+300)
-				} else {
-					hateList.Add(target, ((f0*float64(e.Damage))*weightPoint)*10)
-				}
+				addHate(hateList, target, ((f0*float64(e.Damage))*weightPoint)*10)
 			}
 		},
 		OnClanAttacked: func(_ *script.Script, e script.ClanAttacked) {
@@ -129,11 +109,7 @@ func partyLeaderHooks() script.Hooks {
 			if attacker.Playable() && called.LifeTime() > 7 {
 				hateList := called.HateList()
 				f0 := defaultnpc.HateRatio(called, attacker)
-				if hateList.Empty() {
-					hateList.Add(attacker, (((f0*float64(e.Damage))*30)*10)+300)
-				} else {
-					hateList.Add(attacker, ((f0*float64(e.Damage))*30)*10)
-				}
+				addHate(hateList, attacker, ((f0*float64(e.Damage))*30)*10)
 			}
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {

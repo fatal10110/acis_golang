@@ -25,7 +25,7 @@ func FreyaBear() script.Script {
 				return
 			}
 			switch e.EventID {
-			case 10002:
+			case eventMasterTarget:
 				master := n.Master()
 				if master == nil {
 					return
@@ -43,7 +43,7 @@ func FreyaBear() script.Script {
 					n.CleanAllHate()
 					n.AddAttackDesire(flagged, 1000000)
 				}
-			case 10034:
+			case eventHealMaster:
 				if master := n.Master(); master != nil {
 					castByType(n, master, npc.SkillTypeMagicHeal)
 				}
@@ -85,13 +85,10 @@ func OrfenPrivateRaikelLeos() script.Script {
 			return base.Timer(s, e)
 		},
 		OnAttacked: func(_ *script.Script, e script.Attacked) {
-			if e.Attacker.Level() > e.NPC.Level()+8 {
-				e.NPC.AddCastDesire(e.Attacker, skill.Ref{ID: 4515, Level: 1}, 1000000)
-			}
+			raidCurse(e.NPC, e.Attacker)
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {
-			if e.Caster.Level() > e.NPC.Level()+8 {
-				e.NPC.AddCastDesire(e.Caster, skill.Ref{ID: 4215, Level: 1}, 1000000)
+			if raidMute(e.NPC, e.Caster) {
 				return
 			}
 			base.SeeSpell(s, e)
@@ -141,7 +138,7 @@ func PartyPrivateCannibaliAggressive() script.Script {
 			base.Attacked(s, e)
 		},
 		OnScriptEvent: func(_ *script.Script, e script.ScriptEvent) {
-			if e.EventID == 10028 {
+			if e.EventID == eventLeaderLeft {
 				e.NPC.DeleteMe()
 			}
 		},
