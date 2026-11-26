@@ -14,10 +14,14 @@ import (
 )
 
 func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePlayer, req clientpackets.RequestActionUse) bool {
-	command, ok := summonCommandForActionID(req.ActionID)
+	entry, ok := summonActionTable[req.ActionID]
 	if !ok {
-		return l.handleSummonSkillUse(live, req)
+		return false
 	}
+	if entry.SkillID != 0 {
+		return l.handleSummonSkillUse(live, req, entry)
+	}
+	command := entry.Command
 	if l.world == nil {
 		return false
 	}
@@ -58,9 +62,11 @@ const (
 	summonSkillTargetSelf
 )
 
-// summonSkillEntry is one RequestActionUse action-id-to-skill mapping for a
-// pet/servitor's commanded special skill.
-type summonSkillEntry struct {
+// summonActionEntry is what one RequestActionUse summon action id does:
+// a movement or status command, or, when SkillID is set, a pet/servitor's
+// commanded special skill.
+type summonActionEntry struct {
+	Command    summon.Command
 	SkillID    int
 	TargetKind summonSkillTargetKind
 	// Door is how the action treats a door selected as its target.
@@ -86,6 +92,23 @@ func (r summonDoorRule) refuses(target world.Tracked) bool {
 	return (r == doorOnly && !isDoor) || (r == doorRefused && isDoor)
 }
 
+// Action-bar command ids carried by an action-use request that command a
+// pet or servitor.
+const (
+	actionPetFollow        int32 = 15
+	actionPetAttack        int32 = 16
+	actionPetStop          int32 = 17
+	actionPetReturn        int32 = 19
+	actionServitorFollow   int32 = 21
+	actionServitorAttack   int32 = 22
+	actionServitorStop     int32 = 23
+	actionServitorUnsummon int32 = 52
+	actionServitorMove     int32 = 53
+	actionPetMove          int32 = 54
+	// actionSinEaterBuster is Sin Eater's Ultimate Bombastic Buster.
+	actionSinEaterBuster int32 = 1001
+)
+
 const sinEaterNPCID = 12564
 
 var sinEaterActionStrings = [...]string{
@@ -95,10 +118,21 @@ var sinEaterActionStrings = [...]string{
 	", has not hit...!",
 }
 
-// summonSkillActionTable lists every commanded special-skill action of
-// RequestActionUse. Action 32 (Wild Hog Cannon Mode Change) is
+// summonActionTable lists every summon command and commanded special-skill
+// action of RequestActionUse. Action 32 (Wild Hog Cannon Mode Change) is
 // intentionally absent: it is specified as a no-op.
-var summonSkillActionTable = map[int32]summonSkillEntry{
+var summonActionTable = map[int32]summonActionEntry{
+	actionPetFollow:        {Command: summon.CommandToggleFollow},
+	actionServitorFollow:   {Command: summon.CommandToggleFollow},
+	actionPetAttack:        {Command: summon.CommandAttack},
+	actionServitorAttack:   {Command: summon.CommandAttack},
+	actionPetStop:          {Command: summon.CommandStop},
+	actionServitorStop:     {Command: summon.CommandStop},
+	actionPetReturn:        {Command: summon.CommandReturnPet},
+	actionServitorUnsummon: {Command: summon.CommandUnsummonServitor},
+	actionServitorMove:     {Command: summon.CommandMoveToTarget},
+	actionPetMove:          {Command: summon.CommandMoveToTarget},
+
 	36:   {SkillID: 4259, TargetKind: summonSkillTargetClicked},
 	39:   {SkillID: 4138, TargetKind: summonSkillTargetClicked},
 	41:   {SkillID: 4230, TargetKind: summonSkillTargetClicked, Door: doorOnly},
@@ -111,43 +145,41 @@ var summonSkillActionTable = map[int32]summonSkillEntry{
 	48:   {SkillID: 4068, TargetKind: summonSkillTargetClicked},
 	1000: {SkillID: 4079, TargetKind: summonSkillTargetClicked, Door: doorOnly},
 	// 1001 (Sin Eater's Ultimate Bombastic Buster) targets the summon itself.
-	1001: {SkillID: 4139, TargetKind: summonSkillTargetSelf},
-	1003: {SkillID: 4710, TargetKind: summonSkillTargetClicked},
-	1004: {SkillID: 4711, TargetKind: summonSkillTargetOwner},
-	1005: {SkillID: 4712, TargetKind: summonSkillTargetClicked},
-	1006: {SkillID: 4713, TargetKind: summonSkillTargetOwner},
-	1007: {SkillID: 4699, TargetKind: summonSkillTargetOwner},
-	1008: {SkillID: 4700, TargetKind: summonSkillTargetOwner},
-	1009: {SkillID: 4701, TargetKind: summonSkillTargetClicked},
-	1010: {SkillID: 4702, TargetKind: summonSkillTargetOwner},
-	1011: {SkillID: 4703, TargetKind: summonSkillTargetOwner},
-	1012: {SkillID: 4704, TargetKind: summonSkillTargetClicked},
-	1013: {SkillID: 4705, TargetKind: summonSkillTargetClicked},
-	1014: {SkillID: 4706, TargetKind: summonSkillTargetOwner},
-	1015: {SkillID: 4707, TargetKind: summonSkillTargetClicked},
-	1016: {SkillID: 4709, TargetKind: summonSkillTargetClicked},
-	1017: {SkillID: 4708, TargetKind: summonSkillTargetClicked},
-	1031: {SkillID: 5135, TargetKind: summonSkillTargetClicked},
-	1032: {SkillID: 5136, TargetKind: summonSkillTargetClicked},
-	1033: {SkillID: 5137, TargetKind: summonSkillTargetClicked},
-	1034: {SkillID: 5138, TargetKind: summonSkillTargetClicked},
-	1035: {SkillID: 5139, TargetKind: summonSkillTargetClicked},
-	1036: {SkillID: 5142, TargetKind: summonSkillTargetClicked},
-	1037: {SkillID: 5141, TargetKind: summonSkillTargetClicked},
-	1038: {SkillID: 5140, TargetKind: summonSkillTargetClicked},
-	1039: {SkillID: 5110, TargetKind: summonSkillTargetClicked, Door: doorRefused},
-	1040: {SkillID: 5111, TargetKind: summonSkillTargetClicked, Door: doorRefused},
+	actionSinEaterBuster: {SkillID: 4139, TargetKind: summonSkillTargetSelf},
+	1003:                 {SkillID: 4710, TargetKind: summonSkillTargetClicked},
+	1004:                 {SkillID: 4711, TargetKind: summonSkillTargetOwner},
+	1005:                 {SkillID: 4712, TargetKind: summonSkillTargetClicked},
+	1006:                 {SkillID: 4713, TargetKind: summonSkillTargetOwner},
+	1007:                 {SkillID: 4699, TargetKind: summonSkillTargetOwner},
+	1008:                 {SkillID: 4700, TargetKind: summonSkillTargetOwner},
+	1009:                 {SkillID: 4701, TargetKind: summonSkillTargetClicked},
+	1010:                 {SkillID: 4702, TargetKind: summonSkillTargetOwner},
+	1011:                 {SkillID: 4703, TargetKind: summonSkillTargetOwner},
+	1012:                 {SkillID: 4704, TargetKind: summonSkillTargetClicked},
+	1013:                 {SkillID: 4705, TargetKind: summonSkillTargetClicked},
+	1014:                 {SkillID: 4706, TargetKind: summonSkillTargetOwner},
+	1015:                 {SkillID: 4707, TargetKind: summonSkillTargetClicked},
+	1016:                 {SkillID: 4709, TargetKind: summonSkillTargetClicked},
+	1017:                 {SkillID: 4708, TargetKind: summonSkillTargetClicked},
+	1031:                 {SkillID: 5135, TargetKind: summonSkillTargetClicked},
+	1032:                 {SkillID: 5136, TargetKind: summonSkillTargetClicked},
+	1033:                 {SkillID: 5137, TargetKind: summonSkillTargetClicked},
+	1034:                 {SkillID: 5138, TargetKind: summonSkillTargetClicked},
+	1035:                 {SkillID: 5139, TargetKind: summonSkillTargetClicked},
+	1036:                 {SkillID: 5142, TargetKind: summonSkillTargetClicked},
+	1037:                 {SkillID: 5141, TargetKind: summonSkillTargetClicked},
+	1038:                 {SkillID: 5140, TargetKind: summonSkillTargetClicked},
+	1039:                 {SkillID: 5110, TargetKind: summonSkillTargetClicked, Door: doorRefused},
+	1040:                 {SkillID: 5111, TargetKind: summonSkillTargetClicked, Door: doorRefused},
 }
 
 // handleSummonSkillUse dispatches an owner-commanded pet/servitor special
-// skill (e.g. Wild Hog Cannon Attack). Unlike handleSummonActionUse's movement/status
-// commands, an unresolvable summon or skill still returns true so the
-// client's input is released, matching the existing action-bar contract;
-// only an unmapped action id returns false. A selected target the action's
+// skill (e.g. Wild Hog Cannon Attack) entry. An unresolvable summon or
+// skill still returns true so the client's input is released, matching the
+// existing action-bar contract; only a link with no world returns false. A selected target the action's
 // door rule refuses is answered INVALID_TARGET ahead of everything else.
-func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpackets.RequestActionUse) bool {
-	entry, ok := summonSkillActionTable[req.ActionID]
-	if !ok || l.world == nil {
+func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpackets.RequestActionUse, entry summonActionEntry) bool {
+	if l.world == nil {
 		return false
 	}
 	if entry.Door.refuses(live.Target()) {
@@ -167,7 +199,7 @@ func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpacket
 	}
 
 	target := l.summonSkillTarget(live, actor, entry.TargetKind)
-	if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed, req.ShiftPressed) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
+	if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed, req.ShiftPressed) && req.ActionID == actionSinEaterBuster && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
 		l.broadcastSummonFrame(actor, serverpackets.FrameNpcSay(actor.ObjectID(), actor.NPCID(), serverpackets.SayTypeAll, sinEaterActionStrings[actor.Roll(len(sinEaterActionStrings))]))
 	}
 	live.SendFrame(serverpackets.FrameActionFailed())
@@ -232,25 +264,6 @@ func summonTargetAttackable(live *livePlayer, target attackable.Combatant, ctrlP
 		return false
 	}
 	return rules.AttackableWithoutForceBy(live.Character) || (ctrlPressed && rules.AttackableBy(live.Character))
-}
-
-func summonCommandForActionID(actionID int32) (summon.Command, bool) {
-	switch actionID {
-	case 15, 21:
-		return summon.CommandToggleFollow, true
-	case 16, 22:
-		return summon.CommandAttack, true
-	case 17, 23:
-		return summon.CommandStop, true
-	case 19:
-		return summon.CommandReturnPet, true
-	case 52:
-		return summon.CommandUnsummonServitor, true
-	case 53, 54:
-		return summon.CommandMoveToTarget, true
-	default:
-		return 0, false
-	}
 }
 
 func systemMessageForSummonFeedback(feedback summon.Feedback) (int, bool) {

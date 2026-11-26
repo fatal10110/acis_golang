@@ -21,27 +21,14 @@ import (
 )
 
 // statCalc returns s's live Calculator, creating it (with its builtin
-// finalize step) on first touch. The common warm case only takes statMu's
-// read lock; the slot is created at most once per Stat per Character.
+// finalize step) on first touch.
 func (c *Character) statCalc(s stat.Stat) *effect.Calculator {
-	c.statMu.RLock()
-	if calc := c.statCalcs[s]; calc != nil {
-		c.statMu.RUnlock()
-		return calc
-	}
-	c.statMu.RUnlock()
-	return c.statCalcOrCreate(s)
+	return c.statSlots.Get(s, newStatCalc)
 }
 
-func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
-	c.statMu.Lock()
-	defer c.statMu.Unlock()
-	if calc := c.statCalcs[s]; calc != nil {
-		return calc
-	}
-	calc := effect.NewCalculator(defaultBuiltin(s))
-	c.statCalcs[s] = &calc
-	return &calc
+// newStatCalc returns a fresh chain for s: its builtin finalize step alone.
+func newStatCalc(s stat.Stat) effect.Calculator {
+	return effect.NewCalculator(defaultBuiltin(s))
 }
 
 func (c *Character) calcStat(s stat.Stat, base float64) float64 {

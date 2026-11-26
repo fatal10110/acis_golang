@@ -46,15 +46,6 @@ type summonVitals struct {
 	hp, mp float64
 }
 
-type summonStatCalcs struct {
-	// mu guards calcs slot creation; each slot's own Calculator then
-	// guards its own Mods independently, so a warm read only ever takes
-	// mu's read lock. An attacker's formulas read these stats from the
-	// attacker's queue.
-	mu    sync.RWMutex
-	calcs [stat.Count]*effect.Calculator
-}
-
 func (a *Actor) initVitals() {
 	a.vitals.hp = a.MaxHPValue()
 	a.vitals.mp = a.MaxMPValue()
@@ -77,9 +68,7 @@ func (a *Actor) AddStatFuncs(fns []effect.Mod) {
 // AttachStatFuncs attaches fns to a's live stat calculators without
 // reporting the change.
 func (a *Actor) AttachStatFuncs(fns []effect.Mod) {
-	for _, fn := range fns {
-		a.statCalcOrCreate(fn.Stat).AddMod(fn)
-	}
+	a.statSlots.Attach(fns, newStatCalc)
 }
 
 // StatFuncsAttached reports the stat change of attached fns: the movement
@@ -101,15 +90,7 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	a.statCalc.mu.RLock()
-	calcs := a.statCalc.calcs
-	a.statCalc.mu.RUnlock()
-	removed := false
-	for s := range owner.OwnedStats() {
-		if calc := calcs[s]; calc != nil && calc.RemoveOwner(owner) > 0 {
-			removed = true
-		}
-	}
+	removed := len(a.statSlots.RemoveOwner(owner)) > 0
 	switch {
 	case removed && owner.Stripped():
 		a.refreshMoveSpeed()
@@ -134,24 +115,12 @@ func (a *Actor) statsModified(effectPass bool) {
 }
 
 func (a *Actor) statCalculator(s stat.Stat) *effect.Calculator {
-	a.statCalc.mu.RLock()
-	if calc := a.statCalc.calcs[s]; calc != nil {
-		a.statCalc.mu.RUnlock()
-		return calc
-	}
-	a.statCalc.mu.RUnlock()
-	return a.statCalcOrCreate(s)
+	return a.statSlots.Get(s, newStatCalc)
 }
 
-func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
-	a.statCalc.mu.Lock()
-	defer a.statCalc.mu.Unlock()
-	if calc := a.statCalc.calcs[s]; calc != nil {
-		return calc
-	}
-	calc := effect.NewCalculator(defaultBuiltin(s))
-	a.statCalc.calcs[s] = &calc
-	return &calc
+// newStatCalc returns a fresh chain for s: its builtin finalize step alone.
+func newStatCalc(s stat.Stat) effect.Calculator {
+	return effect.NewCalculator(defaultBuiltin(s))
 }
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {

@@ -12,6 +12,53 @@ const MaxSubclasses = 3
 // level a subclass ever drops to.
 const SubclassStartLevel = 40
 
+// SubclassMinLevel is the level the active class and every subclass held
+// must have reached before another subclass may be added.
+const SubclassMinLevel = 75
+
+// The quests a character who is not noble completes before adding a
+// subclass.
+const (
+	fatesWhisperQuest = "Q234_FatesWhisper"
+	mimirsElixirQuest = "Q235_MimirsElixir"
+)
+
+// SubclassAddRefusal is why AddSubclassRefusal refuses another subclass.
+type SubclassAddRefusal int
+
+const (
+	SubclassAddAllowed SubclassAddRefusal = iota
+	// SubclassAddSlotsFull: c already holds MaxSubclasses.
+	SubclassAddSlotsFull
+	// SubclassAddLevelTooLow: the active class or a held subclass is below
+	// SubclassMinLevel.
+	SubclassAddLevelTooLow
+	// SubclassAddQuestsMissing: c is not noble and has not completed both
+	// subclass quests.
+	SubclassAddQuestsMissing
+)
+
+// AddSubclassRefusal reports why c, holding subs, may not add another
+// subclass, or SubclassAddAllowed. withoutQuests waives the quests, as
+// nobility does. A quest c has no state in counts as not completed.
+func (c *Character) AddSubclassRefusal(subs []SubClass, withoutQuests bool) SubclassAddRefusal {
+	if len(subs) >= MaxSubclasses {
+		return SubclassAddSlotsFull
+	}
+	if c.Level() < SubclassMinLevel {
+		return SubclassAddLevelTooLow
+	}
+	for _, sub := range subs {
+		if sub.Level < SubclassMinLevel {
+			return SubclassAddLevelTooLow
+		}
+	}
+	if withoutQuests || c.IsNoble() || (c.QuestCompleted(fatesWhisperQuest) && c.QuestCompleted(mimirsElixirQuest)) {
+		return SubclassAddAllowed
+	}
+	return SubclassAddQuestsMissing
+}
+
 // SubClass is one subclass slot: the class it plays, its slot index (1 to
 // MaxSubclasses) and its own progression.
 type SubClass struct {

@@ -20,7 +20,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -294,15 +293,11 @@ type Character struct {
 	summonSkill       modelskill.Definition
 	summonDeadline    time.Time
 
-	// statMu guards statCalcs slot creation; each slot's own Calculator
-	// then guards its own Mods independently, so a warm read only ever
-	// takes statMu's read lock. An attacker's formulas read these stats
-	// from the attacker's queue, and removing an effect another actor
+	// statSlots are c's live stat chains. Removing an effect another actor
 	// dispels drops its mods (RemoveStatsByOwner) from that actor's queue.
-	// The effect list takes it under its own lock (AttachStatFuncs), so it
-	// is a leaf.
-	statMu    sync.RWMutex
-	statCalcs [stat.Count]*effect.Calculator
+	// The effect list takes their lock under its own (AttachStatFuncs), so
+	// it is a leaf.
+	statSlots effect.StatSlots
 
 	// equipped records the template each worn item's equip stats attached
 	// with (see EquippedTemplate).

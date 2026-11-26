@@ -2,7 +2,6 @@ package npc
 
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -42,7 +41,3 @@ func (h *Hostile) ReviveOffer() (pending, forPet bool) { return false, false }
 func (h *Hostile) InSiegeZone() bool                   { return false }
 func (h *Hostile) SiegeState() int32                   { return 0 }
 func (h *Hostile) FestivalParticipant() bool           { return false }
-
-// SkillLevels is empty: an NPC's chance procs are its effects' triggers
-// only.
-func (h *Hostile) SkillLevels() player.SkillLevels { return nil }

@@ -17,7 +17,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -64,10 +63,9 @@ type folkCombat struct {
 
 	effects *effect.List
 
-	// statMu guards statCalcs and its slots; each Calculator guards its own
-	// mods. A Stat without a slot computes from the builtin funcs alone.
-	statMu    sync.RWMutex
-	statCalcs *[stat.Count]*effect.Calculator
+	// statSlots are the NPC's live stat chains. A Stat without a slot
+	// computes from the builtin funcs alone.
+	statSlots effect.StatSlots
 	// speedMu orders move-speed hand-offs to a walking NPC's movement.
 	speedMu sync.Mutex
 

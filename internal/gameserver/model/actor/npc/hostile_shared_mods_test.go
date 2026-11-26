@@ -158,7 +158,7 @@ func TestHostileBuiltinOnlyReadsStayCold(t *testing.T) {
 	if allocs != 0 {
 		t.Errorf("stat reads allocated %v times per run, want 0", allocs)
 	}
-	if a.statCalcs != nil {
+	if anyStatSlot(&a.statSlots) {
 		t.Error("stat reads created stat chains, want none")
 	}
 }
@@ -293,7 +293,17 @@ func TestFolkIgnoresTemplatePassives(t *testing.T) {
 			t.Errorf("CalcStat(%v, %v) = %v, want %v", tc.stat, tc.base, got, want)
 		}
 	}
-	if f.statCalcs != nil {
+	if anyStatSlot(&f.statSlots) {
 		t.Error("stat reads created stat chains, want none")
 	}
+}
+
+// anyStatSlot reports whether ss holds a slot for any Stat.
+func anyStatSlot(ss *effect.StatSlots) bool {
+	for s := range stat.Count {
+		if ss.Lookup(stat.Stat(s)) != nil {
+			return true
+		}
+	}
+	return false
 }
