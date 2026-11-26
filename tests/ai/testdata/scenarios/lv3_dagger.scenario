@@ -4,6 +4,7 @@
 # the character being its top desire target on a draw under 33, wants physical special 1 (4101)
 # at 1000, which it casts on itself. After 15 s its timer 4000 (draws 0) wants its weak mode off
 # (4524) on itself.
+driven
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc

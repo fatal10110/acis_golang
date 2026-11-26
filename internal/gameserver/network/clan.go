@@ -79,19 +79,20 @@ func (l *GameClientLink) tellMentorLoggedIn(c *player.Character) {
 	}
 }
 
-// leaveClanOnLogout marks live offline in its clan and shows the rest of
-// the clan its row going offline. Its pending invitation, if any, is left
-// to its partner. One leaving before it entered the world takes a removal
-// its clan kept for it, so its last save stores the leave.
+// leaveClanOnLogout marks live, already out of the world, offline in its
+// clan and shows the rest of the clan its row going offline. Its pending
+// invitation, if any, is left to its partner. One leaving before it entered
+// the world takes a removal its clan kept for it, so its last save stores
+// the leave; one its clan removed since it left the world takes the removal
+// handed to it, its row written as an online member's (clan.Service.Leave).
 func (l *GameClientLink) leaveClanOnLogout(live *livePlayer) {
 	c := live.Character
 	l.clanService().Invites().Left(c.ID)
 	l.clanService().EndEntry(c)
-	cl, ok := l.clanService().ClanOf(c)
+	cl, ok := l.clanService().Leave(c)
 	if !ok {
 		return
 	}
-	cl.SetOffline(c.ID, clan.LiveMember(c))
 	m, _ := cl.Member(c.ID)
 	row := liveMemberRow(c, m)
 	row.OnlineObjectID = 0
@@ -305,7 +306,9 @@ func (l *GameClientLink) onlineCharacter(id int32) *player.Character {
 // clan first checks what it wears (checkLeaverItems); an offline one's
 // circlets go back to its inventory, unless its selection is under way and
 // already loaded them. One lingering after its connection dropped leaves as
-// an online one does, its client told nothing.
+// an online one does, its client told nothing. One still listed online but
+// already out of the world is logging out: it keeps what it wears, as its
+// last saves stored it, and takes the leave as its clan marks it offline.
 func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpackets.RequestOustPledgeMember) {
 	now := time.Now()
 	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, l.onlineCharacter, l.clanMemberConnected, now)
@@ -330,6 +333,12 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 		target, _ = l.livePlayerByID(m.ObjectID)
 	}
 	switch {
+	case target == nil && m.Online:
+		// Out of the world on its way out, it keeps what it wears, as a
+		// member online does: its last inventory save, already queued,
+		// stored it worn. Its removal row is written already, when it was
+		// removed online before leaving the world, or else by
+		// clan.Service.Leave, the leave having been handed to it.
 	case target == nil && !m.Entering:
 		l.unequipLeaverCirclets(cl, m.ObjectID)
 	case target == nil:
