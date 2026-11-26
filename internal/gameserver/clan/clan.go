@@ -2,6 +2,15 @@
 // privileges, the rules for founding, joining, leaving, expelling, ranking
 // and levelling, and the rows those changes write. It decides and mutates;
 // the network layer turns the returned outcomes into packets.
+//
+// A change a player asks for goes through a Service method taking the
+// acting *player.Character, which checks the actor's rights itself. The
+// methods taking only a *Clan check no rights: SetSkill, RaiseSkills,
+// RemoveSkill, RemoveAllSkills, ChangeLevel, SetLeader, AddReputation,
+// TakeReputation, EndWar and Destroy serve admin commands and the server's
+// own changes (rewards, sieges, timers), or run after a player method
+// judged the request (CheckSurrender before EndWar). A new player entry
+// point takes the actor-taking form.
 package clan
 
 import (
@@ -341,9 +350,19 @@ func (cl *Clan) memberPrivilegesLocked(objectID int32) int32 {
 	return cl.privileges[m.PowerGrade]
 }
 
-// HasPrivilege reports whether objectID holds p.
+// HasPrivilege reports whether objectID holds p. It takes cl.mu for
+// reading itself, so it serves a judgment that changes nothing of the
+// clan; a check guarding a change of the clan runs under that change's
+// lock, with hasPrivilegeLocked.
 func (cl *Clan) HasPrivilege(objectID int32, p Privilege) bool {
-	return cl.MemberPrivileges(objectID)&int32(p) != 0
+	cl.mu.RLock()
+	defer cl.mu.RUnlock()
+	return cl.hasPrivilegeLocked(objectID, p)
+}
+
+// hasPrivilegeLocked is HasPrivilege with cl.mu held.
+func (cl *Clan) hasPrivilegeLocked(objectID int32, p Privilege) bool {
+	return cl.memberPrivilegesLocked(objectID)&int32(p) != 0
 }
 
 // leadsSubunit returns the sub-unit objectID leads, 0 when none.

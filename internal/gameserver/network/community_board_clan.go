@@ -37,10 +37,10 @@ func (l *GameClientLink) boardClan(live *livePlayer, command string) {
 	if strings.EqualFold(action, "notice") {
 		if len(tokens) > 2 {
 			if cl, ok := l.clanService().ClanOf(live.Character); ok {
-				if !l.clanLeaderPage(live, cl) {
+				if !l.clanService().EnableNotice(live.Character, cl, strings.EqualFold(tokens[2], "true")) {
+					l.refuseClanLeaderPage(live)
 					return
 				}
-				l.clanService().EnableNotice(cl, strings.EqualFold(tokens[2], "true"))
 			}
 		}
 		l.showClanNotice(live, l.boardClanID(live))
@@ -76,16 +76,24 @@ func (l *GameClientLink) boardClanWrite(live *livePlayer, args [5]string) {
 	switch {
 	case strings.EqualFold(args[0], "intro"):
 		cl, ok := l.boardFormClan(live, args[1])
-		if !ok || !l.clanLeaderPage(live, cl) {
+		if !ok {
 			return
 		}
-		l.clanService().SetIntroduction(cl, args[2])
+		if !l.clanService().SetIntroduction(live.Character, cl, args[2]) {
+			l.refuseClanLeaderPage(live)
+			return
+		}
 		l.showClanManagement(live, cl.ID())
 	case args[0] == "notice":
-		if cl, ok := l.clanService().ClanOf(live.Character); ok && l.clanLeaderPage(live, cl) {
-			l.clanService().SetNotice(cl, args[3])
-			l.showClanNotice(live, cl.ID())
+		cl, ok := l.clanService().ClanOf(live.Character)
+		if !ok {
+			return
 		}
+		if !l.clanService().SetNotice(live.Character, cl, args[3]) {
+			l.refuseClanLeaderPage(live)
+			return
+		}
+		l.showClanNotice(live, cl.ID())
 	case strings.EqualFold(args[0], "mail"):
 		cl, ok := l.boardFormClan(live, args[1])
 		if !ok || !l.clanLeaderPage(live, cl) {
@@ -155,14 +163,22 @@ func (l *GameClientLink) clanBoardOpen(live *livePlayer, cl *clan.Clan) bool {
 }
 
 // clanLeaderPage reports whether live leads the clan id; one that does not
-// is told only the leader may, and shown the clan list.
+// is refused with refuseClanLeaderPage.
 func (l *GameClientLink) clanLeaderPage(live *livePlayer, cl *clan.Clan) bool {
 	if l.boardClanID(live) == cl.ID() && cl.IsLeader(live.ObjectID()) {
 		return true
 	}
+	l.refuseClanLeaderPage(live)
+	return false
+}
+
+// refuseClanLeaderPage tells live only the clan leader may do what it
+// asked, and shows it the clan list. The board writes are judged by the
+// clan service (it leads the clan the page names, or is refused here),
+// the clan mail by clanLeaderPage.
+func (l *GameClientLink) refuseClanLeaderPage(live *livePlayer) {
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyClanLeaderEnabled))
 	l.showClanList(live, 1)
-	return false
 }
 
 // showClanHome shows clan id's home page: the visitor's, the member's or

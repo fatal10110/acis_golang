@@ -6,8 +6,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
-// AcademyCircletID is the circlet an academy graduate is handed.
-const AcademyCircletID = 8181
+// academyCircletID is the circlet an academy graduate is handed.
+const academyCircletID = 8181
+
+// academyGraduationTier is the occupation tier whose taking graduates an
+// academy member: the second occupation.
+const academyGraduationTier = 2
 
 // Graduation is an academy member's graduation from its clan.
 type Graduation struct {
@@ -36,13 +40,18 @@ func graduationPoints(joined int) int {
 	}
 }
 
-// Graduate graduates c, which has just taken its second occupation, from
-// its clan when it joined the clan's academy: the clan earns the
-// graduation's reputation and c leaves the roster, as one step, so no
-// other change to the roster runs between them. It reports false, having
-// done nothing, for a character outside any clan or that never joined an
-// academy. The caller clears c's clan state with ApplyGraduated.
-func (s *Service) Graduate(c *player.Character, now time.Time) (Graduation, bool) {
+// Graduate graduates c, which is taking the occupation classID, from its
+// clan when classID is a second occupation and c joined the clan's
+// academy: the clan earns the graduation's reputation and c leaves the
+// roster, as one step, so no other change to the roster runs between them.
+// It reports false, having done nothing, for another occupation tier, or a
+// character outside any clan or that never joined an academy. The caller
+// clears c's clan state with ApplyGraduated, then hands the graduate its
+// circlet with GiveGraduateCirclet.
+func (s *Service) Graduate(c *player.Character, classID int, now time.Time) (Graduation, bool) {
+	if tier, _ := player.ClassLevel(classID); tier != academyGraduationTier {
+		return Graduation{}, false
+	}
 	cl, ok := s.ClanOf(c)
 	if !ok {
 		return Graduation{}, false
@@ -65,4 +74,11 @@ func (s *Service) Graduate(c *player.Character, now time.Time) (Graduation, bool
 // of the academy since has its penalty cleared.
 func (s *Service) ApplyGraduated(c *player.Character, m Member) {
 	s.applyLeft(c, m, 0)
+}
+
+// GiveGraduateCirclet hands c, which graduated, the Academy Circlet, on
+// c's queue; nextID allocates its object id. It reports whether the
+// circlet was added.
+func GiveGraduateCirclet(c *player.Character, nextID func() (int32, error)) bool {
+	return c.AddCreatedItem(academyCircletID, 1, nextID)
 }
