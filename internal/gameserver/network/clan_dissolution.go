@@ -136,7 +136,7 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 // operation, so a member's deposit or withdrawal waiting on that operation
 // finds it gone (storeStillOpen).
 func (l *GameClientLink) destroyClanWarehouse(clanID int32) {
-	defer l.clanWarehouses.forget(clanID)
+	defer l.clanWarehouses.Forget(clanID)
 	wh, err := l.clanWarehouse(clanID)
 	if err != nil {
 		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("warehouse: restore dissolved clan warehouse")
@@ -152,7 +152,7 @@ func (l *GameClientLink) destroyClanWarehouse(clanID int32) {
 		}
 	}
 	l.applyPersistActions(persist)
-	l.clanWarehouses.forget(clanID)
+	l.clanWarehouses.Forget(clanID)
 	end()
 	wh.ReleasePersistence()
 }

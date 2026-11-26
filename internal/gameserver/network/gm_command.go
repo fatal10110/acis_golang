@@ -86,7 +86,7 @@ func (l *GameClientLink) sendGMView(gm, target *livePlayer, command int32) {
 // its leader's name. A warehouse that cannot be read is logged and the
 // client released.
 func (l *GameClientLink) sendGMClanWarehouseView(gm *livePlayer, cl *clan.Clan) {
-	wh := l.clanWarehouses.restored(cl.ID())
+	wh := l.clanWarehouses.Restored(cl.ID())
 	if wh == nil {
 		gm.SendFrame(serverpackets.FrameActionFailed())
 		return
