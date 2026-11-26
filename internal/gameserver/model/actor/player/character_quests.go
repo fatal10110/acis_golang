@@ -2,6 +2,7 @@ package player
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/memo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 )
@@ -66,3 +67,8 @@ func (c *Character) NotifyQuestOverweight() { c.emit(event.QuestOverweight{}) }
 // ShowNPCChat opens on c the NPC objectID's own chat window, the one it
 // opens when talked to with no script answering.
 func (c *Character) ShowNPCChat(objectID int32) { c.emit(event.NPCChatShown{ObjectID: objectID}) }
+
+// Memos returns c's memos.
+func (c *Character) Memos() *memo.Memos {
+	return &c.memos
+}

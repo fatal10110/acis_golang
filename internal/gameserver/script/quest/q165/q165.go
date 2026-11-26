@@ -3,6 +3,8 @@
 package q165
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -45,7 +47,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {30348}, // Nelsya
 			script.EventTalked:     {30348},
-			script.EventMyDying:    {ashenWolf, youngBrownKeltir, brownKeltir, elderBrownKeltir},
+			script.EventMyDying:    slices.Sorted(maps.Keys(chances())),
 		},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
 	}

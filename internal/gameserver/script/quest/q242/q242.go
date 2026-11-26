@@ -71,6 +71,17 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"31743-05.htm": 2,
+		"31744-02.htm": 3,
+		"31751-02.htm": 4,
+		"30759-02.htm": 7,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	p := e.Player
@@ -80,21 +91,9 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 	}
 	switch {
 	// Kassandra.
-	case strings.EqualFold(e.Name, "31743-05.htm"):
-		st.SetCond(2)
-		s.PlaySound(p, script.SoundMiddle)
 	// Ogmar.
-	case strings.EqualFold(e.Name, "31744-02.htm"):
-		st.SetCond(3)
-		s.PlaySound(p, script.SoundMiddle)
 	// Mysterious Knight.
-	case strings.EqualFold(e.Name, "31751-02.htm"):
-		st.SetCond(4)
-		s.PlaySound(p, script.SoundMiddle)
 	// Kalis.
-	case strings.EqualFold(e.Name, "30759-02.htm"):
-		st.SetCond(7)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "30759-05.htm"):
 		if p.HasItem(sorceryIngredient) {
 			st.SetCond(9)
@@ -127,6 +126,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			}
 		} else {
 			htmltext = ""
+		}
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
 		}
 	}
 	return htmltext

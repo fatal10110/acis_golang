@@ -3,6 +3,8 @@
 package q385
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
@@ -77,11 +79,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: gatekeeperZiggurat,
 			script.EventTalked:     gatekeeperZiggurat,
-			script.EventMyDying: {
-				21208, 21209, 21210, 21211, 21213, 21214, 21215, 21217, 21218, 21219, 21221, 21222, 21223, 21224, 21225,
-				21226, 21227, 21228, 21229, 21230, 21231, 21236, 21237, 21238, 21239, 21240, 21241, 21242, 21243, 21244,
-				21245, 21246, 21247, 21248, 21249, 21250, 21251, 21252, 21253, 21254, 21255,
-			},
+			script.EventMyDying:    slices.Sorted(maps.Keys(chances())),
 		},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
 	}

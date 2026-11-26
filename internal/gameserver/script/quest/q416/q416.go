@@ -84,6 +84,16 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"32057-02.htm": 14,
+		"32057-05.htm": 21,
+		"32090-04.htm": 18,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -134,16 +144,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.TakeItems(p, bloodCauldron, 1)
 		s.GiveItems(p, spiritNet, 1)
 	// Totem Spirit of Gandi
-	case strings.EqualFold(e.Name, "32057-02.htm"):
-		st.SetCond(14)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32057-05.htm"):
-		st.SetCond(21)
-		s.PlaySound(p, script.SoundMiddle)
 	// Dead Leopard Carcass
-	case strings.EqualFold(e.Name, "32090-04.htm"):
-		st.SetCond(18)
-		s.PlaySound(p, script.SoundMiddle)
 	// Umos
 	case strings.EqualFold(e.Name, "30502-07.htm"):
 		s.TakeItems(p, totemSpiritBlood, -1)
@@ -152,6 +153,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		p.SocialAction(3)
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(true)
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }

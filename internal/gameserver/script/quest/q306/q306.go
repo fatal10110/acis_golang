@@ -19,8 +19,11 @@ const (
 
 // droplist returns, per monster, its NPC id, the shard it drops and the
 // drop chance.
-func droplist() [][]int32 {
-	return [][]int32{
+// drop is the shard a monster drops and the chance it drops it at.
+type drop struct{ npcID, itemID, chance int32 }
+
+func droplist() []drop {
+	return []drop{
 		{20109, flameShard, 300000},
 		{20110, iceShard, 300000},
 		{20112, flameShard, 400000},
@@ -100,9 +103,9 @@ func onMyDying(s *script.Script, e script.MyDying) {
 	if s.CheckPlayerState(p, e.NPC, questlog.StatusStarted) == nil {
 		return
 	}
-	for _, drop := range droplist() {
-		if e.NPC.NpcID() == drop[0] {
-			s.DropItems(p, drop[1], 1, 0, drop[2])
+	for _, d := range droplist() {
+		if e.NPC.NpcID() == d.npcID {
+			s.DropItems(p, d.itemID, 1, 0, d.chance)
 			break
 		}
 	}

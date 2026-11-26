@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"time"
 
@@ -21,7 +20,7 @@ import (
 // no answer, so no ActionFailed is owed either. It runs on live's queue,
 // so the quest's hook runs as a hook on that queue.
 func (l *GameClientLink) tutorialRequest(live *livePlayer, name string) {
-	live.NotifyTutorialOnQueue(name)
+	live.NotifyTutorialOnQueue(player.TutorialEvent(name))
 }
 
 // noteRestoredHP runs live's restored-HP tutorial step once (see
@@ -44,7 +43,7 @@ func (live *livePlayer) noteRestoredHP() {
 // leaves the world.
 func tutorialPickedUp(picker *livePlayer, itemID int32) {
 	if itemID == item.AdenaID || itemID == blueGemstoneID {
-		picker.NotifyTutorial(fmt.Sprintf("CE%d", itemID))
+		picker.NotifyTutorial(player.TutorialClientEvent(itemID))
 	}
 }
 

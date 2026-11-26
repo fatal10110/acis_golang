@@ -73,6 +73,22 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"30753-02.htm": 2,
+		"30754-02.htm": 3,
+		"31042-02.htm": 6,
+		"31742-02.htm": 12,
+		"31742-05.htm": 18,
+		"31744-02.htm": 13,
+		"31336-02.htm": 14,
+		"31740-02.htm": 19,
+		"31272-02.htm": 20,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	p := e.Player
@@ -99,17 +115,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, poetryBook, 1)
 	// Gabrielle.
-	case strings.EqualFold(e.Name, "30753-02.htm"):
-		st.SetCond(2)
-		s.PlaySound(p, script.SoundMiddle)
 	// Gilmore.
-	case strings.EqualFold(e.Name, "30754-02.htm"):
-		st.SetCond(3)
-		s.PlaySound(p, script.SoundMiddle)
 	// Kantabilon.
-	case strings.EqualFold(e.Name, "31042-02.htm"):
-		st.SetCond(6)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31042-05.htm"):
 		st.SetCond(8)
 		s.PlaySound(p, script.SoundMiddle)
@@ -121,20 +128,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, poetryBook, 1)
 	// Virgil.
-	case strings.EqualFold(e.Name, "31742-02.htm"):
-		st.SetCond(12)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "31742-05.htm"):
-		st.SetCond(18)
-		s.PlaySound(p, script.SoundMiddle)
 	// Ogmar.
-	case strings.EqualFold(e.Name, "31744-02.htm"):
-		st.SetCond(13)
-		s.PlaySound(p, script.SoundMiddle)
 	// Rahorakti.
-	case strings.EqualFold(e.Name, "31336-02.htm"):
-		st.SetCond(14)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31336-05.htm"):
 		st.SetCond(16)
 		s.PlaySound(p, script.SoundMiddle)
@@ -146,9 +141,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, rahoraktiMedicine, 1)
 	// Caradine.
-	case strings.EqualFold(e.Name, "31740-02.htm"):
-		st.SetCond(19)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31740-05.htm"):
 		// #5183: the reward pays only in the state its page is offered in.
 		if st.Status() != questlog.StatusStarted || st.Cond() != 21 {
@@ -160,9 +152,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)
 	// Noel.
-	case strings.EqualFold(e.Name, "31272-02.htm"):
-		st.SetCond(20)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "31272-05.htm"):
 		if p.HasItem(hellfireOil) && p.ItemCount(lunargent) >= 5 {
 			st.SetCond(21)
@@ -171,6 +160,14 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			s.TakeItems(p, hellfireOil, 1)
 		} else {
 			htmltext = "31272-07.htm"
+		}
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
 		}
 	}
 	return htmltext

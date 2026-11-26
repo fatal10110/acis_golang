@@ -68,6 +68,19 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"32041-36.htm":  20,
+		"32046-02.htm":  19,
+		"32047-13.htm":  7,
+		"32047-13a.htm": 10,
+		"32047-17a.htm": 12,
+		"32047-34.htm":  9,
+	}
+}
+
 func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -119,23 +132,12 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(21)
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, letter, 1)
-	case strings.EqualFold(e.Name, "32041-36.htm"):
-		st.SetCond(20)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32046-02.htm"):
-		st.SetCond(19)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32046-06.htm"):
 		s.PlaySound(p, script.SoundFinish)
 		st.Exit(false)
 	case strings.EqualFold(e.Name, "32047-01.htm"):
-		talk := st.GetInt("talk")
-		talk1 := st.GetInt("talk1")
-		switch {
-		case talk == 1 && talk1 == 1:
+		if st.GetInt("talk") == 1 && st.GetInt("talk1") == 1 {
 			htmltext = "32047-04.htm"
-		case talk == 2 && talk1 == 2 && st.GetInt("talk2") == 2:
-			htmltext = "32047-08.htm"
 		}
 	case strings.EqualFold(e.Name, "32047-02.htm"):
 		if st.GetInt("talk") == 0 {
@@ -163,12 +165,6 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		st.Set("choice", strconv.Itoa(3))
 		st.Unset("talk1")
 		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32047-13.htm"):
-		st.SetCond(7)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32047-13a.htm"):
-		st.SetCond(10)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32047-15.htm"):
 		if st.GetInt("talk") == 0 {
 			st.Set("talk", strconv.Itoa(1))
@@ -184,9 +180,6 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		} else {
 			htmltext = "32047-19a.htm"
 		}
-	case strings.EqualFold(e.Name, "32047-17a.htm"):
-		st.SetCond(12)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32047-20.htm"):
 		st.Set("talk", strconv.Itoa(2))
 	case strings.EqualFold(e.Name, "32047-23.htm"):
@@ -210,9 +203,6 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 			htmltext = "32047-34.htm"
 			s.PlaySound(p, script.SoundMiddle)
 		}
-	case strings.EqualFold(e.Name, "32047-34.htm"):
-		st.SetCond(9)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32047-38.htm"):
 		if p.Adena() >= 3000 {
 			st.SetCond(26)
@@ -235,6 +225,14 @@ func (q quest) onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, letter, 1)
 		s.GiveItems(p, starstone2, 1)
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }
