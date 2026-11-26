@@ -16,6 +16,11 @@ const (
 	maxUnknownPerMin    = 5
 )
 
+// maxLoggedDecodeErrorsPerMin is how many dropped malformed packets (decode
+// errors other than a short buffer) a client gets logged per 60s window; the
+// rest of the window's are dropped unlogged. They never disconnect.
+const maxLoggedDecodeErrorsPerMin = 10
+
 // packetCountWindow is the span of those sliding abuse counters.
 const packetCountWindow = time.Minute
 
@@ -36,6 +41,8 @@ type Client struct {
 	underflowWindowStart time.Time
 	unknownCount         int
 	unknownWindowStart   time.Time
+	decodeErrorCount       int
+	decodeErrorWindowStart time.Time
 
 	// stats and floodProtectors are owned by the connection's read-loop
 	// goroutine: both track per-frame progress along the read path, which
@@ -117,21 +124,27 @@ func (c *Client) Accept(opcode byte) bool {
 // in the current 60s sliding window and reports whether the per-minute
 // threshold has now been exceeded.
 func (c *Client) countUnderflow() bool {
-	return countInWindow(&c.mu, &c.underflowCount, &c.underflowWindowStart, maxUnderflowsPerMin)
+	return countInWindow(&c.mu, &c.underflowCount, &c.underflowWindowStart) > maxUnderflowsPerMin
 }
 
 // countUnknownPacket records one unknown/rejected-opcode occurrence in the
 // current 60s sliding window and reports whether the per-minute threshold
 // has now been exceeded.
 func (c *Client) countUnknownPacket() bool {
-	return countInWindow(&c.mu, &c.unknownCount, &c.unknownWindowStart, maxUnknownPerMin)
+	return countInWindow(&c.mu, &c.unknownCount, &c.unknownWindowStart) > maxUnknownPerMin
 }
 
-// countInWindow implements the sliding-60s-window counters: a
-// tick more than 60s after windowStart resets the window to 1 and reports
-// no threshold breach; otherwise it increments and reports whether count
-// now exceeds max.
-func countInWindow(mu *sync.RWMutex, count *int, windowStart *time.Time, max int) bool {
+// countDecodeError records one dropped malformed packet whose decode failed
+// other than on a short buffer, and returns how many the current 60s sliding
+// window now holds.
+func (c *Client) countDecodeError() int {
+	return countInWindow(&c.mu, &c.decodeErrorCount, &c.decodeErrorWindowStart)
+}
+
+// countInWindow implements the sliding-60s-window counters: a tick more
+// than 60s after windowStart resets the window to 1; otherwise it
+// increments. It returns the window's count after the tick.
+func countInWindow(mu *sync.RWMutex, count *int, windowStart *time.Time) int {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -139,9 +152,9 @@ func countInWindow(mu *sync.RWMutex, count *int, windowStart *time.Time, max int
 	if tick.Sub(*windowStart) > packetCountWindow {
 		*windowStart = tick
 		*count = 1
-		return false
+		return 1
 	}
 
 	*count++
-	return *count > max
+	return *count
 }

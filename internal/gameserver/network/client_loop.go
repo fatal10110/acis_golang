@@ -36,10 +36,11 @@ const rejectedFrameHeadBytes = 16
 // (insufficient bytes, wire.ErrShortPacket) immediately. Once authenticated,
 // that same error class (char-select or in-game) is tolerated up to
 // maxUnderflowsPerMin within a 60s sliding window, then disconnect. Other
-// decode validation errors (e.g. an out-of-range field) are logged and the
-// packet dropped without counting or disconnecting. A request the decoder
-// discarded (clientpackets.ErrDiscarded) was read in full: it is dropped
-// without a word, yet counts as the player acting.
+// decode validation errors (e.g. an out-of-range field) drop the packet
+// without disconnecting; only the first maxLoggedDecodeErrorsPerMin of a 60s
+// window are logged. A request the decoder discarded
+// (clientpackets.ErrDiscarded) was read in full: it is dropped without a
+// word, yet counts as the player acting.
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
 	if errors.Is(err, clientpackets.ErrDiscarded) {
@@ -47,13 +48,30 @@ func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte
 	}
 	if err != nil {
 		client.frameUnread = true
+		if !errors.Is(err, wire.ErrShortPacket) {
+			l.logDecodeError(client, err)
+			return req, err
+		}
 		l.log.Warn().Err(err).Str("addr", client.Session.remoteIP()).Msg("game client")
-		if errors.Is(err, wire.ErrShortPacket) && (client.State() == StateConnected || client.countUnderflow()) {
+		if client.State() == StateConnected || client.countUnderflow() {
 			client.closeNow()
 			return req, errMalformedPacketDisconnect
 		}
 	}
 	return req, err
+}
+
+// logDecodeError logs a dropped malformed packet unless the client already
+// had maxLoggedDecodeErrorsPerMin logged in the current window; the first one
+// over the limit says the rest of the window goes unlogged.
+func (l *GameClientLink) logDecodeError(client *Client, err error) {
+	switch n := client.countDecodeError(); {
+	case n <= maxLoggedDecodeErrorsPerMin:
+		l.log.Warn().Err(err).Str("addr", client.Session.remoteIP()).Msg("game client")
+	case n == maxLoggedDecodeErrorsPerMin+1:
+		l.log.Warn().Err(err).Str("addr", client.Session.remoteIP()).Int("limit", maxLoggedDecodeErrorsPerMin).
+			Msg("game client: malformed packet limit reached, further ones this minute are dropped unlogged")
+	}
 }
 
 // Handle drives one game-client connection end to end. It matches Serve's
@@ -110,13 +128,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		if session.evictedNow() {
 			return
 		}
-		if len(payload) == 0 && client.State() != StateConnected {
-			// A frame with no body is skipped unread, and the client waits
-			// on no answer to it. Before authentication gateFrame still
-			// counts it toward the pre-auth packet cap, so empty frames
-			// cannot hold an unauthenticated connection open.
-			continue
-		}
+		// A frame with no body is skipped unread, and the client waits on no
+		// answer to it, but gateFrame counts it like any other: toward the
+		// flood gate in every state and the pre-auth packet cap before
+		// authentication.
 		serve, open := l.gateFrame(client, payload)
 		if !open {
 			return

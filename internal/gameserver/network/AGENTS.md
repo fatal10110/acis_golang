@@ -27,10 +27,13 @@ opcode byte, `newGameExInbound` the Extended sub-opcode. A new packet is one `re
 handler that reads the raw frame) plus one handler method; wrap a handler that acts on the player
 in the world with `whenLive`. The adapter owns the decode policy (short frame disconnects pre-auth
 or past the underflow threshold, any other decode error drops the frame), so handlers never repeat
-it. Allow a new opcode byte for its states in `allowedOpcodes` (`state.go`); an Extended
-sub-opcode needs no gate entry because it rides on `OpcodeExtended`.
-`TestEveryAcceptedOpcodeHasAHandler` fails when an allowed opcode byte has no `gameInbound` handler
-or a `gameInbound` handler is allowed in no state. Do not dispatch
+it. Allow a new opcode byte for its states in `allowedOpcodes` (`state.go`). An opcode byte that
+means something else in one state gets that state's handler in `stateInbound`; a state that allows
+only some Extended sub-opcodes lists them in `stateExInbound`, and every other sub-opcode is counted
+as an unknown packet there. Never branch on the client state inside a handler to pick a meaning.
+`TestEveryAcceptedOpcodeHasAHandler` fails when an allowed opcode byte has no handler in its state,
+a `gameInbound` handler is allowed in no state, a `stateInbound` handler is not allowed in its state,
+or a `stateExInbound` state does not accept `OpcodeExtended`. Do not dispatch
 on opcodes in `client_loop.go`: it only reads, gates, and hands the frame to the registry.
 
 ## Exact protocol behavior

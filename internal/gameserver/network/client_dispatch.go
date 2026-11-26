@@ -36,6 +36,47 @@ var gameInbound = newGameInbound()
 // sub-opcode; handleExtended asks it.
 var gameExInbound = newGameExInbound()
 
+// stateInbound holds, for a state in which an opcode byte means something
+// else, the handlers that take over from gameInbound's in that state.
+var stateInbound = map[State]inboundRegistry[byte]{
+	StateEntering: newEnteringInbound(),
+}
+
+// stateExInbound holds, for a state that allows only some extended
+// sub-opcodes, the only ones that dispatch in it; any other sub-opcode is
+// refused and counted as an unknown packet. A state absent here dispatches
+// through gameExInbound.
+var stateExInbound = map[State]inboundRegistry[uint16]{
+	StateEntering: newEnteringExInbound(),
+}
+
+// newEnteringInbound lists the opcode bytes that mean something else while
+// the client loads into the world: 0x3f is its quest-list request.
+func newEnteringInbound() inboundRegistry[byte] {
+	reg := inboundRegistry[byte]{}
+	register(reg, clientpackets.OpcodeRequestSkillList, noPayload, (*GameClientLink).handleEnteringQuestList)
+	return reg
+}
+
+// newEnteringExInbound lists the extended sub-opcodes a loading client may
+// send: the manor list only.
+func newEnteringExInbound() inboundRegistry[uint16] {
+	reg := inboundRegistry[uint16]{}
+	register(reg, clientpackets.OpcodeRequestManorList, noPayload, (*GameClientLink).handleRequestManorList)
+	return reg
+}
+
+// inboundFor returns the registry that serves opcode op in state s: the
+// state's own one when it has op, gameInbound otherwise.
+func inboundFor(s State, op byte) inboundRegistry[byte] {
+	if reg, ok := stateInbound[s]; ok {
+		if _, ok := reg[op]; ok {
+			return reg
+		}
+	}
+	return gameInbound
+}
+
 // newGameInbound lists every opcode-byte handler. Which opcodes a client
 // may send in its current state is the state gate's business, decided
 // before any of these runs.
@@ -263,7 +304,8 @@ func clearsSpawnProtection(opcode byte) bool {
 	}
 }
 
-// dispatch serves an accepted frame through gameInbound and reports whether
+// dispatch serves an accepted frame through the registry inboundFor picks
+// for the client's state and reports whether
 // the connection keeps reading. An accepted opcode with no handler is
 // logged and the frame dropped.
 //
@@ -281,7 +323,7 @@ func (l *GameClientLink) dispatch(ctx context.Context, cs *connState, payload []
 			open = false
 		}
 	}()
-	found, open := gameInbound.serve(l, ctx, cs, opcode, payload)
+	found, open := inboundFor(cs.client.State(), opcode).serve(l, ctx, cs, opcode, payload)
 	if !found {
 		l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", cs.client.State().String()).
 			Msg("game client: accepted opcode not implemented yet")

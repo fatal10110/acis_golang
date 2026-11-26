@@ -270,19 +270,19 @@ func (l *GameClientLink) handleRequestEnchantItem(ctx context.Context, cs *connS
 	return nil
 }
 
-// handleRequestSkillList sends the player's skill list.
-//
-// While entering, 0x3f is the quest-list request the client
-// sends during loading: it is answered with the selected
+// handleEnteringQuestList answers 0x3f while entering, where it is the
+// quest-list request the client sends during loading: it gets the selected
 // character's quest list, or the quest panel stays empty.
-func (l *GameClientLink) handleRequestSkillList(_ context.Context, cs *connState, _ struct{}) error {
-	client, session := cs.client, cs.client.Session
-	if client.State() == StateEntering {
-		if cs.entering != nil {
-			session.SendFrame(questListFrame(cs.entering.Character))
-		}
-		return nil
+func (l *GameClientLink) handleEnteringQuestList(_ context.Context, cs *connState, _ struct{}) error {
+	if cs.entering != nil {
+		cs.client.Session.SendFrame(questListFrame(cs.entering.Character))
 	}
+	return nil
+}
+
+// handleRequestSkillList sends the player's skill list.
+func (l *GameClientLink) handleRequestSkillList(_ context.Context, cs *connState, _ struct{}) error {
+	session := cs.client.Session
 	if cs.live == nil {
 		return nil
 	}
