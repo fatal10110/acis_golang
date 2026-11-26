@@ -199,3 +199,26 @@ func TestInlineReadySignalsPostsAndDueTimers(t *testing.T) {
 		t.Fatal("Ready signalled a post a closed queue refused")
 	}
 }
+
+func TestInlineEveryAfterTicksOnTheGridOfTheFirstTick(t *testing.T) {
+	in := NewInline(epoch)
+	q := in.NewQueue("q")
+	var fired []time.Duration
+	ms := time.Millisecond
+	q.EveryAfter(10*ms, 4*ms, func() { fired = append(fired, in.Now().Sub(epoch)) })
+
+	in.Advance(9 * ms)
+	if len(fired) != 0 {
+		t.Fatalf("ticked %v before the first delay", fired)
+	}
+	in.Advance(11 * ms)
+	want := []time.Duration{10 * ms, 14 * ms, 18 * ms}
+	if len(fired) != len(want) {
+		t.Fatalf("ticks = %v, want %v", fired, want)
+	}
+	for i := range want {
+		if fired[i] != want[i] {
+			t.Fatalf("ticks = %v, want %v", fired, want)
+		}
+	}
+}

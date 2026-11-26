@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -44,11 +45,16 @@ func (w cancelWorld) stackedBuffs(t *testing.T, sk effect.Skill, stackTypes ...s
 }
 
 // cast has the caster draw its dice from roll, casts once, and returns the
-// subset of candidates still on its effect list.
+// subset of candidates still on its effect list. The strip happens at the
+// hit, a separate step after the launch frame: the cast has landed once the
+// launch is read and the server has run what the launch armed, so the effects
+// are read then, not after a read that may find the hit still pending.
 func (w cancelWorld) cast(t *testing.T, roll func(int) int, candidates []*effect.Effect) (kept []*effect.Effect) {
 	t.Helper()
 	onPlayerQueue(t, w.srv, w.objID, func(pc *player.Character) { pc.SetRollSource(roll) })
 	w.srv.Client.Send(encodeRequestMagicSkillUse(cancelSkillID, false, false))
+	readUntil(t, w.srv.Client, serverpackets.OpcodeMagicSkillLaunched)
+	w.srv.Settle(t)
 	drainUntilQuiet(t, w.srv.Client)
 	onPlayerQueue(t, w.srv, w.objID, func(pc *player.Character) {
 		held := pc.EffectList().All()
