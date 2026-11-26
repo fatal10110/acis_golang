@@ -32,6 +32,17 @@ type games struct {
 	timer   *sim.Timer
 	ticker  *sim.Ticker
 	counter int
+
+	// drawn are the matches the running draw took off the waiting lists and
+	// has not yet attached to their stadiums, under o.mu: their
+	// competitors count as in a match meanwhile.
+	drawn []drawnGame
+}
+
+// drawnGame is a match a draw made for an idle stadium.
+type drawnGame struct {
+	stadium *Stadium
+	game    *Game
 }
 
 // BindStadiums gives the Olympiad its n stadiums: their matches are carried
@@ -165,12 +176,27 @@ func (g *games) announceLocked() {
 // list holds enough. A classed queue found unable to give a pair ends the
 // draw. The waiting lists outlive the window: no draw runs outside it to
 // clear them.
+//
+// The matches are made under o.mu and drafted and started after it is
+// released, in the order drawn: the drafts and the stadiums' locks are
+// never reached under it. A competitor drawn counts as in a match from
+// the draw on. The caller holds o.run, so draws never overlap.
 func (g *games) draw() {
+	for _, d := range g.drawLocked() {
+		g.start(d.stadium, d.game)
+	}
+	g.o.mu.Lock()
+	g.drawn = nil
+	g.o.mu.Unlock()
+}
+
+// drawLocked makes the draw's matches, each recorded in g.drawn.
+func (g *games) drawLocked() []drawnGame {
 	o := g.o
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.period != Competition {
-		return
+		return nil
 	}
 	classes := make([]int, 0, len(o.classed))
 	for class, list := range o.classed {
@@ -208,26 +234,27 @@ func (g *games) draw() {
 			if classedOpen && i%2 == 0 {
 				game, stop := o.ClassedGame(i, ready, roster, g.rnd)
 				if stop {
-					return
+					return g.drawn
 				}
 				if game != nil {
-					g.start(s, game)
+					g.drawn = append(g.drawn, drawnGame{s, game})
 					continue
 				}
 				classedOpen = false
 			}
 			if nonClassedOpen {
 				if game := o.NonClassedGame(i, &o.nonClassed, roster, g.rnd); game != nil {
-					g.start(s, game)
+					g.drawn = append(g.drawn, drawnGame{s, game})
 					continue
 				}
 				nonClassedOpen = false
 			}
 		}
 		if !classedOpen && !nonClassedOpen {
-			return
+			return g.drawn
 		}
 	}
+	return g.drawn
 }
 
 // start drafts game's competitors into stadium s and runs it there.
@@ -238,8 +265,14 @@ func (g *games) start(s *Stadium, game *Game) {
 	s.attach(game)
 }
 
-// inMatch reports whether objectID competes in a stadium's match.
+// inMatch reports whether objectID competes in a stadium's match, or in
+// one the running draw made. The caller holds o.mu.
 func (g *games) inMatch(objectID int32) bool {
+	for _, d := range g.drawn {
+		if d.game.Contains(objectID) {
+			return true
+		}
+	}
 	for _, s := range g.stadiums {
 		if game := s.Game(); game != nil && game.Contains(objectID) {
 			return true

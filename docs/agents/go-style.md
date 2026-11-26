@@ -116,7 +116,7 @@ actor's queue can reach. All of them sit above every `player.Character` lock: a 
 
 | Order | Lock | Held across calls | Why |
 | --- | --- | --- | --- |
-| 1 | `teleportMu` | outer | It serializes a teleport from its start through the landing (`jumpOrDefer`, `landLivePlayer`, `jumpLivePlayer`): a summon-friend cast teleports the player from the caster's queue while `Appearing` lands it on its own. Under it run the world leave and rejoin, zone exits and entries, the position broadcast, the trade, enchant and boat cancels, and `goIdle` (`pickupMu`, `interactMu`). The onlookers' reveal runs after it is released. |
+| 1 | `teleportMu` | outer | It serializes a teleport from its start through the landing (`jumpOrDefer`, `landLivePlayer`, `jumpLivePlayer`): a summon-friend cast asks the player's teleport from the caster's queue while `Appearing` lands it on its own (`TestSummonFriendTeleportRacesTheTargetsOwnLanding`, real pool, `-race`). Under it run the world leave and rejoin, zone exits and entries, the position broadcast, the trade, enchant and boat cancels, and `goIdle` (`pickupMu`, `interactMu`). The onlookers' reveal runs after it is released. |
 | 1 | `stanceMu` (`StanceLock`) | outer | An attack-stance transition and the frames it sends are one step (`startLiveAutoAttack`, `stopLiveAttackStance`, `startSummonAttackStance`, the stance tracker's expiry): a hit runs it on the attacker's goroutine, the expiry on the player's queue. Under it run the stance tracker, `SetInCombat` (`stateMu`), the cubic list read (`cubicsMu`) and the `AutoAttackStart`/`AutoAttackStop` broadcasts. |
 | 2 | `cubicsMu` | outer, below the two above | Another player's cubic skill grants or evicts a cubic from the caster's queue (`syncCubicRuntime`). Under it run the character's cubic list and each cubic runtime's lock, which arms the cubic's timer on the queue; no frame is sent under it. |
 | 2 | `pickupMu` | outer, only around the pickup-block check and the pickup-lock paralysis | It guards the deferred intentions and the pickup state, which an effect applied from another queue drops. Its accessors are leaves; `livePickupBlockedDeferrable` reads the posture (`stateMu`) and the attack and cast controllers under it. |
@@ -139,11 +139,26 @@ Item locks, outer to inner:
 `itemcontainer.Exchange` is the one place two containers are locked at once: it takes both
 containers' locks, then both inventories' locks, each pair in ascending owner id, runs `fn` under all
 four, and runs the delivery hooks after it releases them. `fn`, and the `check` that
-`inventory.Service.Exchange` runs inside it, may take only leaves below the inventory locks: the
-trade's bound-item check (`boundItems`) reads the enchant scroll state (`enchant.State.mu`), the
-mount and summon world lookup and the cursed weapon table, and nothing else. A check never takes
-another container's or inventory's lock, the operation gate, or a `livePlayer` lock. Any new path
-that locks two containers goes through `Exchange`.
+`inventory.Service.Exchange` runs inside it, read data only: the held views and what the caller read
+before the exchange. The trade's bound items (`boundOffer`: the enchant scroll, the mount and summon
+world lookup, the cursed weapon table) and a store deal's `Trader.Bound` are read after the operation
+gate is taken and before `Exchange`. A check never takes another container's or inventory's lock, the
+operation gate, a `livePlayer` lock or a world lookup. Any new path that locks two containers goes
+through `Exchange`. `TestTradeSettlesWhileTheItemPersisterFlushes` settles a trade on the real pool
+while the persister flushes, under `-race`.
+
+Other owners that call out under a lock:
+
+| Lock | Held across calls | Why |
+| --- | --- | --- |
+| `boat.Fleet.stepMu` (a boat's `fleetMu`) | outer | Every schedule and movement step runs under it: `Tick`, a boat's break and revive, and a reload's `Retire` and `Launch`. It is held across the world moves and the boats' events, so nothing those reach may take it. `Fleet.mu` and `Boat.mu` are leaves under it: `Boats` and `Itineraries` never wait on a tick (`tests/boat/fleet_lock_test.go`). |
+| `olympiad.Olympiad.mu` | only into `Arena.Competitor` (a world lookup) and the stadiums' state reads | A draw makes its matches under it; the drafts (`Arena.Draft`) and `Stadium.attach` run after it is released, and a competitor drawn counts as in its match meanwhile (`TestDrawDraftsOutsideTheLockAndHoldsTheDrawnInTheMatch`). |
+| `wedding.Manager.marrying` | outer | One marriage at a time, from the married check to the couple's commit, held across both payments and the refund (inventory and item locks). It is taken under the requester's attach gate (`WhileAttached`) and takes `Manager.mu` only around the check and the commit; nothing a payment reaches may answer a request. |
+| `wedding.Manager.mu` | only into `Ask`'s reads of both players and their attach gates | Every other method holds it as a leaf; `Answer` looks the requester up and pays outside it (`wedding_lock_test.go`). |
+
+A helper that posts to a queue and waits for the task (the network's `onQueue`, behind `onLive`)
+calls `sim.AssertNotOnQueue`: no queue task may wait on a queue, its own or another. The simdebug
+build checks it.
 
 Creature locks follow the same rules. `creature.HPBar.Publish` holds the bar's lock while it reads
 HP and hands the value to `send`; `send` must not block and must not take a lock a `Publish`

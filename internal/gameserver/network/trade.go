@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -32,6 +33,20 @@ func (l *GameClientLink) boundItems(live *livePlayer, items itemLookup) request.
 		return live.ControlItemInUse(objectID) || objectID == l.enchanting.scrolls.Active(live.ObjectID()) ||
 			l.cursedItem(items, objectID)
 	}
+}
+
+// boundOffer reads which items of live's offer are bound (boundItems) as
+// they stand now, for a check that runs under the inventory locks of an
+// exchange and may read data only. The caller holds live's item operation.
+func (l *GameClientLink) boundOffer(live *livePlayer, offer request.Offer) request.BoundItems {
+	bound := l.boundItems(live, live.Inventory())
+	var ids []int32
+	for _, row := range offer.Items {
+		if bound(row.Snapshot.ObjectID) {
+			ids = append(ids, row.Snapshot.ObjectID)
+		}
+	}
+	return func(objectID int32) bool { return slices.Contains(ids, objectID) }
 }
 
 func (l *GameClientLink) tradeBook() *request.Book {
@@ -374,10 +389,13 @@ func (l *GameClientLink) settleConfirmedTrade(session request.Session, confirmer
 	if !session.Empty() {
 		end := l.belongings.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
 		defer end()
+		// The bound items are read before the exchange locks the
+		// inventories, so its check reads data only.
+		firstBound, secondBound := l.boundOffer(first, session.FirstOffer), l.boundOffer(second, session.SecondOffer)
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
 			func(firstHeld, secondHeld itemcontainer.Held) bool {
-				status = session.Check(firstHeld, secondHeld, l.boundItems(first, firstHeld), l.boundItems(second, secondHeld))
+				status = session.Check(firstHeld, secondHeld, firstBound, secondBound)
 				return status == request.SettlementOK
 			})
 		switch {

@@ -84,10 +84,20 @@ type Spouse interface {
 
 // Manager holds every couple and runs the marriage requests. Its methods
 // are safe for concurrent use.
+//
+// mu is a leaf: nothing is called out under it but Ask's reads of the two
+// players and their attach gates. A marriage pays under marrying instead,
+// which only marry takes, outside mu: the payments and refunds reach the
+// spouses' inventories, and nothing they call may answer a request.
 type Manager struct {
 	cfg Config
 	ids IDs
 	now func() time.Time
+
+	// marrying runs one marriage at a time, from the check that neither
+	// spouse is married to the couple's commit: only a marriage makes a
+	// player married, so the check holds until the commit.
+	marrying sync.Mutex
 
 	mu       sync.Mutex
 	couples  map[int32]Couple
@@ -312,12 +322,13 @@ type Answer struct {
 // that found none to answer.
 func (m *Manager) Answer(partner Spouse, accepted bool, online func(int32) (Spouse, bool)) Answer {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	r := m.requestLocked(partner.ObjectID())
 	if r == nil || r.partner != partner.ObjectID() {
+		m.mu.Unlock()
 		return Answer{}
 	}
 	m.dropLocked(r)
+	m.mu.Unlock()
 	requester, ok := online(r.requester)
 	if !ok {
 		return Answer{}
@@ -348,8 +359,13 @@ func (m *Manager) answer(requester, partner Spouse, accepted bool) Answer {
 // and a requester who asked two players never ends up in two couples
 // (parity exception, #5010).
 func (m *Manager) marry(requester, partner Spouse) Answer {
+	m.marrying.Lock()
+	defer m.marrying.Unlock()
 	out := Answer{Outcome: AnswerVoid, Requester: requester}
-	if m.byPlayer[requester.ObjectID()] > 0 || m.byPlayer[partner.ObjectID()] > 0 || m.ids == nil {
+	m.mu.Lock()
+	married := m.byPlayer[requester.ObjectID()] > 0 || m.byPlayer[partner.ObjectID()] > 0
+	m.mu.Unlock()
+	if married || m.ids == nil {
 		return out
 	}
 	out.RequesterShort = requester.Adena() < m.cfg.Price
@@ -374,8 +390,10 @@ func (m *Manager) marry(requester, partner Spouse) Answer {
 		return out
 	}
 	c := Couple{ID: id, RequesterID: requester.ObjectID(), PartnerID: partner.ObjectID()}
+	m.mu.Lock()
 	m.couples[id] = c
 	m.index(c)
+	m.mu.Unlock()
 	out.Outcome = AnswerMarried
 	return out
 }

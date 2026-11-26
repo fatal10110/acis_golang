@@ -14,8 +14,9 @@ type Trader struct {
 	Inv *itemcontainer.Inventory
 	// Bound reports an item tied where it is that may not change hands
 	// whatever its own state: a summoned or ridden pet's collar, the
-	// selected enchant scroll. A nil Bound binds nothing. It must not take
-	// an inventory lock: the deal calls it holding both.
+	// selected enchant scroll. A nil Bound binds nothing. The deal calls it
+	// holding both inventories' locks, so it reads data only, read before
+	// the deal.
 	Bound func(objectID int32) bool
 	// Casting keeps the trader's augmented items where they are.
 	Casting bool

@@ -26,22 +26,27 @@ type IDAllocator interface {
 	NextID() (int32, error)
 }
 
-// Fleet owns every scheduled boat and the docks they share. Tick, and so
-// every schedule and movement change, runs under mu: on the fleet's ticker
-// in production, on the test in a suite. A reload retires the boats and
-// launches new ones under it too.
+// Fleet owns every scheduled boat and the docks they share. Every schedule
+// and movement change runs under stepMu: Tick (on the fleet's ticker in
+// production, on the test in a suite), a boat's break and revive, and a
+// reload's Retire and Launch. stepMu is held across the world moves and the
+// boats' events, so nothing those reach may take it. mu is a leaf below it:
+// it guards the boats and itineraries Boats and Itineraries read, which
+// change only under both, so a reader never waits on a tick.
 type Fleet struct {
 	ids     IDAllocator
 	state   *world.State
 	newSink func(*Boat) event.Sink
+
+	stepMu  sync.Mutex
+	docks   *docks
+	updates int
 
 	mu      sync.Mutex
 	engines []*engine
 	// itineraries are the routes the boats of the last launch sail, until
 	// the next Retire.
 	itineraries []route.BoatItinerary
-	docks       *docks
-	updates     int
 	// launches numbers the launch the last Retire handed out; using it or
 	// retiring again moves it on.
 	launches uint64
@@ -66,8 +71,8 @@ func New(itineraries []route.BoatItinerary, ids IDAllocator, state *world.State,
 }
 
 // launch spawns itineraries' boats onto fresh docks, every one free but the
-// first dock of each itinerary, which its boat holds. Its caller holds f.mu
-// or owns f alone.
+// first dock of each itinerary, which its boat holds. Its caller holds
+// f.stepMu, not f.mu, or owns f alone.
 func (f *Fleet) launch(itineraries []route.BoatItinerary) error {
 	f.docks = newDocks()
 	legs := make([][]leg, len(itineraries))
@@ -88,15 +93,20 @@ func (f *Fleet) launch(itineraries []route.BoatItinerary) error {
 		if err != nil {
 			return fmt.Errorf("boat: itinerary %d: %w", i, err)
 		}
-		b := newBoat(id, f.state, &f.mu)
+		b := newBoat(id, f.state, &f.stepMu)
 		if f.newSink != nil {
 			b.Attach(f.newSink(b))
 		}
 		at := dockSites[legs[i][0].dock].at
-		f.engines = append(f.engines, newEngine(b, legs[i], f.docks, at))
+		e := newEngine(b, legs[i], f.docks, at)
+		f.mu.Lock()
+		f.engines = append(f.engines, e)
+		f.mu.Unlock()
 		f.state.Spawn(b, at.X, at.Y, at.Z, it.Heading)
 	}
+	f.mu.Lock()
 	f.itineraries = itineraries
+	f.mu.Unlock()
 	return nil
 }
 
@@ -107,9 +117,16 @@ func (f *Fleet) launch(itineraries []route.BoatItinerary) error {
 // ashore and Remove them. The returned launch is what Launch takes to put
 // a new fleet out once they are gone; a later Retire voids it.
 func (f *Fleet) Retire() (retired []*Boat, launch uint64) {
+	f.stepMu.Lock()
+	defer f.stepMu.Unlock()
 	f.mu.Lock()
-	defer f.mu.Unlock()
-	for _, e := range f.engines {
+	engines := f.engines
+	f.engines = nil
+	f.itineraries = nil
+	f.launches++
+	launch = f.launches
+	f.mu.Unlock()
+	for _, e := range engines {
 		b := e.boat
 		b.engine = nil
 		b.mu.Lock()
@@ -119,22 +136,24 @@ func (f *Fleet) Retire() (retired []*Boat, launch uint64) {
 		b.stop()
 		retired = append(retired, b)
 	}
-	f.engines = nil
-	f.itineraries = nil
-	f.launches++
-	return retired, f.launches
+	return retired, launch
 }
 
 // Launch spawns one boat per itinerary, as New does, into the fleet the
 // Retire that returned launch emptied. A launch already used, or voided by a
 // later Retire, spawns nothing.
 func (f *Fleet) Launch(launch uint64, itineraries []route.BoatItinerary) error {
+	f.stepMu.Lock()
+	defer f.stepMu.Unlock()
 	f.mu.Lock()
-	defer f.mu.Unlock()
-	if launch != f.launches {
+	used := launch != f.launches
+	if !used {
+		f.launches++
+	}
+	f.mu.Unlock()
+	if used {
 		return nil
 	}
-	f.launches++
 	return f.launch(itineraries)
 }
 
@@ -159,10 +178,12 @@ func (f *Fleet) Itineraries() []route.BoatItinerary {
 
 // Tick collects the fares that fall due, advances every sailing boat by one
 // position update, ending the legs that arrive, and every updatesPerStep-th
-// call takes each schedule's step once its delay has run out.
+// call takes each schedule's step once its delay has run out. It holds
+// f.stepMu throughout; f.engines changes only under it too, so it reads them
+// without f.mu.
 func (f *Fleet) Tick() {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.stepMu.Lock()
+	defer f.stepMu.Unlock()
 	for _, e := range f.engines {
 		e.boat.tickFare()
 	}
