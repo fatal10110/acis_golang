@@ -33,7 +33,7 @@ func HereticPriestAggressive() script.Script {
 			base.Attacked(s, e)
 			n, attacker := e.NPC, e.Attacker
 			if !fighting(n.Intention()) {
-				s.BroadcastScriptEventEx(n, 10033, attacker.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
+				s.BroadcastScriptEventEx(n, eventHelpCall, attacker.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
 			}
 			if !attacker.Playable() {
 				return
@@ -71,7 +71,7 @@ func HereticPriestAggressive() script.Script {
 				return
 			}
 			if !fighting(n.Intention()) {
-				s.BroadcastScriptEventEx(n, 10033, c.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
+				s.BroadcastScriptEventEx(n, eventHelpCall, c.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
 			}
 			if n.LifeTime() > 7 && n.InMyTerritory() && n.HateList().Empty() {
 				switch {
@@ -119,7 +119,7 @@ func HereticPriestAggressive() script.Script {
 				n.RemoveAllAttackDesire()
 				n.AddMoveToDesire(n.SpawnLocation(), 100)
 				n.HateList().CleanAll()
-				s.BroadcastScriptEvent(n, 10035, 0, int(n.IntParamOr("DistNoDesire", 500)))
+				s.BroadcastScriptEvent(n, eventWalkHome, 0, int(n.IntParamOr("DistNoDesire", 500)))
 			}
 		},
 	})}

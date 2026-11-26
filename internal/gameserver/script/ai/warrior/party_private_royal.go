@@ -21,8 +21,7 @@ func QueenAntPrivateRoyalGuardAnt() script.Script {
 			}
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {
-			if e.Caster.Level() > e.NPC.Level()+8 {
-				e.NPC.AddCastDesire(e.Caster, skill.Ref{ID: 4215, Level: 1}, 1000000)
+			if raidMute(e.NPC, e.Caster) {
 				return
 			}
 			base.SeeSpell(s, e)

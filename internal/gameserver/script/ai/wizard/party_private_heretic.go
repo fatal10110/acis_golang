@@ -4,13 +4,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-// The script events a heretic private answers from its master: a call
-// for help on a target, and a call to walk home.
-const (
-	eventHelpCall = 10033
-	eventWalkHome = 10035
-)
-
 // hereticEngage sets n's engaged flag (int slot 4) when a hit finds it
 // neither attacking nor casting with the flag still clear.
 func hereticEngage(n *script.NPC) {

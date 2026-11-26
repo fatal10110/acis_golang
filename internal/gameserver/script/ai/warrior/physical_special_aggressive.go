@@ -85,7 +85,7 @@ func PhysicalSpecialGatheringAggressive() script.Script {
 		},
 		OnTimer: func(s *script.Script, e script.Timer) string {
 			if strings.EqualFold(e.Name, "3100") {
-				s.BroadcastScriptEvent(e.NPC, 10019, e.NPC.ObjectID(), 500)
+				s.BroadcastScriptEvent(e.NPC, eventCallChildren, e.NPC.ObjectID(), 500)
 			}
 			return base.Timer(s, e)
 		},

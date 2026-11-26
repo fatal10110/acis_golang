@@ -120,7 +120,7 @@ func FrintezzaTeleporter() script.Script {
 				case strings.EqualFold(e.Name, "2006"):
 					c0 := memoNPC(s, bossmemo.Frintezza)
 					c2 := memoNPC(s, bossmemo.FrintezzaFollower)
-					if c0 != nil && c2 != nil && c0.DBValue() >= 2 && c2.DBValue() >= 2 {
+					if c0 != nil && c2 != nil && c0.DBValue() >= stageEntered && c2.DBValue() >= stageEntered {
 						return base.Timer(s, e)
 					}
 
@@ -129,7 +129,7 @@ func FrintezzaTeleporter() script.Script {
 					s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 				case strings.EqualFold(e.Name, "2001"):
 					c0 := memoNPC(s, bossmemo.Frintezza)
-					if c0 != nil && c0.DBValue() < 2 {
+					if c0 != nil && c0.DBValue() < stageEntered {
 						n.SetInt(script.SlotIntAI0, 0)
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 						s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
@@ -147,11 +147,11 @@ func FrintezzaTeleporter() script.Script {
 					c0 := memoNPC(s, bossmemo.Frintezza)
 					c2 := memoNPC(s, bossmemo.FrintezzaFollower)
 					if c0 != nil && c2 != nil {
-						if c0.DBValue() == 0 && c2.DBValue() == 0 {
+						if c0.DBValue() == stageSealed && c2.DBValue() == stageSealed {
 							n.SetInt(script.SlotIntAI0, 0)
 							t.busy.Set(0)
 							s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
-						} else if c0.DBValue() >= 3 {
+						} else if c0.DBValue() >= stageAwakening {
 							s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 						}
 					}
@@ -348,7 +348,7 @@ func (t *teleporter) admit(s *script.Script, n *script.NPC, player *script.Playe
 
 	s.SendScriptEvent(c1, n.ObjectID(), 1, 0)
 
-	if c1.DBValue() >= 2 {
+	if c1.DBValue() >= stageEntered {
 		return
 	}
 
@@ -362,7 +362,7 @@ func (t *teleporter) admit(s *script.Script, n *script.NPC, player *script.Playe
 func tombAwake(s *script.Script) bool {
 	c0 := memoNPC(s, bossmemo.Frintezza)
 	c2 := memoNPC(s, bossmemo.FrintezzaFollower)
-	return c0 != nil && c2 != nil && c0.DBValue() >= 2
+	return c0 != nil && c2 != nil && c0.DBValue() >= stageEntered
 }
 
 // resetTomb tells the patrol, the five wizard and the four alarm makers

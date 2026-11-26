@@ -48,11 +48,7 @@ func corpseZombieHooks() script.Hooks {
 		OnNoDesire: func(_ *script.Script, e script.NoDesire) {
 			n := e.NPC
 			if n.IntParam("IsPrivate") == 1 {
-				if master := n.Master(); master != nil && !master.Dead() {
-					n.AddFollowDesire(master, 50)
-				} else {
-					n.AddWanderDesire(5, 5)
-				}
+				followMaster(n)
 			}
 		},
 		OnTimer: func(s *script.Script, e script.Timer) string {
@@ -259,19 +255,19 @@ func HereticCorpseZombiePhysicalSpecial() script.Script {
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
 			switch e.EventID {
-			case 10033, 10002:
+			case eventHelpCall, eventMasterTarget:
 				c0 := s.Object(e.Arg1)
 				if c0 == nil {
 					return
 				}
-				if e.EventID == 10033 {
+				if e.EventID == eventHelpCall {
 					n.SetInt(script.SlotIntAI4, 1)
 				}
 				n.RemoveAllAttackDesire()
 				if c0.Playable() {
 					n.AddAttackDesire(c0, 200)
 				}
-			case 10035:
+			case eventWalkHome:
 				n.SetInt(script.SlotIntAI4, 0)
 				hereticGoHome(n)
 			}

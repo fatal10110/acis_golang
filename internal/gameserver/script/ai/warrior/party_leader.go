@@ -59,7 +59,7 @@ func PartyLeaderHooks() script.Hooks {
 					n.RemoveAllAttackDesire()
 					n.AddAttackDesire(attacker, 1000)
 					n.SetInt(script.SlotFlag, attacker.ObjectID())
-					s.BroadcastScriptEvent(n, 10002, n.ObjectID(), 300)
+					s.BroadcastScriptEvent(n, eventMasterTarget, n.ObjectID(), 300)
 				}
 			}
 			base.Attacked(s, e)

@@ -27,7 +27,7 @@ func PartyLeaderHereticAggressive() script.Script {
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n := e.NPC
 			if !fighting(n.Intention()) {
-				s.BroadcastScriptEventEx(n, 10033, e.Attacker.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
+				s.BroadcastScriptEventEx(n, eventHelpCall, e.Attacker.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
 			}
 			base.Attacked(s, e)
 		},
@@ -46,7 +46,7 @@ func PartyLeaderHereticAggressive() script.Script {
 				castByType(n, n, npc.SkillTypeSelfMagicHeal, 1000000)
 			}
 			if n.LifeTime() > 7 && n.InMyTerritory() && n.HateList().Size() == 0 && !fighting(n.Intention()) {
-				s.BroadcastScriptEventEx(n, 10033, c.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
+				s.BroadcastScriptEventEx(n, eventHelpCall, c.ObjectID(), n.ObjectID(), int(n.IntParamOr("HelpCastRange", 500)))
 			}
 			base.SeeCreature(s, e)
 		},
@@ -62,7 +62,7 @@ func PartyLeaderHereticAggressive() script.Script {
 			n.RemoveAllAttackDesire()
 			n.AddMoveToDesire(n.SpawnLocation(), 100)
 			n.HateList().CleanAll()
-			s.BroadcastScriptEvent(n, 10035, n.ObjectID(), int(n.IntParamOr("DistNoDesire", 500)))
+			s.BroadcastScriptEvent(n, eventWalkHome, n.ObjectID(), int(n.IntParamOr("DistNoDesire", 500)))
 		},
 	})}
 }

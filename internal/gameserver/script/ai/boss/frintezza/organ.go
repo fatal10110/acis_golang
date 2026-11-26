@@ -25,7 +25,7 @@ func OrganDummy() script.Script {
 	base := defaultnpc.New().Hooks
 	return script.Script{Dir: dir, Behavior: true, NPCs: []int32{29052}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
-			if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil && c0.DBValue() >= 4 {
+			if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil && c0.DBValue() >= stageRising {
 				s.StartTimer("1020", e.NPC, nil, 1000*time.Millisecond)
 				return
 			}

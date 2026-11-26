@@ -60,18 +60,9 @@ func WizardHooks() script.Hooks {
 					}
 				}
 			case strings.EqualFold(e.Name, "1002"):
-				hateList.Refresh()
-				hateList.RemoveIfOutOfRange(1000)
+				refreshHate(hateList)
 			case strings.EqualFold(e.Name, "1003"):
-				if n.Muted() {
-					s.StartTimer("1003", n, nil, 10000*time.Millisecond)
-				} else {
-					n.RemoveAllAttackDesire()
-					n.SetInt(script.SlotIntAI0, 0)
-					if mostHated := hateList.MostHated(); mostHated != nil {
-						s.Attacked(s, script.Attacked{NPC: n, Attacker: mostHated, Damage: 100})
-					}
-				}
+				silenceRetry(s, n, nil, hateList)
 			}
 			return base.Timer(s, e)
 		},
@@ -80,16 +71,9 @@ func WizardHooks() script.Hooks {
 			if attacker.Playable() {
 				hateList := n.HateList()
 				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*100)+300)
-				} else {
-					hateList.Add(attacker, f0*100)
-				}
+				addHate(hateList, attacker, f0*100)
 			}
-			if n.Muted() {
-				n.SetInt(script.SlotIntAI0, 1)
-				s.StartTimer("1003", n, nil, 10000*time.Millisecond)
-			}
+			waitOutSilence(s, n)
 			base.Attacked(s, e)
 		},
 		OnClanAttacked: func(_ *script.Script, e script.ClanAttacked) {
@@ -97,11 +81,7 @@ func WizardHooks() script.Hooks {
 			if attacker.Playable() && called.LifeTime() > 7 {
 				hateList := called.HateList()
 				f0 := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, attacker))
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*30)+300)
-				} else {
-					hateList.Add(attacker, f0*30)
-				}
+				addHate(hateList, attacker, f0*30)
 			}
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {

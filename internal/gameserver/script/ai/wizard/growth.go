@@ -158,7 +158,7 @@ func growthAppear(s *script.Script, n *script.NPC) {
 // reports false when its feeder is gone, which ends the hook there.
 func growOnEvent(s *script.Script, e script.ScriptEvent) bool {
 	n := e.NPC
-	if e.EventID == 10018 && s.Rnd(100) < 20 {
+	if e.EventID == eventGrown && s.Rnd(100) < 20 {
 		c0 := n.Slot(script.SlotCreature0)
 		if c0 == nil {
 			return false
@@ -279,7 +279,7 @@ func GrowthStep4Aggressive() script.Script {
 				n.AddAttackDesire(c0, 100)
 			}
 			n.SetInt(script.SlotIntAI2, 0)
-			s.BroadcastScriptEvent(n, 10018, n.ObjectID(), 700)
+			s.BroadcastScriptEvent(n, eventGrown, n.ObjectID(), 700)
 			if s.Rnd(100) < 33 {
 				castByType(n, n, npc.SkillTypeSelfBuff, 1000000)
 			}

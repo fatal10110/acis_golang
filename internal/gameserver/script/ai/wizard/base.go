@@ -19,13 +19,6 @@ func Base() script.Script {
 	return script.Script{Dir: "ai/individual/Monster/WizardBase", Behavior: true, Hooks: BaseHooks()}
 }
 
-// The script events a wizard answers: a shouting monster names its target,
-// and a caller asks it to look around.
-const (
-	eventShoutTarget = 10016
-	eventLook        = 10020
-)
-
 // isPlayer reports whether c is a player.
 func isPlayer(c script.Creature) bool {
 	_, ok := c.(*script.Player)
@@ -86,11 +79,7 @@ func BaseHooks() script.Hooks {
 					hateList.Clear()
 					if attacker.Playable() {
 						f0 := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, attacker))
-						if hateList.Empty() {
-							hateList.Add(attacker, (f0*100)+300)
-						} else {
-							hateList.Add(attacker, f0*100)
-						}
+						addHate(hateList, attacker, f0*100)
 					}
 				}
 			}
@@ -147,7 +136,7 @@ func BaseHooks() script.Hooks {
 						hateList.Add(c0, 200)
 					}
 				}
-			case eventLook:
+			case eventTarget:
 				if s.Object(e.Arg1) != nil {
 					n.LookNeighbor()
 				}
@@ -191,11 +180,7 @@ func attacked(s *script.Script, e script.Attacked) bool {
 	if attacker.Playable() && mostHated != nil && !script.Same(mostHated, attacker) && n.IntParam("AttackLowHP") == 1 && attackerHPRatio <= 0.3 && s.Rnd(100) < 10 {
 		hateList.Clear()
 		f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-		if hateList.Empty() {
-			hateList.Add(attacker, (f0*100)+300)
-		} else {
-			hateList.Add(attacker, f0*100)
-		}
+		addHate(hateList, attacker, f0*100)
 	}
 
 	if isPlayer(attacker) {

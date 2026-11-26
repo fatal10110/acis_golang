@@ -19,15 +19,6 @@ func Base() script.Script {
 	return script.Script{Dir: "ai/individual/Monster/WarriorBase", Behavior: true, Hooks: BaseHooks()}
 }
 
-// The script events a warrior sends and answers: an ally under attack
-// calls for help, a shouting warrior names its target, and a caller hands
-// its target over.
-const (
-	eventHelp        = 10001
-	eventShoutTarget = 10016
-	eventTarget      = 10020
-)
-
 // isPlayer reports whether c is a player.
 func isPlayer(c script.Creature) bool {
 	_, ok := c.(*script.Player)
@@ -355,8 +346,7 @@ func seeSpell(s *script.Script, e script.SeeSpell) {
 			if intention == script.IntentionAttack {
 				if k := s.Skill(e.Skill); k.AggroPoints() > 0 || k.Power(n) > 0 || k.Offensive() {
 					skillPower := max(max(float64(k.AggroPoints()), k.Power(n)), 20)
-					hateRatio := defaultnpc.HateRatio(n, caster)
-					hateRatio = ((1.0 * skillPower) / float64(n.Level()+7)) + ((hateRatio / 100) * ((1.0 * skillPower) / float64(n.Level()+7)))
+					hateRatio := damageHate(n, skillPower, defaultnpc.HateRatio(n, caster))
 					n.AddAttackDesire(caster, hateRatio*150)
 				}
 			}

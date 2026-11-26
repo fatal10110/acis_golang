@@ -55,11 +55,7 @@ func saintBasicHooks() script.Hooks {
 			n, attacker := e.NPC, e.Attacker
 			f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
 			if attacker.Playable() {
-				if n.HateList().Empty() {
-					n.HateList().Add(attacker, (f0*100)+300)
-				} else {
-					n.HateList().Add(attacker, f0*100)
-				}
+				addHate(n.HateList(), attacker, f0*100)
 			}
 			if n.IntParam("silhouette") != 0 && n.Int(script.SlotIntAI4) == 0 {
 				if hpRatio := n.HPRatio(); hpRatio < 0.7 && hpRatio > 0.5 && s.Rnd(100) < 30 {

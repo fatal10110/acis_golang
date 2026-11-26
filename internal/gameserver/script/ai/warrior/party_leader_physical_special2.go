@@ -8,13 +8,6 @@ import (
 
 const physicalSpecial2Dir = "ai/individual/Monster/WarriorBase/Warrior/PartyLeaderWarrior/PartyLeaderPhysicalSpecial2"
 
-// The script events a heretic leader broadcasts: a call for help against a
-// creature, and the call home once it left its territory.
-const (
-	eventHereticHelp = 10033
-	eventHereticHome = 10035
-)
-
 // PartyLeaderPhysicalSpecial2 is PartyLeaderPhysicalSpecial2: a
 // PartyLeaderWarrior that, hit by the creature it most wants to attack,
 // directly or through a settled clan member, may strike it with its second
@@ -74,7 +67,7 @@ func helpRange(n *script.NPC) int { return int(n.IntParamOr("HelpCastRange", 500
 // its call for help against c.
 func callHelpAgainst(s *script.Script, n *script.NPC, c script.Creature) {
 	if n.Intention() != script.IntentionAttack && n.Intention() != script.IntentionCast {
-		s.BroadcastScriptEventEx(n, eventHereticHelp, c.ObjectID(), n.ObjectID(), helpRange(n))
+		s.BroadcastScriptEventEx(n, eventHelpCall, c.ObjectID(), n.ObjectID(), helpRange(n))
 	}
 }
 
@@ -83,7 +76,7 @@ func callHelpAgainst(s *script.Script, n *script.NPC, c script.Creature) {
 func returnHome(s *script.Script, n *script.NPC) {
 	n.RemoveAllAttackDesire()
 	n.AddMoveToDesire(n.SpawnLocation(), 100)
-	s.BroadcastScriptEvent(n, eventHereticHome, n.ObjectID(), int(n.IntParamOr("DistNoDesire", 500)))
+	s.BroadcastScriptEvent(n, eventWalkHome, n.ObjectID(), int(n.IntParamOr("DistNoDesire", 500)))
 }
 
 // PartyLeaderHeretic2Aggressive is PartyLeaderHeretic2Aggressive: a
@@ -133,7 +126,7 @@ func PartyLeaderHeretic2Aggressive() script.Script {
 				classID := p.ClassID()
 				isCleric := p.InClassGroup("@cleric_group")
 				if s.Rnd(100) < 33 && (classID == 5 || classID == 90 || isCleric) {
-					s.BroadcastScriptEventEx(n, 10002, attacker.ObjectID(), n.ObjectID(), helpRange(n))
+					s.BroadcastScriptEventEx(n, eventMasterTarget, attacker.ObjectID(), n.ObjectID(), helpRange(n))
 				}
 			}
 			base.Attacked(s, e)
@@ -153,7 +146,7 @@ func PartyLeaderHeretic2Aggressive() script.Script {
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {
 			n := e.NPC
 			if n.HPRatio() < 0.4 && s.Rnd(100) < 33 && e.Caster.InClassGroup("@cleric_group") {
-				s.BroadcastScriptEventEx(n, 10002, e.Caster.ObjectID(), n.ObjectID(), helpRange(n))
+				s.BroadcastScriptEventEx(n, eventMasterTarget, e.Caster.ObjectID(), n.ObjectID(), helpRange(n))
 			}
 			base.SeeSpell(s, e)
 		},
