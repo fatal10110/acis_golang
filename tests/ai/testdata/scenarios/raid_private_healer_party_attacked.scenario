@@ -1,6 +1,7 @@
 # RaidPrivateHealer (25008, level 1, privates of a master), every draw 0: a hit on one healer by the
 # character (level 20, 19 over it) has its fellow want the raid curse on the character (1000000) and its
 # heal on the hurt healer (100); a hit on a healer under half its HP adds 1000000 to the heal.
+driven
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc
