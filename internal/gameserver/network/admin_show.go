@@ -391,11 +391,7 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 	}
 	var b strings.Builder
 	for row, e := range rows[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		show := `<td width=40 align=right><a action="bypass admin_show walker ` + strconv.Itoa(page) + " " + e.NPC + `">Show</a></td>`
 		name, index, reverse, spawned := l.walkerRowNPC(e.NPC, walker)
 		if !spawned {
@@ -411,7 +407,7 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 			}
 			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.Nodes[index].Location) + `">` + handleradmin.TrimAndDress(name, 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.Nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
 		}
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_show walker %page%")

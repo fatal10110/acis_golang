@@ -131,11 +131,7 @@ func (l *GameClientLink) writeDropRow(b *strings.Builder, d item.Drop, row int) 
 	if d.Min != d.Max {
 		amount += " - " + strconv.Itoa(int(d.Max))
 	}
-	if row%2 == 0 {
-		b.WriteString("<table width=280 bgcolor=000000><tr>")
-	} else {
-		b.WriteString("<table width=280><tr>")
-	}
+	handleradmin.OpenStripedRow(b, row, "")
 	b.WriteString("<td width=34 height=40><img src=icon.noimage width=32 height=32></td>")
 	b.WriteString("<td width=246>&nbsp;" + name + "<br1>")
 	b.WriteString("<table width=240><tr><td width=80><font color=B09878>Rate:</font> <font color=" + color + ">" + formatPercent(d.Chance) +

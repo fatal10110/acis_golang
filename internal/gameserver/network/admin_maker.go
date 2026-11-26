@@ -211,13 +211,9 @@ func (l *GameClientLink) sendMakersPage(gm *livePlayer, npcs *manager.Npcs, numb
 			if m.Territory == nil || m.Territory.Name != t.Name {
 				continue
 			}
-			if row%2 == 0 {
-				b.WriteString("<table width=280 bgcolor=000000><tr>")
-			} else {
-				b.WriteString("<table width=280><tr>")
-			}
+			handleradmin.OpenStripedRow(&b, row, "")
 			b.WriteString(`<td width=10></td><td width=270><a action="bypass -h admin_maker ` + m.Maker.Name + `">` + m.Maker.Name + "</a></td>")
-			b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+			handleradmin.CloseStripedRow(&b)
 			row++
 		}
 	}

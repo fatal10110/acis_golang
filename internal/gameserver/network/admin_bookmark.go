@@ -127,15 +127,11 @@ func (l *GameClientLink) sendBookmarks(gm *livePlayer, book *bookmark.Book, page
 	}
 	var b strings.Builder
 	for row, m := range marks[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		at := strconv.Itoa(int(m.X)) + " " + strconv.Itoa(int(m.Y)) + " " + strconv.Itoa(int(m.Z))
 		b.WriteString(`<td width=230><a action="bypass -h admin_teleport ` + at + `">` + m.Name + " (" + at + `)</a></td>`)
 		b.WriteString(`<td width=50><a action="bypass -h admin_delbk ` + m.Name + `">Remove</a></td>`)
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_bk %page%")

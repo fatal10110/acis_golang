@@ -159,19 +159,15 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 		if !p.Unread {
 			read = "party_styleicon1_2"
 		}
-		if i%2 == 0 {
-			b.WriteString("<table width=280 height=40 bgcolor=000000>")
-		} else {
-			b.WriteString("<table width=280 height=40>")
-		}
-		fmt.Fprintf(&b, `<tr><td width=20 align=center><img src="L2UI_CH3.msnicon%s" width=12 height=16><img src="L2UI_CH3.%s" width=11 height=16></td>`, status, read)
+		handleradmin.OpenStripedRow(&b, i, " height=40")
+		fmt.Fprintf(&b, `<td width=20 align=center><img src="L2UI_CH3.msnicon%s" width=12 height=16><img src="L2UI_CH3.%s" width=11 height=16></td>`, status, read)
 		details := fmt.Sprintf(`<br1><font color=B09878>Type:</font> %s <font color=B09878>State:</font> %s</td>`, p.Type, p.State)
 		if isAnswering && answering == p.ID {
 			fmt.Fprintf(&b, "<td width=260>#%d by %s%s", p.ID, name, details)
 		} else {
 			fmt.Fprintf(&b, `<td width=260><a action="bypass -h admin_petition view %d">#%d by %s</a>%s`, p.ID, p.ID, name, details)
 		}
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 41)
 	pg.Links(&b, "bypass admin_petition %page%")

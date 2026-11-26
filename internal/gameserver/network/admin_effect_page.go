@@ -267,17 +267,13 @@ func (l *GameClientLink) showAdminEffects(gm *livePlayer, target world.Tracked, 
 	now := gm.Queue().Now()
 	var b strings.Builder
 	for row, e := range effects[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		left := "toggle"
 		if !e.Skill.Toggle {
 			left = strconv.Itoa(e.PeriodRemaining(now)) + "s"
 		}
 		fmt.Fprintf(&b, `<td width=220><a action="bypass -h admin_effect remove %d">%s</a></td><td width=60>%s</td>`, e.Skill.ID, e.Skill.Name, left)
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_effect %page%")

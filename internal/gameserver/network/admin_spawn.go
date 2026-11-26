@@ -187,11 +187,7 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 	// Rows count from the page asked for, even past the last page shown.
 	row := adminListSpawnsPageLimit * (page - 1)
 	for _, obj := range found[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 height=41 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280 height=41><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, int(row), " height=41")
 		at := obj.(positioned)
 		x, y, z := at.Position()
 		fmt.Fprintf(&b, `<td><a action="bypass -h admin_teleport %d %d %d">%d`, x, y, z, row)
@@ -200,7 +196,8 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 		} else {
 			fmt.Fprintf(&b, " - (%d, %d, %d, %d)</a>", x, y, z, at.Heading())
 		}
-		b.WriteString(`</td></tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		b.WriteString("</td>")
+		handleradmin.CloseStripedRow(&b)
 		row++
 	}
 	pg.Space(&b, 42)

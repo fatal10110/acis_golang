@@ -50,17 +50,13 @@ func (l *GameClientLink) adminKnownlist(gm *livePlayer, line string) {
 	}
 	var b strings.Builder
 	for row, obj := range known[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		name, ok := l.objectName(obj)
 		if !ok {
 			name = "null"
 		}
 		b.WriteString("<td width=160>" + name + "</td><td width=120>" + objectClassName(obj) + "</td>")
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_knownlist %page%")

@@ -269,13 +269,9 @@ func (l *GameClientLink) showAdminSkillTable(gm, target *livePlayer, page int) {
 // adminSkillRow writes one row of a //skill page: id, label and level, on
 // a black band every other row.
 func adminSkillRow(b *strings.Builder, row, id int, label string, level int) {
-	if row%2 == 0 {
-		b.WriteString("<table width=280 bgcolor=000000><tr>")
-	} else {
-		b.WriteString("<table width=280><tr>")
-	}
+	handleradmin.OpenStripedRow(b, row, "")
 	fmt.Fprintf(b, `<td width=35>%d</td><td width=220>%s</td><td width=25>%d</td>`, id, label, level)
-	b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+	handleradmin.CloseStripedRow(b)
 }
 
 // sendAdminSkillPage opens the admin page file on gm with name and content
