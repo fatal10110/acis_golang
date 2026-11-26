@@ -43,7 +43,7 @@ func FrintezzaSeeker() script.Script {
 			}
 			c0 := memoNPC(s, bossmemo.Frintezza)
 			if c0 != nil && !c0.Dead() {
-				if c0.DBValue() > 1 {
+				if c0.DBValue() > stageCountdown {
 					n.DeleteMe()
 				}
 			} else {
@@ -55,7 +55,7 @@ func FrintezzaSeeker() script.Script {
 				return
 			}
 			c0 := memoNPC(s, bossmemo.Frintezza)
-			if c0 != nil && !c0.Dead() && c0.DBValue() <= 1 {
+			if c0 != nil && !c0.Dead() && c0.DBValue() <= stageCountdown {
 				s.SendScriptEvent(c0, 0, 2, 0)
 				e.NPC.DeleteMe()
 			}

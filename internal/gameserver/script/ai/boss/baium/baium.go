@@ -35,6 +35,19 @@ const (
 	slotNonPlayer   = script.SlotCreature3
 )
 
+// Baium's db value is its stage.
+const (
+	stageAsleep = 0
+	stageAwake  = 1
+)
+
+// idleLimit is how long, in ticks, Baium fights without a player hit
+// before it goes back to sleep: 30 minutes.
+const idleLimit = 30 * 60
+
+// parked is where a reset boss waits, out of its lair.
+var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+
 // targetSlots are the slots of the three targets Baium ranks: their
 // points, and who each is.
 func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
@@ -68,7 +81,7 @@ func Baium() script.Script {
 			n.SetHeading(-25348)
 			n.TeleportTo(script.Loc{X: 116033, Y: 17447, Z: 10107})
 
-			n.SetDBValue(1)
+			n.SetDBValue(stageAwake)
 
 			n.SetInt(slotWaker, e.Arg1)
 
@@ -87,10 +100,10 @@ func Baium() script.Script {
 			n.SetInt(slotFighting, 0)
 
 			s.GlobalMemo().Set(bossmemo.Baium, int(n.ObjectID()))
-			n.SetDBValue(0)
+			n.SetDBValue(stageAsleep)
 
 			if n.InMyTerritory() {
-				n.SetDBValue(1)
+				n.SetDBValue(stageAwake)
 
 				n.SetInt(slotFighting, 1)
 				n.SetInt(slotLastHit, s.CurrentTick())
@@ -227,11 +240,11 @@ func Baium() script.Script {
 			case "2002":
 				i0 := s.ElapsedTicks(n.Int(slotLastHit))
 				switch {
-				case i0 > 30*60:
+				case i0 > idleLimit:
 					n.RemoveAllDesire()
-					n.SetDBValue(0)
+					n.SetDBValue(stageAsleep)
 					s.TeleportPlayersInTerritory(n, script.Loc{X: 120112, Y: 18208, Z: -5152}, 900)
-					n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+					n.TeleportTo(parked)
 
 					s.Spawner().CreateOnePrivateEx(n, stoneID, script.Loc{X: 116026, Y: 17435, Z: 10107, Heading: -25348}, 0, script.Params{})
 

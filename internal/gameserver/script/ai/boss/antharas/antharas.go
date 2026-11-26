@@ -25,6 +25,21 @@ const (
 	slotLastHit = script.SlotIntAI1 // tick of its last hit, or of its awakening
 )
 
+// Antharas's db value is its stage.
+const (
+	stageAsleep   = 0 // asleep, or reset out of its lair
+	stageWoken    = 1 // woken, moving in shortly
+	stageMovingIn = 2 // walking to its stage
+	stageFighting = 3
+)
+
+// idleLimit is how long, in ticks, a fight goes on without a hit before
+// the boss resets: 15 minutes.
+const idleLimit = 15 * 60
+
+// parked is where a reset boss waits, out of its lair.
+var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+
 // targetSlots are the slots of the three targets Antharas ranks: their
 // points, and who each is.
 func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
@@ -66,7 +81,7 @@ func Antharas() script.Script {
 			s.StartTimerAtFixedRate("2001", n, nil, 2*60*1000*time.Millisecond, 2*60*1000*time.Millisecond)
 
 			if !n.DBLoaded() {
-				n.SetDBValue(0)
+				n.SetDBValue(stageAsleep)
 				n.Earthquake(20, 10)
 			}
 
@@ -82,11 +97,11 @@ func Antharas() script.Script {
 			}
 
 			switch n.DBValue() {
-			case 1:
+			case stageWoken:
 				s.StartTimer("1001", n, nil, 10*60*1000*time.Millisecond)
-			case 2:
+			case stageMovingIn:
 				moveIn(n)
-			case 3:
+			case stageFighting:
 				s.StartTimer("1002", n, nil, 60*1000*time.Millisecond)
 
 				n.SetInt(slotLastHit, s.CurrentTick())
@@ -96,18 +111,18 @@ func Antharas() script.Script {
 		OnNoDesire: func(_ *script.Script, e script.NoDesire) {
 			n := e.NPC
 			switch n.DBValue() {
-			case 3:
+			case stageFighting:
 				n.AddWanderDesire(5, 5)
-			case 0:
+			case stageAsleep:
 				n.RemoveAllDesire()
 			}
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if n.DBValue() == 0 {
+			if n.DBValue() == stageAsleep {
 				s.StartTimer("1001", n, nil, 10*1000*time.Millisecond)
 
-				n.SetDBValue(1)
+				n.SetDBValue(stageWoken)
 			}
 		},
 		OnTimer: func(s *script.Script, e script.Timer) string {
@@ -127,7 +142,7 @@ func Antharas() script.Script {
 			case strings.EqualFold(name, "2002"):
 				n.SetInt(slotCalled, 0)
 			case strings.EqualFold(name, "1001"):
-				n.SetDBValue(2)
+				n.SetDBValue(stageMovingIn)
 				moveIn(n)
 			case strings.EqualFold(name, "1201"):
 				n.SpecialCamera(script.CameraShot{Distance: 700, Yaw: 13, Pitch: -19, Time: 0, Duration: 20000, Turn: 0, Rise: 0, Widescreen: 0, Unknown: 0})
@@ -149,7 +164,7 @@ func Antharas() script.Script {
 				s.StartTimer("1205", n, e.Player, 10800*time.Millisecond)
 			case strings.EqualFold(name, "1205"):
 				n.SpecialCamera(script.CameraShot{Distance: 1100, Yaw: 0, Pitch: -3, Time: 300, Duration: 7000, Turn: 0, Rise: 0, Widescreen: 0, Unknown: 0})
-				n.SetDBValue(3)
+				n.SetDBValue(stageFighting)
 
 				s.StartTimer("1002", n, e.Player, 60000*time.Millisecond)
 
@@ -165,11 +180,11 @@ func Antharas() script.Script {
 
 				n.AddWanderDesire(5, 5)
 			case strings.EqualFold(name, "1002"):
-				if s.ElapsedTicks(n.Int(slotLastHit)) > 15*60 {
-					n.SetDBValue(0)
+				if s.ElapsedTicks(n.Int(slotLastHit)) > idleLimit {
+					n.SetDBValue(stageAsleep)
 					n.RemoveAllDesire()
 					s.TeleportPlayersInTerritory(n, script.Loc{X: 80464, Y: 152294, Z: -3534}, 100)
-					n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+					n.TeleportTo(parked)
 
 					n.SetInt(script.SlotIntAI2, 0)
 					n.SetInt(script.SlotIntAI3, 0)
@@ -202,7 +217,7 @@ func Antharas() script.Script {
 					}
 				}
 
-				if n.DBValue() == 3 && idleOrWandering(n) {
+				if n.DBValue() == stageFighting && idleOrWandering(n) {
 					castAntharasSkill(s, n)
 				}
 			}
@@ -214,7 +229,7 @@ func Antharas() script.Script {
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n, attacker, damage := e.NPC, e.Attacker, e.Damage
-			if n.DBValue() == 0 && !n.Dead() {
+			if n.DBValue() == stageAsleep && !n.Dead() {
 				s.TeleportPlayersInTerritory(n, script.Loc{X: 80464, Y: 152294, Z: -3534}, 100)
 			}
 
@@ -244,7 +259,7 @@ func Antharas() script.Script {
 				rank(s, n, attacker, high)
 			}
 
-			if n.DBValue() == 3 && idleOrWandering(n) {
+			if n.DBValue() == stageFighting && idleOrWandering(n) {
 				castAntharasSkill(s, n)
 			}
 		},
@@ -252,7 +267,7 @@ func Antharas() script.Script {
 			n, c := e.NPC, e.Creature
 			// No class is the occupation "@cleric_group", a class group:
 			// the seen player always takes the last branch.
-			if p, ok := c.(*script.Player); ok && n.DBValue() == 3 && p.SameOccupation("@cleric_group") {
+			if p, ok := c.(*script.Player); ok && n.DBValue() == stageFighting && p.SameOccupation("@cleric_group") {
 				switch hpRatio := n.HPRatio(); {
 				case hpRatio < 0.25:
 					rankInt(s, n, c, 10*1000)
@@ -267,7 +282,7 @@ func Antharas() script.Script {
 				rankInt(s, n, c, 1*1000)
 			}
 
-			if n.DBValue() == 3 && idleOrWandering(n) {
+			if n.DBValue() == stageFighting && idleOrWandering(n) {
 				castAntharasSkill(s, n)
 			}
 		},
@@ -278,7 +293,7 @@ func Antharas() script.Script {
 			n := e.NPC
 			n.SpecialCamera(script.CameraShot{Distance: 1200, Yaw: 20, Pitch: -10, Time: 0, Duration: 13000, Turn: 0, Rise: 0, Widescreen: 0, Unknown: 0})
 			n.PlayMusic("BS01_D")
-			n.SetDBValue(0)
+			n.SetDBValue(stageAsleep)
 
 			s.GlobalMemo().Remove(memoKey(n))
 

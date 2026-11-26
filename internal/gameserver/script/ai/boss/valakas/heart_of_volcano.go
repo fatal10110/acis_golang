@@ -50,7 +50,7 @@ func HeartOfVolcano() script.Script {
 					if npcDBValue != 0 {
 						if c0, ok := s.GlobalMemo().Creature(bossmemo.Valakas).(*script.NPC); ok && !c0.Dead() {
 							c0DBValue := c0.DBValue()
-							if c0DBValue != 0 {
+							if c0DBValue != stageAsleep {
 								return base.Timer(s, e)
 							}
 						}
@@ -74,11 +74,11 @@ func heartEvent(s *script.Script, e script.Event) string {
 		n, player := e.NPC, e.Player
 		if c0, ok := s.GlobalMemo().Creature(bossmemo.Valakas).(*script.NPC); ok && !c0.Dead() {
 			dbValue := c0.DBValue()
-			if dbValue == 0 {
+			if dbValue == stageAsleep {
 				s.SendScriptEvent(c0, 0, 0, 0)
 			}
 
-			if dbValue == 0 || dbValue == 1 {
+			if dbValue == stageAsleep || dbValue == stageWoken {
 				if n.Int(slotEntrants) >= maxPlayersAllowed {
 					htmltext = "heart_of_volcano004.htm"
 				} else {
@@ -91,7 +91,7 @@ func heartEvent(s *script.Script, e script.Event) string {
 					n.SetInt(slotEntrants, n.Int(slotEntrants)+1)
 					n.SetDBValue(int(n.Int(slotEntrants)))
 				}
-			} else if dbValue == 2 || dbValue == 3 {
+			} else if dbValue == stageAppearing || dbValue == stageFighting {
 				htmltext = "heart_of_volcano003.htm"
 			}
 		} else {

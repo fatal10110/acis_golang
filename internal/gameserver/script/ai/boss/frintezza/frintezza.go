@@ -19,6 +19,28 @@ func musicOfPower() skill.Ref   { return skill.Ref{ID: 5007, Level: 3} }
 func musicOfPlague() skill.Ref  { return skill.Ref{ID: 5007, Level: 4} }
 func musicOfPsycho() skill.Ref  { return skill.Ref{ID: 5007, Level: 5} }
 
+// The tomb's stages, the db values of Frintezza, his follower and its
+// transform. The follower stores stageSealed and stageRising to
+// stageSecondForm, and stageBeaten once beaten in its second form.
+const (
+	stageSealed     = 0
+	stageCountdown  = 1 // entered, the entry countdown runs
+	stageEntered    = 2 // entered, waiting for Frintezza to wake
+	stageAwakening  = 3
+	stageRising     = 4 // the follower rises
+	stageFirstForm  = 5
+	stageSecondForm = 6
+	stageTransform  = 7
+	stageBeaten     = 50000
+)
+
+// idleLimit is how long, in ticks, a fight goes on without a hit before
+// the boss resets: 15 minutes.
+const idleLimit = 15 * 60
+
+// parked is where a reset boss waits, out of its lair.
+var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+
 // Frintezza (29045), the tomb's master. His db value is the tomb's stage:
 // 0 sealed, 1 and 2 entered, 3 awakening, 4 to 7 the fight, his follower's
 // two forms (5, 6) and its transform (7) reporting their stages to him by
@@ -58,8 +80,8 @@ func Frintezza() script.Script {
 			// live in memory only, so a restart in that window starts the
 			// tomb over idle and the teleporter takes entries again
 			// (#4683).
-			case !n.DBLoaded() || n.DBValue() == 1:
-				n.SetDBValue(0)
+			case !n.DBLoaded() || n.DBValue() == stageCountdown:
+				n.SetDBValue(stageSealed)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 				setTombDoors(s, 0)
 				if c1 := memoNPC(s, bossmemo.FrintezzaFollower); c1 != nil {
@@ -68,10 +90,10 @@ func Frintezza() script.Script {
 				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-			case n.DBValue() == 2:
+			case n.DBValue() == stageEntered:
 				s.StartTimer("1001", n, nil, 600000*time.Millisecond)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1000", 0, 0)
-			case n.DBValue() > 2 && n.DBValue() < 8:
+			case n.DBValue() > stageEntered && n.DBValue() <= stageTransform:
 				setTombDoors(s, 1)
 				s.Spawner().CreateOnePrivateEx(n, 29052, script.Loc{X: 174239, Y: -89809, Z: -5016, Heading: 16384}, 0, script.Params{})
 				callSong(s, n, ai1)
@@ -123,7 +145,7 @@ func Frintezza() script.Script {
 			case strings.EqualFold(e.Name, "1011"):
 				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 4, 0)
-					n.SetDBValue(4)
+					n.SetDBValue(stageRising)
 				}
 				s.StartTimer("1012", n, nil, 1000*time.Millisecond)
 			case strings.EqualFold(e.Name, "1012"):
@@ -152,9 +174,9 @@ func Frintezza() script.Script {
 			case strings.EqualFold(e.Name, "7000"):
 				n.DoDie(n)
 			case strings.EqualFold(e.Name, "8000"):
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				n.SetHeading(16384)
-				n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+				n.TeleportTo(parked)
 				setTombDoors(s, 0)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1000", 0, 0)
 			case strings.EqualFold(e.Name, "3000"), strings.EqualFold(e.Name, "3001"):
@@ -169,13 +191,13 @@ func Frintezza() script.Script {
 			if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil && e.EventID == c0.ObjectID() {
 				switch e.Arg1 {
 				case 5:
-					n.SetDBValue(5)
+					n.SetDBValue(stageFirstForm)
 					n.SetInt(script.SlotIntAI0, 5)
 					n.SetInt(script.SlotIntAI1, 0)
 				case 30000:
 					n.SetInt(script.SlotIntAI1, 30000)
 				case 6:
-					n.SetDBValue(6)
+					n.SetDBValue(stageSecondForm)
 					n.SetInt(script.SlotIntAI0, 6)
 					n.SetInt(script.SlotIntAI1, 0)
 				case 30010:
@@ -184,7 +206,7 @@ func Frintezza() script.Script {
 			} else {
 				switch e.Arg1 {
 				case 7:
-					n.SetDBValue(7)
+					n.SetDBValue(stageTransform)
 					n.SetInt(script.SlotIntAI0, 7)
 					n.SetInt(script.SlotIntAI1, 0)
 					n.SetInt(npc.IntQuest2, s.CurrentTick())
@@ -199,24 +221,24 @@ func Frintezza() script.Script {
 					return
 				}
 				setTombDoors(s, 0)
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				n.SetHeading(16384)
-				n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+				n.TeleportTo(parked)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 			case 1:
-				n.SetDBValue(1)
+				n.SetDBValue(stageCountdown)
 				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 1, 0)
 				}
 			case 2:
-				n.SetDBValue(2)
+				n.SetDBValue(stageEntered)
 				if c0 := memoNPC(s, bossmemo.FrintezzaFollower); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 2, 0)
 				}
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1000", 0, 0)
 				s.StartTimer("1500", n, nil, s.BossWaitTimes().Frintezza)
 			case 3:
-				n.SetDBValue(3)
+				n.SetDBValue(stageAwakening)
 				s.StartTimer("1000", n, nil, 4000*time.Millisecond)
 			case 8:
 				s.StartTimer("7000", n, nil, 7500*time.Millisecond)
@@ -251,12 +273,12 @@ func Frintezza() script.Script {
 			n := e.NPC
 			s.GlobalMemo().Remove(bossmemo.Frintezza)
 			setTombDoors(s, 0)
-			n.SetDBValue(0)
+			n.SetDBValue(stageSealed)
 			s.Spawner().SendMakerEvent("frintessa_teleportcuve", "1001", 0, 0)
 		},
 		OnNoDesire: func(s *script.Script, e script.NoDesire) {
 			n := e.NPC
-			if n.DBValue() < 4 {
+			if n.DBValue() < stageRising {
 				return
 			}
 			if n.Int(script.SlotIntAI4) == 0 {
@@ -287,20 +309,20 @@ func setTombDoors(s *script.Script, inner int32) {
 // ai1 is the stage his follower or its transform last reported.
 func callSong(s *script.Script, n *script.NPC, ai1 int32) {
 	switch n.DBValue() {
-	case 3:
+	case stageAwakening:
 		playSong(s, n, 0, 0, 0, 0, 0)
-	case 4:
+	case stageRising:
 		playSong(s, n, 0, 0, 0, 0, 0)
-	case 5:
+	case stageFirstForm:
 		playSong(s, n, 2000, 2000, 0, 0, 0)
-	case 6:
+	case stageSecondForm:
 		switch ai1 {
 		case 0:
 			playSong(s, n, 1500, 1500, 1000, 2000, 0)
 		case 30010:
 			playSong(s, n, 1000, 2000, 1000, 2000, 0)
 		}
-	case 7:
+	case stageTransform:
 		switch ai1 {
 		case 0:
 			playSong(s, n, 0, 1500, 625, 2500, 0)
@@ -328,20 +350,20 @@ func callSong(s *script.Script, n *script.NPC, ai1 int32) {
 // where the healing song all but never plays.
 func fightSong(s *script.Script, n *script.NPC, ai1 int32) {
 	switch n.DBValue() {
-	case 3:
+	case stageAwakening:
 		playSong(s, n, 0, 0, 0, 0, 0)
-	case 4:
+	case stageRising:
 		playSong(s, n, 0, 0, 0, 0, 0)
-	case 5:
+	case stageFirstForm:
 		playSong(s, n, 2, 2000, 0, 0, 0)
-	case 6:
+	case stageSecondForm:
 		switch ai1 {
 		case 0:
 			playSong(s, n, 1, 1500, 1000, 2000, 0)
 		case 30010:
 			playSong(s, n, 1, 2000, 1000, 2000, 0)
 		}
-	case 7:
+	case stageTransform:
 		switch ai1 {
 		case 0:
 			playSong(s, n, 0, 1500, 625, 2500, 0)

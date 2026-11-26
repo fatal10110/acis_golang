@@ -60,18 +60,18 @@ func FollowerOfFrintezza() script.Script {
 				s.GlobalMemo().Set(bossmemo.FrintezzaFollower, int(n.ObjectID()))
 			}
 			if !n.DBLoaded() {
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				if c1 := memoNPC(s, bossmemo.Frintezza); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
 				if c1 := memoNPC(s, bossmemo.FrintezzaTransform); c1 != nil {
 					s.SendScriptEvent(c1, n.ObjectID(), 0, 0)
 				}
-			} else if n.DBValue() == 5 {
+			} else if n.DBValue() == stageFirstForm {
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1001", 0, 0)
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker2", "1001", 0, 0)
 				s.StartTimer("3000", n, nil, 1000*time.Millisecond)
-			} else if n.DBValue() == 6 {
+			} else if n.DBValue() == stageSecondForm {
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1001", 0, 0)
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker2", "1001", 0, 0)
 				n.RemoveAllDesire()
@@ -80,7 +80,7 @@ func FollowerOfFrintezza() script.Script {
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
 				n.AddCastDesire(n, changeBodySkill(), 1000000)
-				n.SetDBValue(6)
+				n.SetDBValue(stageSecondForm)
 				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 6, 0)
 				}
@@ -104,7 +104,7 @@ func FollowerOfFrintezza() script.Script {
 			n.SetInt(script.SlotIntAI2, 0)
 			n.SetInt(npc.IntQuest0, 0)
 			n.SetInt(npc.IntQuest1, s.CurrentTick())
-			if n.DBValue() == 5 || n.DBValue() == 6 {
+			if n.DBValue() == stageFirstForm || n.DBValue() == stageSecondForm {
 				n.AddWanderDesire(5, 5)
 				s.StartTimer("3000", n, nil, 60000*time.Millisecond)
 			}
@@ -123,26 +123,26 @@ func FollowerOfFrintezza() script.Script {
 			n.SetInt(npc.IntQuest1, s.CurrentTick())
 			hpRatio := n.HPRatio()
 			switch {
-			case n.DBValue() == 5 && hpRatio < 0.6:
+			case n.DBValue() == stageFirstForm && hpRatio < 0.6:
 				n.RemoveAllDesire()
 				n.SetInt(script.SlotIntAI4, 1)
 				n.SetInt(npc.IntQuest2, 0)
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
 				n.AddCastDesire(n, changeBodySkill(), 1000000)
-				n.SetDBValue(6)
+				n.SetDBValue(stageSecondForm)
 				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 6, 0)
 				}
 				n.SetInt(script.SlotIntAI3, 6)
 				s.StartTimer("4000", n, nil, 2000*time.Millisecond)
-			case n.DBValue() == 6 && hpRatio < 0.5 && n.Int(script.SlotIntAI3) == 6:
+			case n.DBValue() == stageSecondForm && hpRatio < 0.5 && n.Int(script.SlotIntAI3) == 6:
 				if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 					s.SendScriptEvent(c0, n.ObjectID(), 30010, 0)
 				}
 				n.SetInt(script.SlotIntAI3, 30010)
-			case n.DBValue() == 6 && hpRatio <= 0.2 && n.Int(script.SlotIntAI3) == 30010 && n.Int(script.SlotIntAI4) == 0:
-				n.SetDBValue(50000)
+			case n.DBValue() == stageSecondForm && hpRatio <= 0.2 && n.Int(script.SlotIntAI3) == 30010 && n.Int(script.SlotIntAI4) == 0:
+				n.SetDBValue(stageBeaten)
 				n.SetInt(script.SlotIntAI3, 30011)
 				s.BroadcastScriptEvent(n, 0, 50000, 6000)
 				n.RemoveAllDesire()
@@ -156,7 +156,7 @@ func FollowerOfFrintezza() script.Script {
 			if e.Skill == (skill.Ref{ID: 5008, Level: 2}) {
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1001", 0, 0)
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker2", "1001", 0, 0)
-				if n.DBValue() == 6 {
+				if n.DBValue() == stageSecondForm {
 					n.SetInt(script.SlotIntAI2, 1)
 				}
 			}
@@ -170,7 +170,7 @@ func FollowerOfFrintezza() script.Script {
 			if e.Skill == (skill.Ref{ID: 5008, Level: 2}) {
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1001", 0, 0)
 				s.Spawner().SendMakerEvent("frintessa_evilate_maker2", "1001", 0, 0)
-				if n.DBValue() == 6 {
+				if n.DBValue() == stageSecondForm {
 					n.SetInt(script.SlotIntAI2, 1)
 					doAttack(s, n)
 				}
@@ -180,18 +180,18 @@ func FollowerOfFrintezza() script.Script {
 			n := e.NPC
 			switch e.Arg1 {
 			case 4:
-				n.SetDBValue(4)
+				n.SetDBValue(stageRising)
 				n.SetInt(npc.IntQuest1, s.CurrentTick())
 				s.Spawner().CreateOnePrivateEx(n, 29053, script.Loc{X: 174230, Y: -88012, Z: -5112, Heading: 16384}, 0, script.Params{})
 				s.StartTimer("1001", n, nil, 5500*time.Millisecond)
 			case 0:
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				n.RemoveAllDesire()
 				n.SetInt(npc.IntQuest2, 0)
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
 				n.SetHeading(16384)
-				n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+				n.TeleportTo(parked)
 			}
 			base.ScriptEvent(s, e)
 		},
@@ -208,7 +208,7 @@ func FollowerOfFrintezza() script.Script {
 			case strings.EqualFold(e.Name, "1003"):
 				s.StartTimer("1900", n, nil, 10000*time.Millisecond)
 			case strings.EqualFold(e.Name, "1900"):
-				n.SetDBValue(5)
+				n.SetDBValue(stageFirstForm)
 				n.SetInt(script.SlotIntAI4, 0)
 				n.LookNeighbor()
 				doAttack(s, n)
@@ -263,11 +263,11 @@ func FollowerOfFrintezza() script.Script {
 				s.StartTimer("2109", n, nil, 2000*time.Millisecond)
 			case strings.EqualFold(e.Name, "2109"):
 				s.GlobalMemo().Remove(bossmemo.FrintezzaFollower)
-				n.SetDBValue(0)
+				n.SetDBValue(stageSealed)
 				n.DeleteMe()
 			case strings.EqualFold(e.Name, "3000"):
-				if n.DBValue() == 5 || n.DBValue() == 6 {
-					if s.ElapsedTicks(n.Int(npc.IntQuest1)) > 15*60 {
+				if n.DBValue() == stageFirstForm || n.DBValue() == stageSecondForm {
+					if s.ElapsedTicks(n.Int(npc.IntQuest1)) > idleLimit {
 						fallAsleep(s, n)
 					} else {
 						n.LookNeighbor()
@@ -298,7 +298,7 @@ func FollowerOfFrintezza() script.Script {
 			}
 			dbValue := n.DBValue()
 			if script.ActingPlayer(e.Creature) == nil {
-				if s.Rnd(100) < 1 && dbValue == 6 {
+				if s.Rnd(100) < 1 && dbValue == stageSecondForm {
 					// Anything but a player or its summon is an NPC here;
 					// another creature panics.
 					s.SendScriptEvent(e.Creature.(*script.NPC), 0, 20000, 0)
@@ -307,7 +307,7 @@ func FollowerOfFrintezza() script.Script {
 				}
 				return
 			}
-			if dbValue == 5 || dbValue == 6 {
+			if dbValue == stageFirstForm || dbValue == stageSecondForm {
 				rank(s, n, e.Creature, 1*1000)
 				doAttack(s, n)
 			}
@@ -325,15 +325,15 @@ func FollowerOfFrintezza() script.Script {
 				s.SendScriptEvent(c0, n.ObjectID(), 30011, 0)
 			}
 			s.GlobalMemo().Remove(bossmemo.FrintezzaFollower)
-			n.SetDBValue(0)
+			n.SetDBValue(stageSealed)
 			s.StartTimer("2000", n, nil, 500*time.Millisecond)
 		},
 		OnNoDesire: func(_ *script.Script, e script.NoDesire) {
 			n := e.NPC
 			dbValue := n.DBValue()
-			if (dbValue == 5 || dbValue == 6) && n.Int(script.SlotIntAI4) == 0 {
+			if (dbValue == stageFirstForm || dbValue == stageSecondForm) && n.Int(script.SlotIntAI4) == 0 {
 				n.LookNeighbor()
-			} else if dbValue == 0 {
+			} else if dbValue == stageSealed {
 				n.RemoveAllDesire()
 			}
 		},
@@ -360,12 +360,12 @@ func stepNorth(n *script.NPC) {
 // but stand or wander.
 func fighting(n *script.NPC) bool {
 	intention := n.Intention()
-	return (n.DBValue() == 5 || n.DBValue() == 6) && (intention == script.IntentionIdle || intention == script.IntentionWander)
+	return (n.DBValue() == stageFirstForm || n.DBValue() == stageSecondForm) && (intention == script.IntentionIdle || intention == script.IntentionWander)
 }
 
 // fallAsleep puts n back to sleep after 15 minutes with no hit.
 func fallAsleep(s *script.Script, n *script.NPC) {
-	n.SetDBValue(0)
+	n.SetDBValue(stageSealed)
 	if c0 := memoNPC(s, bossmemo.Frintezza); c0 != nil {
 		s.SendScriptEvent(c0, n.ObjectID(), 0, 0)
 	}
@@ -375,7 +375,7 @@ func fallAsleep(s *script.Script, n *script.NPC) {
 	s.BroadcastScriptEvent(n, 0, 40000, 8000)
 	n.RemoveAllDesire()
 	s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
-	n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+	n.TeleportTo(parked)
 	n.SetHeading(16384)
 	n.EquipItem(changeWeaponStart, 0)
 	s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1000", 0, 0)
@@ -487,7 +487,7 @@ func doAttack(s *script.Script, n *script.NPC) {
 		return
 	}
 	switch n.DBValue() {
-	case 5:
+	case stageFirstForm:
 		// One time in five the first form would charge every creature
 		// around from its no-charge territory; it does nothing then.
 		if s.Rnd(10000) >= 2000 {
@@ -497,7 +497,7 @@ func doAttack(s *script.Script, n *script.NPC) {
 				n.AddCastDesireUnchecked(c2, swingVer1(), 10000)
 			}
 		}
-	case 6:
+	case stageSecondForm:
 		switch {
 		case n.Int(script.SlotIntAI2) > 0:
 			dash(n, c2, dashVer2(), dashAllVer2())

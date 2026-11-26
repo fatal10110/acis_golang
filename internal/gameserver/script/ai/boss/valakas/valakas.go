@@ -27,6 +27,21 @@ const (
 	slotLastHit      = npc.IntQuest1     // tick of its last hit, or of its awakening
 )
 
+// Valakas's db value is its stage.
+const (
+	stageAsleep    = 0 // asleep, or reset out of its lair
+	stageWoken     = 1 // woken, appearing once its wait time has passed
+	stageAppearing = 2 // appearing in its lair
+	stageFighting  = 3
+)
+
+// idleLimit is how long, in ticks, a fight goes on without a hit before
+// the boss resets: 15 minutes.
+const idleLimit = 15 * 60
+
+// parked is where a reset boss waits, out of its lair.
+var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+
 // targetSlots are the slots of the three targets Valakas ranks: their
 // points, and who each is.
 func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
@@ -64,9 +79,9 @@ func Valakas() script.Script {
 		OnNoDesire: func(_ *script.Script, e script.NoDesire) {
 			n := e.NPC
 			switch n.DBValue() {
-			case 3:
+			case stageFighting:
 				n.AddWanderDesire(5, 5)
-			case 0:
+			case stageAsleep:
 				n.RemoveAllDesire()
 			}
 		},
@@ -77,8 +92,8 @@ func Valakas() script.Script {
 			}
 
 			if !n.DBLoaded() {
-				n.SetDBValue(0)
-			} else if n.DBValue() == 1 {
+				n.SetDBValue(stageAsleep)
+			} else if n.DBValue() == stageWoken {
 				s.StartTimer("1001", n, nil, 600000*time.Millisecond)
 			}
 
@@ -91,11 +106,11 @@ func Valakas() script.Script {
 			n.SetInt(slotLastHit, s.CurrentTick())
 
 			switch n.DBValue() {
-			case 2:
+			case stageAppearing:
 				// Restored while it appeared: nothing else leaves 2, so the
 				// appearance runs again and ends at 3 with the fight (#5133).
 				appear(s, n)
-			case 3:
+			case stageFighting:
 				n.AddWanderDesire(5, 5)
 
 				s.StartTimer("1002", n, nil, 60000*time.Millisecond)
@@ -107,7 +122,7 @@ func Valakas() script.Script {
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			n, attacker, damage := e.NPC, e.Attacker, e.Damage
-			if p, ok := attacker.(*script.Player); ok && n.DBValue() == 0 && !n.Dead() {
+			if p, ok := attacker.(*script.Player); ok && n.DBValue() == stageAsleep && !n.Dead() {
 				p.TeleportTo(script.Loc{X: 150037, Y: -57255, Z: -2976}, 0)
 			}
 
@@ -193,7 +208,7 @@ func Valakas() script.Script {
 				rank(s, n, attacker, high)
 			}
 
-			if n.DBValue() == 3 && idleOrWandering(n) {
+			if n.DBValue() == stageFighting && idleOrWandering(n) {
 				castAtBest(s, n)
 			}
 		},
@@ -207,10 +222,10 @@ func Valakas() script.Script {
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if n.DBValue() == 0 {
+			if n.DBValue() == stageAsleep {
 				s.StartTimer("1001", n, nil, s.BossWaitTimes().Valakas)
 
-				n.SetDBValue(1)
+				n.SetDBValue(stageWoken)
 			}
 
 			base.ScriptEvent(s, e)
@@ -227,10 +242,10 @@ func Valakas() script.Script {
 			case strings.EqualFold(name, "1001"):
 				n.SetInt(slotLastHit, s.CurrentTick())
 
-				n.SetDBValue(2)
+				n.SetDBValue(stageAppearing)
 				appear(s, n)
 			case strings.EqualFold(name, "1002"):
-				if n.DBValue() == 3 {
+				if n.DBValue() == stageFighting {
 					hp, maxHP := n.HP(), float64(n.MaxHP())
 					regen := func(level int, below int32) {
 						if ref := (skill.Ref{ID: 4691, Level: level}); s.AbnormalLevel(n, ref) < below {
@@ -238,11 +253,11 @@ func Valakas() script.Script {
 						}
 					}
 					switch {
-					case s.ElapsedTicks(n.Int(slotLastHit)) > 15*60:
-						n.SetDBValue(0)
+					case s.ElapsedTicks(n.Int(slotLastHit)) > idleLimit:
+						n.SetDBValue(stageAsleep)
 						n.RemoveAllDesire()
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
-						n.TeleportTo(script.Loc{X: -105200, Y: -253104, Z: -15264})
+						n.TeleportTo(parked)
 
 						pts, _ := targetSlots()
 						for _, slot := range pts {
@@ -261,7 +276,7 @@ func Valakas() script.Script {
 					s.StartTimer("1002", n, p, 60000*time.Millisecond)
 				}
 			case strings.EqualFold(name, "1003"):
-				if n.DBValue() == 3 && idleOrWandering(n) {
+				if n.DBValue() == stageFighting && idleOrWandering(n) {
 					castAtBest(s, n)
 				}
 
@@ -286,7 +301,7 @@ func Valakas() script.Script {
 				camera(750, 170, -10, 3400, 4000, 10, -15, 0, "1110", 5700*time.Millisecond)
 			case strings.EqualFold(name, "1110"):
 				n.AddCastDesire(n, skill.Ref{ID: 4691, Level: 1}, 4000000)
-				n.SetDBValue(3)
+				n.SetDBValue(stageFighting)
 
 				s.StartTimer("1002", n, p, 60000*time.Millisecond)
 
@@ -322,7 +337,7 @@ func Valakas() script.Script {
 
 			// No class is the occupation "@cleric_group", a class group: the
 			// sighting always takes the last branch.
-			if n.DBValue() == 3 && p.SameOccupation("@cleric_group") {
+			if n.DBValue() == stageFighting && p.SameOccupation("@cleric_group") {
 				switch hpRatio := n.HPRatio(); {
 				case hpRatio < 0.25:
 					rankInt(s, n, c, 10*1000)
@@ -337,7 +352,7 @@ func Valakas() script.Script {
 				rankInt(s, n, c, 1*1000)
 			}
 
-			if n.DBValue() == 3 && idleOrWandering(n) {
+			if n.DBValue() == stageFighting && idleOrWandering(n) {
 				castAtBest(s, n)
 			}
 		},
@@ -348,7 +363,7 @@ func Valakas() script.Script {
 			n := e.NPC
 			s.GlobalMemo().Remove(bossmemo.Valakas)
 
-			n.SetDBValue(0)
+			n.SetDBValue(stageAsleep)
 			n.PlayMusic("B03_D")
 			n.SpecialCamera(script.CameraShot{Distance: 2000, Yaw: 130, Pitch: -1, Time: 0, Duration: 10000, Turn: 0, Rise: 0, Widescreen: 1, Unknown: 1})
 
