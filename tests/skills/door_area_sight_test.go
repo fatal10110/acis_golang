@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -204,7 +205,8 @@ func spawnDoorOn(t *testing.T, eng *engine.Engine, tmpl *door.Template) *door.Ob
 	if err != nil {
 		t.Fatalf("door timers: %v", err)
 	}
-	objs, err := gamemanager.NewWorldObjects(doors, statics, &doorIDs{next: 1 << 28}, eng, world.New(), timers, task.NewDoorRegen(nil), nil, zerolog.Nop())
+	state := world.New()
+	objs, err := gamemanager.NewWorldObjects(doors, statics, &doorIDs{next: 1 << 28}, eng, state, timers, task.NewDoorRegen(nil), network.DoorSinks(state), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("world objects: %v", err)
 	}

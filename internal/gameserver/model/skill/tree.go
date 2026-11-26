@@ -84,12 +84,17 @@ type EnchantSkill struct {
 	ItemCount int
 }
 
-// EnchantRoute1Start and EnchantRoute2Start are the first skill levels of
-// the two enchant routes; a route's i-th enchant (from 0) is level start+i.
+// The skill-level numbering of enchants. EnchantRoute1Start and
+// EnchantRoute2Start are the first skill levels of the two enchant routes;
+// a route's i-th enchant (from 0) is level start+i, for enchantRouteLength
+// levels. enchantLevelFloor is the lowest level MaxLevel leaves out: it
+// reports a skill's highest regular level, and the cutoff sits below the
+// first route on purpose, so levels 99 and 100 never count as regular.
 const (
 	EnchantRoute1Start = 101
 	EnchantRoute2Start = 141
 	enchantRouteLength = 30
+	enchantLevelFloor  = 99
 )
 
 // CreateDwarvenSkillID is the Dwarven Craft skill; a character who knows it

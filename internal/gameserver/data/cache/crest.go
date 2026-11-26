@@ -54,11 +54,8 @@ type Crests struct {
 	partial bool
 }
 
-// NewCrests returns an empty crest cache with no directory: it saves no
-// crest.
-func NewCrests() *Crests { return NewCrestsIn("") }
-
-// NewCrestsIn returns an empty crest cache saving new crests to dir.
+// NewCrestsIn returns an empty crest cache saving new crests to dir; with
+// an empty dir it saves no crest.
 func NewCrestsIn(dir string) *Crests {
 	return &Crests{dir: dir, byKey: make(map[crestKey][]byte)}
 }

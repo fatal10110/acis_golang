@@ -81,6 +81,7 @@ func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) 
 		}
 	}
 
+	compileSkillConditions(defs, log)
 	return skill.NewTable(defs), nil
 }
 
@@ -640,63 +641,80 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 
 		RecallType: skill.ParseRecallType(a.strDefault("recallType", "")),
 
-		Extra: skill.Extra{
-			TargetConsumeCount:  a.intDefault("targetConsumeCount", 0),
-			TargetConsumeID:     a.intDefault("targetConsumeId", 0),
-			EffectAbnormalLevel: a.intDefault("effectAbnormalLvl", -1),
-			NegateLevel:         a.intDefault("negateLvl", -1),
-			EquipDelay:          a.intDefault("equipDelay", 0),
-			Attribute:           a.strDefault("attribute", ""),
-			MaxNegatedEffects:   a.intDefault("maxNegated", 0),
-			Stat:                attrEnumDefault(a, "stat", parseStatConstant, ""),
-			// effectType, chanceType and negateStats are kept as written, not
-			// checked against their name sets at load (issue #4779): an unknown
-			// name loads and simply matches nothing. effectId defaults to 0 for
-			// every type, signets included; no consumer reads the default and
-			// every shipped signet sets it.
-			EffectType:            a.strDefault("effectType", ""),
-			EffectID:              a.intDefault("effectId", 0),
-			EffectPower:           a.intDefault("effectPower", 0),
-			EffectLevel:           a.intDefault("effectLevel", 0),
-			EffectNpcID:           a.intDefault("effectNpcId", -1),
-			BaseLandRate:          a.intDefault("baseLandRate", 0),
-			NpcID:                 a.intDefault("npcId", 0),
-			CubicActivationTime:   a.intDefault("activationtime", 8),
-			CubicActivationChance: a.intDefault("activationchance", 30),
-			SummonTotalLifeTime:   a.intDefault("summonTotalLifeTime", 1200000),
-			ExpPenalty:            a.float32Default("expPenalty", 0),
-			SummonTimeLostIdle:    a.intDefault("summonTimeLostIdle", 0),
-			SummonTimeLostActive:  a.intDefault("summonTimeLostActive", 0),
-			ItemConsumeIDOT:       a.intDefault("itemConsumeIdOT", 0),
-			ItemConsumeCountOT:    a.intDefault("itemConsumeCountOT", 0),
-			ItemConsumeSteps:      a.intDefault("itemConsumeSteps", 0),
-			WeaponsAllowed:        a.strDefault("weaponsAllowed", ""),
-			MinPledgeClass:        a.intDefault("minPledgeClass", 0),
-			TriggeredID:           a.intDefault("triggeredId", 0),
-			TriggeredLevel:        a.intDefault("triggeredLevel", 0),
-			ChanceType:            a.strDefault("chanceType", ""),
-			ActivationChance:      a.intDefault("activationChance", -1),
-			MaxCharges:            a.intDefault("maxCharges", 0),
-			NumCharges:            a.intDefault("numCharges", 0),
-			LethalChance1:         a.intDefault("lethal1", 0),
-			LethalChance2:         a.intDefault("lethal2", 0),
-			NextDanceCost:         a.intDefault("nextDanceCost", 0),
-			SoulShotBoost:         a.float32Default("SSBoost", 0),
-			FlyRadius:             a.intDefault("flyRadius", 0),
-			FlyCourse:             a.float32Default("flyCourse", 0),
-			Feed:                  a.intDefault("feed", 0),
-			AbsorbPart:            a.float32Default("absorbPart", 0),
-			AbsorbAbs:             a.intDefault("absorbAbs", 0),
-			ExtractableItems:      a.strDefault("capsuled_items_skill", ""),
-			CreateItemCount:       a.intDefault("create_item_count", 0),
-			CreateItemRandomCount: a.intDefault("random_count", 1),
-			AppearanceFace:        a.intDefault("faceId", -1),
-			AppearanceHairColor:   a.intDefault("hairColorId", -1),
-			AppearanceHairStyle:   a.intDefault("hairStyleId", -1),
-			DespawnDelay:          a.intDefault("despawnDelay", 0),
-		},
+		Extra: buildSkillExtra(a),
 	}
 
+	readOptionalSkillAttrs(a, &attrs)
+
+	if err := a.Err(); err != nil {
+		return skill.DefinitionAttrs{}, err
+	}
+	return attrs, nil
+}
+
+// buildSkillExtra reads the level's rarely used attributes (see
+// skill.Extra), each defaulted when the level's data omits it.
+func buildSkillExtra(a *attrValues) skill.Extra {
+	return skill.Extra{
+		TargetConsumeCount:  a.intDefault("targetConsumeCount", 0),
+		TargetConsumeID:     a.intDefault("targetConsumeId", 0),
+		EffectAbnormalLevel: a.intDefault("effectAbnormalLvl", -1),
+		NegateLevel:         a.intDefault("negateLvl", -1),
+		EquipDelay:          a.intDefault("equipDelay", 0),
+		Attribute:           a.strDefault("attribute", ""),
+		MaxNegatedEffects:   a.intDefault("maxNegated", 0),
+		Stat:                attrEnumDefault(a, "stat", parseStatConstant, ""),
+		// effectType, chanceType and negateStats are kept as written, not
+		// checked against their name sets at load (issue #4779): an unknown
+		// name loads and simply matches nothing. effectId defaults to 0 for
+		// every type, signets included; no consumer reads the default and
+		// every shipped signet sets it.
+		EffectType:            a.strDefault("effectType", ""),
+		EffectID:              a.intDefault("effectId", 0),
+		EffectPower:           a.intDefault("effectPower", 0),
+		EffectLevel:           a.intDefault("effectLevel", 0),
+		EffectNpcID:           a.intDefault("effectNpcId", -1),
+		BaseLandRate:          a.intDefault("baseLandRate", 0),
+		NpcID:                 a.intDefault("npcId", 0),
+		CubicActivationTime:   a.intDefault("activationtime", 8),
+		CubicActivationChance: a.intDefault("activationchance", 30),
+		SummonTotalLifeTime:   a.intDefault("summonTotalLifeTime", 1200000),
+		ExpPenalty:            a.float32Default("expPenalty", 0),
+		SummonTimeLostIdle:    a.intDefault("summonTimeLostIdle", 0),
+		SummonTimeLostActive:  a.intDefault("summonTimeLostActive", 0),
+		ItemConsumeIDOT:       a.intDefault("itemConsumeIdOT", 0),
+		ItemConsumeCountOT:    a.intDefault("itemConsumeCountOT", 0),
+		ItemConsumeSteps:      a.intDefault("itemConsumeSteps", 0),
+		WeaponsAllowed:        a.strDefault("weaponsAllowed", ""),
+		MinPledgeClass:        a.intDefault("minPledgeClass", 0),
+		TriggeredID:           a.intDefault("triggeredId", 0),
+		TriggeredLevel:        a.intDefault("triggeredLevel", 0),
+		ChanceType:            a.strDefault("chanceType", ""),
+		ActivationChance:      a.intDefault("activationChance", -1),
+		MaxCharges:            a.intDefault("maxCharges", 0),
+		NumCharges:            a.intDefault("numCharges", 0),
+		LethalChance1:         a.intDefault("lethal1", 0),
+		LethalChance2:         a.intDefault("lethal2", 0),
+		NextDanceCost:         a.intDefault("nextDanceCost", 0),
+		SoulShotBoost:         a.float32Default("SSBoost", 0),
+		FlyRadius:             a.intDefault("flyRadius", 0),
+		FlyCourse:             a.float32Default("flyCourse", 0),
+		Feed:                  a.intDefault("feed", 0),
+		AbsorbPart:            a.float32Default("absorbPart", 0),
+		AbsorbAbs:             a.intDefault("absorbAbs", 0),
+		ExtractableItems:      a.strDefault("capsuled_items_skill", ""),
+		CreateItemCount:       a.intDefault("create_item_count", 0),
+		CreateItemRandomCount: a.intDefault("random_count", 1),
+		AppearanceFace:        a.intDefault("faceId", -1),
+		AppearanceHairColor:   a.intDefault("hairColorId", -1),
+		AppearanceHairStyle:   a.intDefault("hairStyleId", -1),
+		DespawnDelay:          a.intDefault("despawnDelay", 0),
+	}
+}
+
+// readOptionalSkillAttrs reads into attrs the level's attributes that are
+// only set when the level's data names them or its skill type needs them.
+func readOptionalSkillAttrs(a *attrValues, attrs *skill.DefinitionAttrs) {
 	// Only a CREATE_ITEM skill reads its item ids, and it must name them.
 	if attrs.SkillType == skill.SkillTypeCreateItem {
 		attrs.CreateItemIDs = attrInt32Array(a, "create_item_id")
@@ -747,11 +765,6 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		flight := attrEnum(a, "flyType", skill.ParseFlight)
 		attrs.Flight = &flight
 	}
-
-	if err := a.Err(); err != nil {
-		return skill.DefinitionAttrs{}, err
-	}
-	return attrs, nil
 }
 
 // attrSkillType reads a level's required skillType, which must name a skill

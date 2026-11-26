@@ -3,7 +3,7 @@ package spawn
 import "testing"
 
 func newFixtureTerritory(name string) *Territory {
-	return &Territory{Name: name, MinZ: 0, MaxZ: 100, Nodes: []Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}}}
+	return mustTerritory(Territory{Name: name, MinZ: 0, MaxZ: 100, Nodes: []Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}}})
 }
 
 func newFixtureMaker(name string, territories ...*Territory) *Maker {

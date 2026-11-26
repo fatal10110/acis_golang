@@ -21,7 +21,7 @@ func TestGameClientLinkRequestPledgeCrestDispatch(t *testing.T) {
 }
 
 func TestGameClientLinkRequestPledgeCrestDispatchMissingData(t *testing.T) {
-	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, nil, nil, datacache.NewCrests(), modelskill.BookPolicy{}, nil, true, nil, 0)
+	c, _, _, _, _, _ := newLinkedSQLGameClientFull(t, nil, nil, datacache.NewCrestsIn(""), modelskill.BookPolicy{}, nil, true, nil, 0)
 
 	c.Send(encodeRequestPledgeCrest(999))
 
@@ -40,7 +40,7 @@ func TestGameClientLinkRequestAllyCrestDispatch(t *testing.T) {
 }
 
 func TestGameClientLinkRequestAllyCrestDispatchMissingData(t *testing.T) {
-	c := newInGameSQLClientWithCrests(t, datacache.NewCrests())
+	c := newInGameSQLClientWithCrests(t, datacache.NewCrestsIn(""))
 
 	c.Send(encodeRequestAllyCrest(999))
 
@@ -58,7 +58,7 @@ func TestGameClientLinkRequestExPledgeCrestLargeDispatch(t *testing.T) {
 }
 
 func TestGameClientLinkRequestExPledgeCrestLargeDispatchMissingData(t *testing.T) {
-	c := newInGameSQLClientWithCrests(t, datacache.NewCrests())
+	c := newInGameSQLClientWithCrests(t, datacache.NewCrestsIn(""))
 
 	c.Send(encodeRequestExPledgeCrestLarge(999))
 

@@ -486,14 +486,14 @@ func (constGeoZ) Walkable(int, int, int) bool { return true }
 // z the geo mock always returns, but the merged range (driven by A) includes
 // it, so a fixed spawn-time Z check must still accept points landing in B.
 func TestRandomTerritoryPositionUsesMergedZRangeNotSubTerritoryOwnRange(t *testing.T) {
-	territoryA := &spawn.Territory{
+	territoryA := mustTerritory(spawn.Territory{
 		Name: "a", MinZ: 500, MaxZ: 500,
 		Nodes: []spawn.Node{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 0, Y: 100}},
-	}
-	territoryB := &spawn.Territory{
+	})
+	territoryB := mustTerritory(spawn.Territory{
 		Name: "b", MinZ: -500, MaxZ: -500,
 		Nodes: []spawn.Node{{X: 1000, Y: 0}, {X: 1100, Y: 0}, {X: 1000, Y: 100}},
-	}
+	})
 	maker := &spawn.Maker{Territories: []*spawn.Territory{territoryA, territoryB}}
 	geo := constGeoZ{500}
 
@@ -555,7 +555,7 @@ func (g *halfWalkableGeo) Walkable(x, _, _ int) bool {
 }
 
 func squareTerritory(minX, minY, maxX, maxY int) *spawn.Territory {
-	return &spawn.Territory{
+	return mustTerritory(spawn.Territory{
 		Name: "half-walkable",
 		MinZ: -100,
 		MaxZ: 100,
@@ -565,7 +565,7 @@ func squareTerritory(minX, minY, maxX, maxY int) *spawn.Territory {
 			{X: maxX, Y: maxY},
 			{X: minX, Y: maxY},
 		},
-	}
+	})
 }
 
 // TestRandomTerritoryPosition_RetriesUnwalkablePoints regression-tests #1716:
@@ -620,7 +620,7 @@ func TestRandomTerritoryPosition_FallsBackWhenNeverWalkable(t *testing.T) {
 }
 
 func triangleTerritory(name string, minZ, maxZ int, nodes ...spawn.Node) *spawn.Territory {
-	return &spawn.Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Nodes: nodes}
+	return mustTerritory(spawn.Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Nodes: nodes})
 }
 
 // TestRandomTerritoryPositionBansByMergedBannedZ covers #2160: the banned
@@ -742,3 +742,12 @@ func (nopKiller) Position() (x, y, z int) { return 0, 0, 0 }
 func (lootKiller) Heading() int { return 0 }
 
 func (lootKiller) Position() (x, y, z int) { return 0, 0, 0 }
+
+// mustTerritory builds tr's shape the way the spawnlist loader does.
+func mustTerritory(tr spawn.Territory) *spawn.Territory {
+	built, err := spawn.NewTerritory(tr.Name, tr.MinZ, tr.MaxZ, tr.Nodes)
+	if err != nil {
+		panic(err)
+	}
+	return built
+}

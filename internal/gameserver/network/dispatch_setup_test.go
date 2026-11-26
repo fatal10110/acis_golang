@@ -199,7 +199,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	roster := gamemanager.NewRoster(chars, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
 	html := testHTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"})
 	if crests == nil {
-		crests = datacache.NewCrests()
+		crests = datacache.NewCrestsIn("")
 	}
 	var cursed *entity.CursedWeaponTable
 	if len(cursedWeapons) > 0 {

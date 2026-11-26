@@ -15,15 +15,16 @@ func (m *Maker) ResidenceParam() (id int, ok bool) {
 	if m == nil {
 		return 0, false
 	}
-	parts := splitSpawnTime(m.SpawnTime)
-	if len(parts) != 2 {
+	return m.SpawnTime.residence, m.SpawnTime.hasResidence
+}
+
+// residenceParam reads param, the first parameter of a spawn time of a
+// known kind, as a residence id. Every known kind but door_open names the
+// residence first.
+func residenceParam(kind SpawnTimeKind, param string) (id int, ok bool) {
+	if kind == SpawnTimeNone || kind == SpawnTimeDoorOpen {
 		return 0, false
 	}
-	// Every known kind but door_open names the residence first.
-	if kind := SpawnTimeKindOf(parts[0]); kind == SpawnTimeNone || kind == SpawnTimeDoorOpen {
-		return 0, false
-	}
-	param, _, _ := strings.Cut(parts[1], ";")
 	if param == "" || strings.TrimLeft(param, "0123456789") != "" {
 		return 0, false
 	}

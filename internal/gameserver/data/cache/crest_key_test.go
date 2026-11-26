@@ -74,7 +74,7 @@ func TestCrestsSaveAndRemove(t *testing.T) {
 		t.Fatalf("AllyCrest_9.dds: %v", err)
 	}
 
-	if err := NewCrests().Save(PledgeCrest, 1, bytes.Repeat([]byte{1}, crestSize(PledgeCrest))); err == nil {
+	if err := NewCrestsIn("").Save(PledgeCrest, 1, bytes.Repeat([]byte{1}, crestSize(PledgeCrest))); err == nil {
 		t.Fatal("a cache with no directory saved a crest")
 	}
 }

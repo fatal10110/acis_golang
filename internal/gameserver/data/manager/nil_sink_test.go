@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -69,7 +70,7 @@ func TestNewNpcsWithoutSinkFactoryWarns(t *testing.T) {
 	}
 }
 
-func TestNewWorldObjectsWithoutSinkFactoryWarns(t *testing.T) {
+func TestNewWorldObjectsRequiresSinkFactory(t *testing.T) {
 	doors, err := door.NewTable(nil)
 	if err != nil {
 		t.Fatalf("door.NewTable(): %v", err)
@@ -84,14 +85,18 @@ func TestNewWorldObjectsWithoutSinkFactoryWarns(t *testing.T) {
 	}
 	geo, _, _ := newDoorGeo(t)
 
-	var logs bytes.Buffer
-	if _, err := NewWorldObjects(doors, statics, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), nil, zerolog.New(&logs)); err != nil {
-		t.Fatalf("NewWorldObjects() error: %v", err)
-	}
-	if !strings.Contains(logs.String(), "no door event sink factory") {
-		t.Fatalf("log = %q, want a nil-sink-factory warning", logs.String())
+	if _, err := NewWorldObjects(doors, statics, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), nil, zerolog.Nop()); err == nil {
+		t.Fatal("NewWorldObjects() with no door sink factory error = nil, want a wiring error")
 	}
 }
+
+// discardDoorSinks gives every door a sink that drops its events, for tests
+// that do not watch door broadcasts.
+func discardDoorSinks(*door.Object) event.Sink { return discardSink{} }
+
+type discardSink struct{}
+
+func (discardSink) Emit(event.Event) {}
 
 // npcQueues runs NPC work on a virtual clock no test advances: timers armed
 // on its queues never fire.

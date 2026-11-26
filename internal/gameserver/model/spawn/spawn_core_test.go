@@ -8,62 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-// ---- from entry_test.go ----
-func TestParsePositionsAllowsTrailingWeightedSeparator(t *testing.T) {
-	positions, err := ParsePositions("1;2;3;4;60%;5;6;7;8;40%;")
-	if err != nil {
-		t.Fatalf("ParsePositions error: %v", err)
-	}
-	if got, want := len(positions), 2; got != want {
-		t.Fatalf("len(positions) = %d, want %d", got, want)
-	}
-	if got, want := positions[1].Chance, 40; got != want {
-		t.Fatalf("positions[1].Chance = %d, want %d", got, want)
-	}
-	if got := positions[0]; got.Location.X != 1 || got.Location.Y != 2 || got.Location.Z != 3 || got.Heading != 4 {
-		t.Fatalf("positions[0] = %+v, want x/y/z/heading 1/2/3/4", got)
-	}
-}
-
-func TestParsePositionsRejectsMalformedCoordinate(t *testing.T) {
-	if _, err := ParsePositions("1;x;3;4;60%"); err == nil {
-		t.Fatal("ParsePositions error = nil, want a parse failure for a non-numeric y")
-	}
-}
-
-// Java (SpawnManager.java:205-213) sizes the weighted array at
-// loc.length/5 and loops only over complete groups: a trailing partial
-// group is silently dropped without being parsed, even if malformed.
-func TestParsePositionsDropsIncompleteTrailingWeightedGroup(t *testing.T) {
-	positions, err := ParsePositions("1;2;3;4;60%;garbage")
-	if err != nil {
-		t.Fatalf("ParsePositions error: %v", err)
-	}
-	if got, want := len(positions), 1; got != want {
-		t.Fatalf("len(positions) = %d, want %d", got, want)
-	}
-	if got := positions[0]; got.Location.X != 1 || got.Location.Y != 2 || got.Location.Z != 3 || got.Heading != 4 || got.Chance != 60 {
-		t.Fatalf("positions[0] = %+v, want x/y/z/heading/chance 1/2/3/4/60", got)
-	}
-}
-
-func TestParsePositionsFloorsGroupCountForNonMultipleTokenCounts(t *testing.T) {
-	// 9 tokens: one complete weighted group (5) plus a dropped partial (4).
-	positions, err := ParsePositions("1;2;3;4;10%;5;6;7;8")
-	if err != nil {
-		t.Fatalf("ParsePositions error: %v", err)
-	}
-	if got, want := len(positions), 1; got != want {
-		t.Fatalf("len(positions) = %d, want %d", got, want)
-	}
-}
-
-func TestParsePositionsRejectsFewerThanFourTokens(t *testing.T) {
-	if _, err := ParsePositions("1;2;3"); err == nil {
-		t.Fatal("ParsePositions error = nil, want a failure for an incomplete fixed tuple")
-	}
-}
-
 // ---- from respawn_test.go ----
 func TestCalculateRespawnDelayNoRespawnWhenDelayIsZero(t *testing.T) {
 	entry := Entry{RespawnDelay: 0, RespawnRandom: 5 * time.Second}
@@ -225,29 +169,6 @@ func TestTerritoryGeometryMatchesFields(t *testing.T) {
 	}
 }
 
-func TestTerritoryLiteralWithoutGeometryStaysUsable(t *testing.T) {
-	// Existing callers (e.g. test fixtures elsewhere) build a Territory as
-	// a plain struct literal, leaving the embedded *geometry.Territory
-	// nil. The legacy fields must stay directly usable in that case.
-	tr := &Territory{Name: "t", MinZ: -100, MaxZ: 100, Nodes: []Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 0, Y: 10}}}
-	if tr.Name != "t" || tr.MinZ != -100 || tr.MaxZ != 100 || len(tr.Nodes) != 3 {
-		t.Error("literal-constructed Territory lost its field values")
-	}
-	if !tr.Contains(1, 1, 0) {
-		t.Error("literal-constructed Territory does not contain an interior point")
-	}
-	if got, want := tr.Area(), 50.0; got != want {
-		t.Errorf("literal-constructed Territory Area() = %v, want %v", got, want)
-	}
-	other, err := geometry.NewTerritory(-100, 100, geometry.NewRectangle(0, 1, 0, 1))
-	if err != nil {
-		t.Fatalf("NewTerritory: %v", err)
-	}
-	if !tr.Intersects(other) {
-		t.Error("literal-constructed Territory does not intersect an overlapping territory")
-	}
-}
-
 // TestTerritoryContainsUsesTriangulationNotRayCasting pins the containment
 // rule spawn placement runs on, using a self-touching territory taken
 // verbatim from the shipped spawnlist ("godard01_npc2315_04",
@@ -289,13 +210,6 @@ func TestTerritoryContainsUsesTriangulationNotRayCasting(t *testing.T) {
 	if ring.Contains(x, y) {
 		t.Errorf("even-odd ray casting also contains (%d, %d); this fixture only "+
 			"proves anything while the two algorithms disagree there", x, y)
-	}
-
-	// A territory built as a struct literal has no prebuilt geometry; it must
-	// reach the same answer by triangulating its nodes on demand.
-	literal := &Territory{Name: "literal", MinZ: -3250, MaxZ: -3100, Nodes: nodes}
-	if !literal.Contains2D(x, y) {
-		t.Errorf("literal territory Contains2D(%d, %d) = false, want true", x, y)
 	}
 }
 
@@ -342,7 +256,7 @@ func (g flatTerrain) Walkable(x, y, _ int) bool {
 }
 
 func triangleTerritory(name string, minZ, maxZ int, nodes ...Node) *Territory {
-	return &Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Nodes: nodes}
+	return mustTerritory(Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Nodes: nodes})
 }
 
 // TestMakerRandomLocationDrawsFromMergedTerritory checks the sampler shared
@@ -502,4 +416,13 @@ func TestMakerRandomLocationWithoutTerritory(t *testing.T) {
 			t.Fatalf("RandomLocation on %+v ok = true, want false", maker)
 		}
 	}
+}
+
+// mustTerritory builds tr's shape the way the spawnlist loader does.
+func mustTerritory(tr Territory) *Territory {
+	built, err := NewTerritory(tr.Name, tr.MinZ, tr.MaxZ, tr.Nodes)
+	if err != nil {
+		panic(err)
+	}
+	return built
 }

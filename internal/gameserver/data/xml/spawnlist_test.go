@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
 
@@ -37,7 +39,7 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 		<node x="31" y="30"/>
 		<node x="31" y="31"/>
 	</territory>
-	<npcmaker name="maker_1" territory="a;b" ban="ban1;ban2" event="night" spawnTime="day" maximumNpcs="7">
+	<npcmaker name="maker_1" territory="a;b" ban="ban1;ban2" event="night" spawnTime="SIEGE_warfare_start(7;x)" maximumNpcs="7">
 		<ai type="event_maker">
 			<set name="EventName" val="@event_mutant_pig"/>
 		</ai>
@@ -87,8 +89,11 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 	if got, want := maker.MaximumNPCs, 7; got != want {
 		t.Fatalf("maker.MaximumNPCs = %d, want %d", got, want)
 	}
-	if got, want := maker.SpawnTime, "day"; got != want {
-		t.Fatalf("maker.SpawnTime = %q, want %q", got, want)
+	if kind, params := maker.SpawnTimeOf(); kind != spawn.SpawnTimeSiege || !slices.Equal(params, []string{"7", "x"}) {
+		t.Fatalf("maker.SpawnTimeOf() = (%v, %q), want (siege, [7 x])", kind, params)
+	}
+	if id, ok := maker.ResidenceParam(); !ok || id != 7 {
+		t.Fatalf("maker.ResidenceParam() = (%d, %v), want (7, true)", id, ok)
 	}
 
 	first := maker.Entries[0]

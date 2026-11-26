@@ -119,6 +119,7 @@ func LoadItemTemplates(dir string, log zerolog.Logger) (*item.Table, error) {
 		}
 	}
 
+	compileItemConditions(templates, log)
 	return item.NewTable(templates), nil
 }
 

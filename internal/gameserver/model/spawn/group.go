@@ -186,22 +186,42 @@ var spawnTimeKinds = [...]struct {
 	{"door_open", SpawnTimeDoorOpen},
 }
 
-// SpawnTimeOf returns the maker's spawn-time kind and its parameters. A
-// spawn time that does not split into a known kind and a parameter list,
-// as "siege_warfare_start(7)" does, counts as none.
+// SpawnTime is a maker's spawnTime attribute as it loads (see
+// ParseSpawnTime). The zero value is no spawn time.
+type SpawnTime struct {
+	Kind SpawnTimeKind
+	// Params are the ';'-separated parameters inside the brackets; nil
+	// when Kind is SpawnTimeNone.
+	Params []string
+	// residence is the residence id the first parameter names, when
+	// hasResidence (see Maker.ResidenceParam).
+	residence    int
+	hasResidence bool
+}
+
+// ParseSpawnTime parses a spawnTime attribute such as
+// "siege_warfare_start(7)". A value that does not split into a known kind
+// and a parameter list counts as no spawn time.
+func ParseSpawnTime(raw string) SpawnTime {
+	parts := splitSpawnTime(raw)
+	if len(parts) != 2 {
+		return SpawnTime{}
+	}
+	kind := SpawnTimeKindOf(parts[0])
+	if kind == SpawnTimeNone {
+		return SpawnTime{}
+	}
+	st := SpawnTime{Kind: kind, Params: strings.Split(parts[1], ";")}
+	st.residence, st.hasResidence = residenceParam(kind, st.Params[0])
+	return st
+}
+
+// SpawnTimeOf returns the maker's spawn-time kind and its parameters.
 func (m *Maker) SpawnTimeOf() (SpawnTimeKind, []string) {
 	if m == nil {
 		return SpawnTimeNone, nil
 	}
-	parts := splitSpawnTime(m.SpawnTime)
-	if len(parts) != 2 {
-		return SpawnTimeNone, nil
-	}
-	kind := SpawnTimeKindOf(parts[0])
-	if kind == SpawnTimeNone {
-		return SpawnTimeNone, nil
-	}
-	return kind, strings.Split(parts[1], ";")
+	return m.SpawnTime.Kind, m.SpawnTime.Params
 }
 
 // SpawnTimeKindOf returns the spawn-time kind named name, ignoring case;
@@ -233,7 +253,7 @@ func (m *Maker) OnStart() bool {
 	if m == nil || m.Event != "" {
 		return false
 	}
-	if kind, _ := m.SpawnTimeOf(); kind != SpawnTimeNone {
+	if m.SpawnTime.Kind != SpawnTimeNone {
 		return false
 	}
 	if v, ok := m.AIParams["on_start_spawn"]; ok {

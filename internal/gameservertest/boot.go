@@ -2172,7 +2172,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	relations := relation.NewManager(loadedRelations)
 	crests := o.crests
 	if crests == nil {
-		crests = datacache.NewCrests()
+		crests = datacache.NewCrestsIn("")
 	}
 	var cursed *entity.CursedWeaponTable
 	var cursedState *cursedweapon.Manager
