@@ -2136,13 +2136,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.dbFault != nil {
 		db = o.dbFault.Wrap(t, rowsDB)
 	}
-	stores := buildGraph(t, db)
-	chars := stores.Characters
-	items := stores.Items
-	shortcuts := stores.Shortcuts
-	hennas := stores.Hennas
-	recipeBooks := stores.RecipeBooks
-	subclasses := stores.Subclasses
+	graph := buildGraph(t, db, o.log)
+	chars := graph.Characters
+	items := graph.Items
+	shortcuts := graph.Shortcuts
+	hennas := graph.Hennas
+	recipeBooks := graph.RecipeBooks
+	subclasses := graph.Subclasses
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
 		skillTable := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}})
@@ -2160,7 +2160,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seed != nil {
 		o.seed(chars, items)
 	}
-	relationRows := gamesql.NewRelationStore(db)
+	relationRows := graph.Relations
 	loadedRelations, err := relationRows.Load(context.Background())
 	if err != nil {
 		t.Fatalf("load character relations: %v", err)
@@ -2181,7 +2181,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	servers.Register(1, HexID)
 	shutdownState := newShutdownHarness(servers)
 
-	validator := network.NewSessionValidator()
+	validator := graph.Sessions
 	// The link's handlers run on its reader goroutine, which starts before
 	// the link and the game client link exist; each reaches them through
 	// a pointer published once they do, as production's link holder does.
@@ -2221,7 +2221,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// from an empty registry instead of also ticking this test's leftovers.
 	cleanup(t, taskEffects.Reset)
 	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
-	groundStore := gamesql.NewGroundItemStore(db)
+	groundStore := graph.GroundItems
 	gameNow := o.gameClockNow
 	var drivenNow atomic.Pointer[func() time.Time]
 	if !o.drivenStart.IsZero() {
@@ -2278,22 +2278,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		}
 	}
 	inventoryUpdates := task.NewInventoryUpdates()
-	// Registered before the listener's cleanup, so it drains only after
-	// every connection's detach has enqueued its saves.
-	persistWorker := persist.New(o.log)
+	persistWorker := graph.Persist
 	if cursed != nil {
 		cursedState = cursedweapon.New(cursed, gamesql.NewCursedWeaponStore(db), persistWorker, o.log, o.cursedWeaponClock)
 	}
 	// Known-skill writes run on the worker in production too, so suites see
 	// the same ordering (FlushPersistence waits for them).
 	o.skills.SetPersistWorker(persistWorker, o.log)
-	cleanup(t, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
-		defer cancel()
-		if err := persistWorker.Close(ctx); err != nil {
-			t.Errorf("close persistence worker: %v", err)
-		}
-	})
+	// Stopping the shared graph drains the persistence worker. Registered
+	// before the listener's cleanup, so it drains only after every
+	// connection's detach has enqueued its saves.
+	cleanup(t, graph.stop)
 	// Registered after the persistence worker and before the listener, so
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
@@ -2307,13 +2302,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		drivenNow.Store(&now)
 	}
 	// Both writers of the items table share one ordering, as production does.
-	itemWrites := persist.NewOrder()
+	itemWrites := graph.ItemWrites
 	var itemFlusher task.ItemFlusher = gamesql.NewItemFlushStore(db)
 	if o.itemFlushFault != nil {
 		itemFlusher = faultyItemFlusher{inner: itemFlusher, fault: o.itemFlushFault}
 	}
 	itemInstances := task.NewItemInstances(itemFlusher, itemTemplates, persistWorker, itemWrites, zerolog.Nop())
-	petStore := stores.Pets
+	petStore := graph.Pets
 
 	// Mirror the production boot for the Seven Signs calendar: optional
 	// test seed first, then restore the persisted status and arm the
@@ -2475,7 +2470,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
 		Boats:            boats,
-		BossZones:        o.wrapBossZones(stores.BossZones),
+		BossZones:        o.wrapBossZones(graph.BossZones),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
@@ -2553,16 +2548,18 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.CharacterEdits = faultyCharacterNameStore{CharacterStore: chars, fault: o.characterNameFault}
 	}
 	gclConfig.Punishments = chars
-	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
+	petitions := bootPetitions(t, graph.Petitions, chars, ids, o.petitionConfig)
+	petitionRows := graph.Petitions
 	gclConfig.Petitions = petitions
-	couples, coupleRows := bootWedding(t, db, ids, o.weddingConfig, o.tradeClock)
+	couples := bootWedding(t, graph.Couples, ids, o.weddingConfig, o.tradeClock)
+	coupleRows := graph.Couples
 	gclConfig.Wedding = couples
-	gclConfig.Macros = stores.Macros
-	gclConfig.Bookmarks = stores.Bookmarks
-	gclConfig.Recommendations = stores.Recommendations
-	quests := bootQuests(stores.Quests, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
+	gclConfig.Macros = graph.Macros
+	gclConfig.Bookmarks = graph.Bookmarks
+	gclConfig.Recommendations = graph.Recommendations
+	quests := bootQuests(graph.Quests, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, events, questRates, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
-	quests.memos = &memoStore{MemoStore: stores.Memos, loadErr: o.memoLoadErr}
+	quests.memos = &memoStore{MemoStore: graph.Memos, loadErr: o.memoLoadErr}
 	gclConfig.Memos = quests.memos
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
@@ -2673,7 +2670,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	var npcRespawns *task.Respawn
 	var spawnStore *gamesql.SpawnStore
 	if o.npcSpawns != nil && o.spawnData {
-		spawnStore = gamesql.NewSpawnStore(db)
+		spawnStore = graph.Spawns
 		if o.seedSpawnData != nil {
 			o.seedSpawnData(spawnStore)
 		}
@@ -2880,7 +2877,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore cursed weapons: %v", err)
 	}
 	if o.zones != nil {
-		if err := stores.BossZones.Restore(context.Background(), zone.OfKind[*zone.Boss](o.zones)); err != nil {
+		if err := graph.BossZones.Restore(context.Background(), zone.OfKind[*zone.Boss](o.zones)); err != nil {
 			t.Fatalf("restore boss zones: %v", err)
 		}
 	}
@@ -2988,7 +2985,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		addr:                ln.Addr(),
 		sessions:            sessions,
 		login:               login,
-		groundStore:         gamesql.NewGroundItemStore(db),
+		groundStore:         groundStore,
 		serverCrash:         gamesql.NewServerCrashStore(db),
 		cursedWeapons:       cursed,
 		autosave:            autosave,

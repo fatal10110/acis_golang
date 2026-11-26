@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -53,6 +55,7 @@ func TestGroundItemsSurviveConstructorFailureAfterRestore(t *testing.T) {
 			func() *world.State { return world.New() },
 			func() *sql.DB { return db },
 			provideSimPool,
+			gamesql.NewGroundItemStore,
 			provideGroundItems,
 			func() (*failingComponent, error) {
 				return nil, errors.New("boot: simulated later-constructor failure")
@@ -63,8 +66,8 @@ func TestGroundItemsSurviveConstructorFailureAfterRestore(t *testing.T) {
 
 	startCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := failedApp.Start(startCtx); err == nil {
-		t.Fatal("app.Start() error = nil, want the simulated constructor failure")
+	if err := failedApp.Start(startCtx); err == nil || !strings.Contains(err.Error(), "simulated later-constructor failure") {
+		t.Fatalf("app.Start() error = %v, want the simulated constructor failure", err)
 	}
 	_ = failedApp.Stop(context.Background())
 
@@ -87,6 +90,7 @@ func TestGroundItemsSurviveConstructorFailureAfterRestore(t *testing.T) {
 			func() *world.State { return world.New() },
 			func() *sql.DB { return db },
 			provideSimPool,
+			gamesql.NewGroundItemStore,
 			provideGroundItems,
 		),
 		fx.Invoke(startGroundItems),

@@ -1,5 +1,6 @@
 # RaidPrivateHealer (25008, level 1), every draw 0: a level 20 character casts Ultimate Debuff (4694) on a
 # monster beside it: it wants nothing, not even the raid curse its parent would.
+driven
 character Hunter 20
 skill 4694 1
 roll player 0

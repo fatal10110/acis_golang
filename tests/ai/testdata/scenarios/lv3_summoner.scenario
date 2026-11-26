@@ -3,6 +3,7 @@
 # its desires, wants its buff (BUFF1) on itself at 1000000 and attacks the character at 200; the buff
 # lands nothing here, so its 1 s timer 4000 clears IntAI0 again (checked one second later, since the
 # two timers share the 3 s instant).
+driven
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc

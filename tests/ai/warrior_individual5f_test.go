@@ -252,6 +252,13 @@ func TestCastSummonPCWantsToSummonItsFarAttacker(t *testing.T) {
 func TestCastSummonPCPullsItsAttackerAndStrikes(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual5f(t, ind5fTemplate(ind5fSummonID))
+	// The pull's teleport runs on the character's own queue once the NPC's
+	// hook is done, and takes the character off the grid until its client
+	// answers Appearing; the strike desire the hook queued right after the
+	// pull survives only if the NPC acts on it before that. The inline
+	// executor orders the two; on the real pool the NPC's next pass may
+	// prune the desire (its target no longer known) first.
+	needsDrivenClock(t, w.srv)
 	me := w.player.ObjectID()
 	n := w.spawn(t, ind5fSummonID, 350, 0)
 	w.hit(t, n, 1)
