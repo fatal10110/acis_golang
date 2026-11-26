@@ -1117,19 +1117,22 @@ func (p *livePlayer) fusesTarget(id int32) bool {
 	return p.fusionTargetID.Load() == id
 }
 
-// castController returns live's cast controller, building it on first use
-// with live as the sink its abort, stop and finish events reach.
+// castController returns live's cast controller, built as live attaches
+// (attachCastController).
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
-	if live.cast == nil {
-		actor := actorcast.PlayerActor{Character: live.Character}
-		if live.attack != nil {
-			actor.Attack = live.attack
-		}
-		live.cast = actorcast.NewController(actor, live)
-		live.cast.SetQueue(live.Queue())
-		live.Character.SetCastController(live.cast)
-	}
 	return live.cast
+}
+
+// attachCastController builds live's cast controller on live's queue, with
+// live as the sink its abort, stop and finish events reach, and hands it to
+// live's character.
+func attachCastController(live *livePlayer) {
+	actor := actorcast.PlayerActor{Character: live.Character}
+	if live.attack != nil {
+		actor.Attack = live.attack
+	}
+	live.cast = actorcast.NewController(actor, live, live.Queue())
+	live.Character.SetCastController(live.cast)
 }
 
 func (p *livePlayer) inventoryItems() []*item.Instance {

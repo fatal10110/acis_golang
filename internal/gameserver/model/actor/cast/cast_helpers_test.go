@@ -42,7 +42,7 @@ func (a *abortActor) ExitSignetGround() { a.signetExits++ }
 func newAbortController() (*Controller, *abortActor, *event.Recorder) {
 	actor := &abortActor{testActor: scalingActor()}
 	rec := &event.Recorder{}
-	ctrl := NewController(actor, rec)
+	ctrl := NewController(actor, rec, nil)
 	return ctrl, actor, rec
 }
 

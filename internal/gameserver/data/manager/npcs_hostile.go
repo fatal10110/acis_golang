@@ -179,9 +179,7 @@ type hostileWiring struct {
 
 // NewAttack builds the NPC's attack controller on its own queue.
 func (w *hostileWiring) NewAttack() ai.AttackController {
-	ctl := attack.NewAttackable(&w.actor, &w.control)
-	ctl.SetQueue(w.control.hostile.Queue())
-	return ctl
+	return attack.NewAttackable(&w.actor, &w.control, w.control.hostile.Queue())
 }
 
 // NewCast builds the NPC's AI cast controller on its own queue, nil when
@@ -192,8 +190,7 @@ func (w *hostileWiring) NewCast() ai.CastController {
 		return nil
 	}
 	hostile := w.control.hostile
-	castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, &w.control)
-	castController.SetQueue(hostile.Queue())
+	castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, &w.control, hostile.Queue())
 	// A delete closes the NPC's queue without stopping its cast.
 	castController.OutliveQueueClose()
 	return &hostileCast{AIController: actorcast.AIController{
@@ -276,6 +273,9 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	if walker != nil {
 		w.route = hostileRoute{walker: walker, ref: walkerRef, log: log}
 		hostile.AI().SetRoute(&w.route)
+	}
+	if log != nil {
+		hostile.AI().SetLogger(*log)
 	}
 
 	control.hostile, control.move, control.walkerRef, control.routeMove = hostile, moveCtl, walkerRef, routeMove

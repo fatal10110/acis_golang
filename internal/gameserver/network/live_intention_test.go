@@ -31,8 +31,7 @@ type intentionFixture struct {
 func newIntentionFixture(t *testing.T) intentionFixture {
 	t.Helper()
 	live := newTestLivePlayer(t, 1, &testsupport.FrameCapture{})
-	live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character, Attack: live.attack}, nil)
-	live.cast.SetQueue(live.Queue())
+	live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character, Attack: live.attack}, nil, live.Queue())
 	live.Character.SetCastController(live.cast)
 	f := intentionFixture{link: newBareGameClientLink(t, GameClientLinkConfig{Log: zerolog.Nop()}), live: live, world: world.New()}
 	f.spawn(t, live)

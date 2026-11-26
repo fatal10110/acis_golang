@@ -50,8 +50,7 @@ func TestControllerNotesPvPOncePerSwingFromTheMainTarget(t *testing.T) {
 				actor.known = []attackable.Combatant{&timingTarget{id: 3, x: 50, attackable: true}}
 			}
 			clock := newTimingClock()
-			ctrl := NewPlayer(actor, nil)
-			ctrl.SetQueue(clock.q)
+			ctrl := NewPlayer(actor, nil, clock.q)
 			rec := &event.Recorder{}
 			ctrl.sink = rec
 

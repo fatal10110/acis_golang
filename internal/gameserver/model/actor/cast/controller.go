@@ -229,9 +229,11 @@ type Controller struct {
 //     CASTING_INTERRUPTED once the owner's AI has moved on (a player's
 //     comes after its CastStopAck, which carries Broken too).
 //
-// A nil sink drops them all.
-func NewController(actor Actor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, sink: sink}
+// A nil sink drops them all. The queue, the owning actor's, runs the
+// controller's scheduled launch, hit and finish callbacks; a scheduled cast
+// needs one.
+func NewController(actor Actor, sink event.Sink, queue *sim.Queue) *Controller {
+	return &Controller{actor: actor, sink: sink, queue: queue}
 }
 
 func (c *Controller) emit(e event.Event) {
@@ -240,8 +242,8 @@ func (c *Controller) emit(e event.Event) {
 	}
 }
 
-// SetQueue runs the controller's scheduled launch, hit and finish callbacks
-// as tasks on q, the owning actor's queue. A scheduled cast needs one.
+// SetQueue moves the controller's scheduled launch, hit and finish
+// callbacks onto q, the queue its actor has just moved to.
 func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

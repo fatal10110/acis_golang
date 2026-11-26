@@ -167,8 +167,8 @@ type Controller struct {
 	sink           event.Sink
 }
 
-// SetQueue runs the controller's scheduled hit and finish callbacks as tasks
-// on q, the owning actor's queue. An attack needs one.
+// SetQueue moves the controller's scheduled hit and finish callbacks onto q,
+// the queue its actor has just moved to.
 func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -179,28 +179,30 @@ func (c *Controller) SetQueue(q *sim.Queue) {
 // among them AttackStanceRequested, as each damaging hit lands, and
 // AttackFinished, once the swing finishes (the swing lands and, for non-bow
 // weapons, the actor is free to attack again). A nil sink drops them all.
+// The queue, the owning actor's, runs the controller's scheduled hit and
+// finish callbacks; an attack needs one.
 
 // NewPlayable returns an attack controller with playable-specific rules.
-func NewPlayable(actor PlayableActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, playable: actor, sink: sink}
+func NewPlayable(actor PlayableActor, sink event.Sink, queue *sim.Queue) *Controller {
+	return &Controller{actor: actor, playable: actor, sink: sink, queue: queue}
 }
 
 // NewPlayer returns an attack controller with player-specific rules.
-func NewPlayer(actor PlayerActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, playable: actor, player: actor, sink: sink}
+func NewPlayer(actor PlayerActor, sink event.Sink, queue *sim.Queue) *Controller {
+	return &Controller{actor: actor, playable: actor, player: actor, sink: sink, queue: queue}
 }
 
 // NewAttackable returns an attack controller with hostile NPC-specific
 // rules.
-func NewAttackable(actor CreatureActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, attackable: true, npc: true, sink: sink}
+func NewAttackable(actor CreatureActor, sink event.Sink, queue *sim.Queue) *Controller {
+	return &Controller{actor: actor, attackable: true, npc: true, sink: sink, queue: queue}
 }
 
 // NewNPC returns the attack controller of an NPC that is not attackable, a
 // civilian NPC: the base creature rules, with its AI re-running desire
 // selection on the attack phases as any NPC's does.
-func NewNPC(actor CreatureActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, npc: true, sink: sink}
+func NewNPC(actor CreatureActor, sink event.Sink, queue *sim.Queue) *Controller {
+	return &Controller{actor: actor, npc: true, sink: sink, queue: queue}
 }
 
 func (c *Controller) emit(e event.Event) {

@@ -24,8 +24,7 @@ var scalingDef = modelskill.Definition{ID: 10, Level: 2, Magic: true, HitTime: 1
 func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -70,8 +69,7 @@ func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 	clock := newCastClock()
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
@@ -99,8 +97,7 @@ func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 	clock := newCastClock()
 	actor := &testActor{mp: 100, hp: 100, hitCost: 50}
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true, MPConsume: 50}
@@ -138,8 +135,7 @@ func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -163,8 +159,7 @@ func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -199,8 +194,7 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 // hits to its cast yet (#2650).
 func TestInterruptOnDamageImmuneOverridesFusion(t *testing.T) {
 	clock := newCastClock()
-	ctrl := NewController(scalingActor(), nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(scalingActor(), nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -223,8 +217,7 @@ func TestInterruptOnDamageImmuneOverridesFusion(t *testing.T) {
 func TestScheduleStartedAfterInterruptDoesNotFireStaleTimer(t *testing.T) {
 	clock := newCastClock()
 	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, Magic: true, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
@@ -354,8 +347,7 @@ func TestScheduleFusionReportsWhenCastAlreadyStopped(t *testing.T) {
 // even though the final delay already elapsed while the hold stood.
 func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 	clock := newCastClock()
-	ctrl := NewController(scalingActor(), nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(scalingActor(), nil, clock.q)
 
 	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef)
 	if err != nil {
@@ -406,8 +398,7 @@ func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 // cast on the same controller.
 func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
 	clock := newCastClock()
-	ctrl := NewController(scalingActor(), nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(scalingActor(), nil, clock.q)
 
 	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, &scalingDef)
 	if err != nil {

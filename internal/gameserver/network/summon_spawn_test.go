@@ -405,7 +405,7 @@ func TestSummonDespawnSurvivesAPanickingAbort(t *testing.T) {
 	servitor := newTestServitor(t, owner)
 
 	sink := &summonSink{link: newBareGameClientLink(t, GameClientLinkConfig{World: state, Log: zerolog.Nop()}), actor: servitor}
-	sink.brain = ai.NewSummon(servitor, panickingSummonMove{}, attack.NewPlayable(servitor, sink))
+	sink.brain = ai.NewSummon(servitor, panickingSummonMove{}, attack.NewPlayable(servitor, sink, nil))
 	servitor.Attach(summon.Runtime{AI: sink.brain, Sink: sink})
 	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
 
