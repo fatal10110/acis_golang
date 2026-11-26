@@ -177,7 +177,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 		// The driver read/write timeout comes from a socketTimeout=<ms> URL
 		// option (for example ...?socketTimeout=10000); each login database
 		// call is bounded on its own as well.
-		Database: config.Database(props, maxConnections),
+		Database: db.ConfigFromProperties(props, maxConnections),
 	}, nil
 }
 

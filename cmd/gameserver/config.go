@@ -1135,7 +1135,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 				Pvp:          &pvpServer,
 			},
 		},
-		Database:            config.Database(serverProps, maxConnections),
+		Database:            db.ConfigFromProperties(serverProps, maxConnections),
 		AllowCursedWeapons:  serverProps.Bool("AllowCursedWeapons", true),
 		AllowWater:          serverProps.Bool("AllowWater", true),
 		AllowBoat:           serverProps.Bool("AllowBoat", true),
