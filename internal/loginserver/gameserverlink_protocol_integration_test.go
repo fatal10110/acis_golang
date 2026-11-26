@@ -19,6 +19,8 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -56,7 +58,7 @@ func dialGameServer(t *testing.T, addr string) *fakeGameServer {
 func (f *fakeGameServer) readFrame() []byte {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := testsupport.ReadFrame(f.conn)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}

@@ -17,7 +17,7 @@ func TestSyncBarrierFramesReturnsPrecedingFramesInOrder(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		if _, err := wire.ReadFrame(serverConn); err != nil {
+		if _, err := ReadFrame(serverConn); err != nil {
 			errCh <- err
 			return
 		}

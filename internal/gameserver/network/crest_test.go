@@ -182,7 +182,7 @@ func assertExPledgeCrestLargeFrame(t *testing.T, frame []byte, crestID int32, da
 func assertNoReply(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.Conn().SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	if frame, err := wire.ReadFrame(c.Conn()); err == nil {
+	if frame, err := testsupport.ReadFrame(c.Conn()); err == nil {
 		t.Fatalf("unexpected frame: %x", frame)
 	} else if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 		t.Fatalf("ReadFrame error = %v, want timeout", err)

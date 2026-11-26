@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/rs/zerolog"
 
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
@@ -221,7 +223,7 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 			_ = wire.WriteFrame(conn, buf)
 		}
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if _, err := wire.ReadFrame(conn); err != nil { // Init
+		if _, err := testsupport.ReadFrame(conn); err != nil { // Init
 			return
 		}
 		send(encodeAuthGameGuard(testInitSessionID))

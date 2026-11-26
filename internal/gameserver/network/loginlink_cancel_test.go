@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
@@ -34,7 +36,7 @@ func TestMaintainStopsDuringStalledHandshake(t *testing.T) {
 			if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				t.Fatal(err)
 			}
-			payload, err := wire.ReadFrame(conn)
+			payload, err := testsupport.ReadFrame(conn)
 			if err != nil {
 				t.Fatalf("read BlowFishKey: %v", err)
 			}

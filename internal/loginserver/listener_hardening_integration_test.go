@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/rs/zerolog"
 
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
@@ -115,7 +117,7 @@ func TestClientLinkPurgeDuringActiveTrafficKeepsFramesIntact(t *testing.T) {
 	}
 	read := func() ([]byte, error) {
 		c.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-		payload, err := wire.ReadFrame(c.conn)
+		payload, err := testsupport.ReadFrame(c.conn)
 		if err != nil {
 			return nil, err
 		}

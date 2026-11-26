@@ -1,7 +1,6 @@
 package network
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -78,7 +77,7 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	if err := wire.WriteFrame(client, encodeProtocolVersion(746)); err != nil {
 		t.Fatalf("send protocol version: %v", err)
 	}
-	version, err := wire.ReadFrame(client)
+	version, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read VersionCheck: %v", err)
 	}
@@ -89,14 +88,14 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	if err := wire.WriteFrame(client, encodeAuthLogin("offline", link.SessionKey{})); err != nil {
 		t.Fatalf("send AuthLogin: %v", err)
 	}
-	failure, err := wire.ReadFrame(client)
+	failure, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read AuthLoginFail: %v", err)
 	}
 	if len(failure) == 0 || failure[0] != serverpackets.OpcodeAuthLoginFail {
 		t.Fatalf("AuthLoginFail = %x, want cleartext opcode %#x", failure, serverpackets.OpcodeAuthLoginFail)
 	}
-	closing, err := wire.ReadFrame(client)
+	closing, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read ServerClose: %v", err)
 	}
@@ -746,20 +745,6 @@ func benchmarkUserInfoSnapshot() serverpackets.UserInfoSnapshot {
 	c := &player.Character{}
 	c.SetName("Benchmark")
 	return serverpackets.UserInfoSnapshot{Character: c}
-}
-
-func benchmarkUserInfoPayload(s serverpackets.UserInfoSnapshot) []byte {
-	return serverpackets.EncodeUserInfo(s)
-}
-
-func TestBenchmarkUserInfoPayloadMatchesFrame(t *testing.T) {
-	snapshot := benchmarkUserInfoSnapshot()
-	frame := serverpackets.FrameUserInfo(snapshot)
-	defer frame.Release()
-
-	if got, want := benchmarkUserInfoPayload(snapshot), frame.Bytes()[frameHeaderSize:]; !bytes.Equal(got, want) {
-		t.Fatal("unpooled UserInfo payload differs from FrameUserInfo")
-	}
 }
 
 func BenchmarkSessionSendUserInfoFrame(b *testing.B) {

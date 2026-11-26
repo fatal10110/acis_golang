@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	logincrypt "github.com/fatal10110/acis_golang/internal/loginserver/crypt"
@@ -34,7 +36,7 @@ func TestClientConnSendRejectsOversizedPayloadBeforeFirstEncryption(t *testing.T
 	sent := make(chan error, 1)
 	go func() { sent <- c.send([]byte{0x01}) }()
 
-	payload, err := wire.ReadFrame(client)
+	payload, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read first frame: %v", err)
 	}
@@ -66,7 +68,7 @@ func TestClientConnRequestedCloseReplacesLaterWrites(t *testing.T) {
 
 	// The first frame is the Init, under the static-key scheme; discard it.
 	go func() { _ = c.send([]byte{0x00}) }()
-	if _, err := wire.ReadFrame(client); err != nil {
+	if _, err := testsupport.ReadFrame(client); err != nil {
 		t.Fatalf("read Init frame: %v", err)
 	}
 
@@ -85,7 +87,7 @@ func TestClientConnRequestedCloseReplacesLaterWrites(t *testing.T) {
 		sent <- err
 	}()
 
-	payload, err := wire.ReadFrame(client)
+	payload, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read final frame: %v", err)
 	}
@@ -93,7 +95,7 @@ func TestClientConnRequestedCloseReplacesLaterWrites(t *testing.T) {
 	if payload[0] != 0x01 || payload[1] != 0xaa {
 		t.Fatalf("final frame starts % X, want the requested packet 01 AA", payload[:2])
 	}
-	if _, err := wire.ReadFrame(client); err == nil {
+	if _, err := testsupport.ReadFrame(client); err == nil {
 		t.Fatal("frame after the requested final packet")
 	}
 	if err := <-sent; !errors.Is(err, net.ErrClosed) {

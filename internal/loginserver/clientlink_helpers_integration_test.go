@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
 
@@ -195,7 +197,7 @@ func dialLoginClient(t *testing.T, addr string) *fakeLoginClient {
 	t.Cleanup(func() { conn.Close() })
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := wire.ReadFrame(conn); err != nil {
+	if _, err := testsupport.ReadFrame(conn); err != nil {
 		t.Fatalf("read Init frame: %v", err)
 	}
 
@@ -220,7 +222,7 @@ func (f *fakeLoginClient) send(payload []byte) {
 func (f *fakeLoginClient) read() []byte {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := testsupport.ReadFrame(f.conn)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}

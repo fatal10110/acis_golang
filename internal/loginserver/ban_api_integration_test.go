@@ -10,12 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/rs/zerolog"
 
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
 )
@@ -75,7 +76,7 @@ func dialLoginClientFrom(t *testing.T, addr, local string) *fakeLoginClient {
 	}
 	t.Cleanup(func() { conn.Close() })
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := wire.ReadFrame(conn); err != nil {
+	if _, err := testsupport.ReadFrame(conn); err != nil {
 		t.Fatalf("read Init frame from %s: %v", local, err)
 	}
 	cipher, err := commoncrypt.NewBlowfishCipher(testSessionKey)

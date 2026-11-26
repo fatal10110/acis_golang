@@ -69,7 +69,7 @@ func (r *rawClient) write(payload []byte) {
 func (r *rawClient) read() []byte {
 	r.t.Helper()
 	r.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(r.conn)
+	payload, err := testsupport.ReadFrame(r.conn)
 	if err != nil {
 		r.t.Fatalf("read frame: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestSessionCloseSendsServerCloseThenCloses(t *testing.T) {
 	}()
 
 	client.SetReadDeadline(time.Now().Add(2 * time.Second))
-	frame, err := wire.ReadFrame(client)
+	frame, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read ServerClose: %v", err)
 	}

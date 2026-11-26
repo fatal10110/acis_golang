@@ -62,7 +62,7 @@ func sendProtocolVersion(t *testing.T, conn net.Conn, out *gamecipher.Cipher) {
 func readFrame(t *testing.T, conn net.Conn) []byte {
 	t.Helper()
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(conn)
+	payload, err := testsupport.ReadFrame(conn)
 	if err != nil {
 		t.Fatalf("read VersionCheck: %v", err)
 	}

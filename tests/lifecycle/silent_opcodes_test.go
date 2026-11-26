@@ -49,7 +49,7 @@ func TestRejectedOpcodeLogLineIsBounded(t *testing.T) {
 	if err := wire.WriteFrame(probe.Conn(), frame); err != nil {
 		t.Fatalf("write frame: %v", err)
 	}
-	closing, err := wire.ReadFrame(probe.Conn())
+	closing, err := testsupport.ReadFrame(probe.Conn())
 	if err != nil {
 		t.Fatalf("read ServerClose: %v", err)
 	}

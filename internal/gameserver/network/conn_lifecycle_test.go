@@ -11,6 +11,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -62,7 +64,7 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 	closed := make(chan error, 1)
 	go func() { closed <- c.Close() }()
 	for i := range frames {
-		payload, err := wire.ReadFrame(client)
+		payload, err := testsupport.ReadFrame(client)
 		if err != nil {
 			t.Fatalf("read frame %d: %v", i, err)
 		}
@@ -70,7 +72,7 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 			t.Fatalf("frame %d arrived as sequence %d", i, got)
 		}
 	}
-	if _, err := wire.ReadFrame(client); err == nil {
+	if _, err := testsupport.ReadFrame(client); err == nil {
 		t.Fatal("read after Close drained the queue succeeded, want connection closed")
 	}
 	if err := <-closed; err != nil {
@@ -106,7 +108,7 @@ func TestConnSendLastDropsLaterSends(t *testing.T) {
 	closed := make(chan error, 1)
 	go func() { closed <- c.Close() }()
 	for want := range uint32(2) {
-		payload, err := wire.ReadFrame(client)
+		payload, err := testsupport.ReadFrame(client)
 		if err != nil {
 			t.Fatalf("read frame %d: %v", want, err)
 		}
@@ -114,7 +116,7 @@ func TestConnSendLastDropsLaterSends(t *testing.T) {
 			t.Fatalf("frame %d arrived as sequence %d", want, got)
 		}
 	}
-	if _, err := wire.ReadFrame(client); err == nil {
+	if _, err := testsupport.ReadFrame(client); err == nil {
 		t.Fatal("read past the last frame succeeded, want connection closed")
 	}
 	if err := <-closed; err != nil {
@@ -342,7 +344,7 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 	go func() {
 		next := make([]uint32, senders)
 		for range senders * perSender {
-			payload, err := wire.ReadFrame(client)
+			payload, err := testsupport.ReadFrame(client)
 			if err != nil {
 				received <- err
 				return

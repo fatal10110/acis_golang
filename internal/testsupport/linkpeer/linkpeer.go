@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -83,7 +85,7 @@ func (p *Peer) serve(priv *rsa.PrivateKey, serverID byte, name string) {
 	if wire.WriteFrame(conn, bootstrap.Encrypt(link.EncodeInitLS(priv.PublicKey.N.Bytes()))) != nil {
 		return
 	}
-	payload, err := wire.ReadFrame(conn)
+	payload, err := testsupport.ReadFrame(conn)
 	if err != nil || bootstrap.Decrypt(payload) != nil {
 		return
 	}
@@ -95,14 +97,14 @@ func (p *Peer) serve(priv *rsa.PrivateKey, serverID byte, name string) {
 	if session.SetKey(key) != nil {
 		return
 	}
-	if payload, err = wire.ReadFrame(conn); err != nil || session.Decrypt(payload) != nil {
+	if payload, err = testsupport.ReadFrame(conn); err != nil || session.Decrypt(payload) != nil {
 		return
 	}
 	if wire.WriteFrame(conn, session.Encrypt(link.EncodeAuthResponse(serverID, name))) != nil {
 		return
 	}
 	for {
-		payload, err := wire.ReadFrame(conn)
+		payload, err := testsupport.ReadFrame(conn)
 		if err != nil || session.Decrypt(payload) != nil {
 			return
 		}
