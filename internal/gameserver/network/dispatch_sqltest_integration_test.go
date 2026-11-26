@@ -52,7 +52,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		shortcutSeed(shortcuts)
 	}
 	if crests == nil {
-		crests = datacache.NewCrests()
+		crests = datacache.NewCrestsIn("")
 	}
 	var cursed *entity.CursedWeaponTable
 	if len(cursedWeapons) > 0 {

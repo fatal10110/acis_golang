@@ -118,7 +118,7 @@ func TestInTerritoryMakerOutsidePolygon(t *testing.T) {
 func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
 	home := location.Location{X: 100, Y: 0, Z: 0}
 	allowed := makerPoly()
-	banned := &spawn.Territory{
+	banned := mustTerritory(spawn.Territory{
 		Name: "banned",
 		MinZ: -1000,
 		MaxZ: 1000,
@@ -128,7 +128,7 @@ func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
 			{X: 400, Y: 50},
 			{X: 300, Y: 50},
 		},
-	}
+	})
 	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = home
@@ -220,7 +220,7 @@ func TestInTerritoryMinionFollowsMaster(t *testing.T) {
 }
 
 func makerPoly() *spawn.Territory {
-	return &spawn.Territory{
+	return mustTerritory(spawn.Territory{
 		Name: "maker",
 		MinZ: -1000,
 		MaxZ: 1000,
@@ -230,7 +230,7 @@ func makerPoly() *spawn.Territory {
 			{X: 2000, Y: 2000},
 			{X: -1000, Y: 2000},
 		},
-	}
+	})
 }
 
 func TestReturnHomeAtExactTerritoryBoundaryWalksBack(t *testing.T) {
@@ -717,4 +717,13 @@ func firstAICycle(t *testing.T, hostile *Hostile) {
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("first TickThink() error: %v", err)
 	}
+}
+
+// mustTerritory builds tr's shape the way the spawnlist loader does.
+func mustTerritory(tr spawn.Territory) *spawn.Territory {
+	built, err := spawn.NewTerritory(tr.Name, tr.MinZ, tr.MaxZ, tr.Nodes)
+	if err != nil {
+		panic(err)
+	}
+	return built
 }

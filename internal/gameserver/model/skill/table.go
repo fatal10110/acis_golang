@@ -8,12 +8,6 @@ import (
 	"sync/atomic"
 )
 
-// enchantLevelFloor is the first enchant-level number a Definition can carry
-// (levels below it are regular, non-enchanted levels). It is used to keep
-// enchant levels out of MaxLevel, which reports a skill's highest regular
-// level.
-const enchantLevelFloor = 99
-
 // Table is an in-memory lookup of skill definitions keyed by id and level,
 // built at boot and replaced in place by //reload skill. Every read works on
 // one loaded set of definitions, so a reload never shows a reader half of

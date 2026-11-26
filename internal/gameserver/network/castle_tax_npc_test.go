@@ -66,7 +66,7 @@ func TestNpcCastle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			inst := &npc.Instance{Template: &npc.Template{ID: tt.npcID}}
 			if tt.spawnTime != "" {
-				inst.Maker = &spawn.Maker{Name: "m", SpawnTime: tt.spawnTime}
+				inst.Maker = &spawn.Maker{Name: "m", SpawnTime: spawn.ParseSpawnTime(tt.spawnTime)}
 			}
 			c, ok := l.npcCastle(inst)
 			got := 0

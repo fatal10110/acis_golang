@@ -97,11 +97,9 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 		return nil, fmt.Errorf("world objects: nil door regeneration")
 	}
 	if newSink == nil {
-		// Doors built without a sink factory never reach a client: no
-		// open/close state change is broadcast and nothing errors. Domain
-		// tests boot this way on purpose, so this warns rather than fails,
-		// but a production composition root reaching it is a wiring bug.
-		log.Warn().Msg("data/manager: no door event sink factory; doors will not broadcast state changes")
+		// Doors built without a sink factory would never reach a client:
+		// no open/close state change would be broadcast and nothing errors.
+		return nil, fmt.Errorf("world objects: nil door event sink factory")
 	}
 
 	w := &WorldObjects{
@@ -626,9 +624,7 @@ func (w *WorldObjects) newDoor(tmpl *door.Template) (*door.Object, error) {
 	if err != nil {
 		return nil, fmt.Errorf("world objects: door %d: %w", tmpl.ID, err)
 	}
-	if w.newSink != nil {
-		obj.Attach(w.newSink(obj))
-	}
+	obj.Attach(w.newSink(obj))
 	obj.SetOwner(w)
 	obj.SetSight(doorSight{geo: w.geo})
 	obj.SetStrife(w.strife)

@@ -29,7 +29,7 @@ func TestMakerResidenceParam(t *testing.T) {
 		{"siege_warfare_start(99999999999)", 0, false},
 		{"", 0, false},
 	} {
-		got, ok := (&Maker{SpawnTime: tt.spawnTime}).ResidenceParam()
+		got, ok := (&Maker{SpawnTime: ParseSpawnTime(tt.spawnTime)}).ResidenceParam()
 		if got != tt.want || ok != tt.ok {
 			t.Errorf("ResidenceParam(%q) = (%d, %v), want (%d, %v)", tt.spawnTime, got, ok, tt.want, tt.ok)
 		}

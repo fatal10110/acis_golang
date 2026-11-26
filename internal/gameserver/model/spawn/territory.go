@@ -26,33 +26,13 @@ type Territory struct {
 	*geometry.Territory
 }
 
-// geometryTerritory returns the prebuilt shape, or triangulates the nodes on
-// demand for a Territory assembled as a struct literal.
-//
-// ponytail: the on-demand path re-triangulates per call. Only test fixtures
-// take it — everything loaded from the datapack goes through NewTerritory and
-// has the pointer set — so cache it here only if a production path ever
-// constructs a Territory without it.
+// geometryTerritory returns the prebuilt shape: nil for a Territory not
+// built by NewTerritory, which then contains nothing.
 func (t *Territory) geometryTerritory() *geometry.Territory {
 	if t == nil {
 		return nil
 	}
-	if t.Territory != nil {
-		return t.Territory
-	}
-	points := make([]geometry.Point, len(t.Nodes))
-	for i, n := range t.Nodes {
-		points[i] = geometry.Point{X: n.X, Y: n.Y}
-	}
-	poly, err := geometry.NewTriangulatedPolygon(points)
-	if err != nil {
-		return nil
-	}
-	shape, err := geometry.NewTerritory(t.MinZ, t.MaxZ, poly)
-	if err != nil {
-		return nil
-	}
-	return shape
+	return t.Territory
 }
 
 // Contains reports whether (x, y, z) lies inside the territory.

@@ -11,7 +11,7 @@ type Maker struct {
 	AIParams          map[string]string
 	MaximumNPCs       int
 	Event             string
-	SpawnTime         string
+	SpawnTime         SpawnTime
 	Entries           []Entry
 }
 

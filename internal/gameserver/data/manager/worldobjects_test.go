@@ -80,7 +80,7 @@ func newTestWorldObjectsWith(t *testing.T, tmpl *door.Template, effects task.Doo
 	}
 
 	state := world.New()
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, task.NewDoorRegen(nil), nil, zerolog.Nop())
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, task.NewDoorRegen(nil), discardDoorSinks, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestNewWorldObjectsSpawnsDoorsAndStaticObjects(t *testing.T) {
 	}
 
 	state := world.New()
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, task.NewDoorRegen(nil), nil, zerolog.Nop())
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, task.NewDoorRegen(nil), discardDoorSinks, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestNewWorldObjectsSkipsDegenerateDoor(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	objs, err := NewWorldObjects(doors, statics, &worldObjectIDs{}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), nil, zerolog.New(&logs))
+	objs, err := NewWorldObjects(doors, statics, &worldObjectIDs{}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), discardDoorSinks, zerolog.New(&logs))
 	if err != nil {
 		t.Fatalf("NewWorldObjects() error: %v", err)
 	}
@@ -355,7 +355,7 @@ func TestSetDoorOpenCascadesToTriggeredDoor(t *testing.T) {
 		t.Fatalf("NewDoor: %v", err)
 	}
 
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), nil, zerolog.Nop())
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), discardDoorSinks, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}

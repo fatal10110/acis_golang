@@ -408,7 +408,7 @@ func TestMakerIdleWanderOutOfTerritoryKeepsWanderCurrent(t *testing.T) {
 }
 
 func wanderPoly(nodes ...spawn.Node) *spawn.Territory {
-	return &spawn.Territory{Name: "wander", MinZ: 0, MaxZ: 100, Nodes: nodes}
+	return mustTerritory(spawn.Territory{Name: "wander", MinZ: 0, MaxZ: 100, Nodes: nodes})
 }
 
 func moveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
@@ -432,4 +432,13 @@ func absInt(n int) int {
 		return -n
 	}
 	return n
+}
+
+// mustTerritory builds tr's shape the way the spawnlist loader does.
+func mustTerritory(tr spawn.Territory) *spawn.Territory {
+	built, err := spawn.NewTerritory(tr.Name, tr.MinZ, tr.MaxZ, tr.Nodes)
+	if err != nil {
+		panic(err)
+	}
+	return built
 }

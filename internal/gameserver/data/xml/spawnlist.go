@@ -4,8 +4,10 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
@@ -164,7 +166,7 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory, log ze
 		AIParams:          aiParams,
 		MaximumNPCs:       a.int("maximumNpcs"),
 		Event:             a.strDefault("event", ""),
-		SpawnTime:         a.strDefault("spawnTime", ""),
+		SpawnTime:         spawn.ParseSpawnTime(a.strDefault("spawnTime", "")),
 		Entries:           entries,
 	}
 	if err := a.Err(); err != nil {
@@ -192,7 +194,7 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 	}
 
 	_, aiParams, aiParamKeys := flattenAI(el.AI, false)
-	positions, err := spawn.ParsePositions(a.strDefault("pos", ""))
+	positions, err := parsePositions(a.strDefault("pos", ""))
 	if err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
@@ -214,12 +216,77 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 		DBName:        a.strDefault("dbName", ""),
 	}
 	if a.has("dbSaving") {
-		entry.DBSaving = a.strArray("dbSaving")
+		entry.DBSaving = cleanStrings(a.strArray("dbSaving"))
 	}
 	if err := a.Err(); err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
 	return spawn.NewEntry(entry, spawnMultiplier), nil
+}
+
+// parsePositions decodes the semicolon-separated "pos" attribute shape used
+// by spawnlist XML: either one fixed [x;y;z;heading] tuple or N weighted
+// [x;y;z;heading;chance%] tuples.
+func parsePositions(raw string) ([]spawn.Position, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	raw = strings.TrimRight(raw, ";")
+	if raw == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(raw, ";")
+	if len(parts) == 4 {
+		pos, err := parsePosition(parts, false)
+		if err != nil {
+			return nil, err
+		}
+		return []spawn.Position{pos}, nil
+	}
+	if len(parts) < 5 {
+		return nil, fmt.Errorf("spawn: malformed pos %q", raw)
+	}
+
+	// The weighted list holds count/5 tuples: a token count of 5 or more
+	// that isn't a multiple of 5 yields floor(count/5) complete tuples, and
+	// the remainder tokens are silently dropped without being parsed.
+	groups := len(parts) / 5
+	positions := make([]spawn.Position, 0, groups)
+	for i := 0; i < groups; i++ {
+		pos, err := parsePosition(parts[i*5:i*5+5], true)
+		if err != nil {
+			return nil, err
+		}
+		positions = append(positions, pos)
+	}
+	return positions, nil
+}
+
+func parsePosition(parts []string, weighted bool) (spawn.Position, error) {
+	nums := make([]int, 4)
+	for i, name := range []string{"x", "y", "z", "heading"} {
+		n, err := strconv.Atoi(parts[i])
+		if err != nil {
+			return spawn.Position{}, fmt.Errorf("spawn: pos %s: %w", name, err)
+		}
+		nums[i] = n
+	}
+	chance := 0
+	if weighted {
+		n, err := strconv.Atoi(strings.TrimSuffix(parts[4], "%"))
+		if err != nil {
+			return spawn.Position{}, fmt.Errorf("spawn: pos chance: %w", err)
+		}
+		chance = n
+	}
+
+	return spawn.Position{
+		Location: location.Location{X: nums[0], Y: nums[1], Z: nums[2]},
+		Heading:  nums[3],
+		Chance:   chance,
+	}, nil
 }
 
 // buildSpawnPrivate builds one private spawn row under a spawn entry's
