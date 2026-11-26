@@ -4,7 +4,6 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -197,7 +196,3 @@ func (a *Actor) FestivalParticipant() bool                { return false }
 // an attack is NotifyAttacked.
 func (a *Actor) RecordAttacker(attackable.Combatant)                       {}
 func (a *Actor) SkillAttacked(attackable.Combatant, modelskill.Definition) {}
-
-// SkillLevels is empty: a summon's chance procs are its effects' triggers
-// only.
-func (a *Actor) SkillLevels() player.SkillLevels { return nil }
