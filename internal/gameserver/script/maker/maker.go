@@ -11,15 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-// Catalog maps each maker type with a maker of its own to its
-// constructor. Every other type, default_maker included, runs Default.
-func Catalog() script.MakerCatalog {
-	return script.MakerCatalog{
-		"no_on_start_maker": NoOnStart,
-		"event_maker":       Event,
-	}
-}
-
 // Default is the maker of every npcmaker whose type has none of its own:
 // it spawns the group at start unless its spawn condition holds, keeps the
 // NPCs out while it holds and respawns them otherwise.

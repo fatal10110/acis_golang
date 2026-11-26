@@ -8,7 +8,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
@@ -38,7 +37,7 @@ type recommendationTaskWorld struct {
 
 func bootRecommendationTask(t *testing.T, extra ...gameservertest.Option) *recommendationTaskWorld {
 	t.Helper()
-	list, err := gamexml.LoadScriptList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
+	list, err := script.LoadList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("load scripts.xml: %v", err)
 	}

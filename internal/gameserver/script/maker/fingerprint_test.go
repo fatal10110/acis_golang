@@ -59,10 +59,6 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		// literal.
 		"number 1000",
 		"number 60000",
-		// The catalog keys of the makers ported with the engine; the
-		// reference binds its types in the npcmaker, not in a script class.
-		`string "event_maker"`,
-		`string "no_on_start_maker"`,
 		// A maker reads its NPC's respawn delay from the spawn entry,
 		// deletes the NPC through the group NPC handle and keeps its memo
 		// writes in a cell: none is the script handle call the census names.

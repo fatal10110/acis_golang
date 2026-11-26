@@ -9,6 +9,7 @@ import (
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
@@ -42,7 +43,7 @@ func TestWarriorAggressiveChainRegistersOnFolk(t *testing.T) {
 		s.NPCs = []int32{35592}
 		return s
 	}
-	ops := map[string]script.HandleOps{path: handleOps()["script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive"]}
+	ops := map[string]script.HandleOps{path: catalog.HandleOps()["script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive"]}
 	var logs bytes.Buffer
 	r := script.Build([]script.Listing{{Path: path}}, script.Catalog{path: chain}, script.Config{KindOf: kindOf, Log: zerolog.New(&logs), HandleOps: ops})
 	var dump bytes.Buffer

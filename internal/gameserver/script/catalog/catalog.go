@@ -1,25 +1,56 @@
-// Package catalog maps the content scripts to their constructors: the
-// scripts.xml paths of the quests, features, teleporters and NPC behaviors,
-// and the npcmaker types of the makers, that are ported after the engine.
+// Package catalog maps every script to its constructor: the scripts.xml
+// paths of the quests, features, teleporters, scheduled tasks and NPC
+// behaviors, and the npcmaker types of the makers. engine.go holds those
+// ported with the engine, the other files those ported after it.
 //
 // Each file is the catalog of one owner issue, so content lanes never edit
-// the same file; a lane edits only its own file. A nil constructor marks an
-// entry its owner has not ported yet: the composition root drops it, so a
-// listed path stays unported (logged at error level and skipped at boot)
-// and a maker type keeps the default maker. Porting an entry replaces its
-// nil with the constructor.
+// the same file; a lane edits only its own file.
 package catalog
 
 import (
+	"fmt"
 	"maps"
+	"slices"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 )
 
-// Scripts returns the script catalogs by catalog file. sagas is the family
-// the saga core and every saga share.
-func Scripts(sagas *thirdclass.Family) map[string]script.Catalog {
+// ScriptCatalog joins the script catalog files into the one catalog the
+// server boots with; a path in two files is an error. crystals are the soul
+// crystals a quest charges, buffs the buffs the newbie guides cast.
+func ScriptCatalog(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTable) (script.Catalog, error) {
+	return join("script", Scripts(crystals, buffs, thirdclass.NewFamily()))
+}
+
+// MakerCatalog joins the maker catalog files into one, as ScriptCatalog
+// joins the script catalog files.
+func MakerCatalog() (script.MakerCatalog, error) {
+	return join("maker type", Makers())
+}
+
+// join joins files into one; a key in two files is an error.
+func join[C ~map[string]func() T, T any](what string, files map[string]C) (C, error) {
+	out := C{}
+	owner := map[string]string{}
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		for key, ctor := range files[name] {
+			if first, dup := owner[key]; dup {
+				return nil, fmt.Errorf("%s %s is in catalogs %s and %s", what, key, first, name)
+			}
+			owner[key] = name
+			out[key] = ctor
+		}
+	}
+	return out, nil
+}
+
+// Scripts returns the script catalogs by catalog file. crystals and buffs
+// are as ScriptCatalog takes them; sagas is the family the saga core and
+// every saga share.
+func Scripts(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTable, sagas *thirdclass.Family) map[string]script.Catalog {
 	return map[string]script.Catalog{
 		"ai_boss_antharas":  aiBossAntharas(),
 		"ai_boss_baium":     aiBossBaium(),
@@ -43,6 +74,7 @@ func Scripts(sagas *thirdclass.Family) map[string]script.Catalog {
 		"ai_individual_7":   aiIndividual7(),
 		"ai_individual_8":   aiIndividual8(),
 		"ai_siegeguard":     aiSiegeGuard(),
+		"engine":            engine(crystals, buffs, sagas),
 		"features":          features(),
 		"quests_001_050":    quests001To050(),
 		"quests_051_100":    quests051To100(sagas),
@@ -59,6 +91,7 @@ func Scripts(sagas *thirdclass.Family) map[string]script.Catalog {
 // Makers returns the maker catalogs by catalog file.
 func Makers() map[string]script.MakerCatalog {
 	return map[string]script.MakerCatalog{
+		"engine":   engineMakers(),
 		"makers_1": makers1(),
 		"makers_2": makers2(),
 		"makers_3": makers3(),
@@ -67,7 +100,7 @@ func Makers() map[string]script.MakerCatalog {
 
 // HandleOps returns, per script of the catalog files, the kind-specific NPC
 // handle operations each of its hooks reaches, as generated beside each
-// file.
+// file; the seam gate reads them at boot.
 func HandleOps() map[string]script.HandleOps {
 	out := map[string]script.HandleOps{}
 	for _, ops := range []map[string]script.HandleOps{
@@ -93,6 +126,7 @@ func HandleOps() map[string]script.HandleOps {
 		aiIndividual7HandleOps(),
 		aiIndividual8HandleOps(),
 		aiSiegeGuardHandleOps(),
+		engineHandleOps(),
 		featuresHandleOps(),
 		quests001To050HandleOps(),
 		quests051To100HandleOps(),
