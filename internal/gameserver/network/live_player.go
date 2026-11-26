@@ -397,7 +397,8 @@ func (p *livePlayer) after(d time.Duration, fn func()) *sim.Timer {
 // serialized with that player's timers and ticks. When q no longer accepts
 // tasks (the player detached, or the pool is stopping), fn runs on the
 // calling goroutine as q's owner, after the task q is still running, if any.
-// A task must never call it for its own queue: it would wait on itself.
+// No task may call it, on q or any other queue (sim.AssertNotOnQueue): on
+// its own queue it would wait on itself.
 //
 // It reports whether fn returned normally. False means fn panicked or called
 // runtime.Goexit and the pool's per-task recovery contained it, so whatever
@@ -406,6 +407,7 @@ func (p *livePlayer) after(d time.Duration, fn func()) *sim.Timer {
 // reports true: there the panic keeps unwinding, to the connection handler's
 // own recover.
 func onQueue(q *sim.Queue, fn func()) (ok bool) {
+	sim.AssertNotOnQueue()
 	done := make(chan struct{})
 	// ok is written before the deferred close and read after <-done, so the
 	// waiting goroutine sees the task goroutine's write.
