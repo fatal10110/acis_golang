@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // castAfterAttack boots a pet with the five-second magic strike, has it
@@ -209,7 +210,7 @@ func TestTeleportedPetCastAfterAttackDoesNotResume(t *testing.T) {
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	owner.TeleportTo(x+300, y, z, 0)
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner TeleportToLocation")
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	frames = append(frames, readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "pet TeleportToLocation")...)
 	h.handled(t)
 	frames = append(frames, drainFrames(t, h.client)...)

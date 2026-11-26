@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestFirstSpawnSyncsCollarEnchantToPetLevel lifts a fresh collar (enchant 0)
@@ -113,7 +114,7 @@ func TestLogoutSyncsCollarEnchantToPetLevel(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	assertFrameOpcode(t, mustRead(t, h.client, "LeaveWorld"), serverpackets.OpcodeLeaveWorld, "LeaveWorld")
 	if !h.client.AwaitClose(2 * time.Second) {
 		t.Fatal("logout did not close the connection")

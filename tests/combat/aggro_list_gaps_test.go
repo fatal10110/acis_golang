@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const aggroListMonsterID = 31912
@@ -50,7 +51,7 @@ func aggroListWorld(t *testing.T, aggroRange int) (*gameservertest.Server, *npc.
 		t.Fatalf("%T is not an online character", obj)
 	}
 	pc.TeleportTo(x+150, y, z, 0)
-	bc.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	bc.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	drainUntilQuiet(t, bc)
 	if err := srv.NpcSpawns.SpawnFixed(tmpl, x+50, y, z, 0, 0); err != nil {
 		t.Fatalf("spawn the monster: %v", err)

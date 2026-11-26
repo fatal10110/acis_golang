@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // setPlayerRoll pins the live player's rolls to roll, on its own queue.
@@ -118,7 +119,7 @@ func TestMissingPlayerCanRestart(t *testing.T) {
 	srv.Advance(t, 2*time.Second)
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	for {
 		reply := mustRead(t, c, "RestartResponse")
 		if reply[0] != serverpackets.OpcodeRestartResponse {

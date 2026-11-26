@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q620"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
@@ -447,7 +448,7 @@ func TestQ620KeeperTakesOnePartyAtATime(t *testing.T) {
 		p.TeleportTo(script.Loc{X: w.at.X, Y: w.at.Y, Z: w.at.Z}, 0)
 	})
 	w.srv.Advance(t, time.Second)
-	w.clients[w.ids["Leader"]].Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	w.clients[w.ids["Leader"]].Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	w.srv.Settle(t)
 	w.lines(t, "Leader")
 	got = w.enter(t, "Leader", keeper.ObjectID())
@@ -480,7 +481,7 @@ func TestQ620KeeperLeavesBehindWhoStandsFarOff(t *testing.T) {
 		p.TeleportTo(script.Loc{X: far.X, Y: far.Y, Z: far.Z}, 0)
 	})
 	w.srv.Advance(t, time.Second)
-	w.clients[w.ids["Mate2"]].Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	w.clients[w.ids["Mate2"]].Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	w.srv.Settle(t)
 	if x, y, _ := w.srv.PlayerPosition(t, w.ids["Mate2"]); x != far.X || y != far.Y {
 		t.Fatalf("Mate2 stands at %d,%d, want the far spot %d,%d", x, y, far.X, far.Y)

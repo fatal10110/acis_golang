@@ -73,21 +73,14 @@ func storedNow(t *testing.T, srv *gameservertest.Server, objID int32, column str
 	return got
 }
 
-// storedColumn waits for the characters column of objID to read want.
+// storedColumn requires the characters column of objID to read want once the
+// handled commands have settled and their writes have landed.
 func storedColumn(t *testing.T, srv *gameservertest.Server, objID int32, column, want string) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	var got string
-	for time.Now().Before(deadline) {
-		if err := srv.DB.QueryRowContext(context.Background(), "SELECT CAST("+column+" AS CHAR) FROM characters WHERE obj_Id = ?", objID).Scan(&got); err != nil {
-			t.Fatalf("read %s: %v", column, err)
-		}
-		if got == want {
-			return
-		}
-		time.Sleep(accessPollPeriod)
+	srv.Settle(t)
+	if got := storedNow(t, srv, objID, column); got != want {
+		t.Fatalf("stored %s of %d = %q, want %q", column, objID, got, want)
 	}
-	t.Fatalf("stored %s of %d = %q, want %q", column, objID, got, want)
 }
 
 // opcodes returns the opcodes of frames.

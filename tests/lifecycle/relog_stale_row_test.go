@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestDestroyedStackDoesNotReturnOnRelog destroys a whole stack and relogs
@@ -33,7 +34,7 @@ func TestDestroyedStackDoesNotReturnOnRelog(t *testing.T) {
 
 	// Back to character selection with no flush of the pending delete, which
 	// is what a logout inside the one-minute tick window looks like.
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 
 	if !persistedRowExists(t, srv, objID, potions) {

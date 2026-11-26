@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // selectOnly selects c's character in slot 0 and stops before EnterWorld:
@@ -19,7 +20,7 @@ import (
 // handled, so the character's registration is in place.
 func selectOnly(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "CharSelected")
 	srv.AwaitHandled(t)
@@ -168,7 +169,7 @@ func TestSelectionSeesCharacterStillEntering(t *testing.T) {
 	if !p.bobby.AwaitClose(3 * time.Second) {
 		t.Fatal("account takeover left the entering session open")
 	}
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if frames := p.srv.ReadHandled(t, c); len(frames) != 0 {
 		t.Fatalf("selection with the character still entering answered %x, want nothing", opcodes(frames))
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q503"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
@@ -135,9 +136,9 @@ func q503Boot(t *testing.T, leader bool, cond int, vars map[string]string, holds
 func (w *q503World) enterChief(t *testing.T) {
 	t.Helper()
 	c := w.srv.DialClient(t, "chief", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	w.srv.ReadQueued(t, c)
 	w.srv.ReadQueued(t, w.srv.Client)
 	w.chief = c

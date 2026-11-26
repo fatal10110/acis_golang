@@ -1,11 +1,11 @@
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -26,7 +26,7 @@ type HTML struct {
 
 // htmlPages is one load of the HTML directory.
 type htmlPages struct {
-	dir string
+	fsys fs.FS
 	// names are the pages the load found, sorted.
 	names []string
 	// read holds, per page name, the content of each page read so far.
@@ -45,26 +45,34 @@ func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 	if !info.IsDir() {
 		return nil, nil, fmt.Errorf("data/cache: html path %s is not a directory", dir)
 	}
+	h, undecodable, err = LoadHTMLFS(os.DirFS(dir))
+	if errors.Is(err, errNoHTML) {
+		return nil, nil, fmt.Errorf("data/cache: no html files found in %s", dir)
+	}
+	return h, undecodable, err
+}
 
+// errNoHTML reports a file system that holds no page.
+var errNoHTML = errors.New("no html files found")
+
+// LoadHTMLFS is LoadHTML for the pages under the root of fsys, such as an
+// in-memory file system.
+func LoadHTMLFS(fsys fs.FS) (h *HTML, undecodable []string, err error) {
 	var names []string
-	if err := filepath.WalkDir(dir, func(name string, entry fs.DirEntry, err error) error {
+	if err := fs.WalkDir(fsys, ".", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("data/cache: walk html %s: %w", name, err)
 		}
-		ext := filepath.Ext(entry.Name())
+		ext := path.Ext(entry.Name())
 		if entry.IsDir() || !entry.Type().IsRegular() || (!strings.EqualFold(ext, ".htm") && !strings.EqualFold(ext, ".html")) {
 			return nil
 		}
 
-		data, err := os.ReadFile(name)
+		data, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			return fmt.Errorf("data/cache: read html %s: %w", name, err)
 		}
-		rel, err := filepath.Rel(dir, name)
-		if err != nil {
-			return fmt.Errorf("data/cache: html path %s relative to %s: %w", name, dir, err)
-		}
-		key := path.Clean(filepath.ToSlash(rel))
+		key := path.Clean(name)
 		if !utf8.Valid(data) {
 			undecodable = append(undecodable, key)
 			return nil
@@ -75,13 +83,13 @@ func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 		return nil, nil, err
 	}
 	if len(names) == 0 {
-		return nil, nil, fmt.Errorf("data/cache: no html files found in %s", dir)
+		return nil, nil, errNoHTML
 	}
 	sort.Strings(names)
 	sort.Strings(undecodable)
 
 	h = &HTML{}
-	h.pages.Store(&htmlPages{dir: dir, names: packNames(names)})
+	h.pages.Store(&htmlPages{fsys: fsys, names: packNames(names)})
 	return h, undecodable, nil
 }
 
@@ -128,7 +136,7 @@ func (p *htmlPages) get(key string) (string, bool) {
 	if _, found := slices.BinarySearch(p.names, key); !found {
 		return "", false
 	}
-	data, err := os.ReadFile(filepath.Join(p.dir, filepath.FromSlash(key)))
+	data, err := fs.ReadFile(p.fsys, key)
 	if err != nil || !utf8.Valid(data) {
 		return "", false
 	}

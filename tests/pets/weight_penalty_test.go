@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // ballastID is a weight-10 item a pet may carry, so a give lands the pet's
@@ -296,7 +297,7 @@ func (h *petWorld) takeFromPet(t *testing.T, objectID, count int32) [][]byte {
 // neutral skill-list round trip, which proves it ran what was sent before.
 func syncFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	var frames [][]byte
 	for {
 		frame := mustRead(t, c, "frames before SkillList")

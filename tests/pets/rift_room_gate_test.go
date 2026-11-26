@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
@@ -135,7 +136,7 @@ func TestRiftRoomMonsterSparesPlayersOutsideItsRoom(t *testing.T) {
 		ownerChar.TeleportTo(ownerAt.X, ownerAt.Y, ownerAt.Z, 0)
 		readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner teleport")
 		drainUntilQuiet(t, h.client)
-		h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+		h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 		srv.AdvanceUntil(t, "summon followed its owner", func() bool { return !pet.Teleporting() })
 		drainUntilQuiet(t, h.client)
 		if x, y, z := ownerChar.Position(); (location.Location{X: x, Y: y, Z: z}) != ownerAt {

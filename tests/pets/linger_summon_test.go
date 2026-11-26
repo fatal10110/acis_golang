@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // orderedSeeCalls records the see-creature hooks of the watching monsters
@@ -65,10 +66,10 @@ func TestLingeringOwnerTeleportBringsSummon(t *testing.T) {
 	// The observer waits near the destination, out of the owner's sight.
 	watched := h.srv.SeedCharacterFor(t, "player2", "Watcher", 1, 0)
 	observer := h.srv.DialClient(t, "player2", 1)
-	observer.Send(encodeRequestGameStart(0))
+	observer.Send(clientwire.RequestGameStart(0))
 	observer.Read() // SSQInfo
 	observer.Read() // CharSelected
-	observer.Send(encodeEnterWorld())
+	observer.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, observer)
 	watcherObj, ok := h.srv.State.Player(watched.ID)
 	if !ok {
@@ -80,7 +81,7 @@ func TestLingeringOwnerTeleportBringsSummon(t *testing.T) {
 	}
 	watcher.TeleportTo(dest.X+400, dest.Y, dest.Z, 0)
 	readUntilOpcode(t, observer, serverpackets.OpcodeTeleportToLocation, "observer TeleportToLocation")
-	observer.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	observer.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	drainUntilQuiet(t, observer)
 	drainUntilQuiet(t, h.client)
 

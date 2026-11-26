@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 func TestAttackRequestWaitsForStandUp(t *testing.T) {
@@ -26,7 +27,7 @@ func TestAttackRequestWaitsForStandUp(t *testing.T) {
 	c.Send(encodeAttackRequest(hostile.ObjectID(), 10, 20, 30, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued attack")
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList) {
 		if frame[0] == serverpackets.OpcodeAttack || frame[0] == serverpackets.OpcodeMoveToPawn {
 			t.Fatalf("attack started during stand-up with opcode %#x", frame[0])
@@ -93,7 +94,7 @@ func TestAttackRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 	srv.SettlePosture(t, srv.SoleObjectID(t))
 	failed := false
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList) {
 		if frame[0] == serverpackets.OpcodeAttack || frame[0] == serverpackets.OpcodeMoveToPawn {
 			t.Fatalf("seated player attacked with opcode %#x", frame[0])
@@ -142,7 +143,7 @@ func TestSitRequestWaitsForSwing(t *testing.T) {
 	assertAttackBy(t, c, objID)
 	c.Send(encodeRequestChangeWaitType(false))
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList) {
 		if frame[0] == serverpackets.OpcodeChangeWaitType || frame[0] == serverpackets.OpcodeActionFailed {
 			t.Fatalf("sit answered during swing with opcode %#x", frame[0])

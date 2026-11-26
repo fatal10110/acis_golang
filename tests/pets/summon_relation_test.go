@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // summonRelationView is one RelationChanged a player was sent.
@@ -88,10 +89,10 @@ func TestSummonRelationFollowsOwnerCharInfo(t *testing.T) {
 
 		h.srv.SeedCharacterFor(t, "player2", "Watcher", 1, 0)
 		c := h.srv.DialClient(t, "player2", 1)
-		c.Send(encodeRequestGameStart(0))
+		c.Send(clientwire.RequestGameStart(0))
 		for frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = c.Read() {
 		}
-		c.Send(encodeEnterWorld())
+		c.Send(clientwire.EnterWorld())
 		assertOwnerThenPetRelation(t, drainFrames(t, c), h.ownerID, pet.ObjectID(), karma)
 	})
 }

@@ -16,6 +16,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
@@ -71,21 +72,11 @@ func bootNamed(t *testing.T, name string, stmts []string, opts ...gameservertest
 	return srv.Client, burst
 }
 
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
 // startInWorld selects the first character, enters the world and returns
 // the login burst.
 func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
 	}

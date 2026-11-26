@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestShadowItemTickDuringSelectionDoesNotLoseItsExpiry: a shadow weapon on
@@ -50,21 +51,21 @@ func TestShadowItemTickDuringSelectionDoesNotLoseItsExpiry(t *testing.T) {
 		srv.ShadowItems.Tick()
 	}
 	drainUntilQuiet(t, c)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 	if got := shadowSwordMana(t, srv, objID, sword); got != 61 {
 		t.Fatalf("mana after the logout = %d, want 61", got)
 	}
 
 	armed.Store(true)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
 	armed.Store(false)
 	if got := held.Load(); got != 1 {
 		t.Fatalf("selection hold ran %d times, want once", got)
 	}
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	frames := readEnterWorldBurst(t, c)
 	e := findItemListEntry(readItemListEntries(t, burstFrame(t, frames, serverpackets.OpcodeItemList)), sword)
 	if e == nil {

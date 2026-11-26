@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 func TestMain(m *testing.M) {
@@ -53,10 +54,10 @@ func bootAt(t *testing.T, at location.Location, itineraries ...route.BoatItinera
 		t.Fatalf("place character: %v", err)
 	}
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	return srv, readUntilQuiet(c)
 }
 
@@ -135,20 +136,6 @@ func assertLog(t *testing.T, when string, got []string, want ...string) {
 
 func readUntilQuiet(c *testsupport.ScriptedClient) [][]byte {
 	return c.ReadQueued()
-}
-
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
-func encodeEnterWorld() []byte {
-	return wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes()
 }
 
 func encodeRequestManorList() []byte {

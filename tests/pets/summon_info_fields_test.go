@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: AbstractNpcInfo.SummonInfo.writeImpl (AbstractNpcInfo.java:
@@ -58,9 +59,9 @@ func enterWorldSeeing(t *testing.T, srv *gameservertest.Server, account, name st
 	t.Helper()
 	srv.SeedCharacterFor(t, account, name, 1, 0)
 	c := srv.DialClient(t, account, 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelected, "CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	frames := readUntilOpcode(t, c, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	return append(frames, drainFrames(t, c)...)
 }

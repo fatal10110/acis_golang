@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestSubclassReuseGateOutlivesARestart pins #4914: the subclass actions'
@@ -30,7 +31,7 @@ func TestSubclassReuseGateOutlivesARestart(t *testing.T) {
 
 			w.c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
 			drainFrames(t, w.c)
-			w.c.Send(encodeRequestGameStart(0))
+			w.c.Send(clientwire.RequestGameStart(0))
 			if reply := w.c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 				t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
 			}

@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // The idle deadline is not waited out: ExpireIdleReads makes the wait after
@@ -41,7 +42,7 @@ func TestIdlePlayerInWorldClosesWithServerClose(t *testing.T) {
 	startInWorld(t, srv.Client)
 	srv.ExpireIdleReads(t)
 
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestSkillList))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeSkillList, "skill list")
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "idle ServerClose")
 
@@ -72,7 +73,7 @@ func TestFailedSelectionClosesWithServerClose(t *testing.T) {
 		t.Fatalf("set unknown class: %v", err)
 	}
 
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "failed selection ServerClose")
 	srv.Client.ExpectClosed()
 }

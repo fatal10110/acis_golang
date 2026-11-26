@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestStopSavesConnectedPlayer stops the server with a player still in game.
@@ -74,13 +75,13 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 		t.Fatalf("characters row already holds the post-hit HP %d while the lane is held", hp)
 	}
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	// Selection is parked on the held lane.
 	c.ExpectNoFrame()
 	release()
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	// The monster is still in range, so its NpcInfo interleaves the burst.
 	drainUntilQuiet(t, c)
 	// On the wall clock a quiet spell can end the drain before EnterWorld
@@ -126,7 +127,7 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 	})
 
 	c := srv.DialClient(t, "player1", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelectInfo, "refused selection's character list")
 	if _, ok := srv.State.Player(objID); ok {
 		t.Fatal("refused selection registered the player in the world")
@@ -139,7 +140,7 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 	if queued := c.ReadQueued(); len(queued) != 0 {
 		t.Fatalf("refused selection answered %#x once the lane drained: it waited past its budget", queued[0][0])
 	}
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // npcInfoMoveTypes returns the move type byte of every NpcInfo of objID
@@ -61,7 +62,7 @@ func TestDecorationJoinsTheZonesItStandsIn(t *testing.T) {
 	h.character(t).TeleportTo(x+5_000, y, z, 0)
 	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner teleport")
 	drainUntilQuiet(t, h.client)
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	drainUntilQuiet(t, h.client)
 
 	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))

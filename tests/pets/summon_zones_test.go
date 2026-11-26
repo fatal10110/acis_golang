@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // summonZoneBox is a zone volume over x in [minX, maxX] around the owner's
@@ -122,7 +123,7 @@ func TestSummonZonesFollowOwnerTeleport(t *testing.T) {
 	owner.TeleportTo(x+5_000, y, z, 0)
 	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner teleport")
 	drainUntilQuiet(t, h.client)
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	h.srv.AdvanceUntil(t, "wolf back in the peace zone", func() bool { return enters.Load() == 2 })
 	if got := exits.Load(); got != 1 {
 		t.Fatalf("after the teleport: wolf peace exits = %d, want 1", got)

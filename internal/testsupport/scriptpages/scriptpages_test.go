@@ -177,6 +177,18 @@ func TestCheckPackage(t *testing.T) {
 			exempt: []string{"30048-99.htm", "data/html/script/quest/Q001_LettersOfLove/30033-03.html"},
 		},
 		{
+			name: "a -NN.htm fragment must end an indexed page",
+			dir:  "fragments",
+			want: []string{
+				`fragments.go:8: page "-99.htm" is not in the script page index (looked up quest/Q001_LettersOfLove/<npcId>-99.htm)`,
+			},
+		},
+		{
+			name:   "an exempted fragment passes",
+			dir:    "fragments",
+			exempt: []string{"-99.htm"},
+		},
+		{
 			name:   "stale exemptions fail",
 			dir:    "present",
 			exempt: []string{"30048-01.htm", "30048-77.htm"},

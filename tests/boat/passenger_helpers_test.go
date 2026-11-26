@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // ticketID is the ticket the passenger itinerary's Rune leg charges: a
@@ -81,10 +82,10 @@ func bootPassengerWith(t *testing.T, at location.Location, tickets int32, setup 
 		srv.GiveItem(t, objID, ticketID, tickets)
 	}
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	readUntilQuiet(c)
 	return srv, c, objID, srv.Boats.Boats()[0].ObjectID()
 }
@@ -275,10 +276,10 @@ func enterSecondClient(t *testing.T, srv *gameservertest.Server, at location.Loc
 		t.Fatalf("place second character: %v", err)
 	}
 	c := srv.DialClient(t, "player2", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	readUntilQuiet(c)
 	return c, ch.ID
 }

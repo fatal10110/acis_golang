@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -108,7 +109,7 @@ func TestNewbieSupportMagicDroppedAtLogout(t *testing.T) {
 	onCharacter(t, w.srv, w.player, func(ch *player.Character) { c = ch })
 	expectLines(t, "first buff", w.event(t, "SupportMagic"), "cast 4322-1 player->player")
 
-	w.srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	w.srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	readUntil(t, w.srv.Client, serverpackets.OpcodeLeaveWorld)
 	w.srv.Client.ExpectClosed()
 	w.srv.Advance(t, 3*time.Second)

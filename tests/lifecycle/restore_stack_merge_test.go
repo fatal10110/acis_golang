@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestRestoreMergedStackWritesBothRows covers two persisted rows of one
@@ -52,7 +53,7 @@ func TestRestoreMergedStackWritesBothRows(t *testing.T) {
 	// pending, so the next restore reads both rows back and must not merge
 	// the absorbed one in again.
 	for login := 2; login <= 4; login++ {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 		readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 		if rows := persistedItemCounts(t, srv, objID); rows[absorbed] != absorbedCount || rows[survivor] != 150 {
 			t.Fatalf("login %d: precondition failed: rows %v, want survivor %d at 150 and absorbed %d still at %d, so this run never entered the relog-before-flush window", login, rows, survivor, absorbed, absorbedCount)
@@ -72,7 +73,7 @@ func TestRestoreMergedStackWritesBothRows(t *testing.T) {
 	// The count must hold across relogs rather than grow by the absorbed
 	// row each time.
 	for login := 5; login <= 7; login++ {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 		readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 		entries = readItemListEntries(t, burstFrame(t, startInWorld(t, c), serverpackets.OpcodeItemList))
 		assertSingleAdena(t, entries, 150)

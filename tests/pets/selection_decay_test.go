@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: Player.restore (Player.java:4144-4150) relinks the pet
@@ -83,7 +84,7 @@ func TestPetCorpseDecayingDuringItsOwnersSelection(t *testing.T) {
 	h.giveToPet(t, h.seededItem(t, item.AdenaID), 40)
 	killPet(t, h, wolf)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	decay.passAndTick(t, srv, 1199*time.Second)
 	if _, ok := srv.State.Object(wolf.ObjectID()); !ok {
@@ -91,7 +92,7 @@ func TestPetCorpseDecayingDuringItsOwnersSelection(t *testing.T) {
 	}
 
 	armed.Store(true)
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
 	armed.Store(false)
 	if got := held.Load(); got != 1 {
@@ -100,7 +101,7 @@ func TestPetCorpseDecayingDuringItsOwnersSelection(t *testing.T) {
 	if _, ok := srv.State.Object(wolf.ObjectID()); ok {
 		t.Fatal("pet corpse still in the world after its decay")
 	}
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	srv.Settle(t)
 

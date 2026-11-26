@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // unloadedTemplateID is an item id the catalog has no template for. A
@@ -45,7 +46,7 @@ func TestBrokenItemTemplateCostsOneItemNotTheLogin(t *testing.T) {
 	assertFrameOpcode(t, readSkippingEquipNoise(t, c, "equip UserInfo"), serverpackets.OpcodeUserInfo, "equip UserInfo")
 	drainUntilQuiet(t, c)
 	srv.ShadowItems.Tick()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 	if got := shadowSwordMana(t, srv, objID, sword); got != 299 {
 		t.Fatalf("mana after the first logout = %d, want 299", got)
@@ -68,7 +69,7 @@ func TestBrokenItemTemplateCostsOneItemNotTheLogin(t *testing.T) {
 		if e.equipped != 1 {
 			t.Fatalf("login %d: shadow weapon equipped flag = %d, want 1", step.login, e.equipped)
 		}
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 		readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 		if got := shadowSwordMana(t, srv, objID, sword); got != step.wantMana {
 			t.Fatalf("mana after login %d = %d, want %d (one repeated-equip penalty per completed login)", step.login, got, step.wantMana)

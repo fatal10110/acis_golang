@@ -3,9 +3,8 @@ package gameservertest
 import (
 	"context"
 	"math"
-	"os"
-	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -709,23 +708,17 @@ func ItemTemplates() *item.Table {
 	})
 }
 
-// HTMLCache writes the given pages into a temp dir and loads them through the
-// production HTML cache loader.
+// HTMLCache loads the given pages, keyed by their path under data/html,
+// through the production HTML cache loader.
 func HTMLCache(t testing.TB, pages map[string]string) *cache.HTML {
 	t.Helper()
-	dir := t.TempDir()
+	files := make(fstest.MapFS, len(pages))
 	for name, content := range pages {
-		path := filepath.Join(dir, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		files[name] = &fstest.MapFile{Data: []byte(content)}
 	}
-	html, _, err := cache.LoadHTML(dir)
+	html, _, err := cache.LoadHTMLFS(files)
 	if err != nil {
-		t.Fatalf("LoadHTML: %v", err)
+		t.Fatalf("LoadHTMLFS: %v", err)
 	}
 	return html
 }

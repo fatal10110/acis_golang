@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // charInfoTeamTail is how far the team byte sits from CharInfo's end:
@@ -24,10 +25,10 @@ func charInfoTeam(frame []byte) (objectID int32, team byte) {
 // protection UserInfo that follows the EtcStatusUpdate excluded.
 func enterProtected(t *testing.T, c *scriptedClient) [][]byte {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, mustRead(t, c, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, c, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	var frames [][]byte
 	protection := false
 	for {
@@ -137,7 +138,7 @@ func TestSpawnProtectionCharInfoFollowsTeleportAndAct(t *testing.T) {
 	}
 	observer.ReadQueued()
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	assertFrameOpcode(t, mustRead(t, c, "post-teleport UserInfo"), serverpackets.OpcodeUserInfo, "post-teleport UserInfo")
 	awaitCharInfoTeam(t, observer, subjectID, 1, "teleport landed")
 

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestPlayerTeleportLeavesAndRejoinsTheGrid pins a short player teleport
@@ -88,7 +89,7 @@ func TestPlayerTeleportLeavesAndRejoinsTheGrid(t *testing.T) {
 		t.Fatalf("watcher got %s, want TargetUnselected → TeleportToLocation → DeleteObject for the player", opcodes(watched))
 	}
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	frames = readQuiet(c)
 	info := indexOf(frames, 0, serverpackets.OpcodeNPCInfo, hostile.ObjectID())
 	charInfo := indexOfCharInfo(frames, watcherID)
@@ -118,8 +119,8 @@ func joinBystander(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
 	srv.SeedCharacterFor(t, "bystander", "Bystander", 1, 0)
 	b := srv.DialClient(t, "bystander", 1)
-	b.Send(encodeRequestGameStart(0))
-	b.Send(encodeEnterWorld())
+	b.Send(clientwire.RequestGameStart(0))
+	b.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, b)
 	drainUntilQuiet(t, srv.Client)
 }
@@ -205,7 +206,7 @@ func TestAppearingAfterAnOffQueueTeleportLandsAtTheDestination(t *testing.T) {
 	}()
 	<-done
 	readUntil(t, c, serverpackets.OpcodeTeleportToLocation, "TeleportToLocation")
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	user := readUntil(t, c, serverpackets.OpcodeUserInfo, "Appearing UserInfo")[0]
 	if x := int32(binary.LittleEndian.Uint32(user[1:5])); x != int32(destX) {
 		t.Fatalf("UserInfo x = %d, want the destination %d", x, destX)

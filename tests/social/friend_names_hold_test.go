@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // namesQuery is how the read of stored character names starts.
@@ -92,7 +93,7 @@ func TestEnterWorldFriendNamesHoldNoQueue(t *testing.T) {
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 	startInWorld(t, p.bobby)
 	drainUntilQuiet(t, p.bobby)
-	p.alice.Send(encodeRequestGameStart(0))
+	p.alice.Send(clientwire.RequestGameStart(0))
 	assertOpcode(t, p.alice.Read(), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertOpcode(t, p.alice.Read(), serverpackets.OpcodeCharSelected, "CharSelected")
 

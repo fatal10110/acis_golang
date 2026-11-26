@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -145,8 +146,8 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 		putUpRestartHQ(t, srv, at)
 	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
-	c.Send(encodeRequestGameStart(0))
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.RequestGameStart(0))
+	c.Send(clientwire.EnterWorld())
 	var window deathWindow
 	for i := 0; ; i++ {
 		frame := c.ReadWithTimeout(5 * time.Second)
@@ -167,7 +168,7 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 		break
 	}
 	if indexOf(readQuiet(c), 0, serverpackets.OpcodeTeleportToLocation, objID) >= 0 {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 		drainUntilQuiet(t, c)
 	}
 	return srv, objID, window

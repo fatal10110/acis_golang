@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestConcurrentSelectionOfOneCharacterIsRefused pins one selection of a
@@ -28,13 +29,13 @@ func TestConcurrentSelectionOfOneCharacterIsRefused(t *testing.T) {
 	first := srv.Client
 
 	release := srv.HoldPersistenceLane(t, objID)
-	first.Send(encodeRequestGameStart(0))
+	first.Send(clientwire.RequestGameStart(0))
 	if got := srv.ReadQueued(t, first); len(got) != 0 {
 		t.Fatalf("first selection answered %d frames while its saves were held, want it waiting", len(got))
 	}
 
 	second := srv.DialClient(t, srv.Account(), 1)
-	second.Send(encodeRequestGameStart(0))
+	second.Send(clientwire.RequestGameStart(0))
 	if got := srv.ReadQueued(t, second); len(got) != 0 {
 		t.Fatalf("second selection answered %d frames while the first was under way, want a silent refusal", len(got))
 	}
@@ -44,11 +45,11 @@ func TestConcurrentSelectionOfOneCharacterIsRefused(t *testing.T) {
 	// connection then takes it out of the world again; until it has, the
 	// second connection's selection is refused as a duplicate login.
 	srv.AdvanceUntil(t, "second connection's selection", func() bool {
-		second.Send(encodeRequestGameStart(0))
+		second.Send(clientwire.RequestGameStart(0))
 		frames := srv.ReadQueued(t, second)
 		return slices.ContainsFunc(frames, func(f []byte) bool { return f[0] == serverpackets.OpcodeCharSelected })
 	})
-	second.Send(encodeEnterWorld())
+	second.Send(clientwire.EnterWorld())
 	readEnterWorldBurst(t, second)
 	drainUntilQuiet(t, second)
 

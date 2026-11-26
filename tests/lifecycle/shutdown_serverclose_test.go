@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestStopSendsServerCloseToPlayerInWorld stops the server with a player in
@@ -32,7 +33,7 @@ func TestStopSendsServerCloseToPlayerInWorld(t *testing.T) {
 func TestStopSendsServerCloseToSelectedCharacter(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
 

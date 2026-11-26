@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	featuretutorial "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -106,9 +107,9 @@ func createNewbie(t *testing.T, srv *gameservertest.Server) int32 {
 func enterBurst(t *testing.T, srv *gameservertest.Server) [][]byte {
 	t.Helper()
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	return srv.ReadQueued(t, c)
 }
 

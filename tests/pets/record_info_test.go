@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestRecordInfoResendsWalkingPetInPlace pins RequestRecordInfo for an
@@ -22,7 +23,7 @@ func TestRecordInfoResendsWalkingPetInPlace(t *testing.T) {
 	monster := h.srv.SpawnHostileNPCAt(t, location.Location{X: home.X, Y: home.Y + 40, Z: home.Z})
 	drainFrames(t, h.client)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRecordInfo))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRecordInfo))
 	frames := drainFrames(t, h.client)
 	if len(frames) == 0 || frames[0][0] != serverpackets.OpcodeUserInfo {
 		t.Fatalf("RequestRecordInfo frames = opcodes %x, want UserInfo first", frameOpcodes(frames))

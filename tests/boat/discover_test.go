@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestBoatShownOnEntry pins what a player entering the world beside a
@@ -80,9 +81,9 @@ func enterSecond(t *testing.T, srv *gameservertest.Server, at location.Location)
 		t.Fatalf("place second character: %v", err)
 	}
 	c := srv.DialClient(t, "player2", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	return readUntilQuiet(c)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestPanicInSelectionAfterRestoreDetachesPlayer panics the RequestGameStart
@@ -22,7 +23,7 @@ func TestPanicInSelectionAfterRestoreDetachesPlayer(t *testing.T) {
 	openQueues := srv.OpenActorQueues()
 	panicOnSend(t, srv, serverpackets.OpcodeCharSelected)
 
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "after the panicked selection")
 	srv.Client.ExpectClosed()

@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestFailedDetachFlushKeepsInventoryOnRelog logs a character out with the
@@ -48,7 +49,7 @@ func TestFailedDetachFlushKeepsInventoryOnRelog(t *testing.T) {
 	// From here every write fails, so the detach flush keeps both pending
 	// instead of dropping them.
 	fault.Arm()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 	fault.Disarm()
 
@@ -80,7 +81,7 @@ func TestFailedDetachFlushKeepsInventoryOnRelog(t *testing.T) {
 	// same state again, rather than leaving the stale row as the only record
 	// and handing the destroyed potions back on the login after it.
 	fault.Arm()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 	fault.Disarm()
 

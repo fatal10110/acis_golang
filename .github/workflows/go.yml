@@ -229,10 +229,27 @@ jobs:
           key: lint-${{ runner.os }}-${{ github.sha }}
           restore-keys: lint-${{ runner.os }}-
 
+      # Pruned like the test caches (see the test job): without it every
+      # main run carries all earlier build outputs forward.
+      - name: Mark Go cache entries unused
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p ~/.cache/go-build
+          find ~/.cache/go-build -type f -name '*-[ad]' -exec touch -d '2 hours ago' {} +
+          touch "$RUNNER_TEMP/go-cache-start"
+
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
           skip-cache: true
+
+      - name: Drop Go cache entries this run did not use
+        if: github.event_name == 'push'
+        run: |
+          cd ~/.cache/go-build
+          find . -type f -name '*-a' -newer "$RUNNER_TEMP/go-cache-start" \
+            -exec awk '{print substr($3, 1, 2) "/" $3 "-d"}' {} + | xargs -r touch -c
+          find . -type f -name '*-[ad]' ! -newer "$RUNNER_TEMP/go-cache-start" -delete
 
       - name: Save lint cache
         if: github.event_name == 'push'

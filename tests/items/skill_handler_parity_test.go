@@ -16,6 +16,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // SP Scroll: Low Grade casts Scroll of SP level 1: GIVE_SP, target SELF,
@@ -61,7 +62,7 @@ func TestUseSPScrollGrantsSPAndConsumes(t *testing.T) {
 		t.Fatalf("persisted scroll count = %d, want 1", inst.Count)
 	}
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	if !c.AwaitClose(5 * time.Second) {
 		t.Fatal("server kept the connection open after Logout")
 	}

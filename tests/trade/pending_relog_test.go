@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTargetRelogDropsPendingRequest pins Player.deleteMe clearing the active
@@ -114,7 +115,7 @@ func (h *traders) sendRequest(t *testing.T) {
 // the same object id, then drains both traders.
 func (h *traders) relog(t *testing.T, c *testsupport.ScriptedClient, objID int32) {
 	t.Helper()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeRestartResponse, "RestartResponse")
 	h.awaitOffline(t, objID)
 	drainUntilQuiet(t, c)
