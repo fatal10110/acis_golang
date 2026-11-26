@@ -126,10 +126,10 @@ func FreyaPet() script.Script {
 				n.CleanAllHate()
 				n.AddAttackDesire(attacker, 1000000)
 				n.SetInt(script.SlotFlag, attacker.ObjectID())
-				s.BroadcastScriptEvent(n, 10002, n.ObjectID(), 2000)
+				s.BroadcastScriptEvent(n, eventMasterTarget, n.ObjectID(), 2000)
 			}
 			if n.HPRatio() < 0.8 {
-				s.BroadcastScriptEvent(n, 10034, 0, 2000)
+				s.BroadcastScriptEvent(n, eventHealMaster, 0, 2000)
 			}
 			base.Attacked(s, e)
 		},
@@ -145,7 +145,7 @@ func FreyaPet() script.Script {
 					called.CleanAllHate()
 					called.AddAttackDesire(c, 1000000)
 					called.SetInt(script.SlotFlag, c.ObjectID())
-					s.BroadcastScriptEvent(called, 10002, called.ObjectID(), 500)
+					s.BroadcastScriptEvent(called, eventMasterTarget, called.ObjectID(), 500)
 				}
 			}
 		},
@@ -177,7 +177,7 @@ func FreyaSecretaryLeader() script.Script {
 				params := script.Params{P1: 1000, P2: e.Target.ObjectID()}
 				s.Spawner().CreateOnePrivateEx(called, 18327, script.Loc{X: at.X, Y: at.Y, Z: at.Z}, 0, params)
 				s.Spawner().CreateOnePrivateEx(called, 18327, script.Loc{X: at.X, Y: at.Y, Z: at.Z}, 0, params)
-				s.SendScriptEvent(caller, 10023, 0, 0)
+				s.SendScriptEvent(caller, eventDismiss, 0, 0)
 				called.SetInt(script.SlotIntAI1, called.Int(script.SlotIntAI1)+1)
 			}
 			base.PartyAttacked(s, e)
@@ -269,11 +269,11 @@ func PartyLeaderCannibaliAggressiva() script.Script {
 					at := script.LocOf(n)
 					s.Spawner().CreateOnePrivateEx(n, 22114, script.Loc{X: at.X, Y: at.Y, Z: at.Z}, 0, script.Params{P1: 1000, P2: c0.ObjectID()})
 					n.DeleteMe()
-					s.BroadcastScriptEvent(n, 10028, n.ObjectID(), 500)
+					s.BroadcastScriptEvent(n, eventLeaderLeft, n.ObjectID(), 500)
 				}
 			}
 			if effect2, ok := n.SkillByType(npc.SkillTypeEffectSkill2); ok && e.Skill == effect2 {
-				s.BroadcastScriptEvent(n, 10028, n.ObjectID(), 500)
+				s.BroadcastScriptEvent(n, eventLeaderLeft, n.ObjectID(), 500)
 			}
 		},
 	})}

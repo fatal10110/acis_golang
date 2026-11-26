@@ -92,7 +92,7 @@ func PhysicalSpecialFollowing() script.Script {
 	ids := []int32{21674, 21675, 21697, 21698, 21720, 21721, 21743, 21744, 21766, 21767, 21789, 21790}
 	return script.Script{Dir: physicalSpecialDir, Behavior: true, NPCs: ids, Hooks: base.With(script.Hooks{
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
-			if e.EventID == 10019 {
+			if e.EventID == eventCallChildren {
 				if c0 := s.Object(e.Arg1); c0 != nil {
 					at := script.LocOf(c0)
 					x := (at.X - 50) + s.Rnd(100)

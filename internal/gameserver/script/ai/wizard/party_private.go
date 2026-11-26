@@ -12,10 +12,6 @@ import (
 // under.
 const partyPrivateDir = "ai/individual/Monster/WizardBase/PartyPrivateWizard"
 
-// eventMasterTarget is the script event a party leader broadcasts, with its
-// own object id, when it shouts the target its party should turn on.
-const eventMasterTarget = 10002
-
 // PartyPrivate is PartyPrivateWizard: a WizardBase that follows its master
 // and fills its hate list from every hit on itself and its party. It turns
 // on the target its master shouts, answers its clan and the buffs it sees

@@ -19,13 +19,6 @@ func Base() script.Script {
 	return script.Script{Dir: "ai/individual/Monster/WizardBase", Behavior: true, Hooks: BaseHooks()}
 }
 
-// The script events a wizard answers: a shouting monster names its target,
-// and a caller asks it to look around.
-const (
-	eventShoutTarget = 10016
-	eventLook        = 10020
-)
-
 // isPlayer reports whether c is a player.
 func isPlayer(c script.Creature) bool {
 	_, ok := c.(*script.Player)
@@ -147,7 +140,7 @@ func BaseHooks() script.Hooks {
 						hateList.Add(c0, 200)
 					}
 				}
-			case eventLook:
+			case eventTarget:
 				if s.Object(e.Arg1) != nil {
 					n.LookNeighbor()
 				}

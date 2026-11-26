@@ -116,7 +116,7 @@ func runAwayPhysicalSpecialHooks() script.Hooks {
 				if n.Int(script.SlotIntAI0) == 2 {
 					if c0 := n.Slot(script.SlotCreature0); c0 != nil {
 						n.AddAttackDesire(c0, 1000)
-						s.BroadcastScriptEvent(n, 10000, c0.ObjectID(), 400)
+						s.BroadcastScriptEvent(n, eventFleeHelp, c0.ObjectID(), 400)
 					}
 					n.SetInt(script.SlotIntAI0, 3)
 				}
@@ -132,7 +132,7 @@ func runAwayPhysicalSpecialHooks() script.Hooks {
 			return base.Timer(s, e)
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
-			if e.EventID != 10000 || e.NPC.Intention() == script.IntentionAttack {
+			if e.EventID != eventFleeHelp || e.NPC.Intention() == script.IntentionAttack {
 				return
 			}
 			if c0 := s.Object(e.Arg1); c0 != nil {

@@ -312,7 +312,7 @@ func WarriorGrowthStep2() script.Script {
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if e.EventID == 10018 && s.Rnd(100) < 20 {
+			if e.EventID == eventGrown && s.Rnd(100) < 20 {
 				if n.Slot(script.SlotCreature0) == nil {
 					return
 				}
@@ -394,7 +394,7 @@ func WarriorGrowthStep4Aggressive() script.Script {
 				n.AddAttackDesire(c0, 100)
 			}
 			n.SetInt(script.SlotIntAI2, 0)
-			s.BroadcastScriptEvent(n, 10018, n.ObjectID(), 700)
+			s.BroadcastScriptEvent(n, eventGrown, n.ObjectID(), 700)
 			if s.Rnd(100) < 33 {
 				castByType(n, n, npc.SkillTypeSelfBuff)
 			}

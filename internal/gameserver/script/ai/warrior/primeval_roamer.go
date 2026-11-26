@@ -64,7 +64,7 @@ func primevalRoamerHooks() script.Hooks {
 				}
 			}
 			if int32(s.Rnd(100)) <= n.IntParamOr("ProbCond5", 20)*n.Int(script.SlotIntAI3) {
-				s.BroadcastScriptEvent(n, 10002, n.ObjectID(), int(n.IntParamOr("BroadCastRange", 300)))
+				s.BroadcastScriptEvent(n, eventMasterTarget, n.ObjectID(), int(n.IntParamOr("BroadCastRange", 300)))
 			}
 			if topDesireTarget != nil {
 				if int32(s.Rnd(100)) <= n.IntParam("ProbPhysicalSpecial1")*n.Int(script.SlotIntAI3) {

@@ -73,7 +73,7 @@ func FiendArcherRunAway() script.Script {
 				if n.Int(script.SlotIntAI3) == 2 && n.Intention() != script.IntentionAttack {
 					if c := n.Slot(script.SlotCreature0); c != nil {
 						n.AddAttackDesire(c, 1000)
-						s.BroadcastScriptEvent(n, 10000, c.ObjectID(), 400)
+						s.BroadcastScriptEvent(n, eventFleeHelp, c.ObjectID(), 400)
 					}
 					n.SetInt(script.SlotIntAI3, 3)
 				}

@@ -2,10 +2,6 @@ package warrior
 
 import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 
-// eventAttackPet names, in Arg1, a creature a WarriorAttackPetAggressive
-// is told to attack.
-const eventAttackPet = 10017
-
 // AttackPetAggressive is WarriorAttackPetAggressive: a WarriorAggressive
 // that turns on the creature a script event names.
 func AttackPetAggressive() script.Script {

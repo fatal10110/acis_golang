@@ -105,7 +105,7 @@ func partyLeaderHooks() script.Hooks {
 						f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
 						hateList.Add(attacker, (f0*1000)+300)
 						n.SetInt(script.SlotFlag, attacker.ObjectID())
-						s.BroadcastScriptEvent(n, 10002, n.ObjectID(), 300)
+						s.BroadcastScriptEvent(n, eventMasterTarget, n.ObjectID(), 300)
 					}
 				}
 			}

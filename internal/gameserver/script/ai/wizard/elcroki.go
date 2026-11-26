@@ -105,7 +105,7 @@ func elcrokiHooks() script.Hooks {
 				castByType(n, n, npc.SkillTypeSelfRangeDebuff1, 1000000)
 			}
 			if int32(s.Rnd(100)) <= n.IntParamOr("ProbCond4", 30) {
-				s.BroadcastScriptEvent(n, 10002, n.ObjectID(), int(n.IntParamOr("BroadCastRange", 300)))
+				s.BroadcastScriptEvent(n, eventMasterTarget, n.ObjectID(), int(n.IntParamOr("BroadCastRange", 300)))
 			}
 			base.Attacked(s, e)
 			if attacker.Playable() {

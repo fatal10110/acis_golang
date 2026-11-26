@@ -25,7 +25,7 @@ func FreyaBear() script.Script {
 				return
 			}
 			switch e.EventID {
-			case 10002:
+			case eventMasterTarget:
 				master := n.Master()
 				if master == nil {
 					return
@@ -43,7 +43,7 @@ func FreyaBear() script.Script {
 					n.CleanAllHate()
 					n.AddAttackDesire(flagged, 1000000)
 				}
-			case 10034:
+			case eventHealMaster:
 				if master := n.Master(); master != nil {
 					castByType(n, master, npc.SkillTypeMagicHeal)
 				}
@@ -141,7 +141,7 @@ func PartyPrivateCannibaliAggressive() script.Script {
 			base.Attacked(s, e)
 		},
 		OnScriptEvent: func(_ *script.Script, e script.ScriptEvent) {
-			if e.EventID == 10028 {
+			if e.EventID == eventLeaderLeft {
 				e.NPC.DeleteMe()
 			}
 		},

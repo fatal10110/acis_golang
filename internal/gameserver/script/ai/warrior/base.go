@@ -19,15 +19,6 @@ func Base() script.Script {
 	return script.Script{Dir: "ai/individual/Monster/WarriorBase", Behavior: true, Hooks: BaseHooks()}
 }
 
-// The script events a warrior sends and answers: an ally under attack
-// calls for help, a shouting warrior names its target, and a caller hands
-// its target over.
-const (
-	eventHelp        = 10001
-	eventShoutTarget = 10016
-	eventTarget      = 10020
-)
-
 // isPlayer reports whether c is a player.
 func isPlayer(c script.Creature) bool {
 	_, ok := c.(*script.Player)

@@ -109,7 +109,7 @@ func PartyPrivateHooks() script.Hooks {
 		},
 		OnScriptEvent: func(s *script.Script, e script.ScriptEvent) {
 			n := e.NPC
-			if n.Dead() || e.EventID != 10002 || !n.HasMaster() {
+			if n.Dead() || e.EventID != eventMasterTarget || !n.HasMaster() {
 				return
 			}
 			master, _ := s.Object(e.Arg1).(*script.NPC)
