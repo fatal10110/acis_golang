@@ -42,8 +42,10 @@ func (s State) String() string {
 
 // allowedOpcodes lists, for each state, the first-byte opcodes a client may
 // send; any other opcode is refused before decode. It is held in step with
-// the handler registry: every accepted opcode has a handler, and every
-// handler's opcode is accepted in its state.
+// the handler registries: every accepted opcode has a handler, and every
+// handler's opcode is accepted in its state. An opcode that means something
+// else in one state is served there by stateInbound, and the extended
+// sub-opcodes a state limits are listed in stateExInbound.
 var allowedOpcodes = map[State]map[byte]bool{
 	StateConnected: {
 		0x00: true, // protocol version negotiation
@@ -60,8 +62,8 @@ var allowedOpcodes = map[State]map[byte]bool{
 	},
 	StateEntering: {
 		0x03: true, // enter world
-		0x3f: true, // request quest list
-		0xd0: true, // extended packets used during loading
+		0x3f: true, // request quest list (stateInbound)
+		0xd0: true, // extended packets used during loading (stateExInbound)
 	},
 	StateInGame: {
 		0x01: true, // move backward to location

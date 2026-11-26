@@ -16,7 +16,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
-	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -60,19 +59,20 @@ func NewGameServerLink(
 	keys *manager.RSAKeyPool,
 	sessions *manager.SessionStore,
 	bans *manager.IPBanList,
-	accounts *sql.AccountStore,
+	accounts accessLevelStore,
 	registrations registrationStore,
 	allowNewServers bool,
 	flood *netutil.FloodGuard,
 	roster *LinkRoster,
 	log zerolog.Logger,
 ) *GameServerLink {
-	l := &GameServerLink{
+	return &GameServerLink{
 		servers:         servers,
 		names:           names,
 		keys:            keys,
 		sessions:        sessions,
 		bans:            bans,
+		accounts:        accounts,
 		registrations:   registrations,
 		allowNewServers: allowNewServers,
 		flood:           flood,
@@ -80,10 +80,6 @@ func NewGameServerLink(
 		log:             log,
 		lookupHost:      net.LookupHost,
 	}
-	if accounts != nil {
-		l.accounts = accounts
-	}
-	return l
 }
 
 // Serve accepts game-server connections on ln until ctx is canceled or

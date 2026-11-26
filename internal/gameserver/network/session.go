@@ -42,6 +42,11 @@ type Session struct {
 	// the single goroutine calling ReadFrame.
 	frames      *wire.FrameReader
 	handshaking bool
+	// keepDeadline is set after a frame with no body: the next read keeps
+	// the deadline armedTimeout set, so a client sending only empty frames
+	// still runs into it. Both belong to the ReadFrame goroutine.
+	keepDeadline bool
+	armedTimeout time.Duration
 	// idleTimeout, when set, supplies the established-session read
 	// deadline in place of clientReadIdleTimeout (see readTimeout).
 	idleTimeout func() time.Duration
@@ -106,24 +111,36 @@ func (s *Session) send(frame wire.Frame, last bool) bool {
 // The payload reuses a per-session buffer and is only valid until the next
 // ReadFrame call: decode it before reading again, or copy it. Only one
 // goroutine may call ReadFrame.
+//
+// A frame with no body does not re-arm the read deadline: the read after it
+// waits under the deadline already set, so empty frames cannot hold a
+// connection open past it.
 func (s *Session) ReadFrame() ([]byte, error) {
-	timeout := s.readTimeout()
-	if err := s.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		return nil, err
+	if !s.keepDeadline {
+		s.armedTimeout = s.readTimeout()
+		if err := s.conn.SetReadDeadline(time.Now().Add(s.armedTimeout)); err != nil {
+			return nil, err
+		}
 	}
+	s.keepDeadline = false
 	// The read observer runs once the deadline is fixed, so a watcher that
 	// sees the wait begin knows which deadline it runs under.
 	if observe := s.conn.observeRead; observe != nil {
-		observe(timeout)
+		observe(s.armedTimeout)
 	}
 	payload, err := s.frames.ReadFrame()
 	if errors.Is(err, wire.ErrFrameTooShort) {
 		// A length below the header's own size is a frame with no body:
 		// its header is consumed and the next frame starts right after it.
+		s.keepDeadline = true
 		return payload[:0], nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if len(payload) == 0 {
+		s.keepDeadline = true
+		return payload, nil
 	}
 	if s.cryptEnabled {
 		s.cipher.Decrypt(payload)

@@ -12,6 +12,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/fatal10110/acis_golang/internal/dbtest"
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -94,7 +95,7 @@ func TestRegisterCleanLifecycle(t *testing.T) {
 	if fileHex == "" {
 		t.Fatalf("hexid file has no HexID line:\n%s", data)
 	}
-	if got := model.HexKeyText(row.HexID); got != fileHex {
+	if got := link.HexKeyText(row.HexID); got != fileHex {
 		t.Errorf("database key %q does not match hexid file key %q", got, fileHex)
 	}
 

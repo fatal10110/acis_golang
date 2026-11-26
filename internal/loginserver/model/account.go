@@ -25,9 +25,15 @@ type Account struct {
 // to this server.
 func NewAccount(login, password string, accessLevel, lastServer int) Account {
 	return Account{
-		Login:       strings.ToLower(login),
+		Login:       NormalizeLogin(login),
 		Password:    password,
 		AccessLevel: accessLevel,
 		LastServer:  lastServer,
 	}
+}
+
+// NormalizeLogin folds a login name to the stored form every lookup and
+// insert uses.
+func NormalizeLogin(login string) string {
+	return strings.ToLower(login)
 }

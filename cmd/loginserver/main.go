@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -160,8 +159,8 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	}
 
 	return loginServerConfig{
-		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
-		GameServerAddr:      listenAddress(props.String("LoginHostname", "127.0.0.1"), linkPort),
+		ClientAddr:          netutil.ListenAddress(props.String("LoginserverHostname", "*"), clientPort),
+		GameServerAddr:      netutil.ListenAddress(props.String("LoginHostname", "127.0.0.1"), linkPort),
 		AllowNewGameServers: props.Bool("AcceptNewGameServer", false),
 		AutoCreateAccounts:  props.Bool("AutoCreateAccounts", true),
 		ShowLicence:         props.Bool("ShowLicence", true),
@@ -175,29 +174,11 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 			MaxConnectionsPerIP:  maxConnectionsPerIP,
 		},
 		AcceptFilter: acceptFilter,
-		Database: db.Config{
-			// The driver read/write timeout comes from a socketTimeout=<ms>
-			// URL option (for example ...?socketTimeout=10000); each login
-			// database call is bounded on its own as well.
-			URL:            props.String("URL", "jdbc:mariadb://localhost/acis"),
-			Login:          props.String("Login", "root"),
-			Password:       props.String("Password", ""),
-			MaxConnections: maxConnections,
-		},
+		// The driver read/write timeout comes from a socketTimeout=<ms> URL
+		// option (for example ...?socketTimeout=10000); each login database
+		// call is bounded on its own as well.
+		Database: db.ConfigFromProperties(props, maxConnections),
 	}, nil
-}
-
-// listenAddress returns the listener address for a configured host: "*"
-// binds every address and an empty host binds the loopback address only.
-// A host name stays as written and resolves at bind.
-func listenAddress(host string, port int) string {
-	switch host {
-	case "*":
-		host = ""
-	case "":
-		host = "127.0.0.1"
-	}
-	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 func provideLoginServerLogger(lc fx.Lifecycle, paths loginServerPaths) (zerolog.Logger, error) {
@@ -302,7 +283,12 @@ func provideClientLink(
 	roster *loginserver.LinkRoster,
 	log zerolog.Logger,
 ) *loginserver.ClientLink {
-	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
+	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, loginserver.ClientConfig{
+		AutoCreateAccounts: cfg.AutoCreateAccounts,
+		ShowLicence:        cfg.ShowLicence,
+		LoginTryBeforeBan:  cfg.LoginTryBeforeBan,
+		LoginBlockAfterBan: cfg.LoginBlockAfterBan,
+	}, log)
 }
 
 func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, bans *manager.IPBanList, filter *netutil.AcceptFilter, log zerolog.Logger) {

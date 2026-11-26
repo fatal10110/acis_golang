@@ -47,7 +47,7 @@ func (s *Server) StartLoginClients(t *testing.T) string {
 		t.Fatal("game server 1 is not registered with the login server")
 	}
 	clients := loginserver.NewClientLink(s.login.accounts, s.login.servers, s.login.sessions, s.login.bans, keys, s.login.roster,
-		true, true, 5, 10*time.Minute, zerolog.Nop())
+		loginserver.ClientConfig{AutoCreateAccounts: true, ShowLicence: true, LoginTryBeforeBan: 5, LoginBlockAfterBan: 10 * time.Minute}, zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
