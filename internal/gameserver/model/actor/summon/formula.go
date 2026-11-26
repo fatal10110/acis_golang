@@ -453,13 +453,11 @@ func (a *Actor) PAtkSpd(baseAtkSpd float64) float64 {
 	return a.calcStat(stat.PowerAttackSpeed, baseAtkSpd)
 }
 
-// magicAtkSpdBase is the fixed magic-attack-speed base every pet and
-// servitor uses, independent of npc template.
-const magicAtkSpdBase = 333
-
 // MAtkSpd returns this summon's magic attack speed, halved while hungry.
+// Every pet and servitor starts from the shared casting-speed base,
+// whatever its npc template.
 func (a *Actor) MAtkSpd() float64 {
-	base := float64(magicAtkSpdBase)
+	base := float64(formulas.AttackSpeedBase)
 	if a.hungryHalved() {
 		base /= 2
 	}

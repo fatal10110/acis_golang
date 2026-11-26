@@ -40,7 +40,7 @@ func TestPlanReuseScalesByThePrecomputedSpeedRatio(t *testing.T) {
 				actor.pAtkSpd = tc.spd
 			}
 			def := modelskill.Definition{ID: 10, Level: 1, Magic: magic, HitTime: 1000, StaticHitTime: true, ReuseDelay: tc.reuse}
-			plan := NewController(actor, nil).buildPlan(&def)
+			plan := NewController(actor, nil, nil).buildPlan(&def)
 			if want := time.Duration(tc.want) * time.Millisecond; plan.ReuseDelay != want {
 				t.Errorf("reuse %d at speed %d (magic %v) = %v, want %v", tc.reuse, tc.spd, magic, plan.ReuseDelay, want)
 			}
@@ -82,7 +82,7 @@ func TestPlanReuseTruncatesAfterTheRateThenTheSpeed(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			def := tc.def
 			def.ID, def.Level, def.HitTime, def.StaticHitTime = 10, 1, 1000, true
-			plan := NewController(tc.actor, nil).buildPlan(&def)
+			plan := NewController(tc.actor, nil, nil).buildPlan(&def)
 			if want := time.Duration(tc.want) * time.Millisecond; plan.ReuseDelay != want {
 				t.Fatalf("ReuseDelay = %v, want %v", plan.ReuseDelay, want)
 			}

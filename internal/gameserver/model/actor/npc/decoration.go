@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -420,7 +421,7 @@ func settleFixedStats(inst *Instance) fixedStats {
 	fs := fixedStats{template: t}
 	fs.maxHP = int(fs.calc(stat.MaxHP, t.HPMax))
 	fs.pAtkSpd = int(fs.calc(stat.PowerAttackSpeed, t.AtkSpd))
-	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, magicAttackSpeedBase))
+	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, formulas.AttackSpeedBase))
 	fs.atkSpdMultiplier = npcinfo.AttackSpeedMultiplier(fs.pAtkSpd, t.AtkSpd)
 	// The move speed over the stance's base speed, as a moving NPC computes
 	// it; 0 for a stance whose base is 0.

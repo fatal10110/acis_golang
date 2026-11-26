@@ -8,22 +8,22 @@ import (
 func TestHealthShiftCapsAndLeavesALethalChangeToTheCaller(t *testing.T) {
 	t.Parallel()
 	current := 50.0
-	h := NewHealth(&current)
+	h := NewHealth(current)
 
-	if written, lethal := h.Shift(80, 100); !written || lethal || current != 100 {
-		t.Fatalf("Shift(+80) = %v/%v, current %v; want written, capped at 100", written, lethal, current)
+	if written, lethal := h.Shift(80, 100); !written || lethal || h.Current() != 100 {
+		t.Fatalf("Shift(+80) = %v/%v, current %v; want written, capped at 100", written, lethal, h.Current())
 	}
-	if written, lethal := h.Shift(-30, 100); !written || lethal || current != 70 {
-		t.Fatalf("Shift(-30) = %v/%v, current %v; want written, 70", written, lethal, current)
+	if written, lethal := h.Shift(-30, 100); !written || lethal || h.Current() != 70 {
+		t.Fatalf("Shift(-30) = %v/%v, current %v; want written, 70", written, lethal, h.Current())
 	}
-	if written, lethal := h.Shift(-70, 100); written || !lethal || current != 70 {
-		t.Fatalf("Shift(-70) = %v/%v, current %v; want lethal with nothing written", written, lethal, current)
+	if written, lethal := h.Shift(-70, 100); written || !lethal || h.Current() != 70 {
+		t.Fatalf("Shift(-70) = %v/%v, current %v; want lethal with nothing written", written, lethal, h.Current())
 	}
 
 	dead := 0.0
-	d := NewHealth(&dead)
-	if written, lethal := d.Shift(10, 100); written || lethal || dead != 0 {
-		t.Fatalf("Shift on dead health = %v/%v, current %v; want neither, 0", written, lethal, dead)
+	d := NewHealth(dead)
+	if written, lethal := d.Shift(10, 100); written || lethal || d.Current() != 0 {
+		t.Fatalf("Shift on dead health = %v/%v, current %v; want neither, 0", written, lethal, d.Current())
 	}
 }
 
@@ -32,7 +32,7 @@ func TestHealthShiftCapsAndLeavesALethalChangeToTheCaller(t *testing.T) {
 func TestHealthShiftAndDamageSum(t *testing.T) {
 	t.Parallel()
 	current := 10_000.0
-	h := NewHealth(&current)
+	h := NewHealth(current)
 	var wg sync.WaitGroup
 	for range 100 {
 		wg.Add(2)

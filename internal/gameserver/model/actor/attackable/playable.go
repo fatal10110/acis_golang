@@ -9,6 +9,34 @@ type Playable interface {
 	PvPZoneMember
 }
 
+// ProtectionBlessingLevelGap is the level lead from which a player with karma
+// and a Blessing of Protection holder below it may not fight each other.
+const ProtectionBlessingLevelGap = 10
+
+// CursedWeaponNewbieLevel is the highest level at which a player and a
+// cursed-weapon holder may not fight each other.
+const CursedWeaponNewbieLevel = 20
+
+// BlessingSide is one side of the Blessing of Protection rule.
+type BlessingSide interface {
+	ProtectionBlessing() bool
+	Level() int
+	Karma() int
+}
+
+// BlessingShields reports whether holder's Blessing of Protection keeps it
+// and other apart: holder carries it while other has karma and leads it by
+// ProtectionBlessingLevelGap levels or more.
+func BlessingShields(holder, other BlessingSide) bool {
+	return holder.ProtectionBlessing() && other.Level()-holder.Level() >= ProtectionBlessingLevelGap && other.Karma() > 0
+}
+
+// CursedWeaponNewbie reports whether level keeps a player and a
+// cursed-weapon holder apart.
+func CursedWeaponNewbie(level int) bool {
+	return level <= CursedWeaponNewbieLevel
+}
+
 // PvPZoneMember is an actor that tracks whether it stands inside a PvP zone:
 // a player or a summon. NPCs, doors, and other non-playables track no zone
 // membership, so an assertion to it legitimately fails for them and they
@@ -83,17 +111,14 @@ func PlayableRefuses(target Playable, attacker Combatant) bool {
 	if target.InPvPZone() {
 		return false
 	}
-	if target.ProtectionBlessing() && other.Level()-target.Level() >= 10 && other.Karma() > 0 {
+	if BlessingShields(target, other) || BlessingShields(other, target) {
 		return true
 	}
-	if other.ProtectionBlessing() && target.Level()-other.Level() >= 10 && target.Karma() > 0 {
-		return true
-	}
-	if targetOK && targetPlayer.CursedWeaponEquipped() && other.Level() <= 20 {
+	if targetOK && targetPlayer.CursedWeaponEquipped() && CursedWeaponNewbie(other.Level()) {
 		return true
 	}
 	attackerPlayer, ok := actingPlayerOf(other)
-	return ok && attackerPlayer.CursedWeaponEquipped() && target.Level() <= 20
+	return ok && attackerPlayer.CursedWeaponEquipped() && CursedWeaponNewbie(target.Level())
 }
 
 // actingPlayerOf returns the player acting through c: its owner for a

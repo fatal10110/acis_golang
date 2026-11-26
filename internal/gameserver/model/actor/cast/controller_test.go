@@ -368,7 +368,7 @@ func (a *reentrantCostActor) ReduceHP(n int) {
 func newReentrantCostController() (*Controller, *reentrantCostActor, modelskill.Definition) {
 	actor := &reentrantCostActor{testActor: scalingActor()}
 	actor.items = map[int]int{57: 5}
-	ctrl := NewController(actor, nil)
+	ctrl := NewController(actor, nil, nil)
 	actor.ctrl = ctrl
 	def := scalingDef
 	def.ItemConsumeID, def.ItemConsumeCount = 57, 1
@@ -640,7 +640,7 @@ func TestCanCastWeaponDependency(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			actor := &testActor{mp: 100, hp: 100, held: tt.held, physicalMuted: tt.muted}
-			ctrl := NewController(actor, nil)
+			ctrl := NewController(actor, nil, nil)
 			def := modelskill.Definition{ID: 56, Level: 1, Activation: modelskill.ActivationActive}.WithExtra(modelskill.Extra{WeaponsAllowed: tt.allowed})
 			if err := ctrl.CanCast(testTarget{}, &def); !errors.Is(err, tt.want) || (tt.want == nil && err != nil) {
 				t.Fatalf("CanCast = %v, want %v", err, tt.want)

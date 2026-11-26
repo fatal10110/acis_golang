@@ -24,7 +24,7 @@ func TestServitorSummonAboardAnswersNotCallPetFromThisLocation(t *testing.T) {
 	cubic := servitor
 	cubic.ID, cubic.IsCubic = 10, true
 
-	ctrl := NewController(PlayerActor{Character: ch}, nil)
+	ctrl := NewController(PlayerActor{Character: ch}, nil, nil)
 	if err := ctrl.CanCast(ch, &servitor); err != nil {
 		t.Fatalf("ashore: CanCast = %v, want nil", err)
 	}
@@ -35,7 +35,7 @@ func TestServitorSummonAboardAnswersNotCallPetFromThisLocation(t *testing.T) {
 	if err := ctrl.CanCast(ch, &cubic); err != nil {
 		t.Fatalf("aboard, cubic: CanCast = %v, want nil", err)
 	}
-	swinging := NewController(PlayerActor{Character: ch, Attack: swingState(true)}, nil)
+	swinging := NewController(PlayerActor{Character: ch, Attack: swingState(true)}, nil, nil)
 	if err := swinging.CanCast(ch, &servitor); !errors.Is(err, ErrSummonInCombat) {
 		t.Fatalf("aboard mid-swing: CanCast = %v, want %v", err, ErrSummonInCombat)
 	}

@@ -188,8 +188,7 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 // installCastSeam wires hostile's AI-cast seam over defs (see
 // SpawnCastingHostileNPC) and returns the AIController the AI loop drives.
 func (s *Server) installCastSeam(hostile *npc.Hostile, defs actorcast.Definitions) *actorcast.AIController {
-	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile})
-	ctl.SetQueue(hostile.Queue())
+	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile}, hostile.Queue())
 	ctl.OutliveQueueClose()
 	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Effects: s.castEffects, Caster: hostile, OnHitResult: s.castEffects.OnHitResult}
 	hostile.AI().SetCastController(aiCtl)
@@ -326,7 +325,7 @@ func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Templa
 	t.Helper()
 	actorRef := &hostileActorRef{}
 	signal := &attackFinishedSignal{finished: make(chan struct{}, 1), chance: s.castEffects.Chance}
-	attackCtl := attack.NewAttackable(actorRef, signal)
+	attackCtl := attack.NewAttackable(actorRef, signal, nil)
 	hostile := s.spawnHostile(t, tmpl, at, attackCtl)
 	actorRef.CreatureActor = hostile
 	signal.hostile = hostile
@@ -467,8 +466,7 @@ func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at
 		t.Fatalf("new move controller: %v", err)
 	}
 	actorRef := &hostileActorRef{}
-	attackCtl := attack.NewAttackable(actorRef, control)
-	attackCtl.SetQueue(live.Queue())
+	attackCtl := attack.NewAttackable(actorRef, control, live.Queue())
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)

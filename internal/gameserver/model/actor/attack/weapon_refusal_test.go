@@ -46,7 +46,7 @@ func TestRefuseAttackTellsWeaponRefusal(t *testing.T) {
 			player := &weaponPlayer{arrows: tc.arrows, mpConsume: tc.mpConsume, mp: tc.mp}
 			player.attackType = tc.weapon
 			rec := &event.Recorder{}
-			ctrl := NewPlayer(player, rec)
+			ctrl := NewPlayer(player, rec, nil)
 			target := &timingTarget{id: 2, attackable: true}
 
 			if got, want := ctrl.CanAttack(target), tc.want == 0; got != want {
@@ -80,7 +80,7 @@ func TestRefuseAttackSilentWhenGateRefusesFirst(t *testing.T) {
 	player := &weaponPlayer{}
 	player.attackType = item.WeaponFishingRod
 	rec := &event.Recorder{}
-	ctrl := NewPlayer(player, rec)
+	ctrl := NewPlayer(player, rec, nil)
 
 	if !ctrl.RefuseAttack(&timingTarget{id: 2}) {
 		t.Fatal("RefuseAttack() = false for a target that may not be attacked")

@@ -22,7 +22,7 @@ func newGatePlayer(t *testing.T) (*Controller, *player.Character) {
 	}
 	live.SetQueue(idleQueue())
 	ch.Live = live
-	return NewController(PlayerActor{Character: ch}, nil), ch
+	return NewController(PlayerActor{Character: ch}, nil, nil), ch
 }
 
 func fakeDie(t *testing.T, ch *player.Character) {
@@ -143,7 +143,7 @@ func TestCanCastRefusesOlympiadSkills(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			actor := &olympiadActor{testActor: testActor{mp: 100, hp: 100}, olympiad: tt.olympiad, condFail: tt.condFail}
-			err := NewController(actor, nil).CanCast(testTarget{}, &tt.def)
+			err := NewController(actor, nil, nil).CanCast(testTarget{}, &tt.def)
 			switch want := tt.want.(type) {
 			case nil:
 				if err != nil {
@@ -220,7 +220,7 @@ func TestServitorSummonMidSwingAnswersCannotSummonInCombat(t *testing.T) {
 		{name: "cubic mid-swing", def: cubic, swinging: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := NewController(PlayerActor{Character: ch, Attack: tt.swinging}, nil)
+			ctrl := NewController(PlayerActor{Character: ch, Attack: tt.swinging}, nil, nil)
 			if err := ctrl.CanCast(ch, &tt.def); !errors.Is(err, tt.want) {
 				t.Fatalf("CanCast = %v, want %v", err, tt.want)
 			}

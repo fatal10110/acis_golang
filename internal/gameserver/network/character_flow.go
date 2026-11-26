@@ -850,9 +850,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
-	attackCtl := attack.NewPlayer(live, live)
-	attackCtl.SetQueue(creatureLive.Queue())
+	attackCtl := attack.NewPlayer(live, live, creatureLive.Queue())
 	combat := ai.NewPlayerAttack(live, moveCtl, attackCtl)
+	combat.SetLogger(l.log)
 
 	c.SetCanGiveDamage(access.GiveDamage)
 	c.SetSeesInvisible(access.IsGM)
@@ -864,10 +864,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		scripts = l.scripts
 	}
 	live.zoneActor = newPlayerZones(live, scripts)
-	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
-	// reads live.cast unguarded, so a lazy first write from the read-loop
+	// Build cast here, like attackCtl above: pickup-lock's timer goroutine
+	// reads live.cast unguarded, so a later write from the read-loop
 	// goroutine would race it (issue #1183).
-	l.castController(live)
+	attachCastController(live)
 	// The intention source reads cast, combat and move, all built above.
 	c.SetIntentionSource(live)
 	if l.festival != nil {

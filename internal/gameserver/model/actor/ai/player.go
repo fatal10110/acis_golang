@@ -73,9 +73,9 @@ func NewPlayerAttack(actor PlayerAttackActor, move PlayerMoveController, attack 
 	return &PlayerAttack{actor: actor, move: move, attack: attack}
 }
 
-// SetLogger records where a broadcast error surfaced from a movement-arrived
-// or attack-finished hook (with no caller left to return it to) is logged.
-// The zero value discards it.
+// SetLogger records where a think error (a movement the controller refused:
+// a zero speed, an overlong duration) surfaced from a hook with no caller
+// left to return it to is logged. The zero value discards it.
 func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -135,7 +135,7 @@ func (p *PlayerAttack) start(target attackable.Combatant, shift, request bool) b
 	p.dropNextLocked()
 	accepted, _, err := p.thinkLocked(false)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+		p.log.Warn().Err(err).Msg("ai: player attack think")
 	}
 	return accepted
 }
@@ -177,7 +177,7 @@ func (p *PlayerAttack) ResumeAfterCast(stopped bool) (resumed, actionFailed bool
 	p.deferred = false
 	_, actionFailed, err := p.thinkLocked(stopped)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+		p.log.Warn().Err(err).Msg("ai: player attack think")
 	}
 	return true, actionFailed
 }
@@ -223,7 +223,7 @@ func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift, stopp
 	p.dropNextLocked()
 	_, actionFailed, err := p.thinkLocked(stopped)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+		p.log.Warn().Err(err).Msg("ai: player attack think")
 	}
 	return actionFailed
 }
@@ -269,7 +269,7 @@ func (p *PlayerAttack) Think() (actionFailed bool) {
 	}
 	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+		p.log.Warn().Err(err).Msg("ai: player attack think")
 	}
 	return actionFailed
 }
@@ -299,7 +299,7 @@ func (p *PlayerAttack) FinishedAttack() (actionFailed bool) {
 	}
 	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+		p.log.Warn().Err(err).Msg("ai: player attack think")
 	}
 	return actionFailed
 }
@@ -335,7 +335,7 @@ func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
 	}
 	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+		p.log.Warn().Err(err).Msg("ai: player attack think")
 	}
 	return actionFailed
 }
