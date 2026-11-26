@@ -129,7 +129,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
 				n.SetHeading(16384)
-				n.TeleportTo(parked)
+				n.TeleportTo(parked())
 			}
 			base.ScriptEvent(s, e)
 		},
@@ -185,7 +185,7 @@ func FollowerOfFrintezzaTransform() script.Script {
 						n.RemoveAllDesire()
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 						n.SetHeading(16384)
-						n.TeleportTo(parked)
+						n.TeleportTo(parked())
 						n.SetInt(npc.IntQuest2, 0)
 						n.SetInt(npc.IntQuest3, 0)
 						n.SetInt(npc.IntQuest4, 0)

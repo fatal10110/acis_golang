@@ -38,7 +38,7 @@ const (
 const idleLimit = 15 * 60
 
 // parked is where a reset boss waits, out of its lair.
-var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+func parked() script.Loc { return script.Loc{X: -105200, Y: -253104, Z: -15264} }
 
 // targets are the three targets Antharas ranks.
 func targets() bossrank.Targets {
@@ -185,7 +185,7 @@ func Antharas() script.Script {
 					n.SetDBValue(stageAsleep)
 					n.RemoveAllDesire()
 					s.TeleportPlayersInTerritory(n, script.Loc{X: 80464, Y: 152294, Z: -3534}, 100)
-					n.TeleportTo(parked)
+					n.TeleportTo(parked())
 
 					n.SetInt(script.SlotIntAI2, 0)
 					n.SetInt(script.SlotIntAI3, 0)

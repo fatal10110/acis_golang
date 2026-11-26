@@ -47,7 +47,7 @@ const (
 const idleLimit = 30 * 60
 
 // parked is where a reset boss waits, out of its lair.
-var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+func parked() script.Loc { return script.Loc{X: -105200, Y: -253104, Z: -15264} }
 
 // targets are the three targets Baium ranks.
 func targets() bossrank.Targets {
@@ -246,7 +246,7 @@ func Baium() script.Script {
 					n.RemoveAllDesire()
 					n.SetDBValue(stageAsleep)
 					s.TeleportPlayersInTerritory(n, script.Loc{X: 120112, Y: 18208, Z: -5152}, 900)
-					n.TeleportTo(parked)
+					n.TeleportTo(parked())
 
 					s.Spawner().CreateOnePrivateEx(n, stoneID, script.Loc{X: 116026, Y: 17435, Z: 10107, Heading: -25348}, 0, script.Params{})
 

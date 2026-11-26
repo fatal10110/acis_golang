@@ -191,7 +191,7 @@ func FollowerOfFrintezza() script.Script {
 				n.SetInt(npc.IntQuest3, 0)
 				n.SetInt(npc.IntQuest4, 0)
 				n.SetHeading(16384)
-				n.TeleportTo(parked)
+				n.TeleportTo(parked())
 			}
 			base.ScriptEvent(s, e)
 		},
@@ -375,7 +375,7 @@ func fallAsleep(s *script.Script, n *script.NPC) {
 	s.BroadcastScriptEvent(n, 0, 40000, 8000)
 	n.RemoveAllDesire()
 	s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
-	n.TeleportTo(parked)
+	n.TeleportTo(parked())
 	n.SetHeading(16384)
 	n.EquipItem(changeWeaponStart, 0)
 	s.Spawner().SendMakerEvent("frintessa_evilate_maker1", "1000", 0, 0)

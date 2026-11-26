@@ -40,7 +40,7 @@ const (
 const idleLimit = 15 * 60
 
 // parked is where a reset boss waits, out of its lair.
-var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+func parked() script.Loc { return script.Loc{X: -105200, Y: -253104, Z: -15264} }
 
 // targets are the three targets Valakas ranks.
 func targets() bossrank.Targets {
@@ -258,7 +258,7 @@ func Valakas() script.Script {
 						n.SetDBValue(stageAsleep)
 						n.RemoveAllDesire()
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
-						n.TeleportTo(parked)
+						n.TeleportTo(parked())
 
 						pts := targets().Points
 						for _, slot := range pts {

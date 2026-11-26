@@ -39,7 +39,7 @@ const (
 const idleLimit = 15 * 60
 
 // parked is where a reset boss waits, out of its lair.
-var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
+func parked() script.Loc { return script.Loc{X: -105200, Y: -253104, Z: -15264} }
 
 // Frintezza (29045), the tomb's master. His db value is the tomb's stage:
 // 0 sealed, 1 and 2 entered, 3 awakening, 4 to 7 the fight, his follower's
@@ -176,7 +176,7 @@ func Frintezza() script.Script {
 			case strings.EqualFold(e.Name, "8000"):
 				n.SetDBValue(stageSealed)
 				n.SetHeading(16384)
-				n.TeleportTo(parked)
+				n.TeleportTo(parked())
 				setTombDoors(s, 0)
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1000", 0, 0)
 			case strings.EqualFold(e.Name, "3000"), strings.EqualFold(e.Name, "3001"):
@@ -223,7 +223,7 @@ func Frintezza() script.Script {
 				setTombDoors(s, 0)
 				n.SetDBValue(stageSealed)
 				n.SetHeading(16384)
-				n.TeleportTo(parked)
+				n.TeleportTo(parked())
 				s.Spawner().SendMakerEvent("frintessa_2515_m01", "1001", 0, 0)
 			case 1:
 				n.SetDBValue(stageCountdown)
