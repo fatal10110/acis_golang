@@ -79,11 +79,7 @@ func BaseHooks() script.Hooks {
 					hateList.Clear()
 					if attacker.Playable() {
 						f0 := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, attacker))
-						if hateList.Empty() {
-							hateList.Add(attacker, (f0*100)+300)
-						} else {
-							hateList.Add(attacker, f0*100)
-						}
+						addHate(hateList, attacker, f0*100)
 					}
 				}
 			}
@@ -184,11 +180,7 @@ func attacked(s *script.Script, e script.Attacked) bool {
 	if attacker.Playable() && mostHated != nil && !script.Same(mostHated, attacker) && n.IntParam("AttackLowHP") == 1 && attackerHPRatio <= 0.3 && s.Rnd(100) < 10 {
 		hateList.Clear()
 		f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-		if hateList.Empty() {
-			hateList.Add(attacker, (f0*100)+300)
-		} else {
-			hateList.Add(attacker, f0*100)
-		}
+		addHate(hateList, attacker, f0*100)
 	}
 
 	if isPlayer(attacker) {

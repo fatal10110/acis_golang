@@ -45,7 +45,7 @@ func PartyPrivateSplit() script.Script {
 			n := e.NPC
 			switch {
 			case strings.EqualFold(e.Name, "1006"):
-				if master := n.Master(); master == nil || master.Dead() {
+				if masterGone(n) {
 					if i := n.Intention(); i != script.IntentionAttack && i != script.IntentionCast {
 						n.DeleteMe()
 						return ""
@@ -135,7 +135,7 @@ func PartyPrivateCoupleFollowerHooks() script.Hooks {
 		},
 		OnPartyDied: func(s *script.Script, e script.PartyDied) {
 			called := e.Called
-			if master := called.Master(); (master == nil || master.Dead()) && called.Int(script.SlotIntAI0) == 0 && called.HPRatio() > 0.7 {
+			if masterGone(called) && called.Int(script.SlotIntAI0) == 0 && called.HPRatio() > 0.7 {
 				if topDesireTarget := called.TopDesireTarget(); topDesireTarget != nil {
 					silhouette := called.IntParam("silhouette")
 					at := script.LocOf(called)

@@ -23,7 +23,9 @@ func PartyPrivate() script.Script {
 	return script.Script{Dir: partyPrivateDir, Behavior: true, Hooks: partyPrivateHooks()}
 }
 
-// deadMaster reports whether n has a master and that master is dead.
+// deadMaster reports whether n has a master and that master is dead. A
+// wizard private without a master stays in the world, where a warrior
+// private leaves it.
 func deadMaster(n *script.NPC) bool {
 	return n.HasMaster() && n.Master().Dead()
 }
@@ -53,18 +55,9 @@ func partyPrivateHooks() script.Hooks {
 			hateList := n.HateList()
 			switch {
 			case strings.EqualFold(e.Name, "1002"):
-				hateList.Refresh()
-				hateList.RemoveIfOutOfRange(1000)
+				refreshHate(hateList)
 			case strings.EqualFold(e.Name, "1003"):
-				if n.Muted() {
-					s.StartTimer("1003", n, e.Player, 10000*time.Millisecond)
-				} else {
-					n.RemoveAllAttackDesire()
-					n.SetInt(script.SlotIntAI0, 0)
-					if mostHated := hateList.MostHated(); mostHated != nil {
-						s.Attacked(s, script.Attacked{NPC: n, Attacker: mostHated, Damage: 100})
-					}
-				}
+				silenceRetry(s, n, e.Player, hateList)
 			case strings.EqualFold(e.Name, "1006"):
 				if deadMaster(n) && !fighting(n.Intention()) {
 					s.Spawner().DecayMe(n)
@@ -78,16 +71,9 @@ func partyPrivateHooks() script.Hooks {
 			hateList := n.HateList()
 			if attacker.Playable() {
 				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*100)+300)
-				} else {
-					hateList.Add(attacker, f0*100)
-				}
+				addHate(hateList, attacker, f0*100)
 			}
-			if n.Muted() {
-				n.SetInt(script.SlotIntAI0, 1)
-				s.StartTimer("1003", n, nil, 10000*time.Millisecond)
-			}
+			waitOutSilence(s, n)
 			base.Attacked(s, e)
 		},
 		OnPartyAttacked: func(_ *script.Script, e script.PartyAttacked) {
@@ -95,11 +81,7 @@ func partyPrivateHooks() script.Hooks {
 			if target.Playable() {
 				hateList := called.HateList()
 				f0 := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, target))
-				if hateList.Empty() {
-					hateList.Add(target, (f0*10)+300)
-				} else {
-					hateList.Add(target, f0*10)
-				}
+				addHate(hateList, target, f0*10)
 			}
 		},
 		OnClanAttacked: func(_ *script.Script, e script.ClanAttacked) {
@@ -107,11 +89,7 @@ func partyPrivateHooks() script.Hooks {
 			if attacker.Playable() && deadMaster(called) && called.LifeTime() > 7 {
 				hateList := called.HateList()
 				f0 := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, attacker))
-				if hateList.Empty() {
-					hateList.Add(attacker, (f0*30)+300)
-				} else {
-					hateList.Add(attacker, f0*30)
-				}
+				addHate(hateList, attacker, f0*30)
 			}
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {

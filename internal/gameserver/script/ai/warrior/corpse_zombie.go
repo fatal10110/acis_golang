@@ -48,11 +48,7 @@ func corpseZombieHooks() script.Hooks {
 		OnNoDesire: func(_ *script.Script, e script.NoDesire) {
 			n := e.NPC
 			if n.IntParam("IsPrivate") == 1 {
-				if master := n.Master(); master != nil && !master.Dead() {
-					n.AddFollowDesire(master, 50)
-				} else {
-					n.AddWanderDesire(5, 5)
-				}
+				followMaster(n)
 			}
 		},
 		OnTimer: func(s *script.Script, e script.Timer) string {
