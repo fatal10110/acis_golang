@@ -2548,9 +2548,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.CharacterEdits = faultyCharacterNameStore{CharacterStore: chars, fault: o.characterNameFault}
 	}
 	gclConfig.Punishments = chars
-	petitions, petitionRows := bootPetitions(t, graph.Petitions, chars, ids, o.petitionConfig), graph.Petitions
+	petitions := bootPetitions(t, graph.Petitions, chars, ids, o.petitionConfig)
+	petitionRows := graph.Petitions
 	gclConfig.Petitions = petitions
-	couples, coupleRows := bootWedding(t, graph.Couples, ids, o.weddingConfig, o.tradeClock), graph.Couples
+	couples := bootWedding(t, graph.Couples, ids, o.weddingConfig, o.tradeClock)
+	coupleRows := graph.Couples
 	gclConfig.Wedding = couples
 	gclConfig.Macros = graph.Macros
 	gclConfig.Bookmarks = graph.Bookmarks

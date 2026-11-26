@@ -281,7 +281,7 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
       budgeted at one `ItemInstanceSaveTimeout` as headroom;
     - `drainItemInstances`: save → `Worker.Close` → save, each on its own
       `ItemInstanceSaveTimeout` (10 s);
-    - the persistence worker's last close (`persistCloseTimeout` = 5 s), which gives lanes the
+    - the persistence worker's last close (`app.PersistCloseTimeout` = 5 s), which gives lanes the
       drain left backed up a little longer;
     - the ground-item save (`shutdownSaveTimeout`);
     - the Olympiad, grand boss, scheme buffer, wedding, fishing championship, manor and crash-flag
