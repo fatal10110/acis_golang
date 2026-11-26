@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // The ways a line comes out that no cast of the player ends: the fish
@@ -104,7 +106,13 @@ func TestFishingNightLureByDay(t *testing.T) {
 	for _, night := range []bool{false, true} {
 		t.Run(fmt.Sprintf("night=%v", night), func(t *testing.T) {
 			t.Parallel()
-			r := bootFishingWith(t, false)
+			// The wait runs out between two looks, 1.95 s clear of both: on
+			// the real pool a look comes some milliseconds late, and one
+			// landing a few tens of milliseconds past a deadline set right
+			// beside it would end the line a look early.
+			r := bootFishingWith(t, false, gameservertest.WithFish(fish.NewTable([]fish.Fish{
+				fish.New(fishCaughtID, 1, 100, 4, 1, 1, 500, 5000, 18000, 24000),
+			})))
 			id := r.objID
 			// The in-game hour follows the wall clock: start every run by day.
 			if r.srv.CrossDayNight(t) {
@@ -132,9 +140,9 @@ func TestFishingNightLureByDay(t *testing.T) {
 			}
 			ended, after := r.awaitEvent(t, "end ")
 			// This low grade lure looks every 6.65 s from the 10th: the
-			// look past the 30 s deadline is the fifth, at 36.6 s.
-			if after < 36500*time.Millisecond || after > 37100*time.Millisecond {
-				t.Fatalf("empty line back %v after the cast, want 36.6s", after)
+			// look past the 28 s deadline is the fourth, at 29.95 s.
+			if after < 29900*time.Millisecond || after > 33*time.Second {
+				t.Fatalf("empty line back %v after the cast, want 29.95s", after)
 			}
 			requireEvents(t, "no bite", ended, fmt.Sprintf("end %d win 0", id))
 			requireEvents(t, "no bite notice", fishingEvents(t, r.c), fishingMsg(serverpackets.SystemMessageReelLineAndStopFishing))

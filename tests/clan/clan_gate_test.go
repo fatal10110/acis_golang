@@ -64,14 +64,21 @@ func TestClanGateTellsTheOtherMembers(t *testing.T) {
 	drainFrames(t, w.member)
 
 	w.leader.Send(encodeRequestMagicSkillUse(clanGateID))
-	leader := drainFrames(t, w.leader)
+	// The launch is a separate step after the cast request, and the portal
+	// message follows it: read each client until its frame arrives.
+	leader := readUntilOpcode(t, w.leader, serverpackets.OpcodeMagicSkillLaunched)
+	w.srv.Settle(t)
+	leader = append(leader, drainFrames(t, w.leader)...)
 	if _, ok := firstOpcode(leader, serverpackets.OpcodeMagicSkillLaunched); !ok {
 		t.Fatalf("Clan Gate cast answer = %x, want the cast launched", opcodes(leader))
 	}
 	if ids := messages(t, leader); slices.Contains(ids, serverpackets.SystemMessageCourtMagicianCreatedPortal) {
 		t.Fatalf("caster's messages = %v, want no COURT_MAGICIAN_CREATED_PORTAL", ids)
 	}
-	if ids := messages(t, drainFrames(t, w.member)); !slices.Equal(ids, []int{serverpackets.SystemMessageCourtMagicianCreatedPortal}) {
+	portal := readUntilOpcode(t, w.member, serverpackets.OpcodeSystemMessage)
+	w.srv.Settle(t)
+	portal = append(portal, drainFrames(t, w.member)...)
+	if ids := messages(t, portal); !slices.Equal(ids, []int{serverpackets.SystemMessageCourtMagicianCreatedPortal}) {
 		t.Fatalf("member's messages = %v, want COURT_MAGICIAN_CREATED_PORTAL", ids)
 	}
 }
