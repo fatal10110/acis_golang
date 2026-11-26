@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"iter"
 	"slices"
 	"sync"
 
@@ -101,6 +102,39 @@ func ModOwnerItem(owner ItemOwner) ModOwner { return ModOwner{item: owner} }
 // equipped item instance carries: its bonuses are attached and removed
 // apart from the item's own functions.
 func ModOwnerAugmentation(inst *item.Instance) ModOwner { return ModOwner{augment: inst} }
+
+// OwnedStats yields, in stat order and each once, the stats a holder scans
+// to drop o's Mods: an effect's Mods are its own Funcs, so only their stats.
+// An owner that does not know its stats (a passive skill, an item, an
+// augmentation, an effect with no Funcs) yields every stat.
+func (o ModOwner) OwnedStats() iter.Seq[stat.Stat] {
+	if o.effect == nil || len(o.effect.Funcs) == 0 {
+		return func(yield func(stat.Stat) bool) {
+			for s := range stat.Count {
+				if !yield(stat.Stat(s)) {
+					return
+				}
+			}
+		}
+	}
+	fns := o.effect.Funcs
+	return func(yield func(stat.Stat) bool) {
+		// Funcs are few: pick the next larger stat each round rather than
+		// sort a copy.
+		for prev := -1; ; {
+			next := -1
+			for _, m := range fns {
+				if s := int(m.Stat); s > prev && (next < 0 || s < next) {
+					next = s
+				}
+			}
+			if next < 0 || !yield(stat.Stat(next)) {
+				return
+			}
+			prev = next
+		}
+	}
+}
 
 // Stripped reports whether o is an effect a stop-all is ending
 // (List.StopAll, List.StopAllExceptThoseThatLastThroughDeath). A holder

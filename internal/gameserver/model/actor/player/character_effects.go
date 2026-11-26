@@ -92,12 +92,13 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	calcs := c.statCalcs
 	c.statMu.RUnlock()
 	var stats []stat.Stat
-	for s, calc := range calcs {
+	for s := range owner.OwnedStats() {
+		calc := calcs[s]
 		if calc == nil {
 			continue
 		}
 		for range calc.RemoveOwner(owner) {
-			stats = append(stats, stat.Stat(s))
+			stats = append(stats, s)
 		}
 	}
 	if owner.Stripped() {
