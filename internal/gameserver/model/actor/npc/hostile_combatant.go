@@ -52,7 +52,7 @@ func (h *Hostile) ShieldDefense(creature.FormulaActor, modelskill.Definition, bo
 func (h *Hostile) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool { return false }
 
 // NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
-func (h *Hostile) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+func (h *Hostile) NotePvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {}
 
 // OwnsOffensiveFollowTicker reports false: a hostile NPC's offensive follow
 // is rechecked by its move controller.

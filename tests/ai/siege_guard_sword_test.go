@@ -46,7 +46,7 @@ func siegeSkillfulTemplate(id int32) *npc.Template {
 
 // siegeSkillfulNPCSkills are the skills siegeSkillfulTemplate lists.
 func siegeSkillfulNPCSkills() *modelskill.Table {
-	one := func(id modelskill.ID, magic bool, skillType string, castRange int) modelskill.Definition {
+	one := func(id modelskill.ID, magic bool, skillType modelskill.SkillType, castRange int) modelskill.Definition {
 		return modelskill.Definition{
 			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			Offensive: true, Magic: magic, SkillType: skillType, CastRange: castRange, HitTime: 1000,

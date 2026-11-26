@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -45,7 +46,9 @@ type seedItem interface {
 
 type sowHandler struct{}
 
-func (sowHandler) Types() []string { return []string{"SOW"} }
+func (sowHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSow}
+}
 
 // Use sows the used item's seed onto the first target. Only a player sows,
 // only from a seed item, and only onto a living monster; an already sown
@@ -119,7 +122,9 @@ type harvestHandler struct {
 	cropRate int
 }
 
-func (harvestHandler) Types() []string { return []string{"HARVEST"} }
+func (harvestHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeHarvest}
+}
 
 // Use harvests the first target's sown crop into a player caster's
 // inventory. The crop is spent as soon as the caster is found allowed to

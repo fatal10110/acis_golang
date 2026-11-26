@@ -20,7 +20,9 @@ type servitorSummoner interface {
 // for non-cubic skills, or a cubic refresh for cubic skills.
 type cubicHandler struct{}
 
-func (cubicHandler) Types() []string { return []string{"SUMMON"} }
+func (cubicHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSummon}
+}
 
 func (cubicHandler) Use(cast Cast) {
 	cubicHandler{}.UseResult(cast)

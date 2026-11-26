@@ -100,7 +100,7 @@ func (a *AIController) StopsMovement(ref modelskill.Ref) bool {
 }
 
 // SkillType returns ref's raw skillType tag.
-func (a *AIController) SkillType(ref modelskill.Ref) string {
+func (a *AIController) SkillType(ref modelskill.Ref) modelskill.SkillType {
 	def, ok := a.definition(ref)
 	if !ok {
 		return ""
@@ -383,7 +383,7 @@ func (a *AIController) cast(target attackable.Combatant, ref modelskill.Ref, sta
 			// drives every non-player-initiated cast, so it must skip
 			// FUSION here rather than let it reach fusionHandler, which
 			// has no caster-type gate of its own.
-			if def.SkillType == "FUSION" || !launchRan {
+			if def.SkillType == modelskill.SkillTypeFusion || !launchRan {
 				return
 			}
 			// Off the grid, an object knows nothing, itself included.

@@ -13,7 +13,7 @@ const flagStrikeSkillID = 9350
 
 // flagStrike is an offensive single-target skill: a physical damage hit
 // carrying a debuff effect when damaging, or the debuff alone.
-func flagStrike(skillType string) modelskill.Definition {
+func flagStrike(skillType modelskill.SkillType) modelskill.Definition {
 	return modelskill.Definition{
 		ID: flagStrikeSkillID, Level: 1, Activation: modelskill.ActivationActive,
 		Target: modelskill.TargetOne, SkillType: skillType, Power: 500, Offensive: true,
@@ -30,13 +30,13 @@ func flagStrike(skillType string) modelskill.Definition {
 func TestOffensiveSkillOnSiegeFlag(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		skillType  string
+		skillType  modelskill.SkillType
 		wantDamage bool
 	}{
 		{skillType: "PDAM", wantDamage: true},
 		{skillType: "DEBUFF"},
 	} {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			t.Parallel()
 			def := flagStrike(tc.skillType)
 			w := bootHQ(t, hqSetup{known: []modelskill.Definition{def}})

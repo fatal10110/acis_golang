@@ -16,7 +16,7 @@ const casterTailSkill = modelskill.ID(9341)
 
 // casterTailAura is an offensive aura of skillType around its caster, as
 // wide as radius. 4139 Boom Attack is an MDAM aura of 150.
-func casterTailAura(skillType string, radius int) modelskill.Definition {
+func casterTailAura(skillType modelskill.SkillType, radius int) modelskill.Definition {
 	return modelskill.Definition{
 		ID: casterTailSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetAura,
 		Radius: radius, Offensive: true, SkillType: skillType, Power: 10, HitTime: 500, StaticHitTime: true,
@@ -32,7 +32,7 @@ func TestSuicideAttackKillsItsCaster(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		name      string
-		skillType string
+		skillType modelskill.SkillType
 		radius    int
 		suicide   bool
 	}{

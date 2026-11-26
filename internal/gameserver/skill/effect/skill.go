@@ -37,7 +37,7 @@ type Skill struct {
 	Name string
 	// SkillType is the raw datapack skill-type tag (e.g. "BUFF", "REFLECT").
 	// It drives the buff-slot family used by the list's cap enforcement.
-	SkillType string
+	SkillType modelskill.SkillType
 	// StackType is the stack type of the skill's first effect template, or
 	// empty when the skill has no effect templates. The buff-slot cap guard
 	// reads it instead of each landing effect's own stack type, so every
@@ -100,13 +100,13 @@ func (s Skill) sevenSigns() bool {
 
 // buffSlotFamily is the set of skill types that occupy (and can be evicted
 // from) an owner's limited buff slots.
-var buffSlotFamily = map[string]bool{
-	"BUFF":             true,
-	"REFLECT":          true,
-	"HEAL_PERCENT":     true,
-	"HEAL_STATIC":      true,
-	"MANAHEAL_PERCENT": true,
-	"COMBATPOINTHEAL":  true,
+var buffSlotFamily = map[modelskill.SkillType]bool{
+	modelskill.SkillTypeBuff:            true,
+	modelskill.SkillTypeReflect:         true,
+	modelskill.SkillTypeHealPercent:     true,
+	modelskill.SkillTypeHealStatic:      true,
+	modelskill.SkillTypeManaHealPercent: true,
+	modelskill.SkillTypeCombatPointHeal: true,
 }
 
 func (s Skill) buffSlot() bool {

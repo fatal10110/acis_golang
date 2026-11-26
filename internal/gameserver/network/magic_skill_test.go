@@ -104,8 +104,10 @@ func (a *orderedSkillActor) AttackableWithoutForceBy(skilltarget.Actor) bool { r
 func (a *orderedSkillActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
 	return false
 }
-func (a *orderedSkillActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
-func (a *orderedSkillActor) EffectList() *effect.List                                 { return a.effects }
+
+func (a *orderedSkillActor) NotePvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {}
+
+func (a *orderedSkillActor) EffectList() *effect.List { return a.effects }
 
 func (a *orderedSkillActor) CounterSkillPhysical() float64 { return a.counter }
 

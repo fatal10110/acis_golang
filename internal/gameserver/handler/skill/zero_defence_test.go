@@ -18,7 +18,7 @@ import (
 func TestZeroDefenceDamageNarrowsLikeAnIntCast(t *testing.T) {
 	const hp = 5000.0
 	caster := func() *skillTarget { return &skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: true} }
-	use := func(target *skillTarget, skillType string) Result {
+	use := func(target *skillTarget, skillType modelskill.SkillType) Result {
 		t.Helper()
 		result, ok := NewDefaultRegistry().UseResult(Cast{Caster: caster(), Skill: modelskill.Definition{SkillType: skillType}, Targets: []Actor{target}})
 		if !ok {

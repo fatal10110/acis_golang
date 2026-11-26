@@ -19,7 +19,7 @@ func TestOffensiveCastOnFolkRequiresCtrlDamage(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
-		skillType  string
+		skillType  modelskill.SkillType
 		ctrl       bool
 		wantReject bool
 	}{

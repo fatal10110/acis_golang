@@ -31,16 +31,16 @@ func resolveShieldDefense(caster Creature, target Actor, def modelskill.Definiti
 type disablersHandler struct{}
 
 // Types lists all 15 skill types the disablers handler covers.
-func (disablersHandler) Types() []string {
-	return []string{
-		"STUN", "ROOT", "SLEEP", "PARALYZE", "MUTE", "CONFUSION",
-		"FAKE_DEATH", "BETRAY", "NEGATE", "CANCEL_DEBUFF",
-		"AGGREDUCE", "AGGREDUCE_CHAR", "AGGREMOVE", "ERASE", "AGGDAMAGE",
+func (disablersHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{
+		modelskill.SkillTypeStun, modelskill.SkillTypeRoot, modelskill.SkillTypeSleep, modelskill.SkillTypeParalyze, modelskill.SkillTypeMute, modelskill.SkillTypeConfusion,
+		modelskill.SkillTypeFakeDeath, modelskill.SkillTypeBetray, modelskill.SkillTypeNegate, modelskill.SkillTypeCancelDebuff,
+		modelskill.SkillTypeAggReduce, modelskill.SkillTypeAggReduceChar, modelskill.SkillTypeAggRemove, modelskill.SkillTypeErase, modelskill.SkillTypeAggDamage,
 	}
 }
 
 func (disablersHandler) Use(cast Cast) {
-	skillType := skillTypeKey(cast.Skill.SkillType)
+	skillType := cast.Skill.SkillType.Normalized()
 	// Sampled before any target: this reading decides which spiritshot the
 	// cast spends at the end.
 	bsps := blessedSpiritshotCharged(cast.Caster)
@@ -67,29 +67,29 @@ func (disablersHandler) Use(cast Cast) {
 		land := landing{shield: resolveShieldDefense(cast.Caster, target, cast.Skill), bss: bsps}
 
 		switch skillType {
-		case "BETRAY":
+		case modelskill.SkillTypeBetray:
 			disableWithSuccessCheck(cast, target, land)
-		case "FAKE_DEATH":
+		case modelskill.SkillTypeFakeDeath:
 			land.apply(cast, target)
-		case "ROOT", "STUN", "SLEEP", "PARALYZE":
+		case modelskill.SkillTypeRoot, modelskill.SkillTypeStun, modelskill.SkillTypeSleep, modelskill.SkillTypeParalyze:
 			disableReflectable(cast, target, land)
-		case "MUTE":
+		case modelskill.SkillTypeMute:
 			disableMute(cast, target, land)
-		case "CONFUSION":
+		case modelskill.SkillTypeConfusion:
 			disableConfusion(cast, target, land)
-		case "AGGREDUCE":
+		case modelskill.SkillTypeAggReduce:
 			disableAggReduce(cast, target, land)
-		case "AGGREDUCE_CHAR":
+		case modelskill.SkillTypeAggReduceChar:
 			disableAggReduceChar(cast, target, land)
-		case "AGGREMOVE":
+		case modelskill.SkillTypeAggRemove:
 			disableAggRemove(cast, target, land)
-		case "ERASE":
+		case modelskill.SkillTypeErase:
 			disableErase(cast, target, land)
-		case "NEGATE":
+		case modelskill.SkillTypeNegate:
 			disableNegate(cast, target, land)
-		case "CANCEL_DEBUFF":
+		case modelskill.SkillTypeCancelDebuff:
 			disableCancelDebuff(cast, target)
-		case "AGGDAMAGE":
+		case modelskill.SkillTypeAggDamage:
 			disableAggDamage(cast, target, land)
 		}
 	}
@@ -187,7 +187,7 @@ func disableErase(cast Cast, target Creature, land landing) {
 // target, or the caster when the target reflects the skill back.
 func reflectTarget(cast Cast, target Creature) Creature {
 	in := target.SkillReflectInput(cast.Skill)
-	in.SkillType = skillTypeKey(cast.Skill.SkillType)
+	in.SkillType = cast.Skill.SkillType.Normalized()
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}
@@ -226,7 +226,7 @@ func disableMute(cast Cast, target Creature, land landing) {
 	if !land.lands(cast, effected, 1) {
 		return
 	}
-	stopSkillType(effected.EffectList(), skillTypeKey(cast.Skill.SkillType))
+	stopSkillType(effected.EffectList(), cast.Skill.SkillType.Normalized())
 	land.apply(cast, effected)
 }
 
@@ -242,7 +242,7 @@ func disableConfusion(cast Cast, target Creature, land landing) {
 	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
-	stopSkillType(target.EffectList(), skillTypeKey(cast.Skill.SkillType))
+	stopSkillType(target.EffectList(), cast.Skill.SkillType.Normalized())
 	land.apply(cast, target)
 }
 
@@ -342,12 +342,12 @@ func disableNegate(cast Cast, target Creature, land landing) {
 // level at or below negateLevel.
 func negateMatches(s effect.Skill, negateType string, negateLevel int) bool {
 	if negateLevel == -1 {
-		return strings.EqualFold(s.SkillType, negateType) || strings.EqualFold(s.EffectType, negateType)
+		return strings.EqualFold(string(s.SkillType), negateType) || strings.EqualFold(s.EffectType, negateType)
 	}
 	if s.EffectAbnormalLevel >= 0 {
 		return strings.EqualFold(s.EffectType, negateType) && s.EffectAbnormalLevel <= negateLevel
 	}
-	return strings.EqualFold(s.SkillType, negateType) && s.AbnormalLevel <= negateLevel
+	return strings.EqualFold(string(s.SkillType), negateType) && s.AbnormalLevel <= negateLevel
 }
 
 func disableCancelDebuff(cast Cast, target Creature) {
@@ -356,9 +356,9 @@ func disableCancelDebuff(cast Cast, target Creature) {
 	})
 }
 
-func stopSkillType(list *effect.List, skillType string) {
+func stopSkillType(list *effect.List, skillType modelskill.SkillType) {
 	removeMatching(list, 0, func(e *effect.Effect) bool {
-		return e.Template.StackOrder != 99 && strings.EqualFold(e.Skill.SkillType, skillType)
+		return e.Template.StackOrder != 99 && strings.EqualFold(string(e.Skill.SkillType), string(skillType))
 	})
 }
 

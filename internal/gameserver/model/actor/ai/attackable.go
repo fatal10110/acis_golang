@@ -190,7 +190,7 @@ type CastController interface {
 	StopsMovement(ref skill.Ref) bool
 	// SkillType returns ref's raw skillType tag, used to grant SUMMON_FRIEND
 	// casts a target-lost bypass (the rotation-target exemption).
-	SkillType(ref skill.Ref) string
+	SkillType(ref skill.Ref) skill.SkillType
 	// CanCast validates the final HP/MP/mute/reuse/item gates, immediately
 	// before the cast commits.
 	CanCast(target attackable.Combatant, ref skill.Ref) bool
@@ -1873,11 +1873,11 @@ func (a *Attackable) refreshCombatMemory() {
 // is none, it is no longer in the world, or the actor does not know it. A
 // SUMMON_FRIEND cast (skillType) keeps a target the actor does not know. It
 // changes nothing.
-func (a *Attackable) targetLost(target attackable.Combatant, skillType string) bool {
+func (a *Attackable) targetLost(target attackable.Combatant, skillType skill.SkillType) bool {
 	if target == nil || !a.actor.InWorld(target) {
 		return true
 	}
-	if skillType == "SUMMON_FRIEND" {
+	if skillType == skill.SkillTypeSummonFriend {
 		return false
 	}
 	return !a.actor.Knows(target)

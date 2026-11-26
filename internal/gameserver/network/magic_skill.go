@@ -117,9 +117,9 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	switch {
 	case known && def.Target == modelskill.TargetGround:
 		afterCanCast = l.groundCastAfterCanCast(live, def)
-	case known && def.SkillType == "TAKE_CASTLE":
+	case known && def.SkillType == modelskill.SkillTypeTakeCastle:
 		afterCanCast = l.takeCastleAfterCanCast(live, *def, l.magicSkillFinalTarget(live, def, selected))
-	case known && def.SkillType == "SIEGE_FLAG":
+	case known && def.SkillType == modelskill.SkillTypeSiegeFlag:
 		afterCanCast = l.siegeFlagAfterCanCast(live)
 	case known:
 		afterCanCast = l.siegeCastAfterCanCast(live, *def, func() skilltarget.Actor { return l.magicSkillFinalTarget(live, def, selected) })
@@ -175,10 +175,10 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 
 	handlers := l.castEffects()
 	switch def.SkillType {
-	case "FUSION":
+	case modelskill.SkillTypeFusion:
 		l.startFusionCast(live, controller, target, def, plan)
 		return
-	case "SIGNET_CASTTIME":
+	case modelskill.SkillTypeSignetCastTime:
 		l.startSignetCast(live, controller, handlers, target, def, plan)
 		return
 	}
@@ -656,7 +656,7 @@ func (l *GameClientLink) magicTargetLost(live *livePlayer, target skilltarget.Ac
 	if !ok || l.resolveTarget(target.ObjectID()) == nil {
 		return true
 	}
-	if def.SkillType == "SUMMON_FRIEND" {
+	if def.SkillType == modelskill.SkillTypeSummonFriend {
 		return false
 	}
 	if c, ok := target.(attackable.Combatant); ok {

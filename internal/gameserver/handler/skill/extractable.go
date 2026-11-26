@@ -26,7 +26,9 @@ type itemCreator interface {
 // does nothing.
 type extractableHandler struct{ ids objectIDAllocator }
 
-func (extractableHandler) Types() []string { return []string{"EXTRACTABLE", "EXTRACTABLE_FISH"} }
+func (extractableHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeExtractable, modelskill.SkillTypeExtractableFish}
+}
 
 // Use rolls one of the skill's capsule product rows (weighted by percent
 // chance out of 100000) and grants every item in it to a player caster.

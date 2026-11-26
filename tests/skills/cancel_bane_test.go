@@ -21,7 +21,7 @@ import (
 
 // baneWorld boots a caster whose single skill is of skillType, capped at
 // maxNegated effects per target, with power 30 and the caster's own level.
-func baneWorld(t *testing.T, skillType string, maxNegated int) cancelWorld {
+func baneWorld(t *testing.T, skillType modelskill.SkillType, maxNegated int) cancelWorld {
 	t.Helper()
 	def := modelskill.Definition{
 		ID: cancelSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -170,14 +170,14 @@ func TestWarriorBaneStripsOnlyItsStackTypes(t *testing.T) {
 func TestBaneFilteredEffectsDoNotSpendCount(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		skillType string
+		skillType modelskill.SkillType
 		matching  []string
 		other     []string
 	}{
 		{"MAGE_BANE", []string{"casting_time_down", "ma_up"}, []string{"attack_time_down", "speed_up", "cancel_a", "cancel_b", "cancel_c", "cancel_d"}},
 		{"WARRIOR_BANE", []string{"attack_time_down", "speed_up"}, []string{"casting_time_down", "ma_up", "cancel_a", "cancel_b", "cancel_c", "cancel_d"}},
 	} {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			t.Parallel()
 			w := baneWorld(t, tc.skillType, 2)
 			// Other buffs land first so a cap spent on them would show.

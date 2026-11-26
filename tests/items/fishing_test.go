@@ -97,7 +97,7 @@ func fishingCatalog() *item.Table {
 func fishingSkills(t *testing.T) *skillstate.Persistence {
 	t.Helper()
 	db := sqltest.SharedDB(t)
-	active := func(id modelskill.ID, typ string, power float32) modelskill.Definition {
+	active := func(id modelskill.ID, typ modelskill.SkillType, power float32) modelskill.Definition {
 		return modelskill.Definition{ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: typ, Power: power}
 	}
 	atLevel := func(d modelskill.Definition, level int, power float32) modelskill.Definition {

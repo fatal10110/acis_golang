@@ -9,7 +9,7 @@ import (
 
 func TestContinuousRegistryHasAllHandledTypes(t *testing.T) {
 	registry := NewDefaultRegistry()
-	for _, typ := range []string{
+	for _, typ := range []modelskill.SkillType{
 		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",
 		"HOT", "MPHOT", "FEAR", "CONT", "WEAKNESS", "REFLECT",
 		"AGGDEBUFF", "FUSION",

@@ -130,11 +130,11 @@ type spawnedTarget interface {
 // launchTargetLost reports whether target left the world or, except for a
 // summon-friend skill, which reaches a target anywhere, the caster's
 // surroundings.
-func launchTargetLost(caster LaunchCaster, target Target, skillType string) bool {
+func launchTargetLost(caster LaunchCaster, target Target, skillType modelskill.SkillType) bool {
 	if s, ok := target.(spawnedTarget); ok && !s.Spawned() {
 		return true
 	}
-	if skillType == "SUMMON_FRIEND" {
+	if skillType == modelskill.SkillTypeSummonFriend {
 		return false
 	}
 	combatant, ok := target.(attackable.Combatant)

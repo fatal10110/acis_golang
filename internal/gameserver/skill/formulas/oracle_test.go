@@ -172,7 +172,7 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 				CritDamageMul: r.f(10), CritDamagePosMul: r.f(11), CritVulnMul: r.f(12), CritDamageAddBase: r.f(13),
 			}))
 		case "skillPower":
-			r.wantFloatULP(SkillPowerFor(r.args[0], r.f(1), r.f(2)), powULP)
+			r.wantFloatULP(SkillPowerFor(modelskill.SkillType(r.args[0]), r.f(1), r.f(2)), powULP)
 		case "physicalSkillDamage":
 			r.wantFloat(PhysicalSkillDamage(PhysicalSkillInput{
 				NoDamage: !r.b(0), Shield: shield(r.b(1)), Defence: r.f(2), AttackPower: r.f(3), SkillPower: r.f(4),
@@ -256,7 +256,7 @@ func TestFormulasMatchReferenceProbe(t *testing.T) {
 			r.wantString(strconv.FormatBool(MCritSucceeds(r.n(0), r.n(1))))
 		case "skillReflect":
 			r.wantString(strconv.FormatBool(SkillReflects(SkillReflectInput{
-				IgnoreResists: r.b(0), CanBeReflected: r.b(1), Magic: r.b(2), CastRange: r.n(3), SkillType: r.args[4], ReflectChance: r.f(5),
+				IgnoreResists: r.b(0), CanBeReflected: r.b(1), Magic: r.b(2), CastRange: r.n(3), SkillType: modelskill.SkillType(r.args[4]), ReflectChance: r.f(5),
 			}, r.n(6))))
 		case "doorUnlockSpecial":
 			r.wantString(strconv.FormatBool(DoorUnlockSpecialSucceeds(r.f(0), r.n(1))))

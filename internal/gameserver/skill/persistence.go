@@ -196,7 +196,7 @@ func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []ef
 			Time:         elapsed,
 			Toggle:       e.Skill.Toggle,
 			Herb:         e.Herb,
-			Continuous:   e.Skill.SkillType == "CONT",
+			Continuous:   e.Skill.SkillType == modelskill.SkillTypeCont,
 			HealOverTime: e.Type == effect.TypeHealOverTime,
 		})
 	}

@@ -17,11 +17,11 @@ type continuousHandler struct {
 // skill dispatch anyway: a player's FUSION cast is diverted to the fusion
 // cast path, which lands the force through StartFusion as the channel opens,
 // and AIController skips FUSION for every other caster.
-func (continuousHandler) Types() []string {
-	return []string{
-		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",
-		"HOT", "MPHOT", "FEAR", "CONT", "WEAKNESS", "REFLECT",
-		"AGGDEBUFF",
+func (continuousHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{
+		modelskill.SkillTypeBuff, modelskill.SkillTypeDebuff, modelskill.SkillTypeDOT, modelskill.SkillTypeMDOT, modelskill.SkillTypePoison, modelskill.SkillTypeBleed,
+		modelskill.SkillTypeHOT, modelskill.SkillTypeMPHOT, modelskill.SkillTypeFear, modelskill.SkillTypeCont, modelskill.SkillTypeWeakness, modelskill.SkillTypeReflect,
+		modelskill.SkillTypeAggDebuff,
 	}
 }
 
@@ -32,7 +32,7 @@ func (h continuousHandler) Use(cast Cast) {
 func (h continuousHandler) UseResult(cast Cast) Result {
 	result := Result{messages: cast.messages}
 	def := h.effectSkill(cast.Skill)
-	skillType := skillTypeKey(def.SkillType)
+	skillType := def.SkillType.Normalized()
 	// The blessed-spiritshot charge is read once, before any target, and
 	// both the landing rolls and the end-of-cast discharge use that reading.
 	bsps := blessedSpiritshotCharged(cast.Caster)
@@ -56,7 +56,7 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 		}
 
 		switch skillType {
-		case "BUFF":
+		case modelskill.SkillTypeBuff:
 			if hasEffectType(effected.EffectList(), "BLOCK_BUFF") {
 				continue
 			}
@@ -66,11 +66,11 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 			if !clanHallManager(cast.Caster) && !sameObject(cast.Caster, effected) && (cursed(effected) || actingCursed(cast.Caster)) {
 				continue
 			}
-		case "HOT", "MPHOT":
+		case modelskill.SkillTypeHOT, modelskill.SkillTypeMPHOT:
 			if cast.Caster != nil && cast.Caster.Invul() {
 				continue
 			}
-		case "FEAR":
+		case modelskill.SkillTypeFear:
 			if effected.Kind().Playable() && effect.FearSparesPlayables(def.ID) {
 				continue
 			}
@@ -101,7 +101,7 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 
 			applyCastEffects(cast, effected, def, def.Effects, shield, bsps)
 
-			if skillType == "AGGDEBUFF" {
+			if skillType == modelskill.SkillTypeAggDebuff {
 				fireAggressionEvent(cast.Caster, effected, def)
 			}
 		} else {
@@ -141,7 +141,7 @@ func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Def
 // the caster when the target reflects the skill back.
 func (continuousHandler) reflectTarget(caster Creature, def modelskill.Definition, target Creature) Creature {
 	in := target.SkillReflectInput(def)
-	in.SkillType = skillTypeKey(def.SkillType)
+	in.SkillType = def.SkillType.Normalized()
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}

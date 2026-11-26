@@ -29,17 +29,17 @@ func doorLands(caster Creature, d *door.Object, def modelskill.Definition, bss b
 // the skill at level 1 and BETRAY, AGGREDUCE_CHAR and ERASE at the cast
 // level; CONFUSION tells a player caster a door is no target; every other
 // type does nothing to a door.
-func disableDoor(cast Cast, d *door.Object, skillType string, bsps bool) {
+func disableDoor(cast Cast, d *door.Object, skillType modelskill.SkillType, bsps bool) {
 	if d.Dead() {
 		return
 	}
 	_, player := asPlayer(cast.Caster)
 	level := cast.Skill.Level
 	switch skillType {
-	case "ROOT", "STUN", "SLEEP", "PARALYZE", "MUTE":
+	case modelskill.SkillTypeRoot, modelskill.SkillTypeStun, modelskill.SkillTypeSleep, modelskill.SkillTypeParalyze, modelskill.SkillTypeMute:
 		level = 1
-	case "BETRAY", "AGGREDUCE_CHAR", "ERASE":
-	case "CONFUSION":
+	case modelskill.SkillTypeBetray, modelskill.SkillTypeAggReduceChar, modelskill.SkillTypeErase:
+	case modelskill.SkillTypeConfusion:
 		if player {
 			cast.record(InvalidTargetMessage{})
 		}

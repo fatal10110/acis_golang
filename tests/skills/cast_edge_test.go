@@ -242,7 +242,7 @@ func TestDamageCastBreakRules(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		magic     bool
-		skillType string
+		skillType modelskill.SkillType
 		invul     bool
 		// roll is the caster's [0,100) break roll; the break rate is clamped
 		// to [1,99], so 0 always breaks and 99 never does.

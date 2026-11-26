@@ -1,5 +1,7 @@
 package formulas
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 // meleeAttackRange is the cast range (in game units) below which a
 // non-magic skill still counts as "melee" for reflect purposes.
 const meleeAttackRange = 40
@@ -61,7 +63,7 @@ type SkillReflectInput struct {
 	// SkillType is the cast skill's uppercase type key (e.g. "BUFF",
 	// "HOT"), used to exclude skill types that never bounce back regardless
 	// of the target's reflect stat.
-	SkillType string
+	SkillType modelskill.SkillType
 	// ReflectChance is the target's already-resolved percent chance to
 	// reflect this skill (REFLECT_SKILL_MAGIC or REFLECT_SKILL_PHYSIC).
 	ReflectChance float64
@@ -70,15 +72,15 @@ type SkillReflectInput struct {
 // skillReflectExcludedTypes are skill types skill reflection never bounces
 // back at the caster, regardless of the target's reflect stat or any chance
 // roll.
-var skillReflectExcludedTypes = map[string]bool{
-	"BUFF":             true,
-	"REFLECT":          true,
-	"HEAL_PERCENT":     true,
-	"MANAHEAL_PERCENT": true,
-	"HOT":              true,
-	"MPHOT":            true,
-	"AGGDEBUFF":        true,
-	"CONT":             true,
+var skillReflectExcludedTypes = map[modelskill.SkillType]bool{
+	modelskill.SkillTypeBuff:            true,
+	modelskill.SkillTypeReflect:         true,
+	modelskill.SkillTypeHealPercent:     true,
+	modelskill.SkillTypeManaHealPercent: true,
+	modelskill.SkillTypeHOT:             true,
+	modelskill.SkillTypeMPHOT:           true,
+	modelskill.SkillTypeAggDebuff:       true,
+	modelskill.SkillTypeCont:            true,
 }
 
 // SkillReflects reports whether the target reflects the skill back at its
