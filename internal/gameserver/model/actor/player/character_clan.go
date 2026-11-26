@@ -7,12 +7,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
-// TitleMaxLength is the longest title kept, in UTF-16 code units.
-const TitleMaxLength = 16
+// titleMaxLength is the longest title kept, in UTF-16 code units.
+const titleMaxLength = 16
 
 // CutTitle cuts title to the longest title kept.
 func CutTitle(title string) string {
-	return commons.UTF16Cut(title, TitleMaxLength)
+	return commons.UTF16Cut(title, titleMaxLength)
 }
 
 // clanState is the character's side of its clan membership. A clan
