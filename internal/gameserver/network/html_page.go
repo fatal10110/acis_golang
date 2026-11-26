@@ -61,6 +61,16 @@ func (l *GameClientLink) setPage(file string) string {
 	return serverpackets.NpcHtmlBody(page)
 }
 
+// rawPage is the datapack page file as the cache holds it, with no page
+// limit, or the missing-page notice naming file as given.
+func (l *GameClientLink) rawPage(file string) string {
+	page, ok := l.html.Get(file)
+	if !ok {
+		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
+	}
+	return page
+}
+
 // missingPage is the notice a window shows for a page file the cache does
 // not hold. The name is escaped, since it may carry text a player typed:
 // the notice shows it as text and offers no link of its own.

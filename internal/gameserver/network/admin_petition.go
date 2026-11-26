@@ -175,7 +175,7 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 	if isAnswering {
 		unfollow = petitionUnfollowButton
 	}
-	html := l.adminHTML("petitions.htm")
+	html := l.adminPage("petitions.htm", true)
 	html = strings.ReplaceAll(html, "%unfollow%", unfollow)
 	html = strings.ReplaceAll(html, "%content%", b.String())
 	l.sendFilePage(gm, 0, adminFile("petitions.htm"), html, 0)
@@ -196,7 +196,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	if petitioner, ok := l.livePlayerByID(d.Petitioner); ok && !petitioner.detached() {
 		status = "online"
 	}
-	html := l.adminHTML("petition.htm")
+	html := l.adminPage("petition.htm", true)
 	for _, r := range []struct{ key, value string }{
 		{"%submitDate%", time.UnixMilli(d.SubmitDate).Format("02-01-2006 15:04")},
 		{"%petitionerName%", d.PetitionerName},
@@ -227,11 +227,14 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	l.sendFilePage(gm, 0, adminFile("petition.htm"), html, 0)
 }
 
-// adminHTML returns admin panel page name as set, before its placeholders
-// are filled: the page limited, or the missing-page notice when there is
-// none.
-func (l *GameClientLink) adminHTML(name string) string {
-	return l.setPage(adminFile(name))
+// adminPage returns admin panel page name before its placeholders are
+// filled, or the missing-page notice when there is none: as set, with the
+// page limit applied, when limited, else as the cache holds it.
+func (l *GameClientLink) adminPage(name string, limited bool) string {
+	if limited {
+		return l.setPage(adminFile(name))
+	}
+	return l.rawPage(adminFile(name))
 }
 
 // adminFile is the datapack file of admin page name.

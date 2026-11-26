@@ -113,7 +113,7 @@ func (l *GameClientLink) sendMaintenancePage(gm *livePlayer) {
 	}
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
-	page := l.adminHTML("maintenance.htm")
+	page := l.adminPage("maintenance.htm", true)
 	for _, r := range [...][2]string{
 		{"%count%", strconv.Itoa(online)},
 		{"%used%", strconv.FormatUint(mem.HeapAlloc/(1<<20), 10)},

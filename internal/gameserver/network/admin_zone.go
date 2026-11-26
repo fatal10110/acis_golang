@@ -118,10 +118,7 @@ func (l *GameClientLink) adminZonePanel(gm *livePlayer) bool {
 		}
 	}
 	const file = "data/html/admin/zone.htm"
-	page, found := l.html.Get(file)
-	if !found {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("zone.htm", false)
 	rx := (pos.X-world.MinX)/world.TileSize + world.TileXMin
 	ry := (pos.Y-world.MinY)/world.TileSize + world.TileYMin
 	page = strings.NewReplacer(

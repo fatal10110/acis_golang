@@ -147,9 +147,8 @@ func (l *GameClientLink) listAnnouncements(gm *livePlayer) bool {
 	if !ok {
 		return false
 	}
-	const file = "data/html/admin/announce_list.htm"
 	// The list is shown as read, never named as a set file.
-	sendFilledHTML(gm, 0, strings.ReplaceAll(l.setPage(file), placeholder, content), 0)
+	sendFilledHTML(gm, 0, strings.ReplaceAll(l.adminPage("announce_list.htm", true), placeholder, content), 0)
 	return true
 }
 

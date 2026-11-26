@@ -237,7 +237,7 @@ func (l *GameClientLink) npcSpawnPage(gm *livePlayer, obj world.Tracked, inst *n
 		)
 	}
 	pairs = append(pairs, "%minion%", npcPartyLine(obj))
-	return fillPage(l.adminHTML("npcinfo/spawn.htm"), pairs...)
+	return fillPage(l.adminPage("npcinfo/spawn.htm", true), pairs...)
 }
 
 // npcPartyLine tells whether the NPC obj leads privates, is one, or

@@ -412,10 +412,7 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_show walker %page%")
 	const file = "data/html/admin/walker.htm"
-	html, found := l.html.Get(file)
-	if !found {
-		html = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	html := l.adminPage("walker.htm", false)
 	l.sendValidatedFile(gm, 0, file, strings.ReplaceAll(html, "%content%", b.String()), 0)
 }
 

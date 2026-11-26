@@ -277,7 +277,7 @@ func adminSkillRow(b *strings.Builder, row, id int, label string, level int) {
 // sendAdminSkillPage opens the admin page file on gm with name and content
 // filled in.
 func (l *GameClientLink) sendAdminSkillPage(gm *livePlayer, file, name, content string) {
-	html := l.adminHTML(file)
+	html := l.adminPage(file, true)
 	html = strings.ReplaceAll(html, "%name%", name)
 	html = strings.ReplaceAll(html, "%content%", content)
 	l.sendFilePage(gm, 0, adminFile(file), html, 0)

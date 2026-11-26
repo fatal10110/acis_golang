@@ -41,7 +41,7 @@ func (l *GameClientLink) npcScriptPage(obj world.Tracked, t *npc.Template) strin
 			b.WriteString(name + "<br1>")
 		}
 	}
-	page := strings.ReplaceAll(l.adminHTML("npcinfo/script.htm"), "%scripts%", b.String())
+	page := strings.ReplaceAll(l.adminPage("npcinfo/script.htm", true), "%scripts%", b.String())
 
 	b.Reset()
 	for _, st := range timers {

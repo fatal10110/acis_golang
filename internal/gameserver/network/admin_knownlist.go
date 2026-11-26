@@ -60,7 +60,7 @@ func (l *GameClientLink) adminKnownlist(gm *livePlayer, line string) {
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_knownlist %page%")
-	html := fillPage(l.adminHTML("knownlist.htm"), "%target%", name, "%content%", b.String())
+	html := fillPage(l.adminPage("knownlist.htm", true), "%target%", name, "%content%", b.String())
 	l.sendFilePage(gm, 0, adminFile("knownlist.htm"), html, 0)
 }
 

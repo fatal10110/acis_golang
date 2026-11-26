@@ -92,10 +92,7 @@ func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
 // it is fought.
 func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 	const file = "data/html/admin/castle.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("castle.htm", false)
 	lifeTowers := c.AliveLifeTowers(l.castleBesieged(c.ID))
 	var artifacts, towers strings.Builder
 	for i, a := range c.Artifacts {

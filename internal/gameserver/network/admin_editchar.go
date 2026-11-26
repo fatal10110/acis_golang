@@ -55,7 +55,7 @@ func (l *GameClientLink) charInfoPage(target *livePlayer) string {
 	}
 	x, y, z := target.Position()
 	current, next := target.intentionNames()
-	page := l.adminHTML("charinfo.htm")
+	page := l.adminPage("charinfo.htm", true)
 	for _, r := range [...][2]string{
 		{"%name%", target.CharacterName()},
 		{"%objid%", strconv.Itoa(int(target.ObjectID()))},
@@ -99,7 +99,7 @@ func (l *GameClientLink) adminPartyInfo(gm *livePlayer, line string) {
 		b.WriteString(`<tr><td width=150><a action="bypass -h admin_debug ` + m.CharacterName() + `">` + label +
 			`</a></td><td width=120 align=right>` + player.ClassName(m.ClassID()) + `</td></tr>`)
 	}
-	page := l.adminHTML("partyinfo.htm")
+	page := l.adminPage("partyinfo.htm", true)
 	page = strings.ReplaceAll(page, "%name%", target.CharacterName())
 	page = strings.ReplaceAll(page, "%party%", b.String())
 	l.sendFilePage(gm, 0, adminFile("partyinfo.htm"), page, 0)

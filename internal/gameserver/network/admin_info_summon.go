@@ -40,7 +40,7 @@ func (l *GameClientLink) summonInfoPage(s *summon.Actor) string {
 		}
 		load = strconv.Itoa(weight) + "/" + strconv.Itoa(s.WeightLimit())
 	}
-	return fillPage(l.adminHTML("petinfo.htm"),
+	return fillPage(l.adminPage("petinfo.htm", true),
 		"%name%", name,
 		"%level%", strconv.Itoa(s.Level()),
 		"%exp%", strconv.FormatInt(s.Exp(), 10),

@@ -136,7 +136,7 @@ func (l *GameClientLink) showShot(gm *livePlayer, s movieShot, broadcast bool) {
 func (l *GameClientLink) sendMoviePanel(gm *livePlayer) {
 	shots := l.movies.all()
 	if len(shots) == 0 {
-		l.sendFilePage(gm, 0, adminFile("movie/main_empty.htm"), l.adminHTML("movie/main_empty.htm"), 0)
+		l.sendFilePage(gm, 0, adminFile("movie/main_empty.htm"), l.adminPage("movie/main_empty.htm", true), 0)
 		return
 	}
 	var b strings.Builder
@@ -147,7 +147,7 @@ func (l *GameClientLink) sendMoviePanel(gm *livePlayer) {
 		}
 		b.WriteString("</tr>")
 	}
-	html := strings.ReplaceAll(l.adminHTML("movie/main_notempty.htm"), "%sequences%", b.String())
+	html := strings.ReplaceAll(l.adminPage("movie/main_notempty.htm", true), "%sequences%", b.String())
 	l.sendFilePage(gm, 0, adminFile("movie/main_notempty.htm"), html, 0)
 }
 
@@ -204,7 +204,7 @@ func sequenceID(args []string) (int32, bool) {
 // shot.
 func (l *GameClientLink) addSequence(gm *livePlayer, args []string) {
 	if len(args) == 0 {
-		l.sendFilePage(gm, 0, adminFile("movie/add_sequence.htm"), l.adminHTML("movie/add_sequence.htm"), 0)
+		l.sendFilePage(gm, 0, adminFile("movie/add_sequence.htm"), l.adminPage("movie/add_sequence.htm", true), 0)
 		return
 	}
 	id, ok := commons.ParseInt32(args[0])
@@ -253,7 +253,7 @@ func (l *GameClientLink) addSequence(gm *livePlayer, args []string) {
 // sendSequenceForm opens the edit form of shot s.
 func (l *GameClientLink) sendSequenceForm(gm *livePlayer, s movieShot) {
 	itoa := func(v int32) string { return strconv.Itoa(int(v)) }
-	html := fillPage(l.adminHTML("movie/edit_sequence.htm"),
+	html := fillPage(l.adminPage("movie/edit_sequence.htm", true),
 		"%sId%", itoa(s.id),
 		"%sDist%", itoa(s.shot.Distance),
 		"%sYaw%", itoa(s.shot.Yaw),

@@ -135,6 +135,6 @@ func (l *GameClientLink) sendBookmarks(gm *livePlayer, book *bookmark.Book, page
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_bk %page%")
-	html := strings.ReplaceAll(l.adminHTML("bk.htm"), "%content%", b.String())
+	html := strings.ReplaceAll(l.adminPage("bk.htm", true), "%content%", b.String())
 	l.sendFilePage(gm, 0, adminFile("bk.htm"), html, 0)
 }

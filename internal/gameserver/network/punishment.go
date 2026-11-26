@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -192,11 +191,7 @@ func (p *livePlayer) stopPunishTimer(save bool) {
 
 // sendPunishmentPage opens the page file for live.
 func (l *GameClientLink) sendPunishmentPage(live *livePlayer, file string) {
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
-	}
-	l.sendValidatedFile(live, 0, file, page, 0)
+	l.sendValidatedFile(live, 0, file, l.rawPage(file), 0)
 }
 
 // storePunishment writes live's punishment on its persistence lane.

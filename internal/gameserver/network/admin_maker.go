@@ -219,7 +219,7 @@ func (l *GameClientLink) sendMakersPage(gm *livePlayer, npcs *manager.Npcs, numb
 	}
 	pg.Links(&b, "bypass admin_maker %page%")
 	const file = "spawnlist/maker_check.htm"
-	l.sendFilePage(gm, 0, adminFile(file), fillPage(l.adminHTML(file), "%TERRITORIESLIST%", b.String()), 0)
+	l.sendFilePage(gm, 0, adminFile(file), fillPage(l.adminPage(file, true), "%TERRITORIESLIST%", b.String()), 0)
 }
 
 func containsTerritory(list []*spawn.Territory, t *spawn.Territory) bool {
@@ -249,7 +249,7 @@ func (l *GameClientLink) sendMakerPage(gm *livePlayer, m manager.MakerState) {
 		b.WriteString("</table>")
 		list = b.String()
 	}
-	page := fillPage(l.adminHTML("spawnlist/maker_info.htm"),
+	page := fillPage(l.adminPage("spawnlist/maker_info.htm", true),
 		"%TERRNAME%", territoryName(m.Territory),
 		"%BANTERRNAME%", territoryName(m.Banned),
 		"%MAKERNAME%", m.Maker.Name,
@@ -268,7 +268,7 @@ func (l *GameClientLink) sendMakerPage(gm *livePlayer, m manager.MakerState) {
 // sendMakerScriptsPage sends gm the scripts npcmaker m tells when its last
 // NPC is killed. No script listens for that, so the list is always empty.
 func (l *GameClientLink) sendMakerScriptsPage(gm *livePlayer, m manager.MakerState) {
-	page := fillPage(l.adminHTML("spawnlist/maker_scripts.htm"),
+	page := fillPage(l.adminPage("spawnlist/maker_scripts.htm", true),
 		"%MAKERNAME%", m.Maker.Name,
 		"%MAKERSPAWN%", m.Script,
 		"%MAKEREVENT%", m.Maker.EventName(),

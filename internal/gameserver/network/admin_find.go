@@ -185,7 +185,7 @@ func (l *GameClientLink) findPlayersByIP(gm *livePlayer, ip string) {
 	if found > adminFindIPShown {
 		number = "more than 20"
 	}
-	html := fillPage(l.adminHTML("ipfind.htm"), "%number%", number, "%ip%", ip, "%results%", b.String())
+	html := fillPage(l.adminPage("ipfind.htm", true), "%number%", number, "%ip%", ip, "%results%", b.String())
 	l.sendFilePage(gm, 0, adminFile("ipfind.htm"), html, 0)
 }
 
@@ -203,7 +203,7 @@ func (l *GameClientLink) findAccount(gm *livePlayer, name string) {
 	for i, c := range p.storage.accountChars {
 		others[i] = c.Name
 	}
-	html := fillPage(l.adminHTML("accountinfo.htm"), "%name%", name, "%characters%", strings.Join(others, "<br1>"), "%account%", p.AccountName())
+	html := fillPage(l.adminPage("accountinfo.htm", true), "%name%", name, "%characters%", strings.Join(others, "<br1>"), "%account%", p.AccountName())
 	l.sendFilePage(gm, 0, adminFile("accountinfo.htm"), html, 0)
 }
 
@@ -228,7 +228,7 @@ func (l *GameClientLink) findDualbox(gm *livePlayer, multibox int) {
 		// Each address shows the threshold it reached, not its count.
 		b.WriteString(`<a action="bypass -h admin_find ip ` + ip + `">` + ip + " (" + strconv.Itoa(multibox) + ")</a><br1>")
 	}
-	html := fillPage(l.adminHTML("dualbox.htm"), "%multibox%", strconv.Itoa(multibox), "%results%", b.String())
+	html := fillPage(l.adminPage("dualbox.htm", true), "%multibox%", strconv.Itoa(multibox), "%results%", b.String())
 	l.sendFilePage(gm, 0, adminFile("dualbox.htm"), html, 0)
 }
 

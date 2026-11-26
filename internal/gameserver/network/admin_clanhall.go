@@ -155,10 +155,7 @@ func (l *GameClientLink) adminClanHallSiege(gm *livePlayer, hallID int32, action
 // showAdminClanHall opens hall v's page for gm.
 func (l *GameClientLink) showAdminClanHall(gm *livePlayer, v clanhall.HallView) {
 	const file = "data/html/admin/clanhall.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("clanhall.htm", false)
 	owner := "None"
 	if v.OwnerID != 0 {
 		if cl, found := l.clanService().Table().Get(v.OwnerID); found {
@@ -204,10 +201,7 @@ func (l *GameClientLink) showAdminClanHall(gm *livePlayer, v clanhall.HallView) 
 // auction with its bid count, end date and minimum bid.
 func (l *GameClientLink) showAdminClanHalls(gm *livePlayer) {
 	const file = "data/html/admin/clanhalls.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("clanhalls.htm", false)
 	halls := l.halls.All()
 	var b strings.Builder
 	for _, town := range adminClanHallTowns {

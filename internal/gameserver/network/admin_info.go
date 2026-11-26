@@ -39,7 +39,7 @@ func (l *GameClientLink) adminInfo(gm *livePlayer, line string) {
 // and static object ids, and its class.
 func (l *GameClientLink) staticInfoPage(obj *staticobject.Object) string {
 	x, y, z := obj.Position()
-	return fillPage(l.adminHTML("staticinfo.htm"),
+	return fillPage(l.adminPage("staticinfo.htm", true),
 		"%x%", strconv.Itoa(x),
 		"%y%", strconv.Itoa(y),
 		"%z%", strconv.Itoa(z),

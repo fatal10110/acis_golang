@@ -207,7 +207,7 @@ func (l *GameClientLink) sendCursedWeaponsPage(gm *livePlayer) {
 		}
 		sb.WriteString("</table>")
 	}
-	page := strings.ReplaceAll(l.adminHTML("cwinfo.htm"), "%cwinfo%", sb.String())
+	page := strings.ReplaceAll(l.adminPage("cwinfo.htm", true), "%cwinfo%", sb.String())
 	l.sendFilePage(gm, 0, adminFile("cwinfo.htm"), page, 0)
 }
 
