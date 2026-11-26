@@ -84,7 +84,7 @@ func (h signetHandler) Use(cast Cast) {
 		return
 	}
 
-	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeSignetCastTime {
+	if cast.Skill.SkillType.Normalized() == modelskill.SkillTypeSignetCastTime {
 		h.useCasttime(cast)
 		return
 	}

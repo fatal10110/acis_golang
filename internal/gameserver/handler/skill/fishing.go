@@ -40,7 +40,7 @@ func (fishingSkillHandler) Use(cast Cast) {
 		return
 	}
 	cast.record(FishingAction{
-		Reeling: skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeReeling,
+		Reeling: cast.Skill.SkillType.Normalized() == modelskill.SkillTypeReeling,
 		Power:   cast.Skill.Power,
 		Level:   cast.Skill.Level,
 	})

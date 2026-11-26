@@ -26,5 +26,5 @@ func (craftHandler) Use(cast Cast) {
 		cast.record(CraftWhileOperatingMessage{})
 		return
 	}
-	cast.record(RecipeBookOpened{Dwarven: skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeDwarvenCraft})
+	cast.record(RecipeBookOpened{Dwarven: cast.Skill.SkillType.Normalized() == modelskill.SkillTypeDwarvenCraft})
 }

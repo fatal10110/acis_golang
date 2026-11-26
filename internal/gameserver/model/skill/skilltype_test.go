@@ -23,3 +23,16 @@ func TestParseSkillType(t *testing.T) {
 		t.Error(`KnownSkillType("SUMMON_FRIEND") = false, want true`)
 	}
 }
+
+func TestSkillTypeNormalized(t *testing.T) {
+	for in, want := range map[SkillType]SkillType{
+		"BUFF":          SkillTypeBuff,
+		" heal_static ": SkillTypeHealStatic,
+		"Pdam\t":        SkillTypePDam,
+		"":              "",
+	} {
+		if got := in.Normalized(); got != want {
+			t.Errorf("%q.Normalized() = %q, want %q", in, got, want)
+		}
+	}
+}

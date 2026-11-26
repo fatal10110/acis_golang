@@ -20,7 +20,7 @@ func (r *Registry) UseCubic(cast Cast, mAtk float64) (Result, bool) {
 	if r == nil {
 		return Result{}, false
 	}
-	switch skillTypeKey(cast.Skill.SkillType) {
+	switch cast.Skill.SkillType.Normalized() {
 	case modelskill.SkillTypeParalyze, modelskill.SkillTypeStun, modelskill.SkillTypeRoot, modelskill.SkillTypeAggDamage, modelskill.SkillTypeMDam, modelskill.SkillTypePoison, modelskill.SkillTypeDebuff, modelskill.SkillTypeDOT, modelskill.SkillTypeDrain:
 	default:
 		return r.UseResult(cast)
@@ -42,7 +42,7 @@ func (r *Registry) UseCubic(cast Cast, mAtk float64) (Result, bool) {
 }
 
 func (r *Registry) useCubicOn(cast Cast, target Creature, mAtk float64, result *Result) {
-	switch skillTypeKey(cast.Skill.SkillType) {
+	switch cast.Skill.SkillType.Normalized() {
 	case modelskill.SkillTypeParalyze, modelskill.SkillTypeStun, modelskill.SkillTypeRoot, modelskill.SkillTypeAggDamage:
 		cubicDisable(cast, target, mAtk)
 	case modelskill.SkillTypeMDam:
@@ -87,7 +87,7 @@ func cubicDisable(cast Cast, target Creature, mAtk float64) {
 	if !cubicLands(cast, target, mAtk, bss, shield) {
 		return
 	}
-	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeAggDamage && target.Attackable() {
+	if cast.Skill.SkillType.Normalized() == modelskill.SkillTypeAggDamage && target.Attackable() {
 		target.NotifyAggression(cast.Caster, int(150*float64(cast.Skill.Power)/float64(target.Level()+7)))
 	}
 	landCubicEffects(cast, target)

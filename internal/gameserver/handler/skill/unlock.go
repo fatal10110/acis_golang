@@ -73,7 +73,7 @@ func (unlockHandler) Use(cast Cast) {
 }
 
 func useOnDoor(cast Cast, target doorTarget) {
-	special := skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeUnlockSpecial
+	special := cast.Skill.SkillType.Normalized() == modelskill.SkillTypeUnlockSpecial
 	if !target.Unlockable() && !special {
 		cast.record(DoorUnlockUnableMessage{})
 		return
@@ -111,7 +111,7 @@ func useOnChest(cast Cast, target chestTarget) {
 	}
 
 	var opens bool
-	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeDeluxeKeyUnlock {
+	if cast.Skill.SkillType.Normalized() == modelskill.SkillTypeDeluxeKeyUnlock {
 		regular := int(cast.Skill.ID) == regularUnlockKeySkillID
 		rate := formulas.ChestUnlockDeluxeKeyRate(target.Level(), cast.Skill.Level, regular)
 		opens = rnd.Get(100) < rate

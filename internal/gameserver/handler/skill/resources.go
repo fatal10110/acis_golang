@@ -56,7 +56,7 @@ func (h healHandler) UseResult(cast Cast) Result {
 	}
 	// Heal's own discharge skips a static heal and a potion; any spend for
 	// those comes from the BUFF pass above.
-	if skillTypeKey(cast.Skill.SkillType) != modelskill.SkillTypeHealStatic && !cast.Skill.Potion {
+	if cast.Skill.SkillType.Normalized() != modelskill.SkillTypeHealStatic && !cast.Skill.Potion {
 		spendSpiritshot(cast, bsps)
 	}
 	return result
@@ -78,7 +78,7 @@ func (h healPercentHandler) Use(cast Cast) {
 
 func (h healPercentHandler) UseResult(cast Cast) Result {
 	result := h.buff.UseResult(cast)
-	isHP := skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeHealPercent
+	isHP := cast.Skill.SkillType.Normalized() == modelskill.SkillTypeHealPercent
 	for _, obj := range cast.Targets {
 		target, ok := asCreature(obj)
 		if !ok || !target.CanBeHealed() {
@@ -110,7 +110,7 @@ func (manaHealHandler) Use(cast Cast) {
 			continue
 		}
 		mp := float64(cast.Skill.Power)
-		if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeManaRecharge {
+		if cast.Skill.SkillType.Normalized() == modelskill.SkillTypeManaRecharge {
 			mp = target.RechargeMP(mp)
 		}
 		restored := target.AddMP(mp)

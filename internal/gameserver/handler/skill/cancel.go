@@ -19,7 +19,7 @@ func (cancelHandler) Types() []modelskill.SkillType {
 // non-debuff effects, then optionally refreshes the caster's own
 // self-targeted copy of this skill's effects.
 func (cancelHandler) Use(cast Cast) {
-	skillType := skillTypeKey(cast.Skill.SkillType)
+	skillType := cast.Skill.SkillType.Normalized()
 	minRate, maxRate := 25, 75
 	if skillType != modelskill.SkillTypeCancel {
 		minRate, maxRate = 40, 95

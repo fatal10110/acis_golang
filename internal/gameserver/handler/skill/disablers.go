@@ -40,7 +40,7 @@ func (disablersHandler) Types() []modelskill.SkillType {
 }
 
 func (disablersHandler) Use(cast Cast) {
-	skillType := skillTypeKey(cast.Skill.SkillType)
+	skillType := cast.Skill.SkillType.Normalized()
 	// Sampled before any target: this reading decides which spiritshot the
 	// cast spends at the end.
 	bsps := blessedSpiritshotCharged(cast.Caster)
@@ -187,7 +187,7 @@ func disableErase(cast Cast, target Creature, land landing) {
 // target, or the caster when the target reflects the skill back.
 func reflectTarget(cast Cast, target Creature) Creature {
 	in := target.SkillReflectInput(cast.Skill)
-	in.SkillType = skillTypeKey(cast.Skill.SkillType)
+	in.SkillType = cast.Skill.SkillType.Normalized()
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}
@@ -226,7 +226,7 @@ func disableMute(cast Cast, target Creature, land landing) {
 	if !land.lands(cast, effected, 1) {
 		return
 	}
-	stopSkillType(effected.EffectList(), skillTypeKey(cast.Skill.SkillType))
+	stopSkillType(effected.EffectList(), cast.Skill.SkillType.Normalized())
 	land.apply(cast, effected)
 }
 
@@ -242,7 +242,7 @@ func disableConfusion(cast Cast, target Creature, land landing) {
 	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
-	stopSkillType(target.EffectList(), skillTypeKey(cast.Skill.SkillType))
+	stopSkillType(target.EffectList(), cast.Skill.SkillType.Normalized())
 	land.apply(cast, target)
 }
 

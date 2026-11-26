@@ -72,7 +72,7 @@ func skillReflected(cast Cast, obj Actor) bool {
 		return false
 	}
 	in := src.SkillReflectInput(cast.Skill)
-	in.SkillType = skillTypeKey(cast.Skill.SkillType)
+	in.SkillType = cast.Skill.SkillType.Normalized()
 	return formulas.SkillReflects(in, rnd.Get(100))
 }
 
@@ -654,7 +654,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	if result == nil || failure == formulas.MagicFailureNone {
 		return
 	}
-	drain := skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeDrain
+	drain := cast.Skill.SkillType.Normalized() == modelskill.SkillTypeDrain
 	switch failure {
 	case formulas.MagicFailureHalf:
 		if drain {

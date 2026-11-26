@@ -570,7 +570,7 @@ func (t *skillTarget) NotifyCPRestored(name string, amount int, other bool) {
 func (t *skillTarget) HealInput(skill modelskill.Definition) (formulas.HealInput, bool) {
 	return formulas.HealInput{
 		Power:   t.healAmount,
-		Static:  skillTypeKey(skill.SkillType) == "HEAL_STATIC",
+		Static:  skill.SkillType.Normalized() == "HEAL_STATIC",
 		MAtk:    t.healMAtk,
 		Scaling: t.healScaling,
 	}, t.healOK

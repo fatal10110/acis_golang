@@ -1,7 +1,6 @@
 package skill
 
 import (
-	"strings"
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -616,7 +615,7 @@ func (r *Registry) Register(h Handler) {
 		r.entries = make(map[modelskill.SkillType]Handler)
 	}
 	for _, skillType := range h.Types() {
-		key := skillTypeKey(skillType)
+		key := skillType.Normalized()
 		if key != "" {
 			r.entries[key] = h
 		}
@@ -628,7 +627,7 @@ func (r *Registry) Handler(skillType modelskill.SkillType) (Handler, bool) {
 	if r == nil {
 		return nil, false
 	}
-	h, ok := r.entries[skillTypeKey(skillType)]
+	h, ok := r.entries[skillType.Normalized()]
 	return h, ok
 }
 
@@ -658,10 +657,6 @@ func (r *Registry) UseResult(cast Cast) (Result, bool) {
 	h.Use(cast)
 	reported.Messages = messages.pending
 	return reported, true
-}
-
-func skillTypeKey(skillType modelskill.SkillType) modelskill.SkillType {
-	return modelskill.SkillType(strings.ToUpper(strings.TrimSpace(string(skillType))))
 }
 
 type dummyHandler struct{}

@@ -32,7 +32,7 @@ func (h continuousHandler) Use(cast Cast) {
 func (h continuousHandler) UseResult(cast Cast) Result {
 	result := Result{messages: cast.messages}
 	def := h.effectSkill(cast.Skill)
-	skillType := skillTypeKey(def.SkillType)
+	skillType := def.SkillType.Normalized()
 	// The blessed-spiritshot charge is read once, before any target, and
 	// both the landing rolls and the end-of-cast discharge use that reading.
 	bsps := blessedSpiritshotCharged(cast.Caster)
@@ -141,7 +141,7 @@ func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Def
 // the caster when the target reflects the skill back.
 func (continuousHandler) reflectTarget(caster Creature, def modelskill.Definition, target Creature) Creature {
 	in := target.SkillReflectInput(def)
-	in.SkillType = skillTypeKey(def.SkillType)
+	in.SkillType = def.SkillType.Normalized()
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}

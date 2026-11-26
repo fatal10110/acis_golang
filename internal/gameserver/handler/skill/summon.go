@@ -75,7 +75,7 @@ func (summonFriendHandler) Use(cast Cast) {
 		return
 	}
 
-	if skillTypeKey(cast.Skill.SkillType) == modelskill.SkillTypeSummonParty {
+	if cast.Skill.SkillType.Normalized() == modelskill.SkillTypeSummonParty {
 		party, ok := cast.Caster.(summonPartyProvider)
 		if !ok {
 			return

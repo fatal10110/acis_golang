@@ -1,5 +1,7 @@
 package skill
 
+import "strings"
+
 // SkillType is a skill classification tag: a level's skillType or an
 // effect template's effectType. The loader accepts only the tags below
 // (see ParseSkillType), written in upper case; Go code compares through
@@ -238,4 +240,9 @@ func ParseSkillType(name string) (SkillType, bool) {
 func KnownSkillType(name string) bool {
 	_, ok := ParseSkillType(name)
 	return ok
+}
+
+// Normalized is t trimmed and upper-cased, the form the constants use.
+func (t SkillType) Normalized() SkillType {
+	return SkillType(strings.ToUpper(strings.TrimSpace(string(t))))
 }
