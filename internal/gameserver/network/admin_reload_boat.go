@@ -2,6 +2,8 @@ package network
 
 import (
 	"sync/atomic"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 )
 
 // reloadBoats reads the boat routes anew and replaces the fleet with them:
@@ -9,15 +11,9 @@ import (
 // where it stands, puts its passengers ashore at their town restart point
 // and leaves the world; then the docks are free and one boat per itinerary
 // read puts out, whether AllowBoat turned boats on at boot or not. Routes
-// that cannot be read leave the fleet as it was.
-//
-// Each passenger is put ashore on its own queue, the game master at once.
-// The old boats leave the world, and the new ones enter it, once the last
-// passenger is ashore: a passenger never sees its boat go before its own
-// teleport, and the docks see the old boats go before the new ones come.
-// then runs on gm's queue once the new boats are out: at once when no
-// passenger but gm was aboard, else posted there by the last oust, and
-// dropped when gm left the world meanwhile.
+// that cannot be read leave the fleet as it was. The routes are read on
+// gm's connection goroutine, which calls it, and the fleet replaced on gm's
+// queue (replaceFleet), which then runs on once the new boats are out.
 func (l *GameClientLink) reloadBoats(gm *livePlayer, then func()) error {
 	if l.reloads.BoatRoutes == nil || l.boats == nil || l.world == nil {
 		return errNoReloadHook
@@ -26,6 +22,19 @@ func (l *GameClientLink) reloadBoats(gm *livePlayer, then func()) error {
 	if err != nil {
 		return err
 	}
+	onLive(gm, func() { l.replaceFleet(gm, itineraries, then) })
+	return nil
+}
+
+// replaceFleet retires every boat and launches one per itinerary, on gm's
+// queue. Each passenger is put ashore on its own queue, the game master at
+// once. The old boats leave the world, and the new ones enter it, once the
+// last passenger is ashore: a passenger never sees its boat go before its
+// own teleport, and the docks see the old boats go before the new ones
+// come. then runs on gm's queue once the new boats are out: at once when no
+// passenger but gm was aboard, else posted there by the last oust, and
+// dropped when gm left the world meanwhile.
+func (l *GameClientLink) replaceFleet(gm *livePlayer, itineraries []route.BoatItinerary, then func()) {
 	retired, launch := l.boats.Retire()
 
 	// pending counts the ousts still to run, plus this call's own share,
@@ -76,7 +85,6 @@ func (l *GameClientLink) reloadBoats(gm *livePlayer, then func()) error {
 	if done() {
 		then()
 	}
-	return nil
 }
 
 // oustFromRetiredBoat puts live ashore at its town restart point if it

@@ -34,7 +34,7 @@ func (l *GameClientLink) wireZones(ix *zone.Index) {
 // battlefields; then every holder of the zone index sees the new zones at
 // once, and each creature leaves the zones it stood in and enters those
 // around it.
-func (l *GameClientLink) reloadZones() error {
+func (l *GameClientLink) reloadZones(ctx context.Context) error {
 	if l.reloads.Zones == nil || l.zones == nil {
 		return errNoReloadHook
 	}
@@ -48,7 +48,7 @@ func (l *GameClientLink) reloadZones() error {
 		return errors.New("zone reload read no zones")
 	}
 	handOverBossZones(l.zones, next)
-	l.saveBossPermissions()
+	l.saveBossPermissions(ctx)
 	l.wireZones(next)
 	l.sieges.Rebind(zone.OfKind[*zone.Siege](next))
 	l.halls.RebindBattlefields(zone.OfKind[*zone.Siege](next))
@@ -59,11 +59,11 @@ func (l *GameClientLink) reloadZones() error {
 
 // saveBossPermissions stores who may enter the current boss zones. A
 // failure is logged and the reload goes on.
-func (l *GameClientLink) saveBossPermissions() {
+func (l *GameClientLink) saveBossPermissions(ctx context.Context) {
 	if l.bossZones == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), reloadZonesTimeout)
+	ctx, cancel := context.WithTimeout(ctx, reloadZonesTimeout)
 	defer cancel()
 	if err := l.bossZones.SaveZones(ctx, zone.OfKind[*zone.Boss](l.zones)); err != nil {
 		l.log.Error().Err(err).Msg("admin: //reload zone could not save the boss zones")
