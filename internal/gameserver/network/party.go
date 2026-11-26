@@ -6,7 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 )
 
 // partyRegistry is the registry of the parties live players form.
@@ -96,12 +96,12 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 
 	// Either side may have become busy on another queue since the checks
 	// above; the invitation then asks no one, so the party stops waiting.
-	switch book.Invite(tradebook.KindParty, live.ObjectID(), target.ObjectID(), true).Status {
-	case tradebook.RequestRequesterBusy:
+	switch book.Invite(request.KindParty, live.ObjectID(), target.ObjectID(), true).Status {
+	case request.RequestRequesterBusy:
 		l.parties.CancelInvite(live.ObjectID())
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWaitingForAnotherReply))
 		return
-	case tradebook.RequestTargetBusy:
+	case request.RequestTargetBusy:
 		l.parties.CancelInvite(live.ObjectID())
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
@@ -114,7 +114,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 // invitation pending, or its inviter gone, nothing answers: the dialog
 // closed on the client when it answered.
 func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpackets.Response) {
-	requesterID, ok := l.tradeBook().TakeInvite(tradebook.KindParty, live.ObjectID())
+	requesterID, ok := l.tradeBook().TakeInvite(request.KindParty, live.ObjectID())
 	if !ok {
 		return
 	}

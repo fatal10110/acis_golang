@@ -110,7 +110,6 @@ func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(
 		if !ok {
 			return SaleResult{}, false, errNoIDAllocator
 		}
-		defer grant.release()
 		nextID = grant.next
 	}
 

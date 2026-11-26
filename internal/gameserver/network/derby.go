@@ -149,14 +149,13 @@ func (l *GameClientLink) derbyBypass(live *livePlayer, f *npc.Folk, command stri
 // live it was acquired and stores its lane's stake off the queue.
 func (l *GameClientLink) giveDerbyTicket(live *livePlayer, buy *derby.Purchase) {
 	inv := live.Inventory()
-	id, err := l.nextObjectID()
-	if err != nil || inv == nil {
-		l.log.Error().Err(err).Msg("derby: allocate race ticket")
+	if inv == nil {
+		l.log.Error().Msg("derby: allocate race ticket")
 		return
 	}
-	ticket := inv.AddNew(derby.TicketItemID, 1, id)
+	ticket, err := inv.AddCreated(derby.TicketItemID, 1, l.nextObjectID)
 	if ticket == nil {
-		l.log.Error().Msg("derby: create race ticket")
+		l.log.Error().Err(err).Msg("derby: create race ticket")
 		return
 	}
 	inv.SetEnchantLevel(ticket, buy.Race)

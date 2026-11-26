@@ -22,22 +22,16 @@ func spendAdena(live *livePlayer, count int) (*item.Instance, bool) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 		return nil, false
 	}
-	if count <= 0 {
-		return nil, true
+	paid, ok := inv.PayAdena(count)
+	if paid != nil {
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
 	}
-	paid := inv.DestroyByTemplateID(item.AdenaID, count)
-	if paid == nil {
-		return nil, false
-	}
-	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
-	return paid, true
+	return paid, ok
 }
 
 // takeAdena takes count adena from inv without a notice, reporting false,
 // taking none, when inv holds less. A count of 0 or less takes nothing.
 func takeAdena(inv *itemcontainer.Inventory, count int) bool {
-	if count > inv.Adena() {
-		return false
-	}
-	return count <= 0 || inv.DestroyByTemplateID(item.AdenaID, count) != nil
+	_, ok := inv.PayAdena(count)
+	return ok
 }

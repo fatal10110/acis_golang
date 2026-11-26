@@ -164,8 +164,9 @@ func payAdena(c *player.Character, price int) bool {
 		return true
 	}
 	inv := c.Inventory()
-	if inv == nil || inv.Adena() < price {
+	if inv == nil {
 		return false
 	}
-	return inv.DestroyByTemplateID(item.AdenaID, price) != nil
+	_, ok := inv.PayAdena(price)
+	return ok
 }

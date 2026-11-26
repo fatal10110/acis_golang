@@ -407,7 +407,6 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	if err != nil || !ok {
 		return TransferResult{}, false, err
 	}
-	defer id.release()
 
 	result, freedObjectID, freed, err := source.TransferItem(objectID, count, receiver, id.next)
 	if result == nil {
@@ -469,7 +468,6 @@ func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, che
 		if err != nil {
 			return
 		}
-		defer ids.release()
 		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, &ids) &&
 			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, &ids)
 	})
@@ -491,7 +489,6 @@ func (s *Service) takeExchangeIDs(n int) (exchangeIDs, error) {
 			err = errNoIDAllocator
 		}
 		if err != nil {
-			ids.release()
 			return exchangeIDs{}, err
 		}
 		ids.pool = append(ids.pool, id)
@@ -524,22 +521,6 @@ func (ids *exchangeIDs) late() bool {
 // use marks the id peek returned as spent.
 func (ids *exchangeIDs) use() {
 	ids.pool = ids.pool[1:]
-}
-
-// release gives back the ids no row spent; an allocator that cannot take
-// ids back keeps them.
-func (ids *exchangeIDs) release() {
-	if ids.s == nil {
-		return
-	}
-	// accepted: releasing ids is an optional allocator capability.
-	r, ok := ids.s.ids.(interface{ ReleaseID(int32) })
-	for _, id := range ids.pool {
-		if ok {
-			r.ReleaseID(id)
-		}
-	}
-	ids.pool = nil
 }
 
 // splitsAhead counts the rows that will split an instance into a receiver
@@ -706,7 +687,6 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	if err != nil || !ok {
 		return CrystallizeResult{}, CrystallizeNoop, err
 	}
-	defer grant.release()
 
 	if count > st.Count {
 		count = st.Count
@@ -802,19 +782,6 @@ func (g *grantID) next() (int32, error) {
 // created reports whether inst is the new instance next named.
 func (g *grantID) created(inst *item.Instance) bool {
 	return g.issued != 0 && inst != nil && inst.ObjectID == g.issued
-}
-
-// release gives back a reserved id the grant never used; an allocator that
-// cannot take ids back keeps it.
-func (g *grantID) release() {
-	if g.id == 0 {
-		return
-	}
-	// accepted: releasing ids is an optional allocator capability.
-	if r, ok := g.s.ids.(interface{ ReleaseID(int32) }); ok {
-		r.ReleaseID(g.id)
-	}
-	g.id = 0
 }
 
 func (s *Service) nextID() (int32, bool, error) {

@@ -31,7 +31,10 @@ func (s weddingSpouse) Pay(count int) bool {
 		return true
 	}
 	inv := s.Inventory()
-	if inv == nil || inv.DestroyByTemplateID(item.AdenaID, count) == nil {
+	if inv == nil {
+		return false
+	}
+	if _, ok := inv.PayAdena(count); !ok {
 		return false
 	}
 	s.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))

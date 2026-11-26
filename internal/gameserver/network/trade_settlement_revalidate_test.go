@@ -6,7 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -95,13 +95,13 @@ func TestCancelTradePartnerGoneCancelsCanceller(t *testing.T) {
 // readyTradeSession opens a trade between first and second and confirms it
 // on both sides the way handleTradeDone does, returning the ready session
 // Confirm has already taken out of the book.
-func readyTradeSession(t *testing.T, ctx context.Context, link *GameClientLink, first, second *livePlayer) tradebook.Session {
+func readyTradeSession(t *testing.T, ctx context.Context, link *GameClientLink, first, second *livePlayer) request.Session {
 	t.Helper()
 	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
 	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
 	link.handleTradeDone(ctx, second, clientpackets.TradeDone{Response: 1})
 	ready := link.trades.Confirm(first.ObjectID())
-	if ready.Status != tradebook.DoneReady {
+	if ready.Status != request.DoneReady {
 		t.Fatalf("Confirm status = %v, want ready", ready.Status)
 	}
 	return ready.Session
@@ -124,7 +124,7 @@ func TestSettleConfirmedTradeCancelsWhenOfferedScrollBecameSelected(t *testing.T
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: scrollID, Count: 3})
 	link.handleTradeDone(context.Background(), second, clientpackets.TradeDone{Response: 1})
 	ready := link.trades.Confirm(first.ObjectID())
-	if ready.Status != tradebook.DoneReady {
+	if ready.Status != request.DoneReady {
 		t.Fatalf("Confirm status = %v, want ready", ready.Status)
 	}
 	if n := len(ready.Session.FirstOffer.Items); n != 1 {

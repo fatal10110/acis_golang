@@ -168,13 +168,18 @@ type Purchase struct {
 // and adena. Then the limited items are taken off their stock in one step,
 // all or none, so a buyer who reached the last units first leaves the
 // other refused before it pays; the adena is taken, the stock
-// given back if it cannot be, and every item created. A purchase is never
+// given back if it cannot be, and every item created. The new items' object
+// ids are taken before anything else changes, so a purchase is never
 // charged for an item it does not get. A reload never lands between the
 // checks and the sale.
 func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []BuyRow, taxRate float64, gm bool) (Purchase, error) {
 	s.reloadMu.RLock()
 	defer s.reloadMu.RUnlock()
 	var subtotal, slots, weight int64
+	// newIDs counts the instances the rows create: each non-stackable item,
+	// and one stack of each stackable one the buyer does not hold.
+	newIDs := 0
+	newStacks := map[int32]bool{}
 	weightOverflow := false
 	var lots []Lot
 	lotOf := map[int32]int{}
@@ -230,8 +235,13 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		switch {
 		case !tmpl.Stackable:
 			slots += int64(row.Count)
+			newIDs++
 		case inv.ItemByTemplateID(row.ItemID) == nil:
 			slots++
+			if !newStacks[row.ItemID] {
+				newStacks[row.ItemID] = true
+				newIDs++
+			}
 		}
 	}
 	if weightOverflow {
@@ -246,6 +256,12 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 	if subtotal < 0 || subtotal > int64(inv.Adena()) {
 		return Purchase{Outcome: BuyNotEnoughAdena}, nil
 	}
+	// The new items' ids are taken before the stock and the adena, so that
+	// running out of ids refuses the purchase instead of charging for it.
+	ids, err := itemcontainer.ReserveIDs(newIDs, s.ids.NextID)
+	if err != nil {
+		return Purchase{}, err
+	}
 	if len(lots) > 0 && (s.stock == nil || !s.stock.Take(lots...)) {
 		return Purchase{}, nil
 	}
@@ -258,7 +274,7 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 
 	var errs []error
 	for _, row := range rows {
-		if _, err := inv.AddCreated(row.ItemID, int(row.Count), s.ids.NextID); err != nil {
+		if _, err := inv.AddCreated(row.ItemID, int(row.Count), ids.Next); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -342,8 +358,6 @@ func reduceAdena(inv *itemcontainer.Inventory, count int64) bool {
 	if count > int64(inv.Adena()) {
 		return false
 	}
-	if count > 0 {
-		return inv.DestroyByTemplateID(item.AdenaID, int(count)) != nil
-	}
-	return true
+	_, ok := inv.PayAdena(int(count))
+	return ok
 }
