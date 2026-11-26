@@ -38,7 +38,7 @@ const lidiaSelfCast = 4997
 func New() script.Script {
 	// damage is, per attacking clan, the damage it dealt Lidia this siege,
 	// each sum a counter the attacked hook adds to.
-	damage := &script.IntMapCell[*script.IntCell]{}
+	damage := &script.ClanDamage{}
 	base := script.Hooks{}.Named("ClanHallSiege")
 	return script.Script{
 		Dir: "siegablehall",
@@ -51,7 +51,7 @@ func New() script.Script {
 		},
 		BindHall: func(s *script.Script) {
 			s.BindHallSiege(fortressOfDead, script.HallSiegeHooks{
-				Winner: func(*script.Hall) int32 { return winner(s, damage) },
+				Winner: func(*script.Hall) int32 { return s.LiveClanID(damage.Top()) },
 				Start: func(h *script.Hall, b script.HallBase) {
 					// The siege must start at night.
 					if hoursLeft := s.GameHour(); hoursLeft < 0 || hoursLeft > 6 {
@@ -87,8 +87,7 @@ func New() script.Script {
 				}
 				if p := script.ActingPlayer(e.Attacker); p != nil {
 					if clanID := p.ClanID(); clanID != 0 && slices.Contains(h.Attackers(), clanID) {
-						counter, _ := damage.SetIfAbsent(clanID, &script.IntCell{})
-						counter.Add(int(e.Damage))
+						damage.Add(clanID, int(e.Damage))
 					}
 				}
 				if n := e.NPC; !n.InMyTerritory() {
@@ -142,28 +141,6 @@ func New() script.Script {
 			},
 		}),
 	}
-}
-
-// winner names the attacking clan that dealt Lidia the most damage, the
-// first in the map's walk order among equals, and forgets every clan's
-// damage; it is 0 when no clan dealt her any, or when that clan is gone.
-// The sums wrap as 32-bit ints.
-func winner(s *script.Script, damage *script.IntMapCell[*script.IntCell]) int32 {
-	entries := damage.Entries()
-	if len(entries) == 0 {
-		return 0
-	}
-	best := entries[0]
-	for _, e := range entries[1:] {
-		if int32(e.Value.Get()) > int32(best.Value.Get()) {
-			best = e
-		}
-	}
-	damage.Clear()
-	if clan := s.Clan(best.Key); clan != nil {
-		return clan.ID()
-	}
-	return 0
 }
 
 // private is one private Lidia raises: its NPC id, where it stands and the

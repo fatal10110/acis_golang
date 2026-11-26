@@ -7,10 +7,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 const (
-	dayMs = int64(24 * time.Hour / time.Millisecond)
 	// The steps towards a siege's start: the registrations close a day
 	// before it, then the calendar wakes 13,600,000 ms, ten minutes, five
 	// minutes and ten seconds before it.
@@ -47,7 +47,7 @@ func NextDate(castleID int, prev, now time.Time) time.Time {
 // startAutoTaskLocked sets the siege's calendar going at boot: a date
 // already passed is moved to the next one and stored, the calendar left
 // idle; any other date has its next step taken a second from now.
-func (s *Siege) startAutoTaskLocked(fx *effects) {
+func (s *Siege) startAutoTaskLocked(fx *sim.Effects) {
 	if s.castle.SiegeDate() < s.e.nowLocked().UnixMilli() {
 		s.saveSiegeLocked(fx, false)
 		return
@@ -58,7 +58,7 @@ func (s *Siege) startAutoTaskLocked(fx *effects) {
 // saveSiegeLocked sets the next siege date, opens its registrations and
 // its date to change, and stores it; when launch is set, the calendar then
 // takes its next step a second from now.
-func (s *Siege) saveSiegeLocked(fx *effects, launch bool) {
+func (s *Siege) saveSiegeLocked(fx *sim.Effects, launch bool) {
 	now := s.e.nowLocked()
 	next := NextDate(s.castle.ID, time.UnixMilli(s.castle.SiegeDate()), now)
 	s.castle.SetSiegeDate(next.UnixMilli())
@@ -115,7 +115,7 @@ func (s *Siege) DateMoved() {
 // 13,600,000 ms, ten minutes, five minutes and ten seconds before the
 // siege, and starts it once its date is reached.
 func (s *Siege) step(gen uint64) {
-	s.runLifecycle(func(fx *effects) {
+	s.runLifecycle(func(fx *sim.Effects) {
 		if s.startGen != gen {
 			return
 		}
@@ -124,13 +124,13 @@ func (s *Siege) step(gen uint64) {
 	})
 }
 
-func (s *Siege) stepLocked(fx *effects) {
+func (s *Siege) stepLocked(fx *sim.Effects) {
 	if s.status == StatusInProgress {
 		return
 	}
 	now := s.e.nowLocked().UnixMilli()
 	if !s.castle.IsTimeRegistrationOver() {
-		if remaining := s.castle.SiegeDate() - dayMs - now; remaining > 0 {
+		if remaining := s.castle.RegistrationsEnd() - now; remaining > 0 {
 			s.armStartLocked(time.Duration(remaining) * time.Millisecond)
 			return
 		}
@@ -139,8 +139,8 @@ func (s *Siege) stepLocked(fx *effects) {
 	remaining := s.castle.SiegeDate() - now
 	ms := func(v int64) time.Duration { return time.Duration(v) * time.Millisecond }
 	switch {
-	case remaining > dayMs:
-		s.armStartLocked(ms(remaining - dayMs))
+	case remaining > commons.DayMs:
+		s.armStartLocked(ms(remaining - commons.DayMs))
 	case remaining > registrationEndMs:
 		s.announceLocked(fx, castleMsg(MsgRegistrationTermEnded, s.castle.ID))
 		s.changeStatusLocked(fx, StatusRegistrationOver)
@@ -170,7 +170,7 @@ func (s *Siege) Start() { s.runLifecycle(s.startLocked) }
 // siege state, the castle's control towers work, its gates close, its
 // siege guards spawn, everyone is told and hears it start, the attackers
 // are told they are in a temporary alliance, and the siege clock runs.
-func (s *Siege) startLocked(fx *effects) {
+func (s *Siege) startLocked(fx *sim.Effects) {
 	if s.status == StatusInProgress {
 		return
 	}
@@ -190,7 +190,7 @@ func (s *Siege) startLocked(fx *effects) {
 		s.formerOwner = owner
 	}
 	s.changeStatusLocked(fx, StatusInProgress)
-	fx.add(func() {
+	fx.Add(func() {
 		s.withBattlefield(func(f *zone.Siege) {
 			f.BanishForeigners(owner)
 			f.SetActive(true)
@@ -202,7 +202,7 @@ func (s *Siege) startLocked(fx *effects) {
 	s.spawnGuardsLocked(fx)
 	s.announceLocked(fx, castleMsg(MsgSiegeStarted, castleID))
 	if n := s.e.notify; n != nil {
-		fx.add(func() { n.PlaySound(SoundSiegeStarted) })
+		fx.Add(func() { n.PlaySound(SoundSiegeStarted) })
 	}
 	s.tellLocked(fx, Message{ID: MsgTemporaryAlliance}, SideAttacker)
 	s.endsAt = s.e.nowLocked().Add(s.e.cfg.Length).UnixMilli()
@@ -214,7 +214,7 @@ func (s *Siege) startLocked(fx *effects) {
 // with: past the last hour it tells both sides the time left, an hour,
 // then 30, 10, 5 and 1 minutes, then each of the last ten seconds, and
 // ends the siege when its time is up.
-func (s *Siege) tickLocked(fx *effects, gen uint64) {
+func (s *Siege) tickLocked(fx *sim.Effects, gen uint64) {
 	if s.status != StatusInProgress || s.clockGen != gen {
 		return
 	}
@@ -258,7 +258,7 @@ func (s *Siege) armClockLocked(d time.Duration) {
 	}
 	gen := s.clockGen
 	s.clock = s.e.queue.After(max(d, 0), func() {
-		s.runLifecycle(func(fx *effects) { s.tickLocked(fx, gen) })
+		s.runLifecycle(func(fx *sim.Effects) { s.tickLocked(fx, gen) })
 	})
 }
 
@@ -278,7 +278,7 @@ func (s *Siege) End() { s.runLifecycle(s.endLocked) }
 // battlefield turns off. Last, the rulers engraved on the castle's
 // artifacts are wiped. Every registered clan loses its headquarters with
 // its counters.
-func (s *Siege) endLocked(fx *effects) {
+func (s *Siege) endLocked(fx *sim.Effects) {
 	if s.status != StatusInProgress {
 		return
 	}
@@ -294,7 +294,7 @@ func (s *Siege) endLocked(fx *effects) {
 	}
 	s.announceLocked(fx, castleMsg(MsgSiegeEnded, castleID))
 	if n := e.notify; n != nil {
-		fx.add(func() { n.PlaySound(SoundSiegeEnded) })
+		fx.Add(func() { n.PlaySound(SoundSiegeEnded) })
 	}
 	ownerID := s.castle.OwnerID()
 	owner, owned := e.clans.Get(ownerID)
@@ -303,7 +303,7 @@ func (s *Siege) endLocked(fx *effects) {
 		if former, ok := e.clans.Get(s.formerOwner); ok && s.formerOwner != ownerID {
 			if n := e.notify; n != nil {
 				c := s.castle
-				fx.add(func() { n.CastleTaken(c, owner, former) })
+				fx.Add(func() { n.CastleTaken(c, owner, former) })
 			}
 		}
 	} else {
@@ -316,14 +316,14 @@ func (s *Siege) endLocked(fx *effects) {
 	}
 	dropHeadquarters(fx, e.resolve(registered))
 	s.reputationLocked(fx, ownerID)
-	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
+	fx.Add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	s.siegeStatesLocked(fx, true)
 	s.saveSiegeLocked(fx, true)
 	s.clearAllLocked()
 	s.towersLocked(fx, Tower.UnpolymorphTower)
 	s.despawnGuardsLocked(fx)
 	s.respawnGatesLocked(fx, false)
-	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
+	fx.Add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
 	clear(s.engraved)
 }
 
@@ -331,7 +331,7 @@ func (s *Siege) endLocked(fx *effects) {
 // owner that lost the castle loses 1000 points and the new owner, if any,
 // gains 1000; a former owner that held it gains 500; with no former owner,
 // the clan that took the castle from the NPCs gains 1000.
-func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
+func (s *Siege) reputationLocked(fx *sim.Effects, ownerID int32) {
 	n := s.e.notify
 	if n == nil {
 		return
@@ -340,16 +340,16 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 	former, hadFormer := s.e.clans.Get(s.formerOwner)
 	switch {
 	case hadFormer && s.formerOwner != ownerID:
-		fx.add(func() { n.Reputation(former, -reputationWon, numberMsg(MsgClanDefeatedLostReputation, reputationWon)) })
+		fx.Add(func() { n.Reputation(former, -reputationWon, numberMsg(MsgClanDefeatedLostReputation, reputationWon)) })
 		if owned {
-			fx.add(func() { n.Reputation(owner, reputationWon, numberMsg(MsgClanVictoriousGainReputation, reputationWon)) })
+			fx.Add(func() { n.Reputation(owner, reputationWon, numberMsg(MsgClanVictoriousGainReputation, reputationWon)) })
 		}
 	case hadFormer:
-		fx.add(func() {
+		fx.Add(func() {
 			n.Reputation(former, reputationHeld, numberMsg(MsgClanVictoriousGainReputation, reputationHeld))
 		})
 	case owned:
-		fx.add(func() { n.Reputation(owner, reputationWon, numberMsg(MsgClanVictoriousGainReputation, reputationWon)) })
+		fx.Add(func() { n.Reputation(owner, reputationWon, numberMsg(MsgClanVictoriousGainReputation, reputationWon)) })
 	}
 }
 
@@ -366,7 +366,7 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 // siege state.
 func (s *Siege) MidVictory() { s.runLifecycle(s.midVictoryLocked) }
 
-func (s *Siege) midVictoryLocked(fx *effects) {
+func (s *Siege) midVictoryLocked(fx *sim.Effects) {
 	if s.status != StatusInProgress {
 		return
 	}
@@ -396,10 +396,10 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 			}
 		}
 	}
-	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
+	fx.Add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	dropHeadquarters(fx, defenders)
 	c := s.castle
-	fx.add(func() {
+	fx.Add(func() {
 		c.RemoveDoorUpgrades()
 		c.RemoveTrapUpgrades()
 	})
@@ -410,8 +410,8 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 
 // dropHeadquarters takes each of clans' siege headquarters out of the
 // world.
-func dropHeadquarters(fx *effects, clans []*clan.Clan) {
-	fx.add(func() {
+func dropHeadquarters(fx *sim.Effects, clans []*clan.Clan) {
+	fx.Add(func() {
 		for _, cl := range clans {
 			cl.DropHeadquarters()
 		}
@@ -421,7 +421,7 @@ func dropHeadquarters(fx *effects, clans []*clan.Clan) {
 // siegeStatesLocked gives the members in the world of the attacking clans
 // the attacker state and those of the owning and defending clans the
 // defender state, or clears both when clear is set.
-func (s *Siege) siegeStatesLocked(fx *effects, clear bool) {
+func (s *Siege) siegeStatesLocked(fx *sim.Effects, clear bool) {
 	n := s.e.notify
 	if n == nil {
 		return
@@ -432,23 +432,23 @@ func (s *Siege) siegeStatesLocked(fx *effects, clear bool) {
 	if clear {
 		attack, defend = StateNone, StateNone
 	}
-	fx.add(func() {
+	fx.Add(func() {
 		n.SetSiegeState(attackers, attack)
 		n.SetSiegeState(defenders, defend)
 	})
 }
 
 // announceLocked tells every player in the world m.
-func (s *Siege) announceLocked(fx *effects, m Message) {
+func (s *Siege) announceLocked(fx *sim.Effects, m Message) {
 	if n := s.e.notify; n != nil {
-		fx.add(func() { n.Announce(m) })
+		fx.Add(func() { n.Announce(m) })
 	}
 }
 
 // tellLocked tells m to the members of the clans on each of sides in
 // turn: SideAttacker for the attackers, SideDefender for the owner and the
 // defenders.
-func (s *Siege) tellLocked(fx *effects, m Message, sides ...Side) {
+func (s *Siege) tellLocked(fx *sim.Effects, m Message, sides ...Side) {
 	n := s.e.notify
 	if n == nil {
 		return
@@ -463,7 +463,7 @@ func (s *Siege) tellLocked(fx *effects, m Message, sides ...Side) {
 		default:
 			continue
 		}
-		fx.add(func() { n.TellClans(clans, m) })
+		fx.Add(func() { n.TellClans(clans, m) })
 	}
 }
 

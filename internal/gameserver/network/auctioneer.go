@@ -523,7 +523,7 @@ func (l *GameClientLink) showSelectedItems(live *livePlayer, f *npc.Folk, cl *cl
 // clanAdena is the adena in the warehouse of the clan clanID, which
 // auctioneerBypass found in memory, 0 when its clan was dissolved since.
 func (l *GameClientLink) clanAdena(clanID int32) int {
-	wh := l.clanWarehouses.restored(clanID)
+	wh := l.clanWarehouses.Restored(clanID)
 	if wh == nil {
 		return 0
 	}

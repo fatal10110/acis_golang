@@ -44,26 +44,14 @@ func addMonths(t time.Time, n int) time.Time {
 	return first.AddDate(0, 0, min(t.Day(), last)-1)
 }
 
-// siegeEffects are a step's world effects, run in order once the halls'
-// locks are released.
-type siegeEffects []func()
-
-func (fx *siegeEffects) add(f func()) { *fx = append(*fx, f) }
-
-func (fx siegeEffects) run() {
-	for _, f := range fx {
-		f()
-	}
-}
-
 // decide runs step deciding under the halls' mu, then runs the world
 // effects it decided with no lock held.
-func (hs *Halls) decide(step func(fx *siegeEffects)) {
-	var fx siegeEffects
+func (hs *Halls) decide(step func(fx *sim.Effects)) {
+	var fx sim.Effects
 	hs.mu.Lock()
 	step(&fx)
 	hs.mu.Unlock()
-	fx.run()
+	fx.Run()
 }
 
 // runStep runs a step of s, serialized with every other step: the
@@ -219,7 +207,7 @@ func (s *HallSiege) script() *SiegeScript {
 // attackers and the hall is remembered as owned, the hall is freed, the
 // players of every clan are thrown out of its grounds, everyone is told and
 // the siege starts after delay.
-func (hs *Halls) prepareLocked(h *hall, fx *siegeEffects, delay time.Duration) {
+func (hs *Halls) prepareLocked(h *hall, fx *sim.Effects, delay time.Duration) {
 	st := h.siege
 	owned := h.ownerID > 0
 	_, ownerIsClan := hs.clans.Get(h.ownerID)
@@ -244,7 +232,7 @@ func (hs *Halls) prepareLocked(h *hall, fx *siegeEffects, delay time.Duration) {
 // turns on, the attackers' members in the world take the attacker state,
 // the siege is under way, the script spawns its NPCs and the siege ends
 // once its length has passed.
-func (hs *Halls) startLocked(h *hall, fx *siegeEffects) {
+func (hs *Halls) startLocked(h *hall, fx *sim.Effects) {
 	st := h.siege
 	id := h.id()
 	if len(st.attackers) == 0 && id != FortressOfResistance {
@@ -257,14 +245,14 @@ func (hs *Halls) startLocked(h *hall, fx *siegeEffects) {
 	s := &HallSiege{hs: hs, h: h}
 	hs.respawnDoorsLocked(h, fx)
 	hs.banishLocked(h, fx, -1)
-	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(true) }) })
+	fx.Add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(true) }) })
 	if n := hs.siegeNotify; n != nil {
 		attackers := hs.resolveClans(st.attackers)
-		fx.add(func() { n.SetSiegeState(attackers, siege.StateAttacker) })
+		fx.Add(func() { n.SetSiegeState(attackers, siege.StateAttacker) })
 	}
 	hs.setSiege(func() { st.status = siege.StatusInProgress })
 	if sc := st.script; sc.SpawnNPCs != nil {
-		fx.add(sc.SpawnNPCs)
+		fx.Add(sc.SpawnNPCs)
 	}
 	hs.armEndLocked(h, time.Duration(h.data.SiegeLength)*time.Millisecond)
 }
@@ -278,7 +266,7 @@ func (hs *Halls) startLocked(h *hall, fx *siegeEffects) {
 // world their siege state, the players still on the battlefield are
 // flagged, the attackers are dropped, the registrations open again for the
 // next siege and the script takes its NPCs away.
-func (hs *Halls) endLocked(h *hall, fx *siegeEffects, winnerID int32) {
+func (hs *Halls) endLocked(h *hall, fx *sim.Effects, winnerID int32) {
 	st := h.siege
 	id := h.id()
 	s := &HallSiege{hs: hs, h: h}
@@ -291,7 +279,7 @@ func (hs *Halls) endLocked(h *hall, fx *siegeEffects, winnerID int32) {
 	}
 	hs.announceLocked(fx, siege.Message{ID: MsgSiegeFinished, CastleID: int(id)})
 	hs.setSiege(func() { st.accomplished = false })
-	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
+	fx.Add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
 	hs.updateNextSiegeLocked(h)
 	hs.respawnDoorsLocked(h, fx)
 	hs.banishLocked(h, fx, h.ownerID)
@@ -299,19 +287,19 @@ func (hs *Halls) endLocked(h *hall, fx *siegeEffects, winnerID int32) {
 	hs.armPrepareLocked(h)
 	hs.setSiege(func() { st.status = siege.StatusRegistrationOpened })
 	if sc := st.script; sc.UnspawnNPCs != nil {
-		fx.add(sc.UnspawnNPCs)
+		fx.Add(sc.UnspawnNPCs)
 	}
 }
 
 // releaseAttackersLocked lets h's attackers go: each loses its
 // headquarters and its members in the world their siege state, the players
 // still on the battlefield are flagged and the attackers are dropped.
-func (hs *Halls) releaseAttackersLocked(h *hall, fx *siegeEffects) {
+func (hs *Halls) releaseAttackersLocked(h *hall, fx *sim.Effects) {
 	st := h.siege
 	s := &HallSiege{hs: hs, h: h}
 	n := hs.siegeNotify
 	for _, cl := range hs.resolveClans(st.attackers) {
-		fx.add(func() {
+		fx.Add(func() {
 			cl.DropHeadquarters()
 			if n != nil {
 				n.SetSiegeState([]*clan.Clan{cl}, siege.StateNone)
@@ -320,7 +308,7 @@ func (hs *Halls) releaseAttackersLocked(h *hall, fx *siegeEffects) {
 	}
 	if n != nil {
 		id, owner := h.id(), h.ownerID
-		fx.add(func() { s.withBattlefield(func(f *zone.Siege) { n.FlagPvP(f, id, owner) }) })
+		fx.Add(func() { s.withBattlefield(func(f *zone.Siege) { n.FlagPvP(f, id, owner) }) })
 	}
 	hs.setSiege(func() {
 		st.attackers = nil
@@ -338,25 +326,25 @@ func (hs *Halls) updateNextSiegeLocked(h *hall) {
 
 // banishLocked throws every player not of clan clanID out of h's grounds,
 // everyone for -1.
-func (hs *Halls) banishLocked(h *hall, fx *siegeEffects, clanID int32) {
+func (hs *Halls) banishLocked(h *hall, fx *sim.Effects, clanID int32) {
 	if g := hs.grounds; g != nil {
 		id := h.id()
-		fx.add(func() { g.BanishForeigners(id, clanID) })
+		fx.Add(func() { g.BanishForeigners(id, clanID) })
 	}
 }
 
 // respawnDoorsLocked stands h's doors again at full HP, closed.
-func (hs *Halls) respawnDoorsLocked(h *hall, fx *siegeEffects) {
+func (hs *Halls) respawnDoorsLocked(h *hall, fx *sim.Effects) {
 	if n := hs.siegeNotify; n != nil && len(h.data.Gates) > 0 {
 		gates := h.data.Gates
-		fx.add(func() { n.RespawnDoors(gates, false) })
+		fx.Add(func() { n.RespawnDoors(gates, false) })
 	}
 }
 
 // announceLocked tells every player in the world m.
-func (hs *Halls) announceLocked(fx *siegeEffects, m siege.Message) {
+func (hs *Halls) announceLocked(fx *sim.Effects, m siege.Message) {
 	if n := hs.siegeNotify; n != nil {
-		fx.add(func() { n.Announce(m) })
+		fx.Add(func() { n.Announce(m) })
 	}
 }
 

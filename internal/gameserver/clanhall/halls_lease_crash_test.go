@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
@@ -50,7 +51,7 @@ func TestLeasePaymentSurvivesACrashAnywhere(t *testing.T) {
 
 	n := len(log.writes)
 	end := log.replay(base, n)
-	if got, want := end.halls[crashHall].PaidUntil, base.halls[crashHall].PaidUntil+weekMs; got != want || end.adena[crashSellers] != 700 {
+	if got, want := end.halls[crashHall].PaidUntil, base.halls[crashHall].PaidUntil+commons.WeekMs; got != want || end.adena[crashSellers] != 700 {
 		t.Fatalf("after the payment: paid until %d with %d adena, want %d with 700", got, end.adena[crashSellers], want)
 	}
 	restartAt := loop.Now().Add(time.Minute)
@@ -110,7 +111,7 @@ func TestLeasePaymentWhoseAdenaFailsToLandStoresNoTerm(t *testing.T) {
 	h := hs.byID[crashHall]
 	paidUntil, paid := h.paidUntil, h.paid
 	hs.mu.Unlock()
-	if want := base.halls[crashHall].PaidUntil + weekMs; paidUntil != want || !paid {
+	if want := base.halls[crashHall].PaidUntil + commons.WeekMs; paidUntil != want || !paid {
 		t.Fatalf("live term paid until %d (paid %v), want %d and paid", paidUntil, paid, want)
 	}
 }

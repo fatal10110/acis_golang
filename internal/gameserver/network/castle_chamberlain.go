@@ -1,7 +1,6 @@
 package network
 
 import (
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -230,20 +229,17 @@ func (d chamberlainDialog) manageVault(val string, rest []string) bool {
 	}
 	file := "vault.htm"
 	if amount > 0 {
-		d.c.Purchase(func() {
-			switch {
-			case strings.EqualFold(val, "deposit"):
-				if d.c.Treasury()+int64(amount) < math.MaxInt32 && reduceAdena(d.live, amount) {
-					d.c.EditTreasury(int64(amount), true)
-				}
-			case strings.EqualFold(val, "withdraw"):
-				if d.c.Treasury() < int64(amount) {
-					file = "vault-no.htm"
-				} else if d.c.EditTreasury(-int64(amount), true) {
-					d.live.AddRewardItem(item.AdenaID, amount, false, d.l.nextObjectID)
-				}
+		switch {
+		case strings.EqualFold(val, "deposit"):
+			d.c.Deposit(amount, d.pay)
+		case strings.EqualFold(val, "withdraw"):
+			enough, paid := d.c.Withdraw(amount)
+			if !enough {
+				file = "vault-no.htm"
+			} else if paid {
+				d.live.AddRewardItem(item.AdenaID, amount, false, d.l.nextObjectID)
 			}
-		})
+		}
 	}
 	d.send(file,
 		"%tax_income%", commons.FormatNumber(d.c.Treasury()),
@@ -386,19 +382,14 @@ func (d chamberlainDialog) siegeChange() {
 // siege; siegetime2.htm once the date is closed to change; "" while the
 // date is open to change.
 func (d chamberlainDialog) siegeDateClosedPage() string {
-	const dayMs = int64(24 * time.Hour / time.Millisecond)
 	switch {
-	case d.c.SiegeDate()-dayMs < d.l.sieges.Now().UnixMilli():
+	case d.c.RegistrationsEnd() < d.l.sieges.Now().UnixMilli():
 		return "siegetime1.htm"
 	case d.c.IsTimeRegistrationOver():
 		return "siegetime2.htm"
 	}
 	return ""
 }
-
-// siegeHourKept is the "siege_time_set 1 <hour>" choice that keeps the
-// siege at its default hour: the hour less 12.
-const siegeHourKept = 6
 
 // siegeTimeSet answers "siege_time_set 1 <hour>", which moves the siege to
 // 12 hours past hour, closing the date to change, and the siege's calendar
@@ -417,7 +408,7 @@ func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 	if !ok {
 		return false
 	}
-	hour := siegeHourKept
+	hour := castle.SiegeHourKept
 	if choice == 1 {
 		if len(rest) == 0 {
 			return false
@@ -430,12 +421,12 @@ func (d chamberlainDialog) siegeTimeSet(val string, rest []string) bool {
 		d.sendFile(page)
 		return true
 	}
-	if hour == siegeHourKept {
+	if hour == castle.SiegeHourKept {
 		d.sendFile("siegetime6.htm")
 		return true
 	}
 	// Another talker may have closed the date since the check above.
-	if !d.c.SetSiegeHour(hour + 12) {
+	if !d.c.SetSiegeHourChoice(hour) {
 		d.sendFile("siegetime2.htm")
 		return true
 	}
@@ -472,27 +463,37 @@ func (d chamberlainDialog) certificates(buy bool) {
 	if !d.allowed(clan.PrivCastleFunctions) {
 		return
 	}
-	d.c.Purchase(func() {
-		file, left := "not-dawn-or-event.htm", d.c.LeftCertificates()
-		switch {
-		case !d.r.SealValidation, d.l.sevenSigns != nil && d.l.sevenSigns.PlayerCabal(d.live.ObjectID()) == sevensigns.Dusk:
-		case left == 0:
+	file, left := "not-dawn-or-event.htm", 0
+	switch {
+	case !d.r.SealValidation, d.l.sevenSigns != nil && d.l.sevenSigns.PlayerCabal(d.live.ObjectID()) == sevensigns.Dusk:
+	case !buy:
+		file, left = "sell-dawn-ticket.htm", d.c.LeftCertificates()
+		if left == 0 {
 			file = "not-enough-ticket.htm"
-		case !buy:
-			file = "sell-dawn-ticket.htm"
-		case reduceAdena(d.live, certificateBundle*certificatePrice):
-			d.live.AddCreatedItem(sevensigns.CertificateOfApprovalID, certificateBundle, d.l.nextObjectID)
-			file, left = "sell-dawn-ticket.htm", d.c.TakeCertificates(certificateBundle)
-		default:
+		}
+	default:
+		var out castle.PurchaseOutcome
+		out, left = d.c.BuyCertificates(certificateBundle, certificateBundle*certificatePrice, d.pay)
+		switch out {
+		case castle.PurchaseNoneLeft:
+			file = "not-enough-ticket.htm"
+		case castle.PurchaseShortOfAdena:
 			file = "not-enough-adena.htm"
+		default:
+			d.live.AddCreatedItem(sevensigns.CertificateOfApprovalID, certificateBundle, d.l.nextObjectID)
+			file = "sell-dawn-ticket.htm"
 		}
-		pairs := []string{"%objectId%", objID(d.f)}
-		if file == "sell-dawn-ticket.htm" {
-			pairs = append([]string{"%left%", strconv.Itoa(left), "%bundle%", strconv.Itoa(certificateBundle), "%price%", strconv.Itoa(certificatePrice)}, pairs...)
-		}
-		d.sendRaw(file, pairs...)
-	})
+	}
+	pairs := []string{"%objectId%", objID(d.f)}
+	if file == "sell-dawn-ticket.htm" {
+		pairs = append([]string{"%left%", strconv.Itoa(left), "%bundle%", strconv.Itoa(certificateBundle), "%price%", strconv.Itoa(certificatePrice)}, pairs...)
+	}
+	d.sendRaw(file, pairs...)
 }
+
+// pay takes adena from the talker for a castle purchase, reporting false
+// when it holds less.
+func (d chamberlainDialog) pay(adena int) bool { return reduceAdena(d.live, adena) }
 
 // doorsUpdate opens the gate upgrade page <npcId>-gu.htm, or with a gate
 // and its type doors-update.htm naming both.
@@ -570,19 +571,14 @@ func (d chamberlainDialog) doorsConfirmUpgrade(val string, rest []string) bool {
 	if !d.gateOfClass(val, gateType) {
 		return true
 	}
-	d.c.Purchase(func() {
-		current, ok := d.c.GateUpgradeRatio(id)
-		switch {
-		case !ok:
-		case current >= ratio:
-			d.send("doors-already-updated.htm", "%level%", strconv.Itoa(current*100))
-		case !reduceAdena(d.live, price):
-			d.send("not-enough-adena.htm")
-		default:
-			d.c.UpgradeDoor(id, ratio, true)
-			d.send("doors-success.htm")
-		}
-	})
+	switch out, current := d.c.BuyGateUpgrade(id, ratio, price, d.pay); out {
+	case castle.PurchaseAlreadyUpgraded:
+		d.send("doors-already-updated.htm", "%level%", strconv.Itoa(current*100))
+	case castle.PurchaseShortOfAdena:
+		d.send("not-enough-adena.htm")
+	case castle.PurchaseDone:
+		d.send("doors-success.htm")
+	}
 	return true
 }
 
@@ -669,22 +665,17 @@ func (d chamberlainDialog) trapsConfirmUpgrade(val string, rest []string) bool {
 	if !ok {
 		return false
 	}
-	aborted := false
-	d.c.Purchase(func() {
-		current, ok := d.c.TrapUpgrade(index)
-		switch {
-		case !ok:
-			aborted = true
-		case current >= level:
-			d.send("traps-already-updated.htm", "%level%", strconv.Itoa(current))
-		case !reduceAdena(d.live, price):
-			d.send("not-enough-adena.htm")
-		default:
-			d.c.SetTrapUpgrade(index, level, true)
-			d.send("traps-success.htm")
-		}
-	})
-	return !aborted
+	switch out, current := d.c.BuyTrapUpgrade(index, level, price, d.pay); out {
+	case castle.PurchaseUnknown:
+		return false
+	case castle.PurchaseAlreadyUpgraded:
+		d.send("traps-already-updated.htm", "%level%", strconv.Itoa(current))
+	case castle.PurchaseShortOfAdena:
+		d.send("not-enough-adena.htm")
+	case castle.PurchaseDone:
+		d.send("traps-success.htm")
+	}
+	return true
 }
 
 // banishFromCastleGrounds throws every player who is not a member of the

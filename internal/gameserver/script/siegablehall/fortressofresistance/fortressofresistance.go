@@ -41,7 +41,7 @@ func ddMagicLevel1() skill.Ref { return skill.Ref{ID: ddMagic, Level: 1} }
 func New() script.Script {
 	// damage is, per clan, the damage it dealt Nurka this siege, each sum a
 	// counter the attacked hook adds to.
-	damage := &script.IntMapCell[*script.IntCell]{}
+	damage := &script.ClanDamage{}
 	base := script.Hooks{}.Named("ClanHallSiege")
 	return script.Script{
 		Dir: "siegablehall",
@@ -56,7 +56,7 @@ func New() script.Script {
 		},
 		BindHall: func(s *script.Script) {
 			s.BindHallSiege(fortressOfResistance, script.HallSiegeHooks{
-				Winner: func(*script.Hall) int32 { return winner(s, damage) },
+				Winner: func(*script.Hall) int32 { return s.LiveClanID(damage.Top()) },
 				SpawnNPCs: func(h *script.Hall) {
 					s.Spawner().StartSpawnTime(spawnTime(h), "21")
 				},
@@ -84,8 +84,7 @@ func New() script.Script {
 				}
 				if p := script.ActingPlayer(e.Attacker); p != nil {
 					if clanID := p.ClanID(); clanID != 0 {
-						counter, _ := damage.SetIfAbsent(clanID, &script.IntCell{})
-						counter.Add(int(e.Damage))
+						damage.Add(clanID, int(e.Damage))
 					}
 				}
 				base.Attacked(s, e)
@@ -130,26 +129,4 @@ func spawnTime(h *script.Hall) string {
 		return "agit_attack_warfare_start"
 	}
 	return "agit_defend_warfare_start"
-}
-
-// winner names the clan that dealt Nurka the most damage, the first in the
-// map's walk order among equals, and forgets every clan's damage; it is 0
-// when no clan dealt him any, or when that clan is gone. The sums wrap as
-// 32-bit ints.
-func winner(s *script.Script, damage *script.IntMapCell[*script.IntCell]) int32 {
-	entries := damage.Entries()
-	if len(entries) == 0 {
-		return 0
-	}
-	best := entries[0]
-	for _, e := range entries[1:] {
-		if int32(e.Value.Get()) > int32(best.Value.Get()) {
-			best = e
-		}
-	}
-	damage.Clear()
-	if clan := s.Clan(best.Key); clan != nil {
-		return clan.ID()
-	}
-	return 0
 }

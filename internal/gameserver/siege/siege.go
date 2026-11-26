@@ -231,7 +231,7 @@ type Siege struct {
 	// pending are the life-cycle steps' world effects decided and not yet
 	// run, in the order they were decided; draining is set while a
 	// goroutine runs them (see runLifecycle).
-	pending  effects
+	pending  sim.Effects
 	draining bool
 
 	// watchers are called with each status the siege changes to, in the
@@ -749,26 +749,14 @@ func (s *Siege) write(what string, fn func(context.Context, Store) error) {
 	}
 }
 
-// effects are the calls a change makes once the engine's lock is
-// released, in order.
-type effects []func()
-
-func (fx *effects) add(fn func()) { *fx = append(*fx, fn) }
-
-func (fx effects) run() {
-	for _, fn := range fx {
-		fn()
-	}
-}
-
 // runLifecycle decides one of the siege's life-cycle steps with decide,
 // under the engine's lock, then runs the world effects it queued in the
 // order the steps were decided: a step decided while another step's
 // effects still run has its effects run after them, by the goroutine
 // already running them, so its own call may return before they ran. A
 // step's effects never run while the engine's lock is held.
-func (s *Siege) runLifecycle(decide func(fx *effects)) {
-	var fx effects
+func (s *Siege) runLifecycle(decide func(fx *sim.Effects)) {
+	var fx sim.Effects
 	s.e.mu.Lock()
 	decide(&fx)
 	s.pending = append(s.pending, fx...)
@@ -804,6 +792,6 @@ func (s *Siege) drain() {
 			return
 		}
 		s.e.mu.Unlock()
-		batch.run()
+		batch.Run()
 	}
 }

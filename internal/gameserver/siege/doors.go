@@ -4,6 +4,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // swoopCannonID is the anti-infantry siege summon, which neither damages a
@@ -97,46 +98,46 @@ func (s *Siege) DoorBroken(wall bool) {
 	if wall {
 		id = MsgCastleWallDamaged
 	}
-	var fx effects
+	var fx sim.Effects
 	s.e.mu.Lock()
 	if s.status == StatusInProgress {
 		s.tellLocked(&fx, Message{ID: id}, SideDefender)
 	}
 	s.e.mu.Unlock()
-	fx.run()
+	fx.Run()
 }
 
 // closeGatesLocked closes the castle's gates.
-func (s *Siege) closeGatesLocked(fx *effects) {
+func (s *Siege) closeGatesLocked(fx *sim.Effects) {
 	n, gates := s.e.notify, s.castle.Gates
 	if n == nil || len(gates) == 0 {
 		return
 	}
-	fx.add(func() { n.CloseDoors(gates) })
+	fx.Add(func() { n.CloseDoors(gates) })
 }
 
 // respawnGatesLocked stands the castle's gates again, closed, at full HP or
 // at half of it when weak.
-func (s *Siege) respawnGatesLocked(fx *effects, weak bool) {
+func (s *Siege) respawnGatesLocked(fx *sim.Effects, weak bool) {
 	n, gates := s.e.notify, s.castle.Gates
 	if n == nil || len(gates) == 0 {
 		return
 	}
-	fx.add(func() { n.RespawnDoors(gates, weak) })
+	fx.Add(func() { n.RespawnDoors(gates, weak) })
 }
 
 // spawnGuardsLocked spawns the castle's siege guards.
-func (s *Siege) spawnGuardsLocked(fx *effects) {
+func (s *Siege) spawnGuardsLocked(fx *sim.Effects) {
 	if n := s.e.notify; n != nil {
 		c := s.castle
-		fx.add(func() { n.SpawnGuards(c) })
+		fx.Add(func() { n.SpawnGuards(c) })
 	}
 }
 
 // despawnGuardsLocked deletes the castle's siege guards.
-func (s *Siege) despawnGuardsLocked(fx *effects) {
+func (s *Siege) despawnGuardsLocked(fx *sim.Effects) {
 	if n := s.e.notify; n != nil {
 		c := s.castle
-		fx.add(func() { n.DespawnGuards(c) })
+		fx.Add(func() { n.DespawnGuards(c) })
 	}
 }

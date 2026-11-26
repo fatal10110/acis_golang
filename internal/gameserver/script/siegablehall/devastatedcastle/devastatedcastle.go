@@ -58,7 +58,7 @@ func level1(id skill.ID) skill.Ref { return skill.Ref{ID: id, Level: 1} }
 func New() script.Script {
 	// damage is, per attacking clan, the damage it dealt Gustav this
 	// siege, each sum a counter the attacked hook adds to.
-	damage := &script.IntMapCell[*script.IntCell]{}
+	damage := &script.ClanDamage{}
 	// speller is the last healer or buffer whose spell Dietrich saw.
 	speller := &script.PlayerCell{}
 	base := script.Hooks{}.Named("ClanHallSiege")
@@ -75,7 +75,7 @@ func New() script.Script {
 		},
 		BindHall: func(s *script.Script) {
 			s.BindHallSiege(devastatedCastle, script.HallSiegeHooks{
-				Winner: func(*script.Hall) int32 { return winner(s, damage) },
+				Winner: func(*script.Hall) int32 { return s.LiveClanID(damage.Top()) },
 				SpawnNPCs: func(*script.Hall) {
 					s.Spawner().StartSpawnTime("agit_defend_warfare_start", "34")
 				},
@@ -107,8 +107,7 @@ func New() script.Script {
 				}
 				if p := script.ActingPlayer(e.Attacker); p != nil {
 					if clanID := p.ClanID(); clanID != 0 && slices.Contains(h.Attackers(), clanID) {
-						counter, _ := damage.SetIfAbsent(clanID, &script.IntCell{})
-						counter.Add(int(e.Damage))
+						damage.Add(clanID, int(e.Damage))
 					}
 				}
 				base.Attacked(s, e)
@@ -196,28 +195,6 @@ func escapeOnce(called, watched *script.NPC, line string) {
 		called.AddCastDesire(called, level1(escape), 1000000)
 		called.Say(line)
 	}
-}
-
-// winner names the clan that dealt Gustav the most damage, the first in
-// the map's walk order among equals, and forgets every clan's damage; it
-// is 0 when no clan dealt him any, or when that clan is gone. The sums
-// wrap as 32-bit ints.
-func winner(s *script.Script, damage *script.IntMapCell[*script.IntCell]) int32 {
-	entries := damage.Entries()
-	if len(entries) == 0 {
-		return 0
-	}
-	best := entries[0]
-	for _, e := range entries[1:] {
-		if int32(e.Value.Get()) > int32(best.Value.Get()) {
-			best = e
-		}
-	}
-	damage.Clear()
-	if clan := s.Clan(best.Key); clan != nil {
-		return clan.ID()
-	}
-	return 0
 }
 
 // private is one private Gustav raises: its NPC id and where it stands.

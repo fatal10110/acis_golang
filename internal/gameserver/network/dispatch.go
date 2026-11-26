@@ -408,7 +408,7 @@ type GameClientLink struct {
 	castles          *castle.Manager
 	castleManor      *castlemanor.Manager
 	sieges           *siege.Engine
-	clanWarehouses   clanWarehouseBook
+	clanWarehouses   invops.ClanWarehouses
 	flow             characterFlow
 	belongings       belongings
 	enchanting       enchanting

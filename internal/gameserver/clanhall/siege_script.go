@@ -27,12 +27,12 @@ func (b SiegeBase) Siege() *HallSiege { return b.s }
 // freed, everyone is thrown out of its grounds, everyone is told and the
 // siege starts after delay.
 func (b SiegeBase) Prepare(delay time.Duration) {
-	b.s.hs.decide(func(fx *siegeEffects) { b.s.hs.prepareLocked(b.s.h, fx, delay) })
+	b.s.hs.decide(func(fx *sim.Effects) { b.s.hs.prepareLocked(b.s.h, fx, delay) })
 }
 
 // Start runs the base start of the siege (see startLocked).
 func (b SiegeBase) Start() {
-	b.s.hs.decide(func(fx *siegeEffects) { b.s.hs.startLocked(b.s.h, fx) })
+	b.s.hs.decide(func(fx *sim.Effects) { b.s.hs.startLocked(b.s.h, fx) })
 }
 
 // End runs the base end of the siege, the script naming the winner first
@@ -42,7 +42,7 @@ func (b SiegeBase) End() {
 	if sc := b.s.script(); sc != nil && sc.Winner != nil {
 		winner = sc.Winner()
 	}
-	b.s.hs.decide(func(fx *siegeEffects) { b.s.hs.endLocked(b.s.h, fx, winner) })
+	b.s.hs.decide(func(fx *sim.Effects) { b.s.hs.endLocked(b.s.h, fx, winner) })
 }
 
 // The operations below are the parts a script's own steps are made of. None
@@ -170,18 +170,18 @@ func (s *HallSiege) ClearAttackers() {
 // its members in the world their siege state, the players still on the
 // battlefield are flagged and the attackers are dropped, and stored.
 func (s *HallSiege) ReleaseAttackers() {
-	s.hs.decide(func(fx *siegeEffects) { s.hs.releaseAttackersLocked(s.h, fx) })
+	s.hs.decide(func(fx *sim.Effects) { s.hs.releaseAttackersLocked(s.h, fx) })
 }
 
 // RespawnDoors stands the hall's doors again at full HP, closed.
 func (s *HallSiege) RespawnDoors() {
-	s.hs.decide(func(fx *siegeEffects) { s.hs.respawnDoorsLocked(s.h, fx) })
+	s.hs.decide(func(fx *sim.Effects) { s.hs.respawnDoorsLocked(s.h, fx) })
 }
 
 // BanishForeigners throws the players of other clans than the owner's out
 // of the hall's grounds.
 func (s *HallSiege) BanishForeigners() {
-	s.hs.decide(func(fx *siegeEffects) { s.hs.banishLocked(s.h, fx, s.h.ownerID) })
+	s.hs.decide(func(fx *sim.Effects) { s.hs.banishLocked(s.h, fx, s.h.ownerID) })
 }
 
 // SetBattlefieldActive turns the siege's battlefield on or off.
@@ -191,16 +191,16 @@ func (s *HallSiege) SetBattlefieldActive(on bool) {
 
 // Announce tells every player in the world m.
 func (s *HallSiege) Announce(m siege.Message) {
-	s.hs.decide(func(fx *siegeEffects) { s.hs.announceLocked(fx, m) })
+	s.hs.decide(func(fx *sim.Effects) { s.hs.announceLocked(fx, m) })
 }
 
 // TellClans tells m to the members in the world of each of clanIDs still a
 // clan, clan by clan.
 func (s *HallSiege) TellClans(clanIDs []int32, m siege.Message) {
-	s.hs.decide(func(fx *siegeEffects) {
+	s.hs.decide(func(fx *sim.Effects) {
 		if n := s.hs.siegeNotify; n != nil {
 			clans := s.hs.resolveClans(clanIDs)
-			fx.add(func() { n.TellClans(clans, m) })
+			fx.Add(func() { n.TellClans(clans, m) })
 		}
 	})
 }
