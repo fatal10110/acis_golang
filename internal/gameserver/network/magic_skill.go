@@ -26,7 +26,7 @@ import (
 // up; the ground request carries no such gate, so a confused player may still
 // cast a ground skill.
 func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
-	if live == nil || liveOutOfControl(live) {
+	if liveOutOfControl(live) {
 		sendMagicActionFailed(live)
 		return
 	}

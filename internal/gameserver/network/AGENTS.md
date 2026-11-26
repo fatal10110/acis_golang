@@ -25,7 +25,7 @@ Inbound frames dispatch through the registries in `client_dispatch.go`: `newGame
 opcode byte, `newGameExInbound` the Extended sub-opcode. A new packet is one `register(...)` line
 (`registerCapped` for an item-list request with the per-packet cap, `registerFrame` only for a
 handler that reads the raw frame) plus one handler method; wrap a handler that acts on the player
-in the world with `whenLive`. The adapter owns the decode policy (short frame disconnects pre-auth
+in the world with `whenLive` (`whenLiveCtx` when it needs the connection's context). The adapter owns the decode policy (short frame disconnects pre-auth
 or past the underflow threshold, any other decode error drops the frame), so handlers never repeat
 it. Allow a new opcode byte for its states in `allowedOpcodes` (`state.go`); an Extended
 sub-opcode needs no gate entry because it rides on `OpcodeExtended`.
