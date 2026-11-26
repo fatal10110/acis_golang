@@ -11,7 +11,6 @@ import (
 	"context"
 	"slices"
 	"sync"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -19,17 +18,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// taskTimeout bounds one database write.
-const taskTimeout = 10 * time.Second
-
 // winnerCount is how many players Winners returns.
 const winnerCount = 100
-
-// writeLane is the persistence owner every raid point write is queued
-// under: one lane keeps the writes in the order the points changed, so a
-// later total never lands before an earlier one, and no player's saves wait
-// behind them.
-const writeLane = persist.ServiceOwner
 
 // Row is one stored character_raid_points row.
 type Row struct {
@@ -212,22 +202,11 @@ func (p *Points) recordOf(objectID int32) *record {
 	return r
 }
 
-// writeLocked queues fn on the raid points' persistence lane while p.mu is
-// held, or runs it at once without a writer. Each write gets taskTimeout.
+// writeLocked queues fn on the game-wide services' persistence lane while
+// p.mu is held, or runs it at once without a writer. One lane keeps the
+// writes in the order the points changed, so a later total never lands
+// before an earlier one.
 func (p *Points) writeLocked(what string, fn func(context.Context, Store) error) {
-	store, log := p.store, p.log
-	job := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
-		defer cancel()
-		if err := fn(ctx, store); err != nil {
-			log.Error().Err(err).Msg("raid points: " + what)
-		}
-	}
-	if p.writes == nil {
-		job()
-		return
-	}
-	if !p.writes.Enqueue(writeLane, job) {
-		log.Error().Msg("raid points: " + what + ": write dropped")
-	}
+	store := p.store
+	persist.ServiceWrite(p.writes, p.log, "raid points: "+what, func(ctx context.Context) error { return fn(ctx, store) })
 }

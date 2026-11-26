@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 )
 
@@ -74,7 +75,7 @@ func TestCleanUpQueuesBehindEarlierTotals(t *testing.T) {
 	if len(writes.lanes) != 1 {
 		t.Fatalf("writes on %d lanes, want one", len(writes.lanes))
 	}
-	for _, job := range writes.lanes[writeLane] {
+	for _, job := range writes.lanes[persist.ServiceOwner] {
 		job()
 	}
 	if want := []string{"save 7 25001 10", "clear", "save 7 25001 3"}; !slices.Equal(store.ops, want) {

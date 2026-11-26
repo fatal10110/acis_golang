@@ -4,8 +4,6 @@ import (
 	"slices"
 	"sync"
 	"time"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // Player is a duellist as a duel reads and drives it. Its standing is the
@@ -207,9 +205,7 @@ func disturbed[P Player](p, opponent P) bool {
 	if p.DuelState() == Interrupted || p.PvPFlagged() || p.InDuelBlockedZone() {
 		return true
 	}
-	px, py, pz := p.Position()
-	ox, oy, oz := opponent.Position()
-	return !location.In3DRadius(px, py, pz, ox, oy, oz, Range)
+	return !InRange(p, opponent)
 }
 
 // Surrender gives up the duel p is in, for p's whole side: the side is

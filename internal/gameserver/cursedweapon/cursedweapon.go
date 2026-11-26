@@ -40,9 +40,6 @@ const (
 // HolderKarma is the karma a holder carries while it holds a weapon.
 const HolderKarma = 9999999
 
-// taskTimeout bounds one database write.
-const taskTimeout = 10 * time.Second
-
 // writeLane is the persistence lane every cursed_weapons write is queued
 // on, so they land in the order the weapons changed, and no player's saves
 // wait behind them.
@@ -820,19 +817,13 @@ func (m *Manager) writeLocked(what string, fn func(context.Context, Store) error
 }
 
 // writeOnLocked queues fn on lane while mu is held, or runs it at once
-// without a writer. Each write gets taskTimeout.
+// without a writer.
 func (m *Manager) writeOnLocked(lane int32, what string, fn func(context.Context, Store) error) {
 	if m.store == nil {
 		return
 	}
 	store, log := m.store, m.log
-	job := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
-		defer cancel()
-		if err := fn(ctx, store); err != nil {
-			log.Error().Err(err).Msg("cursed weapons: " + what)
-		}
-	}
+	job := persist.ServiceJob(log, "cursed weapons: "+what, func(ctx context.Context) error { return fn(ctx, store) })
 	if m.writes == nil {
 		job()
 		return

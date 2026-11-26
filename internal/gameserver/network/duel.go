@@ -42,7 +42,7 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 		live.SendFrame(serverpackets.FrameSystemMessageString(reason, target.CharacterName()))
 		return
 	}
-	if !inDuelRange(live, target) {
+	if !duel.InRange(live, target) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CannotReceiveDuelTooFar, target.CharacterName()))
 		return
 	}
@@ -171,7 +171,7 @@ func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpack
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageUnableToRequestDuel))
 		return
 	}
-	if !inDuelRange(requester, live) {
+	if !duel.InRange(requester, live) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CannotReceiveDuelTooFar, requester.CharacterName()))
 		return
 	}
@@ -198,27 +198,40 @@ func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpack
 // naming p, that tells why.
 func (l *GameClientLink) duelRefusal(p *livePlayer) (msg int, ok bool) {
 	res := p.ResourceValues()
-	switch {
-	case p.InCombat() || p.Jailed():
-		return serverpackets.SystemMessageS1CannotDuelInBattle, false
-	case p.AlikeDead() || res.CurrentHP < res.MaxHP*0.5 || res.CurrentMP < res.MaxMP*0.5:
-		return serverpackets.SystemMessageS1CannotDuelHPOrMPBelowHalf, false
-	case p.InDuel():
-		return serverpackets.SystemMessageS1CannotDuelAlreadyDuelling, false
-	case p.OlympiadMode():
-		return serverpackets.SystemMessageS1CannotDuelOlympiad, false
-	case p.CursedWeaponEquipped() || p.Karma() != 0 || p.PvPFlagged():
-		return serverpackets.SystemMessageS1CannotDuelChaotic, false
-	case p.Operating():
-		return serverpackets.SystemMessageS1CannotDuelPrivateStore, false
-	case p.Mounted() || p.InBoat():
-		return serverpackets.SystemMessageS1CannotDuelRiding, false
-	case p.Fishing():
-		return serverpackets.SystemMessageS1CannotDuelFishing, false
-	case duelProhibitedArea(p):
-		return serverpackets.SystemMessageS1CannotDuelProhibitedArea, false
+	refusal := duel.CanDuel(duel.Candidate{
+		InCombat:       p.InCombat(),
+		Jailed:         p.Jailed(),
+		AlikeDead:      p.AlikeDead(),
+		CurrentHP:      res.CurrentHP,
+		MaxHP:          res.MaxHP,
+		CurrentMP:      res.CurrentMP,
+		MaxMP:          res.MaxMP,
+		InDuel:         p.InDuel(),
+		InOlympiad:     p.OlympiadMode(),
+		Chaotic:        p.CursedWeaponEquipped() || p.Karma() != 0 || p.PvPFlagged(),
+		Operating:      p.Operating(),
+		Riding:         p.Mounted() || p.InBoat(),
+		Fishing:        p.Fishing(),
+		ProhibitedArea: duelProhibitedArea(p),
+	})
+	if refusal == duel.Eligible {
+		return 0, true
 	}
-	return 0, true
+	return duelRefusalMessages[refusal], false
+}
+
+// duelRefusalMessages is the message, naming the player, that tells each
+// duel refusal.
+var duelRefusalMessages = [...]int{
+	duel.RefusedInBattle:        serverpackets.SystemMessageS1CannotDuelInBattle,
+	duel.RefusedHPOrMPBelowHalf: serverpackets.SystemMessageS1CannotDuelHPOrMPBelowHalf,
+	duel.RefusedAlreadyDuelling: serverpackets.SystemMessageS1CannotDuelAlreadyDuelling,
+	duel.RefusedOlympiad:        serverpackets.SystemMessageS1CannotDuelOlympiad,
+	duel.RefusedChaotic:         serverpackets.SystemMessageS1CannotDuelChaotic,
+	duel.RefusedPrivateStore:    serverpackets.SystemMessageS1CannotDuelPrivateStore,
+	duel.RefusedRiding:          serverpackets.SystemMessageS1CannotDuelRiding,
+	duel.RefusedFishing:         serverpackets.SystemMessageS1CannotDuelFishing,
+	duel.RefusedProhibitedArea:  serverpackets.SystemMessageS1CannotDuelProhibitedArea,
 }
 
 // duelProhibitedArea reports whether p stands where no duel may be fought:
@@ -228,14 +241,6 @@ func duelProhibitedArea(p *livePlayer) bool {
 		return true
 	}
 	return p.zoneActor != nil && p.zoneActor.ZoneFlags().Has(zone.FlagNoRestart)
-}
-
-// inDuelRange reports whether a and b stand within duel.Range of each
-// other.
-func inDuelRange(a, b *livePlayer) bool {
-	ax, ay, az := a.Position()
-	bx, by, bz := b.Position()
-	return location.In3DRadius(ax, ay, az, bx, by, bz, duel.Range)
 }
 
 // duelCondition is what a duel saved of one of its players when it began,
