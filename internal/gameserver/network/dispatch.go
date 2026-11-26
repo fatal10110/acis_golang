@@ -1,7 +1,6 @@
 package network
 
 import (
-	"cmp"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -841,6 +840,32 @@ type GameClientLinkConfig struct {
 	LoginStatus *LoginStatus
 }
 
+// missingService names the first domain service cfg leaves out that the link
+// has no stand-in for, or "" when every one is set.
+func (cfg *GameClientLinkConfig) missingService() string {
+	for _, s := range []struct {
+		name    string
+		missing bool
+	}{
+		{"Relations", cfg.Relations == nil},
+		{"Petitions", cfg.Petitions == nil},
+		{"Forums", cfg.Forums == nil},
+		{"Favorites", cfg.Favorites == nil},
+		{"SchemeBuffer", cfg.SchemeBuffer == nil},
+		{"Wedding", cfg.Wedding == nil},
+		{"FishingChampionship", cfg.FishingChampionship == nil},
+		{"Lottery", cfg.Lottery == nil},
+		{"Announcements", cfg.Announcements == nil},
+		{"Fences", cfg.Fences == nil},
+		{"Clans", cfg.Clans == nil},
+	} {
+		if s.missing {
+			return s.name
+		}
+	}
+	return ""
+}
+
 // NewGameClientLink builds a GameClientLink from its collaborators.
 // loginLink returns the game server's current link to the login server, or
 // nil while disconnected/reconnecting: session validation fails clients
@@ -851,6 +876,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	if cfg.Effects.Activity == nil {
 		return nil, errors.New("network: GameClientLinkConfig.Effects.Activity is required")
+	}
+	if name := cfg.missingService(); name != "" {
+		return nil, fmt.Errorf("network: GameClientLinkConfig.%s is required", name)
 	}
 	link := &GameClientLink{
 		clients:       NewClientRegistry(),
@@ -911,12 +939,12 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		rooms:            partymatch.NewRegistry[*livePlayer](),
 		duels:            duel.NewManager[*livePlayer](),
-		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
+		relations:        cfg.Relations,
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
 		characterEdits:   cfg.CharacterEdits,
 		punishments:      cfg.Punishments,
-		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
+		petitions:        cfg.Petitions,
 		flow:             newCharacterFlow(cfg.Flow),
 		belongings:       newBelongings(cfg.Belongings),
 		enchanting:       newEnchanting(cfg),
@@ -974,48 +1002,20 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.augment = newAugmentService(cfg)
 	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, forums: cfg.Forums, favorites: cfg.Favorites, serverNews: cfg.ShowServerNews}
-	if link.board.forums == nil {
-		link.board.forums = bbs.NewForums(nil, nil, cfg.Log)
-	}
-	if link.board.favorites == nil {
-		link.board.favorites = bbs.NewFavorites(nil, nil, cfg.Log)
-	}
 	link.schemeBuffer = cfg.SchemeBuffer
 	link.derby = cfg.Derby
 	link.boats = cfg.Boats
-	if link.schemeBuffer == nil {
-		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
-	}
 	link.wedding = cfg.Wedding
-	if link.wedding == nil {
-		ids, _ := cfg.IDs.(wedding.IDs)
-		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil, cfg.TradeClock)
-	}
 	link.fishChamp = cfg.FishingChampionship
-	if link.fishChamp == nil {
-		link.fishChamp = fishchamp.New(fishchamp.Config{}, nil, nil, cfg.Queues.NewQueue("fishchamp"), cfg.Log)
-	}
 	link.lottery = cfg.Lottery
 	link.hallFunctions = cfg.ClanHallFunctions
 	link.halls = cfg.ClanHalls
-	if link.lottery == nil {
-		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
-	}
 	link.announcements = cfg.Announcements
-	if link.announcements == nil {
-		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
-	}
 	link.fences = cfg.Fences
-	if link.fences == nil && cfg.World != nil && cfg.IDs != nil {
-		link.fences = fence.NewManager(engine.New(), cfg.World, cfg.IDs)
-	}
 	link.clans = cfg.Clans
 	link.castles = cfg.Castles
 	link.castleManor = cfg.CastleManor
 	link.sieges = cfg.Sieges
-	if link.clans == nil {
-		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
-	}
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID, link.clans)
 	if link.roster != nil {
 		clans, couples, schemes := link.clans, link.wedding, link.schemeBuffer

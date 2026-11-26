@@ -2651,6 +2651,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	quests.bindResidences(worldObjects, gclConfig.Castles, o.clanHallData, gclConfig.Sieges, halls, gclConfig.Clans.Table())
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
 	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
+	fillLinkStandIns(&gclConfig, queues, o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)

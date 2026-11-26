@@ -84,7 +84,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	sevenSigns.Start()
 	t.Cleanup(func() { sevenSigns.Stop(context.Background()) })
 	roster := gamemanager.NewRoster(chars, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl, err := NewGameClientLink(GameClientLinkConfig{
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{
 		Flow: CharacterFlowConfig{Validator: validator, PlayerClock: playerClock},
 		Belongings: BelongingsConfig{
 			Items:            items,
@@ -113,9 +113,6 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		Effects:       effect.Env{Activity: task.NewEffects()},
 		Log:           zerolog.Nop(),
 	})
-	if err != nil {
-		t.Fatalf("new game client link: %v", err)
-	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
