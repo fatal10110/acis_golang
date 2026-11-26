@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -10,13 +11,6 @@ import (
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-)
-
-// The clan skills are the skill ids from firstClanSkillID to
-// lastClanSkillID, each at its highest level.
-const (
-	firstClanSkillID = 370
-	lastClanSkillID  = 391
 )
 
 // adminClanSkillPageLimit is how many skills a page of //clan_skill shows.
@@ -128,7 +122,7 @@ func (l *GameClientLink) adminClanSkillSet(leader *livePlayer, cl *clan.Clan, ne
 	if !ok {
 		return usage, false
 	}
-	if id < firstClanSkillID || id > lastClanSkillID || level < 1 || level > 3 || l.skills == nil {
+	if !slices.Contains(l.clanSkillIDs(), modelskill.ID(id)) || level < 1 || level > 3 || l.skills == nil {
 		return usage, true
 	}
 	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: int(level)})
@@ -230,13 +224,28 @@ func (l *GameClientLink) replyAdminClanSkills(gm, leader *livePlayer, cl *clan.C
 	})
 }
 
-// clanSkillCatalog returns every clan skill at its highest level, by id.
+// clanSkillIDs returns the distinct skill ids of the clan skill tree, in
+// ascending order.
+func (l *GameClientLink) clanSkillIDs() []modelskill.ID {
+	if l.skillTrees == nil {
+		return nil
+	}
+	ids := make([]modelskill.ID, 0, len(l.skillTrees.Clan))
+	for _, node := range l.skillTrees.Clan {
+		ids = append(ids, node.ID)
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids)
+}
+
+// clanSkillCatalog returns every clan skill of the clan skill tree at its
+// highest level, by id.
 func (l *GameClientLink) clanSkillCatalog() []modelskill.Definition {
 	if l.skills == nil {
 		return nil
 	}
 	var out []modelskill.Definition
-	for id := modelskill.ID(firstClanSkillID); id <= lastClanSkillID; id++ {
+	for _, id := range l.clanSkillIDs() {
 		if def, ok := l.skills.Definition(modelskill.Ref{ID: id, Level: l.skills.MaxLevel(id)}); ok {
 			out = append(out, *def)
 		}
