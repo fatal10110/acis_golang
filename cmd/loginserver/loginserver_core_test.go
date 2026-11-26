@@ -95,10 +95,3 @@ MaxConnections = 16
 		t.Errorf("Database.MaxConnections = %d, want 16", cfg.Database.MaxConnections)
 	}
 }
-
-func TestListenAddressWildcard(t *testing.T) {
-	got := listenAddress("*", 2106)
-	if got != ":2106" {
-		t.Fatalf("listenAddress wildcard = %q, want :2106", got)
-	}
-}

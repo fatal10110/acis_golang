@@ -1116,7 +1116,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		return gameServerConfig{}, err
 	}
 	return gameServerConfig{
-		ListenAddr:   listenAddress(listenHost, listenPort),
+		ListenAddr:   netutil.ListenAddress(listenHost, listenPort),
 		AcceptFilter: acceptFilter,
 		LoginAddr:    net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
 		Auth: network.LoginServerAuth{
@@ -1135,12 +1135,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 				Pvp:          &pvpServer,
 			},
 		},
-		Database: db.Config{
-			URL:            serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
-			Login:          serverProps.String("Login", "root"),
-			Password:       serverProps.String("Password", ""),
-			MaxConnections: maxConnections,
-		},
+		Database:            config.Database(serverProps, maxConnections),
 		AllowCursedWeapons:  serverProps.Bool("AllowCursedWeapons", true),
 		AllowWater:          serverProps.Bool("AllowWater", true),
 		AllowBoat:           serverProps.Bool("AllowBoat", true),
@@ -1151,19 +1146,6 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		// after the request, not at a calendar-day boundary.
 		CharacterDeleteAfter: time.Duration(deleteCharAfterDays) * 24 * time.Hour,
 	}, nil
-}
-
-// listenAddress returns the game listener address for GameserverHostname:
-// "*" binds every address and an empty host binds the loopback address
-// only. A host name stays as written; gameBindAddress resolves it at bind.
-func listenAddress(host string, port int) string {
-	switch host {
-	case "*":
-		host = ""
-	case "":
-		host = "127.0.0.1"
-	}
-	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 func provideGroundItemOptions(props *config.Properties) (task.GroundItemOptions, error) {

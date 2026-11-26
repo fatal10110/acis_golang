@@ -28,11 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pool, err := db.Open(db.Config{
-		URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
-		Login:    props.String("Login", "root"),
-		Password: props.String("Password", ""),
-	})
+	pool, err := db.Open(config.Database(props, 0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -94,7 +90,7 @@ func run(ctx context.Context, in io.Reader, out io.Writer, store *sql.AccountSto
 			if !ok {
 				return sc.Err()
 			}
-			login = storedLogin(ctx, store, strings.ToLower(v))
+			login = storedLogin(ctx, store, model.NormalizeLogin(v))
 
 			if mode == "1" {
 				if v, ok = ask("Password: "); !ok {

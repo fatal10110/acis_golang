@@ -47,11 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pool, err := db.Open(db.Config{
-		URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
-		Login:    props.String("Login", "root"),
-		Password: props.String("Password", ""),
-	})
+	pool, err := db.Open(config.Database(props, 0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

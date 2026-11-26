@@ -1,6 +1,5 @@
 package model
 
-
 // GameServer is a registered game server row.
 type GameServer struct {
 	ID    int

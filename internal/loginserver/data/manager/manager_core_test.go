@@ -367,8 +367,8 @@ func TestNewRSAKeyPool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRSAKeyPool: %v", err)
 	}
-	if len(pool.keys) != gsKeyPoolSize {
-		t.Fatalf("len(pool.keys) = %d, want %d", len(pool.keys), gsKeyPoolSize)
+	if len(pool.keys) != keyPoolSize {
+		t.Fatalf("len(pool.keys) = %d, want %d", len(pool.keys), keyPoolSize)
 	}
 	for i, k := range pool.keys {
 		if got := k.N.BitLen(); got != gsKeyBits {
