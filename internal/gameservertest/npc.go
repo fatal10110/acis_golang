@@ -44,7 +44,7 @@ func (s *Server) SpawnHostileNPC(t *testing.T) *npc.Hostile {
 // construction path.
 func (s *Server) SpawnHostileNPCAt(t *testing.T, at location.Location) *npc.Hostile {
 	t.Helper()
-	return s.SpawnHostileNPCKindAt(t, "Monster", at)
+	return s.SpawnHostileNPCKindAt(t, string(npc.KindMonster), at)
 }
 
 // SpawnHostileNPCKindAt seeds a parked hostile NPC of the given instance
@@ -289,7 +289,7 @@ func AttackingHostileTemplate() *npc.Template {
 	return &npc.Template{
 		ID:         100,
 		TemplateID: 100,
-		Type:       "Monster",
+		Type:       string(npc.KindMonster),
 		Level:      1,
 		HPMax:      1000,
 		// PAtk deals roughly 20 damage against the
