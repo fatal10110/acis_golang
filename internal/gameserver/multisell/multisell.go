@@ -1,8 +1,8 @@
-// Package exchange runs the multisell rules: preparing a list for the
+// Package multisell runs the multisell rules: preparing a list for the
 // player an NPC shows it to, and trading one of its entries. It decides and
 // mutates; the caller sends the prepared list's pages and turns the
 // returned notices into client packets.
-package exchange
+package multisell
 
 import (
 	"math"
@@ -13,7 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	modelmultisell "github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 )
 
 const (
@@ -37,7 +37,7 @@ type Clans interface {
 
 // Service applies the multisell rules against the loaded lists.
 type Service struct {
-	lists          *multisell.Table
+	lists          *modelmultisell.Table
 	keepMaintained atomic.Bool
 	nextID         func() (int32, error)
 	clans          Clans
@@ -47,7 +47,7 @@ type Service struct {
 // BlacksmithUseRecipes switch inverted: when set, an ingredient marked
 // maintainIngredient is only checked for, once, and never taken. nextID
 // allocates the products' object ids; clans settles clan reputation.
-func NewService(lists *multisell.Table, keepMaintained bool, nextID func() (int32, error), clans Clans) *Service {
+func NewService(lists *modelmultisell.Table, keepMaintained bool, nextID func() (int32, error), clans Clans) *Service {
 	s := &Service{lists: lists, nextID: nextID, clans: clans}
 	s.SetKeepMaintained(keepMaintained)
 	return s
@@ -65,7 +65,7 @@ func (s *Service) SetKeepMaintained(keepMaintained bool) {
 // taking it. taxRate is the tax rate of the castle owning the NPC, 0 when
 // it belongs to no castle or the castle has no owner; a list applying taxes
 // adds it to its entries' adena.
-func (s *Service) Open(c *player.Character, name string, npcID int, inventoryOnly bool, taxRate float64) *multisell.List {
+func (s *Service) Open(c *player.Character, name string, npcID int, inventoryOnly bool, taxRate float64) *modelmultisell.List {
 	if s.lists == nil {
 		return nil
 	}
@@ -85,12 +85,12 @@ func (s *Service) Open(c *player.Character, name string, npcID int, inventoryOnl
 // enchantment, or a trainee or traveler weapon at the adventurers' guide.
 // A non-stackable item is listed once per item id, or, when maintain is
 // set, once per item id, enchant level and augmentation.
-func offered(inv *itemcontainer.Inventory, maintain, newbieWeapons bool) []multisell.Held {
+func offered(inv *itemcontainer.Inventory, maintain, newbieWeapons bool) []modelmultisell.Held {
 	if inv == nil {
 		return nil
 	}
 	var (
-		out    []multisell.Held
+		out    []modelmultisell.Held
 		listed []item.InstanceState
 	)
 	for _, inst := range inv.Items() {
@@ -112,7 +112,7 @@ func offered(inv *itemcontainer.Inventory, maintain, newbieWeapons bool) []multi
 			continue
 		}
 		listed = append(listed, st)
-		out = append(out, multisell.Held{ItemID: st.TemplateID, EnchantLevel: st.EnchantLevel})
+		out = append(out, modelmultisell.Held{ItemID: st.TemplateID, EnchantLevel: st.EnchantLevel})
 	}
 	return out
 }
@@ -207,7 +207,7 @@ type Outcome struct {
 // reachable whether c can interact with it. A choice that does not match
 // the open list, the NPC or c's reach, or asks for more than one unit of
 // an entry with a non-stackable product, forgets the list without a word.
-func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, reachable bool, ch Choice) Outcome {
+func (s *Service) Choose(c *player.Character, list *modelmultisell.List, npcID int, reachable bool, ch Choice) Outcome {
 	if ch.Amount < 1 || ch.Amount > maxAmount || list == nil || list.ID != ch.ListID ||
 		ch.EntryID < 1 || int(ch.EntryID) > len(list.Entries) {
 		return Outcome{Forget: true}
@@ -297,7 +297,7 @@ func (s *Service) clanOf(c *player.Character) (*clan.Clan, bool) {
 // taken is how many units of e an exchange of amount units takes, or, for
 // an ingredient kept by the exchange (keep set and e maintained), how many
 // it must find.
-func taken(e multisell.Ingredient, amount int, keep bool) int {
+func taken(e modelmultisell.Ingredient, amount int, keep bool) int {
 	if keep && e.MaintainIngredient {
 		return e.Count
 	}
@@ -308,8 +308,8 @@ func taken(e multisell.Ingredient, amount int, keep bool) int {
 // level, at the place of the first. A merged ingredient reads at enchant
 // level 0 from then on. ok is false when a sum would pass the largest
 // int32.
-func mergeIngredients(ingredients []multisell.Ingredient) ([]multisell.Ingredient, bool) {
-	out := make([]multisell.Ingredient, 0, len(ingredients))
+func mergeIngredients(ingredients []modelmultisell.Ingredient) ([]modelmultisell.Ingredient, bool) {
+	out := make([]modelmultisell.Ingredient, 0, len(ingredients))
 	for _, e := range ingredients {
 		merged := false
 		for i := len(out) - 1; i >= 0; i-- {
@@ -339,7 +339,7 @@ func mergeIngredients(ingredients []multisell.Ingredient) ([]multisell.Ingredien
 // the clan the ingredient check found able to pay it. It reports false when
 // an ingredient could not be found or taken; what was taken before stays
 // taken.
-func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, payer *clan.Clan, keep bool, out *Outcome) ([]item.Augmentation, bool) {
+func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *modelmultisell.List, entry modelmultisell.Entry, amount int, payer *clan.Clan, keep bool, out *Outcome) ([]item.Augmentation, bool) {
 	var augmentations []item.Augmentation
 	for _, e := range entry.Ingredients {
 		if e.ItemID == clanReputationID {
@@ -451,7 +451,7 @@ func consume(inv *itemcontainer.Inventory, inst *item.Instance, count int, out *
 // maintaining enchantment takes the product's enchant level and, by its
 // place among the units, the taken ingredients' augmentations. Each product
 // is named once, but clan reputation, which goes to c's clan unnamed.
-func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, augmentations []item.Augmentation, out *Outcome) {
+func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory, list *modelmultisell.List, entry modelmultisell.Entry, amount int, augmentations []item.Augmentation, out *Outcome) {
 	for _, p := range entry.Products {
 		if p.ItemID == clanReputationID {
 			s.payReputation(c, p.Count*amount, out)

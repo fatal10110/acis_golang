@@ -9,7 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 )
 
 const tradeInteractionDistance = 150
@@ -27,16 +27,16 @@ const tradeChaoticRefusal = "You cannot trade in a chaotic state."
 // of its mount, the enchant scroll it has selected, and any cursed weapon.
 // Each call reads them as they stand then, resolving items through items:
 // live's inventory, or the held view of it while an exchange locks it.
-func (l *GameClientLink) boundItems(live *livePlayer, items itemLookup) tradebook.BoundItems {
+func (l *GameClientLink) boundItems(live *livePlayer, items itemLookup) request.BoundItems {
 	return func(objectID int32) bool {
 		return live.ControlItemInUse(objectID) || objectID == l.enchanting.scrolls.Active(live.ObjectID()) ||
 			l.cursedItem(items, objectID)
 	}
 }
 
-func (l *GameClientLink) tradeBook() *tradebook.Book {
+func (l *GameClientLink) tradeBook() *request.Book {
 	if l.trades == nil {
-		l.trades = tradebook.NewBook(time.Now)
+		l.trades = request.NewBook(time.Now)
 	}
 	return l.trades
 }
@@ -78,13 +78,13 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 	// The target's block settings refuse only once neither side is busy.
 	blocked := l.blockRefusal(live, target)
 	switch l.tradeBook().RequestUnless(live.ObjectID(), target.ObjectID(), blocked != 0).Status {
-	case tradebook.RequestRequesterBusy:
+	case request.RequestRequesterBusy:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 		return
-	case tradebook.RequestTargetBusy:
+	case request.RequestTargetBusy:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
-	case tradebook.RequestRefused:
+	case request.RequestRefused:
 		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.CharacterName()))
 		return
 	}
@@ -119,7 +119,7 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 	}
 
 	result := l.tradeBook().Answer(live.ObjectID(), req.Response == 1)
-	if result.Status == tradebook.AnswerMissing {
+	if result.Status == request.AnswerMissing {
 		live.SendFrame(serverpackets.FrameSendTradeDone(false))
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
@@ -127,7 +127,7 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 
 	requester, requesterOnline := l.livePlayerByID(result.RequesterID)
 	if !requesterOnline {
-		if result.Status == tradebook.AnswerAccepted {
+		if result.Status == request.AnswerAccepted {
 			l.tradeBook().Cancel(live.ObjectID())
 		}
 		live.SendFrame(serverpackets.FrameSendTradeDone(false))
@@ -136,7 +136,7 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 	}
 	// A requester that left after asking is not this login under its id:
 	// the denial is the asker's, and it is gone.
-	if result.Status == tradebook.AnswerDenied {
+	if result.Status == request.AnswerDenied {
 		if !result.RequesterLeft {
 			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeniedTradeRequest, live.CharacterName()))
 		}
@@ -214,18 +214,18 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 
 	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), l.boundItems(live, live.Inventory()), req.ObjectID, int(req.Count))
 	switch result.Status {
-	case tradebook.AddNoSession:
+	case request.AddNoSession:
 		return
-	case tradebook.AddSelfConfirmed:
+	case request.AddSelfConfirmed:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnceTradeConfirmedCannotMove))
 		return
-	case tradebook.AddPartnerConfirmed:
+	case request.AddPartnerConfirmed:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotAdjustItemsAfterConfirm))
 		return
-	case tradebook.AddInvalidItem:
+	case request.AddInvalidItem:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
 		return
-	case tradebook.AddNotOffered:
+	case request.AddNotOffered:
 		// An item the trader may move but not offer as asked (a bad count,
 		// an item that cannot change hands) is dropped without an answer;
 		// the trade window holds no pending state for an add, so the
@@ -330,14 +330,14 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 
 	result := l.tradeBook().Confirm(live.ObjectID())
 	switch result.Status {
-	case tradebook.DoneNoSession, tradebook.DoneAlreadyConfirmed:
+	case request.DoneNoSession, request.DoneAlreadyConfirmed:
 		return
-	case tradebook.DonePartnerLeft:
+	case request.DonePartnerLeft:
 		// The confirm's re-check found the partner gone: the whole trade
 		// is cancelled, naming the confirmer.
 		l.cancelTradeByID(live.ObjectID())
 		return
-	case tradebook.DoneConfirmed:
+	case request.DoneConfirmed:
 		l.sendTradeConfirmed(live, partner)
 		return
 	}
@@ -359,7 +359,7 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 // partner runs meanwhile on a leg it receives waits for the trade's write
 // and then carries both legs. Both inventories' updates and weight reach
 // their owners through the inventory-update tick, on each owner's own queue.
-func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirmerID int32) {
+func (l *GameClientLink) settleConfirmedTrade(session request.Session, confirmerID int32) {
 	// Confirm already took the ready session out of the book, so a failed
 	// re-check cancels straight to the participants: a book cancel would
 	// reach no one. The confirmer is the canceller, and a participant who
@@ -370,7 +370,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 		return
 	}
 
-	status := tradebook.SettlementEmpty
+	status := request.SettlementEmpty
 	if !session.Empty() {
 		end := l.belongings.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
 		defer end()
@@ -378,19 +378,19 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
 			func(firstHeld, secondHeld itemcontainer.Held) bool {
 				status = session.Check(firstHeld, secondHeld, l.boundItems(first, firstHeld), l.boundItems(second, secondHeld))
-				return status == tradebook.SettlementOK
+				return status == request.SettlementOK
 			})
 		switch {
 		case err != nil:
 			l.log.Error().Err(err).Msg("allocate trade item id")
-			status = tradebook.SettlementTransferFailed
-		case !moved && status == tradebook.SettlementOK:
-			status = tradebook.SettlementTransferFailed
+			status = request.SettlementTransferFailed
+		case !moved && status == request.SettlementOK:
+			status = request.SettlementTransferFailed
 		}
 		l.applyPersistActions(res.Persist)
 		end()
 	}
-	if status == tradebook.SettlementInvalidItems {
+	if status == request.SettlementInvalidItems {
 		l.sendTradeCanceled(session, confirmerID)
 		return
 	}
@@ -399,10 +399,10 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 		first.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 		second.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 	}
-	l.finishTrade(first, second, status == tradebook.SettlementOK)
+	l.finishTrade(first, second, status == request.SettlementOK)
 }
 
-func tradeMoves(offer tradebook.Offer) []invops.Move {
+func tradeMoves(offer request.Offer) []invops.Move {
 	moves := make([]invops.Move, 0, len(offer.Items))
 	for _, row := range offer.Items {
 		moves = append(moves, invops.Move{ObjectID: row.Snapshot.ObjectID, Count: row.Count})
@@ -438,7 +438,7 @@ func (l *GameClientLink) holdsActiveRequester(live *livePlayer) bool {
 
 func (l *GameClientLink) cancelTradeByID(playerID int32) {
 	result := l.tradeBook().Cancel(playerID)
-	if result.Status != tradebook.CancelDone {
+	if result.Status != request.CancelDone {
 		return
 	}
 	l.sendTradeCanceled(result.Session, playerID)
@@ -449,7 +449,7 @@ func (l *GameClientLink) cancelTradeByID(playerID int32) {
 // participant no longer in the world gets nothing, so a canceller whose
 // partner is gone still hears its own cancel. Neither does a partner who
 // left with the window open, even when a new login holds its id.
-func (l *GameClientLink) sendTradeCanceled(session tradebook.Session, cancellerID int32) {
+func (l *GameClientLink) sendTradeCanceled(session request.Session, cancellerID int32) {
 	if canceller, ok := l.livePlayerByID(cancellerID); ok {
 		l.announceTradeCanceled(session, canceller)
 	}
@@ -457,7 +457,7 @@ func (l *GameClientLink) sendTradeCanceled(session tradebook.Session, cancellerI
 
 // announceTradeCanceled is sendTradeCanceled for a canceller already in
 // hand, which need no longer be listed in the world.
-func (l *GameClientLink) announceTradeCanceled(session tradebook.Session, canceller *livePlayer) {
+func (l *GameClientLink) announceTradeCanceled(session request.Session, canceller *livePlayer) {
 	cancellerID := canceller.ObjectID()
 	if partnerID, ok := session.PartnerID(cancellerID); ok && !session.PartnerLeft(cancellerID) {
 		if partner, ok := l.livePlayerByID(partnerID); ok {
@@ -543,24 +543,24 @@ func livePlayersInRange(first, second *livePlayer, radius int) bool {
 	return location.In3DRadius(ax, ay, az, bx, by, bz, radius)
 }
 
-func (l *GameClientLink) tradeParticipants(session tradebook.Session) (*livePlayer, *livePlayer, bool) {
+func (l *GameClientLink) tradeParticipants(session request.Session) (*livePlayer, *livePlayer, bool) {
 	first, firstOK := l.livePlayerByID(session.FirstID)
 	second, secondOK := l.livePlayerByID(session.SecondID)
 	return first, second, firstOK && secondOK
 }
 
-func tradeSettlementMessage(status tradebook.SettlementStatus) int {
+func tradeSettlementMessage(status request.SettlementStatus) int {
 	switch status {
-	case tradebook.SettlementWeightExceeded:
+	case request.SettlementWeightExceeded:
 		return serverpackets.SystemMessageWeightLimitExceeded
-	case tradebook.SettlementSlotsFull:
+	case request.SettlementSlotsFull:
 		return serverpackets.SystemMessageSlotsFull
 	default:
 		return 0
 	}
 }
 
-func tradeItemSnapshot(item tradebook.ItemSnapshot) serverpackets.TradeItemSnapshot {
+func tradeItemSnapshot(item request.ItemSnapshot) serverpackets.TradeItemSnapshot {
 	return serverpackets.TradeItemSnapshot{
 		ObjectID:     item.ObjectID,
 		TemplateID:   item.TemplateID,
@@ -569,7 +569,7 @@ func tradeItemSnapshot(item tradebook.ItemSnapshot) serverpackets.TradeItemSnaps
 	}
 }
 
-func tradeItemUpdateEntries(entries []tradebook.ItemUpdateEntry) []serverpackets.TradeItemUpdateEntry {
+func tradeItemUpdateEntries(entries []request.ItemUpdateEntry) []serverpackets.TradeItemUpdateEntry {
 	out := make([]serverpackets.TradeItemUpdateEntry, 0, len(entries))
 	for _, entry := range entries {
 		out = append(out, serverpackets.TradeItemUpdateEntry{

@@ -8,7 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -132,7 +132,7 @@ func TestAutoSoulShotIgnoredWhileHoldingRequest(t *testing.T) {
 		t.Fatal("the requester's own enable was ignored")
 	}
 
-	advance(trade.RequestTimeout)
+	advance(request.RequestTimeout)
 
 	h.second.Send(encodeRequestAutoSoulShot(soulshot, 1))
 	assertAutoShotToggled(t, h.second, soulshot, true)
@@ -163,7 +163,7 @@ func TestAutoSoulShotIgnoredWhileTradingOnExpiredInvite(t *testing.T) {
 	inviter.Send(w.Bytes())
 	assertSystemMessageText(t, inviter.Read(), serverpackets.SystemMessageYouInvitedS1ToParty, "TraderTwo")
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeAskJoinParty, "AskJoinParty")
-	advance(trade.RequestTimeout + time.Second)
+	advance(request.RequestTimeout + time.Second)
 
 	h.second.Send(encodeRequestAutoSoulShot(soulshot, 1))
 	assertSilent(t, h.second, "enable while trading on an expired invitation")
@@ -191,7 +191,7 @@ func TestSocialActionIgnoredWhileHoldingRequest(t *testing.T) {
 	assertSocialAction(t, h.first, h.firstID, 3, "requester's own emote")
 	assertSocialAction(t, h.second, h.firstID, 3, "requester's emote seen by the target")
 
-	advance(trade.RequestTimeout)
+	advance(request.RequestTimeout)
 
 	h.second.Send(encodeRequestSocialAction(2))
 	assertSocialAction(t, h.second, h.secondID, 2, "emote after the request expired")

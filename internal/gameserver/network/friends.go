@@ -10,9 +10,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
 
 // characterDirectory finds characters, online or not, by name and id.
@@ -167,7 +167,7 @@ func (l *GameClientLink) handleRequestFriendInvite(live *livePlayer, req clientp
 	// The invitation takes the target's request slot, shared with every
 	// other kind of request; only the target being busy refuses it there.
 	if refusal == relation.InviteAllowed &&
-		l.tradeBook().Invite(tradebook.KindFriend, live.ObjectID(), target.ObjectID(), false).Status == tradebook.RequestStarted {
+		l.tradeBook().Invite(request.KindFriend, live.ObjectID(), target.ObjectID(), false).Status == request.RequestStarted {
 		target.SendFrame(serverpackets.FrameFriendAddRequest(live.CharacterName()))
 		return
 	}
@@ -207,7 +207,7 @@ func friendInviteRefusalMessage(refusal relation.InviteRefusal, name string) wir
 // character is stored: the returned lookup reads that name off the queue
 // and sends live's notices; see whenLiveStaged.
 func (l *GameClientLink) beginAnswerFriendInvite(live *livePlayer, req clientpackets.RequestAnswerFriendInvite) func(context.Context) {
-	inv, ok := l.tradeBook().TakeRequest(tradebook.KindFriend, live.ObjectID())
+	inv, ok := l.tradeBook().TakeRequest(request.KindFriend, live.ObjectID())
 	if !ok {
 		return nil
 	}

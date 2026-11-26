@@ -7,7 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -35,7 +35,7 @@ func TestAnswerAfterRequestExpired(t *testing.T) {
 			h.enterAll(t)
 			h.sendRequest(t)
 
-			clock.Add(int64(trade.RequestTimeout))
+			clock.Add(int64(request.RequestTimeout))
 
 			h.second.Send(encodeAnswerTradeRequest(tc.response))
 			frame := h.second.Read()

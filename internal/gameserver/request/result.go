@@ -1,4 +1,4 @@
-package trade
+package request
 
 // RequestStatus describes the outcome of creating a direct-trade request.
 type RequestStatus uint8
