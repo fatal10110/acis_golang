@@ -100,13 +100,8 @@ func TestClientLinkUnknownAccountAutoCreateOffCountsFailedAttempts(t *testing.T)
 // newFailedAttemptLink builds a ClientLink with only what the failed-attempt
 // bookkeeping touches, so the window can be driven with explicit times.
 func newFailedAttemptLink() (*ClientLink, *manager.IPBanList) {
-	bans := manager.NewIPBanList(zerolog.Nop())
-	return &ClientLink{
-		bans:               bans,
-		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
-		loginBlockAfterBan: DefaultLoginBlockAfterBan,
-		log:                zerolog.Nop(),
-	}, bans
+	l := newBareClientLink(manager.NewServerRegistry())
+	return l, l.bans
 }
 
 func failedAttemptCount(l *ClientLink) int {

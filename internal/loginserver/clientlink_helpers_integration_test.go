@@ -328,21 +328,15 @@ func newTestClientLinkOn(t *testing.T, wrap func(net.Listener) net.Listener, acc
 	sessions = manager.NewSessionStore()
 	bans = manager.NewIPBanList(zerolog.Nop())
 
-	l = &ClientLink{
-		accounts:           accounts,
-		servers:            servers,
-		sessions:           sessions,
-		bans:               bans,
-		autoCreateAccounts: autoCreate,
-		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
-		loginBlockAfterBan: DefaultLoginBlockAfterBan,
-		log:                zerolog.Nop(),
-		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
-		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
-		newSessionID:       func() int32 { return testInitSessionID },
-		hashPassword:       minCostHashPassword,
-		handshakeTimeout:   connectionHandshakeTimeout,
-	}
+	l = NewClientLink(accounts, servers, sessions, bans, fixedLoginKey{keyPair}, nil, ClientConfig{
+		AutoCreateAccounts: autoCreate,
+		ShowLicence:        true,
+		LoginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		LoginBlockAfterBan: DefaultLoginBlockAfterBan,
+	}, zerolog.Nop())
+	l.newSessionKey = func() ([]byte, error) { return testSessionKey, nil }
+	l.newSessionID = func() int32 { return testInitSessionID }
+	l.hashPassword = minCostHashPassword
 	for _, opt := range opts {
 		opt(l)
 	}
@@ -366,7 +360,22 @@ func newTestClientLinkOn(t *testing.T, wrap func(net.Listener) net.Listener, acc
 // loginKeyPair exposes the test ClientLink's fixed RSA key pair for
 // building RequestAuthLogin payloads.
 func (l *ClientLink) loginKeyPair() *commoncrypt.LoginKeyPair {
-	return l.newKeyPair()
+	return l.keys.Random()
+}
+
+// fixedLoginKey hands every connection the same RSA key pair.
+type fixedLoginKey struct{ pair *commoncrypt.LoginKeyPair }
+
+func (k fixedLoginKey) Random() *commoncrypt.LoginKeyPair { return k.pair }
+
+// newBareClientLink builds a ClientLink that is never served, for tests
+// that drive one of its methods directly.
+func newBareClientLink(servers *manager.ServerRegistry) *ClientLink {
+	return NewClientLink(newFakeAccountStore(), servers, manager.NewSessionStore(), manager.NewIPBanList(zerolog.Nop()), fixedLoginKey{}, nil, ClientConfig{
+		ShowLicence:        true,
+		LoginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		LoginBlockAfterBan: DefaultLoginBlockAfterBan,
+	}, zerolog.Nop())
 }
 
 func loginFailReason(t *testing.T, reply []byte) serverpackets.LoginFailReason {

@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
 	logincrypt "github.com/fatal10110/acis_golang/internal/loginserver/crypt"
+	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
@@ -50,7 +51,7 @@ func TestClientLinkAuthGameGuardClosesOnGGAuthWriteFailure(t *testing.T) {
 	c := &clientConn{conn: server, crypt: crypt, sessionID: testInitSessionID}
 	defer server.Close()
 
-	if (&ClientLink{}).onAuthGameGuard(c, encodeAuthGameGuard(testInitSessionID)) {
+	if newBareClientLink(manager.NewServerRegistry()).onAuthGameGuard(c, encodeAuthGameGuard(testInitSessionID)) {
 		t.Fatal("onAuthGameGuard() = true after GGAuth write failure, want false")
 	}
 	if c.ggAuthed {
@@ -257,7 +258,7 @@ func TestClientLinkLoginUnknownAccountAutoCreateOn(t *testing.T) {
 // Test links hash auto-created passwords at MinCost; the production
 // constructor must keep hashing at the full default cost.
 func TestNewClientLinkHashesAutoCreatedPasswordsAtDefaultCost(t *testing.T) {
-	l := NewClientLink(nil, nil, nil, nil, nil, nil, true, true, DefaultLoginTryBeforeBan, DefaultLoginBlockAfterBan, zerolog.Nop())
+	l := NewClientLink(nil, nil, nil, nil, nil, nil, ClientConfig{AutoCreateAccounts: true, ShowLicence: true, LoginTryBeforeBan: DefaultLoginTryBeforeBan, LoginBlockAfterBan: DefaultLoginBlockAfterBan}, zerolog.Nop())
 	hashed, err := l.hashPassword("s3cret")
 	if err != nil {
 		t.Fatalf("hashPassword: %v", err)

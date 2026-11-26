@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/config"
 )
 
@@ -41,7 +42,7 @@ func TestListenAddressFromGameserverHostname(t *testing.T) {
 // TestEmptyGameserverHostnameBindsLoopbackOnly: the listener an empty host
 // opens accepts on the loopback address alone.
 func TestEmptyGameserverHostnameBindsLoopbackOnly(t *testing.T) {
-	addr := gameBindAddress(context.Background(), listenAddress("", 0), net.DefaultResolver.LookupIPAddr, zerolog.Nop())
+	addr := gameBindAddress(context.Background(), netutil.ListenAddress("", 0), net.DefaultResolver.LookupIPAddr, zerolog.Nop())
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +81,7 @@ func TestGameBindAddressResolvesHostName(t *testing.T) {
 // does not resolve logs and binds every address instead of failing boot.
 func TestUnresolvableGameserverHostnameBindsAllAddresses(t *testing.T) {
 	var logs bytes.Buffer
-	addr := gameBindAddress(context.Background(), listenAddress("no-such-host.invalid", 0), net.DefaultResolver.LookupIPAddr, zerolog.New(&logs))
+	addr := gameBindAddress(context.Background(), netutil.ListenAddress("no-such-host.invalid", 0), net.DefaultResolver.LookupIPAddr, zerolog.New(&logs))
 	if addr != ":0" {
 		t.Fatalf("gameBindAddress(no-such-host.invalid) = %q, want :0", addr)
 	}

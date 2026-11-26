@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
 // OpcodeRequestAuthLogin is the wire opcode for RequestAuthLogin, valid once
@@ -59,7 +60,7 @@ func DecodeRequestAuthLogin(payload []byte, key *rsa.PrivateKey) (RequestAuthLog
 		return RequestAuthLogin{}, ErrCredentialBlockRange
 	}
 	return RequestAuthLogin{
-		Username: strings.ToLower(trimControlBytes(block[usernameOffset : usernameOffset+usernameSize])),
+		Username: model.NormalizeLogin(trimControlBytes(block[usernameOffset : usernameOffset+usernameSize])),
 		Password: trimControlBytes(block[passwordOffset : passwordOffset+passwordSize]),
 	}, nil
 }

@@ -70,9 +70,13 @@ func (s *AccountStore) SetLastActive(ctx context.Context, login string, at time.
 	return nil
 }
 
+// updateAccessLevelSQL is the one statement that changes an account's
+// access level.
+const updateAccessLevelSQL = "UPDATE accounts SET access_level = ? WHERE login = ?"
+
 // SetAccessLevel updates the account's access level.
 func (s *AccountStore) SetAccessLevel(ctx context.Context, login string, level int) error {
-	if _, err := s.db.ExecContext(ctx, "UPDATE accounts SET access_level = ? WHERE login = ?", level, login); err != nil {
+	if _, err := s.db.ExecContext(ctx, updateAccessLevelSQL, level, login); err != nil {
 		return fmt.Errorf("set access level for %q: %w", login, err)
 	}
 	return nil
@@ -112,7 +116,7 @@ func (s *AccountStore) UpsertAccount(ctx context.Context, login, hashedPassword,
 // as typed: the database converts it to the column's integer type and, under
 // a strict sql_mode, rejects a value it cannot convert.
 func (s *AccountStore) ChangeAccessLevel(ctx context.Context, login, level string) (bool, error) {
-	res, err := s.db.ExecContext(ctx, "UPDATE accounts SET access_level = ? WHERE login = ?", level, login)
+	res, err := s.db.ExecContext(ctx, updateAccessLevelSQL, level, login)
 	if err != nil {
 		return false, fmt.Errorf("change access level for %q: %w", login, err)
 	}

@@ -316,14 +316,18 @@ func newTestLink(t *testing.T, allowNewServers bool) (addr string, l *GameServer
 
 func newTestLinkCommon(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations *sql.GameServerStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
+	var levels accessLevelStore
+	if accounts != nil {
+		levels = accounts
+	}
 	var store registrationStore
 	if registrations != nil {
 		store = registrations
 	}
-	return newTestLinkWithRegistrationStore(t, allowNewServers, accounts, store, configure...)
+	return newTestLinkWithRegistrationStore(t, allowNewServers, levels, store, configure...)
 }
 
-func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations registrationStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts accessLevelStore, registrations registrationStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
 
 	dir := t.TempDir()
