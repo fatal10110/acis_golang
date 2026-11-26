@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossrank"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -48,11 +49,12 @@ const idleLimit = 30 * 60
 // parked is where a reset boss waits, out of its lair.
 var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
 
-// targetSlots are the slots of the three targets Baium ranks: their
-// points, and who each is.
-func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
-	return [3]script.IntSlot{npc.IntQuest0, npc.IntQuest1, npc.IntQuest2},
-		[3]script.CreatureSlot{npc.CreatureQuest0, npc.CreatureQuest1, npc.CreatureQuest2}
+// targets are the three targets Baium ranks.
+func targets() bossrank.Targets {
+	return bossrank.Targets{
+		Points: [3]script.IntSlot{npc.IntQuest0, npc.IntQuest1, npc.IntQuest2},
+		Who:    [3]script.CreatureSlot{npc.CreatureQuest0, npc.CreatureQuest1, npc.CreatureQuest2},
+	}
 }
 
 // Baium is the grand boss Baium. Created outside its lair it sleeps: it
@@ -150,18 +152,18 @@ func Baium() script.Script {
 					// of a spell at high HP: that second pass may move it to
 					// another slot, so it can hold two. A spell at high HP
 					// ranks it only once.
-					high := (damage / 150) * 1000
+					high := bossrank.Int((damage / 150) * 1000)
 					switch hp, maxHP := n.HP(), float64(n.MaxHP()); {
 					case e.Skill.ID == 0:
-						settle(s, n, attacker, rank(s, n, attacker, damage*1000), high)
+						targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Int(damage*1000)), high)
 					case hp < (maxHP*1.0)/4.0:
-						settle(s, n, attacker, rank(s, n, attacker, (damage/30)*1000), high)
+						targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Int((damage/30)*1000)), high)
 					case hp < (maxHP*2.0)/4.0:
-						settle(s, n, attacker, rank(s, n, attacker, (damage/50)*1000), high)
+						targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Int((damage/50)*1000)), high)
 					case hp < (maxHP*3.0)/4.0:
-						settle(s, n, attacker, rank(s, n, attacker, (damage/100)*1000), high)
+						targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Int((damage/100)*1000)), high)
 					default:
-						rank(s, n, attacker, high)
+						targets().Rank(s, n, attacker, high)
 					}
 				}
 			} else {
@@ -203,9 +205,9 @@ func Baium() script.Script {
 				// A priest given a new slot is ranked once more with the
 				// points of anyone seen, which may move it to another slot,
 				// so it can hold two.
-				settle(s, n, c, rank(s, n, c, v), 1*1000)
+				targets().Settle(s, n, c, targets().Rank(s, n, c, bossrank.Int(v)), bossrank.Int(1*1000))
 			} else {
-				rank(s, n, c, 1*1000)
+				targets().Rank(s, n, c, bossrank.Int(1*1000))
 			}
 
 			if n.Intention() == script.IntentionWander && n.Int(slotAwake) != 0 {
@@ -324,87 +326,11 @@ func Baium() script.Script {
 	})}
 }
 
-// rank weighs c with points among Baium's three targets. A creature
-// already ranked keeps its slot, raised to points (plus a random share)
-// when that beats its standing by more than 1000; any other takes the
-// weakest slot, a tie broken at random. It returns the slot it gave c, 2 to
-// 4, or 0 when it gave none.
-func rank(s *script.Script, n *script.NPC, c script.Creature, points int32) int32 {
-	pts, who := targetSlots()
-	q0, q1, q2 := n.Int(pts[0]), n.Int(pts[1]), n.Int(pts[2])
-	var i1 int32
-	switch {
-	case script.Same(c, n.Slot(who[0])):
-		if points+1000 > q0 {
-			n.SetInt(pts[0], points+int32(s.Rnd(3000)))
-		}
-	case script.Same(c, n.Slot(who[1])):
-		if points+1000 > q1 {
-			n.SetInt(pts[1], points+int32(s.Rnd(3000)))
-		}
-	case script.Same(c, n.Slot(who[2])):
-		if points+1000 > q2 {
-			n.SetInt(pts[2], points+int32(s.Rnd(3000)))
-		}
-	case q0 > q1:
-		i1 = 3
-	case q0 == q1:
-		i1 = pick(s, 2, 3)
-	case q0 < q1:
-		i1 = 2
-	}
-	return settle(s, n, c, i1, points)
-}
-
-// settle gives c slot i1 (2 to 4) with points, plus a random share, unless
-// the third slot stands lower: then c takes that one, a tie broken at
-// random. It returns the slot it gave c, or 0 when i1 names none.
-func settle(s *script.Script, n *script.NPC, c script.Creature, i1, points int32) int32 {
-	pts, who := targetSlots()
-	q2 := n.Int(pts[2])
-	switch i1 {
-	case 2:
-		switch q0 := n.Int(pts[0]); {
-		case q0 > q2:
-			i1 = 4
-		case q0 == q2:
-			i1 = pick(s, 2, 4)
-		case q0 < q2:
-			i1 = 2
-		}
-	case 3:
-		switch q1 := n.Int(pts[1]); {
-		case q1 > q2:
-			i1 = 4
-		case q1 == q2:
-			i1 = pick(s, 3, 4)
-		case q1 < q2:
-			i1 = 3
-		}
-	}
-
-	switch i1 {
-	case 2, 3, 4:
-		n.SetInt(pts[i1-2], points+int32(s.Rnd(3000)))
-		n.SetSlot(who[i1-2], c)
-		return i1
-	}
-	return 0
-}
-
-// pick returns a or b on an even draw.
-func pick(s *script.Script, a, b int32) int32 {
-	if s.RndBool() {
-		return a
-	}
-	return b
-}
-
 // castBaiumSkill makes Baium cast one of its skills at its best target,
 // the creature that hit it last when it has none: the lower its HP, the
 // more of its skills it draws from.
 func castBaiumSkill(s *script.Script, n *script.NPC) {
-	pts, who := targetSlots()
+	pts, who := targets().Points, targets().Who
 
 	// The last non-player attacker drawn here is replaced below by the best
 	// target anyway: only the draw, which moves the random sequence, and

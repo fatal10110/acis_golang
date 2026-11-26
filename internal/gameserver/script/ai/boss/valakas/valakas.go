@@ -4,11 +4,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossmemo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossrank"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -42,11 +42,12 @@ const idleLimit = 15 * 60
 // parked is where a reset boss waits, out of its lair.
 var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
 
-// targetSlots are the slots of the three targets Valakas ranks: their
-// points, and who each is.
-func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
-	return [3]script.IntSlot{npc.IntQuest2, npc.IntQuest3, npc.IntQuest4},
-		[3]script.CreatureSlot{npc.CreatureQuest2, npc.CreatureQuest3, npc.CreatureQuest4}
+// targets are the three targets Valakas ranks.
+func targets() bossrank.Targets {
+	return bossrank.Targets{
+		Points: [3]script.IntSlot{npc.IntQuest2, npc.IntQuest3, npc.IntQuest4},
+		Who:    [3]script.CreatureSlot{npc.CreatureQuest2, npc.CreatureQuest3, npc.CreatureQuest4},
+	}
 }
 
 // appear brings Valakas into its lair with its music and, 2 s later,
@@ -194,18 +195,18 @@ func Valakas() script.Script {
 			// high HP: that second pass may move it to another slot, so it
 			// can hold two. A spell at high HP ranks it only once.
 			hp, maxHPf := n.HP(), float64(maxHP)
-			high := scaledPoints(float64(damage) / 150.0 * 1000)
+			high := bossrank.Scaled(float64(damage) / 150.0 * 1000)
 			switch {
 			case e.Skill.ID == 0:
-				settle(s, n, attacker, rank(s, n, attacker, points{stored: damage * 1000}), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Int(damage*1000)), high)
 			case hp < (maxHPf*1.0)/4.0:
-				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/30.0*1000)), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Scaled(float64(damage)/30.0*1000)), high)
 			case hp < (maxHPf*2.0)/4.0:
-				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/50.0*1000)), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Scaled(float64(damage)/50.0*1000)), high)
 			case hp < (maxHPf*3.0)/4.0:
-				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/100.0*1000)), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Scaled(float64(damage)/100.0*1000)), high)
 			default:
-				rank(s, n, attacker, high)
+				targets().Rank(s, n, attacker, high)
 			}
 
 			if n.DBValue() == stageFighting && idleOrWandering(n) {
@@ -259,7 +260,7 @@ func Valakas() script.Script {
 						s.TeleportPlayersInTerritory(n, script.Loc{X: 150037, Y: -57255, Z: -2976}, 150)
 						n.TeleportTo(parked)
 
-						pts, _ := targetSlots()
+						pts := targets().Points
 						for _, slot := range pts {
 							n.SetInt(slot, 0)
 						}
@@ -340,16 +341,16 @@ func Valakas() script.Script {
 			if n.DBValue() == stageFighting && p.SameOccupation("@cleric_group") {
 				switch hpRatio := n.HPRatio(); {
 				case hpRatio < 0.25:
-					rankInt(s, n, c, 10*1000)
+					targets().Rank(s, n, c, bossrank.Int(10*1000))
 				case hpRatio < 0.5:
-					rankInt(s, n, c, 6*1000)
+					targets().Rank(s, n, c, bossrank.Int(6*1000))
 				case hpRatio < 0.75:
-					rankInt(s, n, c, 3*1000)
+					targets().Rank(s, n, c, bossrank.Int(3*1000))
 				default:
-					rankInt(s, n, c, 2*1000)
+					targets().Rank(s, n, c, bossrank.Int(2*1000))
 				}
 			} else {
-				rankInt(s, n, c, 1*1000)
+				targets().Rank(s, n, c, bossrank.Int(1*1000))
 			}
 
 			if n.DBValue() == stageFighting && idleOrWandering(n) {
@@ -395,113 +396,11 @@ func idleOrWandering(n *script.NPC) bool {
 	return false
 }
 
-// points are the points a hit or a sighting ranks a creature with.
-type points struct {
-	stored int32   // what a slot takes, before its random share
-	exact  float64 // the unrounded points of a spell's damage
-	scaled bool    // whether exact, not stored, is compared
-}
-
-// beats reports whether p beats a standing of cur by more than 1000: in
-// whole numbers for a plain hit or a sighting, unrounded for a spell.
-func (p points) beats(cur int32) bool {
-	if p.scaled {
-		return p.exact+1000 > float64(cur)
-	}
-	return p.stored+1000 > cur
-}
-
-// rankInt ranks c with points counted in whole numbers, as a sighting is.
-func rankInt(s *script.Script, n *script.NPC, c script.Creature, v int32) {
-	rank(s, n, c, points{stored: v})
-}
-
-// scaledPoints are the points scaled from a spell's damage, compared
-// unrounded and stored truncated.
-func scaledPoints(v float64) points {
-	return points{stored: commons.TruncInt32Sat(v), exact: v, scaled: true}
-}
-
-// rank weighs c with p among Valakas's three targets. A creature already
-// ranked keeps its slot, raised to p (plus a random share) when p beats its
-// standing; any other takes the weakest slot, a tie broken at random. It
-// returns the slot it gave c, 2 to 4, or 0 when it gave none.
-func rank(s *script.Script, n *script.NPC, c script.Creature, p points) int {
-	pts, who := targetSlots()
-	q0, q1, q2 := n.Int(pts[0]), n.Int(pts[1]), n.Int(pts[2])
-	var i1 int
-	switch {
-	case script.Same(c, n.Slot(who[0])):
-		if p.beats(q0) {
-			n.SetInt(pts[0], p.stored+int32(s.Rnd(3000)))
-		}
-	case script.Same(c, n.Slot(who[1])):
-		if p.beats(q1) {
-			n.SetInt(pts[1], p.stored+int32(s.Rnd(3000)))
-		}
-	case script.Same(c, n.Slot(who[2])):
-		if p.beats(q2) {
-			n.SetInt(pts[2], p.stored+int32(s.Rnd(3000)))
-		}
-	case q0 > q1:
-		i1 = 3
-	case q0 == q1:
-		i1 = pick(s, 2, 3)
-	case q0 < q1:
-		i1 = 2
-	}
-	return settle(s, n, c, i1, p)
-}
-
-// settle gives c slot i1 (2 to 4) with p, plus a random share, unless the
-// third slot stands lower: then c takes that one, a tie broken at random.
-// It returns the slot it gave c, or 0 when i1 names none.
-func settle(s *script.Script, n *script.NPC, c script.Creature, i1 int, p points) int {
-	pts, who := targetSlots()
-	q2 := n.Int(pts[2])
-	switch i1 {
-	case 2:
-		switch q0 := n.Int(pts[0]); {
-		case q0 > q2:
-			i1 = 4
-		case q0 == q2:
-			i1 = pick(s, 2, 4)
-		case q0 < q2:
-			i1 = 2
-		}
-	case 3:
-		switch q1 := n.Int(pts[1]); {
-		case q1 > q2:
-			i1 = 4
-		case q1 == q2:
-			i1 = pick(s, 3, 4)
-		case q1 < q2:
-			i1 = 3
-		}
-	}
-
-	switch i1 {
-	case 2, 3, 4:
-		n.SetInt(pts[i1-2], p.stored+int32(s.Rnd(3000)))
-		n.SetSlot(who[i1-2], c)
-		return i1
-	}
-	return 0
-}
-
-// pick returns a or b on an even draw.
-func pick(s *script.Script, a, b int) int {
-	if s.RndBool() {
-		return a
-	}
-	return b
-}
-
 // castAtBest drops the targets Valakas can no longer rank, empty, over 5000
 // away in 3D or dead, and casts one of its skills at the best of the
 // others, if any: the lower its HP, the likelier its stronger skills.
 func castAtBest(s *script.Script, n *script.NPC) {
-	pts, who := targetSlots()
+	pts, who := targets().Points, targets().Who
 	for i := range pts {
 		if c := n.Slot(who[i]); c == nil || n.Distance3D(c) > 5000 || c.Dead() {
 			n.SetInt(pts[i], 0)

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/boss/bossrank"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
 
@@ -40,11 +40,12 @@ const idleLimit = 15 * 60
 // parked is where a reset boss waits, out of its lair.
 var parked = script.Loc{X: -105200, Y: -253104, Z: -15264}
 
-// targetSlots are the slots of the three targets Antharas ranks: their
-// points, and who each is.
-func targetSlots() ([3]script.IntSlot, [3]script.CreatureSlot) {
-	return [3]script.IntSlot{script.SlotIntAI2, script.SlotIntAI3, script.SlotIntAI4},
-		[3]script.CreatureSlot{script.SlotCreature2, script.SlotCreature3, script.SlotCreature4}
+// targets are the three targets Antharas ranks.
+func targets() bossrank.Targets {
+	return bossrank.Targets{
+		Points: [3]script.IntSlot{script.SlotIntAI2, script.SlotIntAI3, script.SlotIntAI4},
+		Who:    [3]script.CreatureSlot{script.SlotCreature2, script.SlotCreature3, script.SlotCreature4},
+	}
 }
 
 // memoKey is the global memo key under which Antharas leaves its object id
@@ -210,7 +211,7 @@ func Antharas() script.Script {
 					selfBuff(4125, 11)
 				}
 
-				pts, _ := targetSlots()
+				pts := targets().Points
 				for _, slot := range pts {
 					if v := n.Int(slot); v > 10 {
 						n.SetInt(slot, v-int32(s.Rnd(9)+1))
@@ -245,18 +246,18 @@ func Antharas() script.Script {
 			// high HP: that second pass may move it to another slot, so it
 			// can hold two. A spell at high HP ranks it only once.
 			hp, maxHP := n.HP(), float64(n.MaxHP())
-			high := scaledPoints(float64(damage) / 150.0 * 1000)
+			high := bossrank.Scaled(float64(damage) / 150.0 * 1000)
 			switch {
 			case e.Skill.ID == 0:
-				settle(s, n, attacker, rank(s, n, attacker, points{stored: damage * 1000}), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Int(damage*1000)), high)
 			case hp < (maxHP*1.0)/4.0:
-				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/30.0*1000)), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Scaled(float64(damage)/30.0*1000)), high)
 			case hp < (maxHP*2.0)/4.0:
-				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/50.0*1000)), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Scaled(float64(damage)/50.0*1000)), high)
 			case hp < (maxHP*3.0)/4.0:
-				settle(s, n, attacker, rank(s, n, attacker, scaledPoints(float64(damage)/100.0*1000)), high)
+				targets().Settle(s, n, attacker, targets().Rank(s, n, attacker, bossrank.Scaled(float64(damage)/100.0*1000)), high)
 			default:
-				rank(s, n, attacker, high)
+				targets().Rank(s, n, attacker, high)
 			}
 
 			if n.DBValue() == stageFighting && idleOrWandering(n) {
@@ -270,16 +271,16 @@ func Antharas() script.Script {
 			if p, ok := c.(*script.Player); ok && n.DBValue() == stageFighting && p.SameOccupation("@cleric_group") {
 				switch hpRatio := n.HPRatio(); {
 				case hpRatio < 0.25:
-					rankInt(s, n, c, 10*1000)
+					targets().Rank(s, n, c, bossrank.Int(10*1000))
 				case hpRatio < 0.5:
-					rankInt(s, n, c, 6*1000)
+					targets().Rank(s, n, c, bossrank.Int(6*1000))
 				case hpRatio < 0.75:
-					rankInt(s, n, c, 3*1000)
+					targets().Rank(s, n, c, bossrank.Int(3*1000))
 				default:
-					rankInt(s, n, c, 2*1000)
+					targets().Rank(s, n, c, bossrank.Int(2*1000))
 				}
 			} else {
-				rankInt(s, n, c, 1*1000)
+				targets().Rank(s, n, c, bossrank.Int(1*1000))
 			}
 
 			if n.DBValue() == stageFighting && idleOrWandering(n) {
@@ -311,108 +312,6 @@ func idleOrWandering(n *script.NPC) bool {
 	return false
 }
 
-// points are the points a hit or a sighting ranks a creature with.
-type points struct {
-	stored int32   // what a slot takes, before its random share
-	exact  float64 // the unrounded points of a spell's damage
-	scaled bool    // whether exact, not stored, is compared
-}
-
-// beats reports whether p beats a standing of cur by more than 1000: in
-// whole numbers for a plain hit or a sighting, unrounded for a spell.
-func (p points) beats(cur int32) bool {
-	if p.scaled {
-		return p.exact+1000 > float64(cur)
-	}
-	return p.stored+1000 > cur
-}
-
-// rankInt ranks c with points counted in whole numbers, as a sighting is.
-func rankInt(s *script.Script, n *script.NPC, c script.Creature, v int32) {
-	rank(s, n, c, points{stored: v})
-}
-
-// scaledPoints are the points scaled from a spell's damage, compared
-// unrounded and stored truncated.
-func scaledPoints(v float64) points {
-	return points{stored: commons.TruncInt32Sat(v), exact: v, scaled: true}
-}
-
-// rank weighs c with p among Antharas's three targets. A creature already
-// ranked keeps its slot, raised to p (plus a random share) when p beats its
-// standing; any other takes the weakest slot, a tie broken at random. It
-// returns the slot it gave c, 2 to 4, or 0 when it gave none.
-func rank(s *script.Script, n *script.NPC, c script.Creature, p points) int {
-	pts, who := targetSlots()
-	q0, q1, q2 := n.Int(pts[0]), n.Int(pts[1]), n.Int(pts[2])
-	var i1 int
-	switch {
-	case script.Same(c, n.Slot(who[0])):
-		if p.beats(q0) {
-			n.SetInt(pts[0], p.stored+int32(s.Rnd(3000)))
-		}
-	case script.Same(c, n.Slot(who[1])):
-		if p.beats(q1) {
-			n.SetInt(pts[1], p.stored+int32(s.Rnd(3000)))
-		}
-	case script.Same(c, n.Slot(who[2])):
-		if p.beats(q2) {
-			n.SetInt(pts[2], p.stored+int32(s.Rnd(3000)))
-		}
-	case q0 > q1:
-		i1 = 3
-	case q0 == q1:
-		i1 = pick(s, 2, 3)
-	case q0 < q1:
-		i1 = 2
-	}
-	return settle(s, n, c, i1, p)
-}
-
-// settle gives c slot i1 (2 to 4) with p, plus a random share, unless the
-// third slot stands lower: then c takes that one, a tie broken at random.
-// It returns the slot it gave c, or 0 when i1 names none.
-func settle(s *script.Script, n *script.NPC, c script.Creature, i1 int, p points) int {
-	pts, who := targetSlots()
-	q2 := n.Int(pts[2])
-	switch i1 {
-	case 2:
-		switch q0 := n.Int(pts[0]); {
-		case q0 > q2:
-			i1 = 4
-		case q0 == q2:
-			i1 = pick(s, 2, 4)
-		case q0 < q2:
-			i1 = 2
-		}
-	case 3:
-		switch q1 := n.Int(pts[1]); {
-		case q1 > q2:
-			i1 = 4
-		case q1 == q2:
-			i1 = pick(s, 3, 4)
-		case q1 < q2:
-			i1 = 3
-		}
-	}
-
-	switch i1 {
-	case 2, 3, 4:
-		n.SetInt(pts[i1-2], p.stored+int32(s.Rnd(3000)))
-		n.SetSlot(who[i1-2], c)
-		return i1
-	}
-	return 0
-}
-
-// pick returns a or b on an even draw.
-func pick(s *script.Script, a, b int) int {
-	if s.RndBool() {
-		return a
-	}
-	return b
-}
-
 // gone reports whether target slot c holds no one Antharas can still
 // rank: empty, over 9000 away in 3D or dead.
 func gone(n *script.NPC, c script.Creature) bool {
@@ -428,7 +327,7 @@ func inCone(n *script.NPC, c script.Creature, distance, half float64) bool {
 // castAntharasSkill makes Antharas cast one of its skills at or around its
 // best target: the lower its HP, the more of its skills it draws from.
 func castAntharasSkill(s *script.Script, n *script.NPC) {
-	pts, who := targetSlots()
+	pts, who := targets().Points, targets().Who
 	for i := range pts {
 		if gone(n, n.Slot(who[i])) {
 			n.SetInt(pts[i], 0)

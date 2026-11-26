@@ -11,13 +11,15 @@ import (
 // says and shows are named constants in the reference, numbers in Go; the
 // stone's abort on an empty memo key is the reference's thrown exception;
 // the memo key itself is named from the shared bossmemo table.
+// Its even draws (Rnd.nextBoolean) are made by the shared target ranker of
+// package bossrank.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.boss.baium.Archangel",
 		"script.ai.boss.baium.Baium",
 		"script.ai.boss.baium.BaiumAngelicVortex",
 		"script.ai.boss.baium.BaiumStone",
-	}, "number 22937", "number 1000521",
+	}, "call Rnd.nextBoolean", "number 22937", "number 1000521",
 		`string "baium: global memo %q holds no value"`, `string "2"`)
 	if err != nil {
 		t.Fatal(err)
