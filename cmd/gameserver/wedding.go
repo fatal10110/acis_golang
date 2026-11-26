@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/config"
@@ -37,18 +36,17 @@ func loadWeddingConfig(paths gameServerPaths) (wedding.Config, error) {
 // ones from the id allocator, whose boot scan already counts the stored
 // couple ids as used. A load that fails stops boot, so that the shutdown
 // save cannot replace couples it never read.
-func provideWedding(ctx bootContext, paths gameServerPaths, pool *sql.DB, ids *idfactory.Allocator, log zerolog.Logger) (*wedding.Manager, *gamesql.CoupleStore, error) {
+func provideWedding(ctx bootContext, paths gameServerPaths, store *gamesql.CoupleStore, ids *idfactory.Allocator, log zerolog.Logger) (*wedding.Manager, error) {
 	cfg, err := loadWeddingConfig(paths)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	store := gamesql.NewCoupleStore(pool)
 	couples, err := store.Load(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	log.Info().Int("count", len(couples)).Msg("wedding: loaded couples")
-	return wedding.NewManager(cfg, ids, couples, nil), store, nil
+	return wedding.NewManager(cfg, ids, couples, nil), nil
 }
 
 // startWedding stores every couple once the game server has let every

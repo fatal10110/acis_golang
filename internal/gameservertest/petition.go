@@ -2,7 +2,6 @@ package gameservertest
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -15,10 +14,9 @@ func WithPetitionConfig(cfg petition.Config) Option {
 	return func(o *options) { o.petitionConfig = &cfg }
 }
 
-// bootPetitions loads the stored petitions as the boot path does.
-func bootPetitions(t *testing.T, db *sql.DB, chars *gamesql.CharacterStore, ids petition.IDs, cfg *petition.Config) (*petition.Manager, *gamesql.PetitionStore) {
+// bootPetitions loads the petitions stored in store as the boot path does.
+func bootPetitions(t *testing.T, store *gamesql.PetitionStore, chars *gamesql.CharacterStore, ids petition.IDs, cfg *petition.Config) *petition.Manager {
 	t.Helper()
-	store := gamesql.NewPetitionStore(db)
 	records, err := store.Load(context.Background())
 	if err != nil {
 		t.Fatalf("load petitions: %v", err)
@@ -31,7 +29,7 @@ func bootPetitions(t *testing.T, db *sql.DB, chars *gamesql.CharacterStore, ids 
 	if cfg != nil {
 		config = *cfg
 	}
-	return petition.NewManager(config, ids, time.Now, records, names), store
+	return petition.NewManager(config, ids, time.Now, records, names)
 }
 
 // SavePetitions writes every petition to the petition tables, as the

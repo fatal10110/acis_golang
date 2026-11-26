@@ -27,10 +27,6 @@ const (
 	// simPoolStopTimeout bounds the wait for the actor pool's workers to
 	// finish their queued, in-memory tasks.
 	simPoolStopTimeout = 5 * time.Second
-	// persistCloseTimeout bounds the persistence worker's last close, which
-	// gives lanes the item drain's own close left backed up a little longer.
-	// The ground-item save and the database close still follow it.
-	persistCloseTimeout = 5 * time.Second
 	// gameServerStopSlack covers the stop hooks that neither wait on the
 	// database nor on other goroutines' work: in-memory tickers finishing a
 	// tick, stopping a timer, closing the logger. Closing the database pool
@@ -57,7 +53,7 @@ const (
 		simPoolStopTimeout +
 		task.ItemInstanceSaveTimeout + // item ticker: its stop cancels an in-flight save, so this is headroom, not task.ItemInstanceTickBudget
 		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
-		persistCloseTimeout +
+		app.PersistCloseTimeout +
 		shutdownSaveTimeout + // items_on_ground
 		2*olympiad.TaskTimeout + // the Olympiad's queued olympiad_nobles and server_memo writes, then its final save
 		shutdownSaveTimeout + // grandboss_list
@@ -164,7 +160,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 func gameServerProviders(paths gameServerPaths) []fx.Option {
 	return []fx.Option{
 		fx.Supply(paths),
-		app.Stores,
+		app.Graph,
 		fx.Provide(
 			provideBootContext,
 			loadGameServerProperties,
@@ -175,8 +171,6 @@ func gameServerProviders(paths gameServerPaths) []fx.Option {
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
 			provideGameServerDatabase,
-			providePersist,
-			provideItemWriteOrder,
 			loadHTMLCache,
 			loadCrestCache,
 			loadGameData,
@@ -231,7 +225,6 @@ func gameServerProviders(paths gameServerPaths) []fx.Option {
 			provideScriptSpawner,
 			provideQuestJournals,
 			provideMakers,
-			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideLoginStatus,
 			provideShutdown,

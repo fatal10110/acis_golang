@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"path/filepath"
 	"time"
 
@@ -83,15 +82,14 @@ func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
 }
 
 // provideSpawns loads the spawnlist XML and restores dynamic spawn_data
-// rows, returning the store alongside so it can be reused to persist state
-// back at shutdown. A row's death, respawn deadline and db value changes are
-// written as they happen, on the persistence worker.
-func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, worker *persist.Worker, log zerolog.Logger, gameplay gameplayConfig) (*manager.Spawns, *gamesql.SpawnStore, error) {
-	store := gamesql.NewSpawnStore(pool)
+// rows from store, which persists their state back at shutdown. A row's
+// death, respawn deadline and db value changes are written as they happen,
+// on the persistence worker.
+func provideSpawns(ctx bootContext, paths gameServerPaths, store *gamesql.SpawnStore, worker *persist.Worker, log zerolog.Logger, gameplay gameplayConfig) (*manager.Spawns, error) {
 	dir := filepath.Join(paths.DataRoot, "data", "xml", "spawnlist")
 	spawns, err := manager.LoadSpawns(ctx, dir, store, log, float64(gameplay.SpawnMultiplier))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	spawns.WriteRows(store, worker, log)
 	log.Info().
@@ -99,7 +97,7 @@ func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, worker 
 		Int("spawn_entries", spawns.Table().SpawnCount()).
 		Int("persisted_spawn_rows", spawns.StateCount()).
 		Msg("spawn list loaded")
-	return spawns, store, nil
+	return spawns, nil
 }
 
 // provideNpcs builds the NPC population, wires the decay/respawn tasks'

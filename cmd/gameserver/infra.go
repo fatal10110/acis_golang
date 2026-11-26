@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/config"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
-	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
@@ -100,36 +98,6 @@ func provideGameServerDatabase(lc fx.Lifecycle, ctx bootContext, cfg gameServerC
 // unreachable database refuses the boot at once rather than after the
 // datapack has loaded.
 func requireDatabase(*sql.DB) {}
-
-// providePersist starts the persistence worker that runs player, pet and item
-// writes. It takes the pool so fx builds the database first and therefore
-// closes it only after this worker has drained, and every hook appended later
-// (item flush, the game listener's detach saves) stops before the drain.
-func providePersist(lc fx.Lifecycle, _ *sql.DB, log zerolog.Logger) *persist.Worker {
-	worker := persist.New(log)
-	lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
-		return closePersistOnStop(ctx, worker, persistCloseTimeout)
-	}})
-	return worker
-}
-
-// closePersistOnStop waits at most budget of the stop context for the
-// persistence worker to drain. Lanes a slow database has backed up would
-// otherwise hold the rest of the stop budget, and fx would then skip the
-// ground-item save that stops after this hook.
-func closePersistOnStop(ctx context.Context, worker *persist.Worker, budget time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, budget)
-	defer cancel()
-	return worker.Close(ctx)
-}
-
-// provideItemWriteOrder builds the ordering both writers of the items table
-// share: the handlers' single-row writes and the lazy persistence task write
-// the same rows from different lanes, and a row's last write has to be the
-// last one produced for it.
-func provideItemWriteOrder() *persist.Order {
-	return persist.NewOrder()
-}
 
 func provideIDAllocator(ctx bootContext, pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
 	return idfactory.New(ctx, pool, log)
