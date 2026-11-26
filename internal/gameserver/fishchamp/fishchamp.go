@@ -26,7 +26,7 @@ import (
 )
 
 // TaskTimeout bounds one database read or write.
-const TaskTimeout = 10 * time.Second
+const TaskTimeout = persist.ServiceTaskTimeout
 
 // writeLane is the persistence owner every championship save is queued
 // under, the game-wide services' own lane.
@@ -494,13 +494,7 @@ func (c *Championship) enqueueSave() {
 	if pending {
 		return
 	}
-	if !c.writes.Enqueue(writeLane, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
-		defer cancel()
-		if err := c.save(ctx); err != nil {
-			c.log.Error().Err(err).Msg("fishing championship: save")
-		}
-	}) {
+	if !c.writes.Enqueue(writeLane, persist.ServiceJob(c.log, "fishing championship: save", c.save)) {
 		c.mu.Lock()
 		c.savePending = false
 		c.mu.Unlock()
