@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"database/sql"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,69 +16,6 @@ import (
 // waits, both queues still run work posted to them, and the command answers
 // as before once the wait is over.
 
-// lockTable takes a table lock of mode on table for the test, returning the
-// unlock, which the test's cleanup runs too.
-func lockTable(t *testing.T, srv *gameservertest.Server, table, mode string) func() {
-	t.Helper()
-	ctx := context.Background()
-	conn, err := srv.DB.Conn(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := conn.ExecContext(ctx, `LOCK TABLES `+table+` `+mode); err != nil {
-		t.Fatal(err)
-	}
-	var unlocked bool
-	unlock := func() {
-		if unlocked {
-			return
-		}
-		unlocked = true
-		if _, err := conn.ExecContext(ctx, `UNLOCK TABLES`); err != nil {
-			t.Error(err)
-		}
-		conn.Close()
-	}
-	t.Cleanup(unlock)
-	return unlock
-}
-
-// awaitStatementOnLock returns once a statement starting with prefix waits
-// on a table lock.
-func awaitStatementOnLock(t *testing.T, db *sql.DB, prefix string) {
-	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		if time.Now().After(deadline) {
-			t.Fatalf("no %q ever waited on a table lock", prefix)
-		}
-		var n int
-		if err := db.QueryRowContext(context.Background(),
-			`SELECT COUNT(*) FROM information_schema.PROCESSLIST
-			  WHERE db = DATABASE() AND state LIKE 'Waiting for table%' AND info LIKE ?`, prefix+"%").Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		if n > 0 {
-			return
-		}
-	}
-}
-
-// probeQueue requires the queue of the online character objID to run work
-// posted to it.
-func probeQueue(t *testing.T, srv *gameservertest.Server, objID int32) {
-	t.Helper()
-	ran := make(chan struct{})
-	if !srv.PlayerQueue(t, objID).Post(func() { close(ran) }) {
-		t.Fatalf("queue of %d refused the probe", objID)
-	}
-	select {
-	case <-ran:
-	case <-time.After(10 * time.Second):
-		t.Fatalf("queue of %d did not run the probe while the command waited", objID)
-	}
-}
-
 // TestAdminBanOfflineLookupHoldsNoQueue bans an offline character by name
 // while the characters table is locked: the name lookup waits off the game
 // master's queue, and the ban lands and is reported once it is unlocked.
@@ -90,10 +26,10 @@ func TestAdminBanOfflineLookupHoldsNoQueue(t *testing.T) {
 	enterWorld(t, gm)
 	ch := srv.SeedCharacterFor(t, "player2", "Player", 1, 0)
 
-	unlock := lockTable(t, srv, "characters", "WRITE")
+	unlock := srv.LockTable(t, "characters")
 	gm.Send(encodeBuildCmd("ban player Player"))
-	awaitStatementOnLock(t, srv.DB, "SELECT obj_Id, char_name")
-	probeQueue(t, srv, gmID)
+	srv.AwaitLockWait(t, "SELECT obj_Id, char_name")
+	srv.AwaitQueueRuns(t, gmID)
 	unlock()
 
 	assertTexts(t, settle(t, gm), "Player now has an access level of -1.")
@@ -115,11 +51,11 @@ func TestAdminSetNameCheckHoldsNoQueue(t *testing.T) {
 	drain(t, gm)
 	selectPlayer(t, gm, user, userID)
 
-	unlock := lockTable(t, srv, "characters", "WRITE")
+	unlock := srv.LockTable(t, "characters")
 	gm.Send(encodeBuildCmd("set name Renamed7"))
-	awaitStatementOnLock(t, srv.DB, "SELECT COUNT(*) FROM characters WHERE char_name")
-	probeQueue(t, srv, gmID)
-	probeQueue(t, srv, userID)
+	srv.AwaitLockWait(t, "SELECT COUNT(*) FROM characters WHERE char_name")
+	srv.AwaitQueueRuns(t, gmID)
+	srv.AwaitQueueRuns(t, userID)
 	unlock()
 
 	_, rest := split(settle(t, gm))
@@ -142,11 +78,11 @@ func TestAdminSetNameStoreHoldsNoQueue(t *testing.T) {
 	drain(t, gm)
 	selectPlayer(t, gm, user, userID)
 
-	unlock := lockTable(t, srv, "characters", "READ")
+	unlock := srv.LockTableRead(t, "characters")
 	gm.Send(encodeBuildCmd("set name Renamed8"))
-	awaitStatementOnLock(t, srv.DB, "UPDATE characters SET char_name")
-	probeQueue(t, srv, gmID)
-	probeQueue(t, srv, userID)
+	srv.AwaitLockWait(t, "UPDATE characters SET char_name")
+	srv.AwaitQueueRuns(t, gmID)
+	srv.AwaitQueueRuns(t, userID)
 	unlock()
 
 	_, rest := split(settle(t, gm))
@@ -181,7 +117,7 @@ func TestAdminRespawnAllHoldsNoQueue(t *testing.T) {
 		close(release)
 		t.Fatal("//respawnall never reached its spawn list reload")
 	}
-	probeQueue(t, srv, gmID)
+	srv.AwaitQueueRuns(t, gmID)
 	close(release)
 
 	if got := noticesIn(settle(t, gm)); len(got) != 1 || got[0] != "NPCs' respawn is now complete." {
@@ -218,7 +154,7 @@ func TestAdminReloadHoldsNoQueue(t *testing.T) {
 		close(release)
 		t.Fatal("//reload never reached its HTML read")
 	}
-	probeQueue(t, srv, gmID)
+	srv.AwaitQueueRuns(t, gmID)
 	close(release)
 
 	assertTexts(t, settle(t, gm), "The HTM cache has been reloaded.", "Walking routes have been reloaded.")
@@ -239,10 +175,10 @@ func TestAdminBookmarkReadHoldsNoQueue(t *testing.T) {
 	}
 	enterWorld(t, gm)
 
-	unlock := lockTable(t, srv, "bookmarks", "WRITE")
+	unlock := srv.LockTable(t, "bookmarks")
 	gm.Send(encodeBuildCmd("bk"))
-	awaitStatementOnLock(t, srv.DB, "SELECT name, COALESCE(x, 0)")
-	probeQueue(t, srv, gmID)
+	srv.AwaitLockWait(t, "SELECT name, COALESCE(x, 0)")
+	srv.AwaitQueueRuns(t, gmID)
 	unlock()
 
 	assertOnePage(t, "//bk", settle(t, gm), bookmarkPage(t, bookmarkRow(0, "Alpha", 1, 2, 3)))

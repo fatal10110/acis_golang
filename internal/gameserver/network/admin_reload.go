@@ -104,8 +104,9 @@ type reloadType struct {
 	exact bool
 	// done is what the game master is told once the type has reloaded.
 	done string
-	// run reloads the type on the game master's connection goroutine.
-	run func(l *GameClientLink) error
+	// run reloads the type on the game master's connection goroutine,
+	// bounding its database work by ctx.
+	run func(l *GameClientLink, ctx context.Context) error
 	// runThen, when set, reloads in place of run for the game master gm,
 	// on gm's connection goroutine. Unless it fails, it runs then on gm's
 	// queue once the reload is over, which may be after it returns.
@@ -115,23 +116,28 @@ type reloadType struct {
 // reloadTypes are the types //reload takes, in the order //reload
 // tests a token against them: the first that matches reloads.
 var reloadTypes = []reloadType{
-	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Admin) }},
-	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink) error { return l.announcements.Load() }},
+	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.Admin) }},
+	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return l.announcements.Load() }},
 	{word: "boat", done: "Boat have been reloaded.", runThen: (*GameClientLink).reloadBoats},
 	{word: "buylist", done: "Buylists have been reloaded.", run: (*GameClientLink).reloadBuyLists},
-	{word: "config", done: "Configs files have been reloaded.", run: (*GameClientLink).reloadConfig},
-	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
-	{word: "cw", done: "Cursed weapons have been reloaded.", run: (*GameClientLink).reloadCursedWeapons},
-	{word: "door", done: "Doors instance has been reloaded.", run: (*GameClientLink).reloadDoors},
-	{word: "htm", done: "The HTM cache has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.HTML) }},
-	{word: "item", done: "Items' templates have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Items) }},
-	{word: "multisell", exact: true, done: "The multisell instance has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Multisells) }},
-	{word: "npc", exact: true, done: "NPCs templates have been reloaded; scripts were not reloaded.", run: (*GameClientLink).reloadNPCs},
-	{word: "npcwalker", done: "Walking routes have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.WalkerRoutes) }},
+	{word: "config", done: "Configs files have been reloaded.", run: withoutContext((*GameClientLink).reloadConfig)},
+	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.Crests) }},
+	{word: "cw", done: "Cursed weapons have been reloaded.", run: withoutContext((*GameClientLink).reloadCursedWeapons)},
+	{word: "door", done: "Doors instance has been reloaded.", run: withoutContext((*GameClientLink).reloadDoors)},
+	{word: "htm", done: "The HTM cache has been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.HTML) }},
+	{word: "item", done: "Items' templates have been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.Items) }},
+	{word: "multisell", exact: true, done: "The multisell instance has been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.Multisells) }},
+	{word: "npc", exact: true, done: "NPCs templates have been reloaded; scripts were not reloaded.", run: withoutContext((*GameClientLink).reloadNPCs)},
+	{word: "npcwalker", done: "Walking routes have been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.WalkerRoutes) }},
 	{word: "script", exact: true, done: "Script reload is not supported; scripts load once, at server start.", run: reloadNothing},
-	{word: "skill", done: "Skills' XMLs have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Skills) }},
-	{word: "teleport", done: "Teleport locations have been reloaded.", run: (*GameClientLink).reloadTeleports},
+	{word: "skill", done: "Skills' XMLs have been reloaded.", run: func(l *GameClientLink, _ context.Context) error { return reloadHook(l.reloads.Skills) }},
+	{word: "teleport", done: "Teleport locations have been reloaded.", run: withoutContext((*GameClientLink).reloadTeleports)},
 	{word: "zone", done: "Zones have been reloaded.", run: (*GameClientLink).reloadZones},
+}
+
+// withoutContext adapts a reload that does no database work to run.
+func withoutContext(run func(*GameClientLink) error) func(*GameClientLink, context.Context) error {
+	return func(l *GameClientLink, _ context.Context) error { return run(l) }
 }
 
 // reloadUsage is what //reload answers a type it does not take.
@@ -188,7 +194,7 @@ func (l *GameClientLink) reloadTokens(ctx context.Context, gm *livePlayer, token
 				}
 			}
 		} else {
-			err = typ.run(l)
+			err = typ.run(l, context.WithoutCancel(ctx))
 		}
 		stop := false
 		onLive(gm, func() {
@@ -229,7 +235,7 @@ func sendReloadUsage(live *livePlayer) {
 
 // reloadNothing answers a type that is never reloaded: scripts are built
 // once, at boot, and their registry never changes.
-func reloadNothing(*GameClientLink) error { return nil }
+func reloadNothing(*GameClientLink, context.Context) error { return nil }
 
 // reloadNPCs reloads the NPC templates. Scripts are not
 // reloaded with them; their bindings are keyed by NPC id, so the new
@@ -275,7 +281,7 @@ const reloadBuyListsTimeout = 30 * time.Second
 
 // reloadBuyLists reads the buylists anew and hands them to the merchant,
 // which rebuilds their limited stock from the saved rows.
-func (l *GameClientLink) reloadBuyLists() error {
+func (l *GameClientLink) reloadBuyLists(ctx context.Context) error {
 	if l.reloads.BuyLists == nil || l.merchant == nil {
 		return errNoReloadHook
 	}
@@ -283,7 +289,7 @@ func (l *GameClientLink) reloadBuyLists() error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), reloadBuyListsTimeout)
+	ctx, cancel := context.WithTimeout(ctx, reloadBuyListsTimeout)
 	defer cancel()
 	return l.merchant.Reload(ctx, lists)
 }
