@@ -26,13 +26,8 @@ func (e castleManorEffects) AddToClanWarehouse(clanID, itemID int32, count int) 
 	}
 	end := l.belongings.itemInstances.BeginOperation(clanID)
 	defer end()
-	id, err := l.nextObjectID()
-	if err != nil {
+	if _, err := wh.AddCreated(itemID, count, l.nextObjectID); err != nil {
 		l.log.Error().Err(err).Int32("clan_id", clanID).Int32("item_id", itemID).Int("count", count).Msg("manor: no object id for crops")
-		return
-	}
-	if added := wh.AddNew(itemID, count, id); added == nil || added.ObjectID != id {
-		l.releaseObjectID(id)
 	}
 }
 

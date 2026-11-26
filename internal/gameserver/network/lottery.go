@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -161,22 +162,19 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 	}
 	// The ticket's id is taken before the price, so an exhausted id
 	// factory refuses the sale instead of charging for no ticket.
-	id, err := l.nextObjectID()
+	ids, err := itemcontainer.ReserveIDs(1, l.nextObjectID)
 	if err != nil {
 		l.log.Error().Err(err).Msg("lottery: no object id for a ticket")
 		return false
 	}
 	if !reduceAdena(live, int(price)) {
-		l.releaseObjectID(id)
 		return false
 	}
 	lot.IncreasePrize(price)
-	if ticket := inv.AddNew(lottery.TicketID, 1, id); ticket != nil {
+	if ticket, _ := inv.AddCreated(lottery.TicketID, 1, ids.Next); ticket != nil {
 		ticket.SetCustomType1(int(round))
 		inv.SetEnchantLevel(ticket, int(numbers.Low))
 		ticket.SetCustomType2(int(numbers.High))
-	} else {
-		l.releaseObjectID(id)
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEarnedItemS1, lottery.TicketID))
 	return true
@@ -202,42 +200,22 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 	// reads what a check after it would. A payout that needs a new
 	// adena stack takes its id before the destroy, so an exhausted id
 	// factory keeps the ticket; one joining held adena takes none, since an
-	// id taken and given back is still spent.
+	// id is never reused once taken. Should the held adena go since the
+	// check, the payout takes a late id.
 	_, adena := l.lottery.Check(int32(st.CustomType1), lottery.Numbers{Low: int32(st.EnchantLevel), High: int32(st.CustomType2)})
-	var id int32
+	newStack := 0
 	if adena > 0 && inv.ItemByTemplateID(item.AdenaID) == nil {
-		var err error
-		if id, err = l.nextObjectID(); err != nil {
-			l.log.Error().Err(err).Msg("lottery: no object id for a payout")
-			return
-		}
+		newStack = 1
 	}
-	defer func() {
-		if id != 0 {
-			l.releaseObjectID(id)
-		}
-	}()
+	ids, err := itemcontainer.ReserveIDs(newStack, l.nextObjectID)
+	if err != nil {
+		l.log.Error().Err(err).Msg("lottery: no object id for a payout")
+		return
+	}
 	if !destroyHeldItem(live, inst, st.Count) || adena <= 0 {
 		return
 	}
-	live.AddRewardItem(item.AdenaID, int(adena), false, func() (int32, error) {
-		if reserved := id; reserved != 0 {
-			id = 0
-			return reserved, nil
-		}
-		// The held adena went since the check: take a late id.
-		return l.nextObjectID()
-	})
-}
-
-// releaseObjectID gives back id, taken for a ticket or payout that was then
-// refused, so a refused attempt holds no object id; an allocator that
-// cannot take ids back keeps it.
-func (l *GameClientLink) releaseObjectID(id int32) {
-	// accepted: releasing ids is an optional allocator capability.
-	if r, ok := l.ids.(interface{ ReleaseID(int32) }); ok {
-		r.ReleaseID(id)
-	}
+	live.AddRewardItem(item.AdenaID, int(adena), false, ids.Next)
 }
 
 // destroyHeldItem destroys count units of inst out of live's inventory,

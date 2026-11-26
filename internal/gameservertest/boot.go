@@ -1985,12 +1985,13 @@ func (s *Server) Close() {
 //
 // mu guards next, reserved, issued and released.
 type sequentialIDs struct {
-	mu       sync.Mutex
-	start    int32 // ids up to start are never handed out
-	next     int32 // last id handed out (start before the first)
-	reserved map[int32]struct{}
-	issued   int                // ids handed out
-	released map[int32]struct{} // ids handed out and given back
+	mu        sync.Mutex
+	start     int32 // ids up to start are never handed out
+	next      int32 // last id handed out (start before the first)
+	reserved  map[int32]struct{}
+	issued    int                // ids handed out
+	released  map[int32]struct{} // ids handed out and given back
+	exhausted bool               // NextID fails, as a used-up id range does
 }
 
 func newSequentialIDs(start int32) *sequentialIDs {
@@ -2015,6 +2016,9 @@ func (s *sequentialIDs) ReleaseID(id int32) {
 func (s *sequentialIDs) NextID() (int32, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.exhausted {
+		return 0, errObjectIDsExhausted
+	}
 	for {
 		s.next++
 		if _, ok := s.reserved[s.next]; !ok {

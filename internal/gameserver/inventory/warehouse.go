@@ -150,7 +150,7 @@ func (s *Service) Deposit(inv *itemcontainer.Inventory, store Store, rows []Move
 	if !fits(slots) {
 		return Result{}, StoreOverCapacity, nil
 	}
-	if int64(adena) < int64(fee) || !reduceAdena(inv, fee) {
+	if int64(adena) < int64(fee) || !payAdena(inv, fee) {
 		return Result{}, StoreNotEnoughAdena, nil
 	}
 	var res Result
@@ -199,7 +199,7 @@ func (s *Service) SendPackage(inv *itemcontainer.Inventory, store Store, rows []
 	if !fits(slots) {
 		return Result{}, StoreOverCapacity, nil
 	}
-	if int64(adena) < int64(fee) || !reduceAdena(inv, fee) {
+	if int64(adena) < int64(fee) || !payAdena(inv, fee) {
 		return Result{}, StoreNotEnoughAdena, nil
 	}
 	var res Result
@@ -339,7 +339,6 @@ func (s *Service) move(res *Result, sourceOwnerID int32, inst *item.Instance, co
 	if !ok {
 		return errNoIDAllocator
 	}
-	defer id.release()
 	moved, freedID, freed, err := transfer(id.next)
 	if moved == nil && err == nil {
 		return nil
@@ -362,14 +361,8 @@ func (s *Service) move(res *Result, sourceOwnerID int32, inst *item.Instance, co
 	return nil
 }
 
-// reduceAdena takes count adena from inv, reporting false when inv holds
-// less. Nothing is taken for a count below 1.
-func reduceAdena(inv *itemcontainer.Inventory, count int) bool {
-	if count > inv.Adena() {
-		return false
-	}
-	if count > 0 {
-		return inv.DestroyByTemplateID(item.AdenaID, count) != nil
-	}
-	return true
+// payAdena takes count adena from inv, per Inventory.PayAdena.
+func payAdena(inv *itemcontainer.Inventory, count int) bool {
+	_, ok := inv.PayAdena(count)
+	return ok
 }

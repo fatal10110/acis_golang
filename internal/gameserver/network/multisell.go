@@ -49,6 +49,9 @@ func (l *GameClientLink) requestMultiSellChoose(live *livePlayer, req clientpack
 	out := l.multisell.Choose(live.Character, live.shownMultisell.Load(), npcID, reachable, multisell.Choice{
 		ListID: req.ListID, EntryID: req.EntryID, Amount: req.Amount,
 	})
+	if out.Err != nil {
+		l.log.Error().Err(out.Err).Int32("multisell", req.ListID).Msg("multisell choose: allocate item id")
+	}
 	if out.Forget {
 		live.shownMultisell.Store(nil)
 	}

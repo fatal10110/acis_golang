@@ -338,10 +338,10 @@ func (c *Container) Adena() int {
 // When merged, inst's own identity is absorbed into the pre-existing
 // stack: absorbed is true, inst's own state is reset as destroyed — so a
 // row it may have had is deleted rather than surviving alongside the units
-// now counted on the pre-existing stack — and the caller must release its
-// object id back to the id allocator (and remove it from the world
-// registry) since it's no longer live. The returned instance is always the
-// one the container now actually holds.
+// now counted on the pre-existing stack — and its object id is no longer
+// live. Object ids are not reused within a session, so that id is never
+// handed out again. The returned instance is always the one the container
+// now actually holds.
 func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bool) {
 	if inst == nil {
 		return nil, false
@@ -383,9 +383,10 @@ func (c *Container) insertLocked(inst *item.Instance) {
 // It always creates exactly one instance: a stackable template gets count
 // units on it, a non-stackable one gets a single unit regardless of count.
 // When the units join a stack the container already holds, objectID is not
-// used: the returned instance carries another id, and the caller must give
-// objectID back to its allocator. AddCreated takes an id only when one is
-// needed.
+// used: the returned instance carries another id, and objectID stays spent,
+// since object ids are not reused within a session. It serves callers
+// holding an id already assigned; a new item takes AddCreated, which takes
+// an id only when one is needed.
 func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.Instance {
 	inst, ok := newInstance(c.templates, templateID, count, objectID)
 	if !ok {
@@ -569,9 +570,10 @@ func noObjectID() (int32, error) { return 0, errNoObjectID }
 // held stack take none; a nil nextID refuses that case. It returns the
 // resulting instance in target (nil if objectID isn't held by c, or with
 // nextID's error when the units left c but no id could be taken for
-// them), and reports via freed/freedObjectID an object id the caller must
-// now release — either objectID itself (fully absorbed into an existing
-// target stack or fully destroyed here) or none.
+// them), and reports via freed/freedObjectID an object id no longer live —
+// either objectID itself (fully absorbed into an existing target stack or
+// fully destroyed here) or none. Object ids are not reused within a
+// session, so a freed id is never handed out again.
 //
 // The caller remains responsible for undoing any life-stone augmentation
 // bonus a transferred instance was granting its previous owner — that's

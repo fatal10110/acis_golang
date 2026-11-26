@@ -200,6 +200,9 @@ type Outcome struct {
 	// Tax is the castle tax a completed exchange took, for the castle of
 	// the NPC the player is trading with to collect.
 	Tax int
+	// Err is why the exchange was refused without a word before anything
+	// changed: no object ids could be taken for its products.
+	Err error
 }
 
 // Choose trades amount units of entry entryID of list, the list c was last
@@ -222,15 +225,24 @@ func (s *Service) Choose(c *player.Character, list *modelmultisell.List, npcID i
 		return Outcome{Forget: true}
 	}
 
-	slots, weight := 0, 0
+	// newIDs counts the instances the products create: each unit of a
+	// non-stackable product, and one stack of each stackable one c does not
+	// hold.
+	slots, weight, newIDs := 0, 0, 0
+	newStacks := map[int32]bool{}
 	for _, p := range entry.Products {
 		if p.ItemID < 0 {
 			continue
 		}
 		if !p.Stackable() {
 			slots += p.Count * amount
+			newIDs += p.Count * amount
 		} else if inv.ItemByTemplateID(p.ItemID) == nil {
 			slots++
+			if !newStacks[p.ItemID] {
+				newStacks[p.ItemID] = true
+				newIDs++
+			}
 		}
 		weight += p.Count * amount * int(p.Weight())
 	}
@@ -274,13 +286,19 @@ func (s *Service) Choose(c *player.Character, list *modelmultisell.List, npcID i
 		}
 	}
 
+	// The products' ids are taken before any ingredient, so that running out
+	// of ids refuses the exchange instead of taking its price.
+	ids, err := itemcontainer.ReserveIDs(newIDs, s.nextID)
+	if err != nil {
+		return Outcome{Err: err}
+	}
 	var out Outcome
 	augmentations, ok := s.takeIngredients(inv, list, entry, amount, payer, keep, &out)
 	if !ok {
 		out.Forget = true
 		return out
 	}
-	s.giveProducts(c, inv, list, entry, amount, augmentations, &out)
+	s.giveProducts(c, inv, list, entry, amount, augmentations, ids.Next, &out)
 	out.Notices = append(out.Notices, Traded{})
 	out.Tax = entry.TaxAmount() * amount
 	return out
@@ -451,7 +469,7 @@ func consume(inv *itemcontainer.Inventory, inst *item.Instance, count int, out *
 // maintaining enchantment takes the product's enchant level and, by its
 // place among the units, the taken ingredients' augmentations. Each product
 // is named once, but clan reputation, which goes to c's clan unnamed.
-func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory, list *modelmultisell.List, entry modelmultisell.Entry, amount int, augmentations []item.Augmentation, out *Outcome) {
+func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory, list *modelmultisell.List, entry modelmultisell.Entry, amount int, augmentations []item.Augmentation, nextID func() (int32, error), out *Outcome) {
 	for _, p := range entry.Products {
 		if p.ItemID == clanReputationID {
 			s.payReputation(c, p.Count*amount, out)
@@ -459,10 +477,10 @@ func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory
 		}
 		count := p.Count * amount
 		if p.Stackable() {
-			s.add(inv, p.ItemID, count)
+			add(inv, p.ItemID, count, nextID)
 		} else {
 			for i := range count {
-				inst := s.add(inv, p.ItemID, 1)
+				inst := add(inv, p.ItemID, 1, nextID)
 				if inst == nil || !list.MaintainEnchantment {
 					continue
 				}
@@ -498,7 +516,7 @@ func (s *Service) payReputation(c *player.Character, points int, out *Outcome) {
 // add creates count units of itemID in inv as one new instance, joining a
 // held stack of a stackable item, which takes no object id. It returns nil
 // when itemID has no template or no object id could be allocated.
-func (s *Service) add(inv *itemcontainer.Inventory, itemID int32, count int) *item.Instance {
-	inst, _ := inv.AddCreated(itemID, count, s.nextID)
+func add(inv *itemcontainer.Inventory, itemID int32, count int, nextID func() (int32, error)) *item.Instance {
+	inst, _ := inv.AddCreated(itemID, count, nextID)
 	return inst
 }

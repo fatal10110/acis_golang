@@ -1,5 +1,10 @@
 package gameservertest
 
+import "errors"
+
+// errObjectIDsExhausted is the allocator error after ExhaustObjectIDs.
+var errObjectIDsExhausted = errors.New("object ids exhausted")
+
 // WithSingleItemDrop turns server.properties MultipleItemDrop off for kill
 // rewards, party loot, the scripts and item creation: a non-stackable item
 // counted above one falls, is auto-looted or is given as a single instance. Without it the setting is on, as
@@ -24,4 +29,12 @@ func (s *Server) ObjectIDsInUse() int {
 	s.ids.mu.Lock()
 	defer s.ids.mu.Unlock()
 	return s.ids.issued - len(s.ids.released)
+}
+
+// ExhaustObjectIDs makes every later object id request fail, as a used-up
+// id range does.
+func (s *Server) ExhaustObjectIDs() {
+	s.ids.mu.Lock()
+	defer s.ids.mu.Unlock()
+	s.ids.exhausted = true
 }

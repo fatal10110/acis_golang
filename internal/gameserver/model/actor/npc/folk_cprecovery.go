@@ -2,7 +2,6 @@ package npc
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -46,7 +45,7 @@ func (f *Folk) CPRecovery(talker *player.Character) CPRecoveryOutcome {
 	if inv == nil || inv.Adena() < CPRecoveryFee {
 		return CPRecoveryNotEnoughAdena
 	}
-	if inv.DestroyByTemplateID(item.AdenaID, CPRecoveryFee) == nil {
+	if _, ok := inv.PayAdena(CPRecoveryFee); !ok {
 		return CPRecoveryUnpaid
 	}
 	f.AddCastDesire(talker, arenaCPRecovery, cpRecoveryWeight, true, true)

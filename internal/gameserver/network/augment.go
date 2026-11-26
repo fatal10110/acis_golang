@@ -4,7 +4,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -214,12 +213,12 @@ func (l *GameClientLink) cancelAugment(live *livePlayer, req clientpackets.Reque
 	var persist []invops.Persist
 	end := l.belongings.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
-	if check.Price > 0 {
-		paid := inv.DestroyByTemplateID(item.AdenaID, check.Price)
-		if paid == nil {
-			live.SendFrame(serverpackets.FrameExVariationCancelResult(0))
-			return
-		}
+	paid, ok := inv.PayAdena(check.Price)
+	if !ok {
+		live.SendFrame(serverpackets.FrameExVariationCancelResult(0))
+		return
+	}
+	if paid != nil {
 		persist = append(persist, invops.DestroyedOrUpdated(adenaOwner, paid))
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(check.Price)))
 	}
