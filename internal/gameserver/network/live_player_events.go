@@ -162,6 +162,21 @@ func (p *livePlayer) Emit(ev event.Event) {
 	if p.holdForEnterWorld(ev) {
 		return
 	}
+	// Each event type belongs to exactly one group.
+	switch {
+	case p.emitAttackEvent(ev):
+	case p.emitMotionEvent(ev):
+	case p.emitStatusEvent(ev):
+	case p.emitEffectNoticeEvent(ev):
+	case p.emitScriptEvent(ev):
+	case p.emitHitFeedbackEvent(ev):
+	case p.emitRequestEvent(ev):
+	case p.emitActionEndEvent(ev):
+	}
+}
+
+// emitAttackEvent handles attack, cast and shot events.
+func (p *livePlayer) emitAttackEvent(ev event.Event) bool {
 	l, live := p.link, p
 	switch e := ev.(type) {
 	case event.Attack:
@@ -190,6 +205,16 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.combat.chance.AttackHit(live, e)
 	case event.ShotsRechargeRequested:
 		l.rechargeShots(live, live.Inventory(), e.Physical, e.Magic)
+	default:
+		return false
+	}
+	return true
+}
+
+// emitMotionEvent handles movement, stance and revive events.
+func (p *livePlayer) emitMotionEvent(ev event.Event) bool {
+	l, live := p.link, p
+	switch e := ev.(type) {
 	case event.Move:
 		l.broadcastLiveMoveEvent(live, e)
 	case event.MoveDebugStart, event.MoveDebugStep, event.PathDebug:
@@ -239,6 +264,17 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameConfirmDlgResurrectionRequest(e.ReviverName))
 	case event.ReviveRefused:
 		live.SendFrame(serverpackets.FrameSystemMessage(reviveRefusalMessage(e.Reason)))
+	default:
+		return false
+	}
+	return true
+}
+
+// emitStatusEvent handles death, vitals, experience, karma, mount and
+// character status events.
+func (p *livePlayer) emitStatusEvent(ev event.Event) bool {
+	l, live := p.link, p
+	switch e := ev.(type) {
 	case event.Died:
 		l.broadcastLiveDie(live)
 		l.stopLiveAttackStance(live)
@@ -320,7 +356,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.ChargeMessage:
 		if e.Maxed {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageForceMaxLevelReached))
-			return
+			return true
 		}
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageForceIncreasedToS1, int32(e.Charges)))
 	case event.GradePenaltyChanged:
@@ -341,6 +377,16 @@ func (p *livePlayer) Emit(ev event.Event) {
 			l.parties.RecalculateLevel(live.ObjectID())
 		}
 		l.refreshClanMemberLevel(live)
+	default:
+		return false
+	}
+	return true
+}
+
+// emitEffectNoticeEvent handles buff, regeneration and effect messages.
+func (p *livePlayer) emitEffectNoticeEvent(ev event.Event) bool {
+	live := p
+	switch e := ev.(type) {
 	case event.ShortBuff:
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(e.SkillID, e.Level, e.DurationSeconds))
 	case event.RegenMax:
@@ -369,11 +415,22 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.SpoilResult:
 		if e.Already {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadySpoiled))
-			return
+			return true
 		}
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSpoilSuccess))
 	case event.OverHit:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOverHit))
+	default:
+		return false
+	}
+	return true
+}
+
+// emitScriptEvent handles quest, dialog, tutorial and other script-driven
+// events.
+func (p *livePlayer) emitScriptEvent(ev event.Event) bool {
+	l, live := p.link, p
+	switch e := ev.(type) {
 	case event.ClanGateOpened:
 		l.announceClanGate(live)
 	case event.QuestListChanged:
@@ -426,10 +483,21 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.makeNoble(live)
 	case event.ServitorVanished:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
+	default:
+		return false
+	}
+	return true
+}
+
+// emitHitFeedbackEvent handles hit and damage feedback, attack refusals,
+// retargets and obtained items.
+func (p *livePlayer) emitHitFeedbackEvent(ev event.Event) bool {
+	l, live := p.link, p
+	switch e := ev.(type) {
 	case event.ShieldBlocked:
 		if e.Perfect {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageExcellentShieldDefenseSuccess))
-			return
+			return true
 		}
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShieldDefenceSuccessful))
 	case event.AttackFailed:
@@ -437,7 +505,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.HitDealt:
 		if e.Miss {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
-			return
+			return true
 		}
 		sendDamageMessage(live, hitDamage(e, skillhandler.DamageByPlayer))
 		l.notifyCompetitorDamage(live, e.TargetID, e.Damage)
@@ -469,7 +537,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.Retargeted:
 		if e.Target == nil {
 			l.unselectLiveTarget(live)
-			return
+			return true
 		}
 		l.selectLiveTarget(live, e.Target)
 	case event.HerbConsumed:
@@ -485,6 +553,17 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.feedCursedWeapon(live)
 	case event.CursedWeaponLost:
 		l.loseCursedWeapon(live)
+	default:
+		return false
+	}
+	return true
+}
+
+// emitRequestEvent handles summon, teleport, recall and attack stance
+// requests.
+func (p *livePlayer) emitRequestEvent(ev event.Event) bool {
+	l, live := p.link, p
+	switch e := ev.(type) {
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
@@ -517,6 +596,17 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.Attacked:
 		l.standAttackedLivePlayer(live)
 		l.startLiveAutoAttack(live)
+	default:
+		return false
+	}
+	return true
+}
+
+// emitActionEndEvent handles the ends of attacks, moves and casts, idle and
+// think requests, and summon spawns.
+func (p *livePlayer) emitActionEndEvent(ev event.Event) bool {
+	l, live := p.link, p
+	switch e := ev.(type) {
 	case event.Evaded:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, e.Attacker.CharacterName()))
 	case event.AttackAborted:
@@ -526,7 +616,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case event.AttackFinished:
 		if l.finishDeferredAction(live) {
-			return
+			return true
 		}
 		// A queued pickup, cast, follow or summon interact took the
 		// intention the swing had when it was queued; whether it started
@@ -534,12 +624,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 		// not swing again. A queued equip toggle resumes the attack itself
 		// once it has run.
 		if l.finishQueuedBehindAttack(live) {
-			return
+			return true
 		}
 		live.finishAttack()
 	case event.BowShotFinished:
 		if l.finishDeferredAction(live) {
-			return
+			return true
 		}
 		// A shot's end runs whatever was queued behind it, while the bow
 		// still reloads: a pickup, cast, follow, summon interact or equip
@@ -547,7 +637,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		// reuse answers with ActionFailed. The toggle re-thinks the attack
 		// itself.
 		if l.finishQueuedBehindAttack(live) {
-			return
+			return true
 		}
 		if live.combat != nil && live.combat.ThinkQueued() {
 			live.SendFrame(serverpackets.FrameActionFailed())
@@ -599,7 +689,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastScriptClanInfo(live)
 	case event.ClassChangeRequested, event.BaseClassChangeRequested, event.UserInfoBroadcast:
 		l.applyScriptClassEvent(live, e)
+	default:
+		return false
 	}
+	return true
 }
 
 // hitDamage is an auto-attack hit's damage feedback from source.
