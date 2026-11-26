@@ -14,8 +14,8 @@ func TestAttackableLayoutSize(t *testing.T) {
 	if got := unsafe.Sizeof(intention{}); got != 112 {
 		t.Errorf("unsafe.Sizeof(intention{}) = %d, want 112", got)
 	}
-	if got := unsafe.Sizeof(Attackable{}); got != 416 {
-		t.Errorf("unsafe.Sizeof(Attackable{}) = %d, want 416", got)
+	if got := unsafe.Sizeof(Attackable{}); got != 424 {
+		t.Errorf("unsafe.Sizeof(Attackable{}) = %d, want 424", got)
 	}
 }
 

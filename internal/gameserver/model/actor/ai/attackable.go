@@ -289,9 +289,9 @@ type Attackable struct {
 	// before the actor is published.
 	route Route
 	// log records the movement errors the think loop has no caller to
-	// return to; set once before the actor is published. The zero value
-	// discards them.
-	log zerolog.Logger
+	// return to; set once before the actor is published. Nil discards
+	// them.
+	log *zerolog.Logger
 
 	// cast is read without mu so AbortAll can run from inside the think
 	// loop, which holds mu (a return-home teleport aborts the actor). A loop
@@ -414,14 +414,16 @@ func newAttackable(actor AttackableActor, move AttackableMoveController) *Attack
 
 // SetLogger gives the AI the logger its dropped movement errors reach. Call
 // it once, before the actor is published.
-func (a *Attackable) SetLogger(log zerolog.Logger) {
+func (a *Attackable) SetLogger(log *zerolog.Logger) {
 	a.log = log
 }
 
 // logMoveError records a movement the think loop asked for and the
 // controller refused (a zero speed, an overlong duration).
 func (a *Attackable) logMoveError(err error) {
-	a.log.Warn().Err(err).Int32("npc", a.actor.ObjectID()).Msg("ai: attackable move")
+	if a.log != nil {
+		a.log.Warn().Err(err).Int32("npc", a.actor.ObjectID()).Msg("ai: attackable move")
+	}
 }
 
 // attackController returns the attack controller, building it first when

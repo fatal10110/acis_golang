@@ -274,9 +274,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		w.route = hostileRoute{walker: walker, ref: walkerRef, log: log}
 		hostile.AI().SetRoute(&w.route)
 	}
-	if log != nil {
-		hostile.AI().SetLogger(*log)
-	}
+	hostile.AI().SetLogger(log)
 
 	control.hostile, control.move, control.walkerRef, control.routeMove = hostile, moveCtl, walkerRef, routeMove
 	return hostile, walkerRef, nil
