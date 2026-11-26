@@ -419,7 +419,7 @@ func (s *Service) Reorganize(c *player.Character, selected bool, name string, pl
 	}
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
-	if cl.memberPrivilegesLocked(c.ID)&int32(PrivManageRanks) == 0 {
+	if !cl.hasPrivilegeLocked(c.ID, PrivManageRanks) {
 		return nil, Member{}, ReorganizeNotAuthorized
 	}
 	m1, ok1 := cl.memberByNameLocked(name)
@@ -494,7 +494,7 @@ func (s *Service) SetMentor(c *player.Character, link bool, name, otherName stri
 	}
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
-	if cl.memberPrivilegesLocked(c.ID)&int32(PrivMasterRights) == 0 {
+	if !cl.hasPrivilegeLocked(c.ID, PrivMasterRights) {
 		return MentorChange{}, MentorNotAuthorized
 	}
 	current, ok1 := cl.memberByNameLocked(name)

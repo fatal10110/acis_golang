@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
@@ -19,9 +18,6 @@ type accessLevelStore interface {
 // characterWriteTimeout bounds one admin write of a character's stored
 // row.
 const characterWriteTimeout = 5 * time.Second
-
-// titleMaxLength is the longest title kept, in UTF-16 code units.
-const titleMaxLength = 16
 
 // accessLevel is the access level p plays under.
 func (p *livePlayer) accessLevel() admin.AccessLevel {
@@ -41,7 +37,7 @@ func (p *livePlayer) IsGM() bool { return p.accessLevel().IsGM }
 // level colors the name and title.
 func applyAccessAppearance(c *player.Character, level int, access admin.AccessLevel) {
 	if level > 0 {
-		c.SetTitle(trimTitle(access.Name))
+		c.SetTitle(player.CutTitle(access.Name))
 	}
 	c.SetColors(access.Colors())
 }
@@ -94,7 +90,7 @@ func (l *GameClientLink) storeLeavingAccessLevel(target *livePlayer, level int) 
 	access := l.resolveAccessLevel(target.Character, level)
 	title := target.Title()
 	if level > 0 {
-		title = trimTitle(access.Name)
+		title = player.CutTitle(access.Name)
 	}
 	l.storeAccessLevel(target.ObjectID(), access.Level, title)
 }
@@ -157,9 +153,4 @@ func (l *GameClientLink) sendAccountAccessLevel(account string, level int32) err
 		l.log.Error().Err(err).Str("account", account).Int32("level", level).Msg("send account access level")
 	}
 	return err
-}
-
-// trimTitle cuts title to the longest title kept.
-func trimTitle(title string) string {
-	return commons.UTF16Cut(title, titleMaxLength)
 }

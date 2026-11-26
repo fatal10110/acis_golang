@@ -162,7 +162,7 @@ func (l *GameClientLink) gmOffLeaveState(live *livePlayer, st *player.SaveState)
 	access := l.resolveAccessLevel(live.Character, restore.level)
 	st.AccessLevel = access.Level
 	if restore.level > 0 {
-		st.Title = trimTitle(access.Name)
+		st.Title = player.CutTitle(access.Name)
 	}
 }
 

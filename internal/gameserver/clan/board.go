@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
 // The longest community board texts a clan keeps, in UTF-16 code units.
@@ -41,20 +42,30 @@ func (cl *Clan) Introduction() string {
 	return cl.board.introduction
 }
 
-// SetNotice replaces cl's notice text, keeping whether it shows, and
-// stores both.
-func (s *Service) SetNotice(cl *Clan, notice string) {
+// SetNotice has c replace cl's notice text, keeping whether it shows, and
+// stores both. Only cl's leader may: for anyone else it reports false and
+// changes nothing.
+func (s *Service) SetNotice(c *player.Character, cl *Clan, notice string) bool {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
+	if c.ID != cl.leaderID {
+		return false
+	}
 	s.setNoticeLocked(cl, notice, cl.board.noticeEnabled)
+	return true
 }
 
-// EnableNotice sets whether cl's notice shows at login, keeping its text,
-// and stores both.
-func (s *Service) EnableNotice(cl *Clan, enabled bool) {
+// EnableNotice has c set whether cl's notice shows at login, keeping its
+// text, and stores both. Only cl's leader may: for anyone else it reports
+// false and changes nothing.
+func (s *Service) EnableNotice(c *player.Character, cl *Clan, enabled bool) bool {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
+	if c.ID != cl.leaderID {
+		return false
+	}
 	s.setNoticeLocked(cl, cl.board.notice, enabled)
+	return true
 }
 
 func (s *Service) setNoticeLocked(cl *Clan, notice string, enabled bool) {
@@ -66,15 +77,20 @@ func (s *Service) setNoticeLocked(cl *Clan, notice string, enabled bool) {
 	})
 }
 
-// SetIntroduction replaces cl's introduction and stores it.
-func (s *Service) SetIntroduction(cl *Clan, introduction string) {
+// SetIntroduction has c replace cl's introduction and stores it. Only
+// cl's leader may: for anyone else it reports false and changes nothing.
+func (s *Service) SetIntroduction(c *player.Character, cl *Clan, introduction string) bool {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
+	if c.ID != cl.leaderID {
+		return false
+	}
 	cl.board.introduction = commons.UTF16Cut(introduction, introductionLength)
 	id, text := cl.id, cl.board.introduction
 	s.write(id, "update clan introduction", func(ctx context.Context, st Store) error {
 		return st.UpdateIntroduction(ctx, id, text)
 	})
+	return true
 }
 
 // MembersInTableOrder returns the roster in the order of the hash table it

@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -18,10 +17,7 @@ import (
 // its withdrawal; live leaves the clan, with no join penalty, and picks up
 // the Academy Circlet.
 func (l *GameClientLink) graduateFromAcademy(live *livePlayer, classID int) {
-	if tier, _ := player.ClassLevel(classID); tier != 2 {
-		return
-	}
-	g, ok := l.clanService().Graduate(live.Character, time.Now())
+	g, ok := l.clanService().Graduate(live.Character, classID, time.Now())
 	if !ok {
 		return
 	}
@@ -54,5 +50,5 @@ func (l *GameClientLink) graduateFromAcademy(live *livePlayer, classID int) {
 	l.checkLeaverItems(live, cl)
 	l.clanService().ApplyGraduated(live.Character, g.Member)
 	l.sendLeftClan(live, cl)
-	live.AddCreatedItem(clan.AcademyCircletID, 1, l.nextObjectID)
+	clan.GiveGraduateCirclet(live.Character, l.nextObjectID)
 }

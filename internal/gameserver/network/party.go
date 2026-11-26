@@ -49,23 +49,21 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.CharacterName()))
 		return
 	}
-	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() || target.Invisible() {
+	switch l.parties.CheckInvite(live, target) {
+	case party.InviteWrongTarget:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveInvitedTheWrongTarget))
 		return
-	}
-	if l.parties.InParty(target.ObjectID()) {
+	case party.InviteTargetInParty:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsAlreadyInParty, target.CharacterName()))
 		return
-	}
-	if target.clientDetached() {
+	case party.InviteTargetDetached:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, partyInviteDetachedText))
 		return
-	}
-	if target.Jailed() || live.Jailed() {
+	case party.InviteJailed:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, partyInviteJailedText))
 		return
-	}
-	if target.OlympiadMode() || live.OlympiadMode() {
+	case party.InviteOlympiad:
+		// Not answered: neither side hears of it.
 		return
 	}
 	book := l.tradeBook()
