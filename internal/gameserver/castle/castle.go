@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 )
 
@@ -24,7 +25,7 @@ type Castle struct {
 	parent *Castle
 	m      *Manager
 
-	// purchase serializes the castle's purchases; see Purchase.
+	// purchase serializes the castle's purchases; see purchases.go.
 	purchase sync.Mutex
 
 	mu                sync.Mutex
@@ -163,6 +164,18 @@ func (c *Castle) SetTimeRegistrationOver(over bool) {
 	defer c.mu.Unlock()
 	c.regTimeOver = over
 }
+
+// RegistrationsEnd is when the registrations for the castle's siege end,
+// a day before its date, in Unix milliseconds.
+func (c *Castle) RegistrationsEnd() int64 { return c.SiegeDate() - commons.DayMs }
+
+// SiegeHourKept is the siege hour choice that keeps the siege at its
+// default hour, 18:00; see SetSiegeHourChoice.
+const SiegeHourKept = 6
+
+// SetSiegeHourChoice moves the siege to 12 hours past the hour choice, as
+// SetSiegeHour does.
+func (c *Castle) SetSiegeHourChoice(choice int) bool { return c.SetSiegeHour(choice + 12) }
 
 // SetSiegeHour moves the siege to hour on its day, in the server's time
 // zone, an hour past 23 rolling into the next day, closes the date to

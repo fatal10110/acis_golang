@@ -130,7 +130,7 @@ func (s *Siege) stepLocked(fx *sim.Effects) {
 	}
 	now := s.e.nowLocked().UnixMilli()
 	if !s.castle.IsTimeRegistrationOver() {
-		if remaining := s.castle.SiegeDate() - commons.DayMs - now; remaining > 0 {
+		if remaining := s.castle.RegistrationsEnd() - now; remaining > 0 {
 			s.armStartLocked(time.Duration(remaining) * time.Millisecond)
 			return
 		}

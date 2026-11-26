@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
@@ -647,11 +646,18 @@ func (d hallDialog) change(c hallChange, args []string) {
 	if !ok {
 		return
 	}
-	decos := d.l.hallFunctions.Decos()
-	days, cost := decos.Days(c.funcType, link), decos.Fee(c.funcType, link)
 	shown := c.shown(link)
 	level := shown * c.mult
-	if fn, ok := d.function(c.funcType); ok && fn.Level == level {
+	pay := func(fee int) (clanhall.Landing, bool) {
+		stack, ok := spendAdena(d.live, fee)
+		if !ok || stack == nil {
+			return nil, ok
+		}
+		return d.l.landItems(stack), true
+	}
+	file := "functions-apply_confirmed.htm"
+	switch d.l.hallFunctions.Rent(d.hallID(), c.funcType, link, level, pay) {
+	case clanhall.RentUnchanged:
 		used := strconv.Itoa(shown) + "%"
 		switch {
 		case c.stageUsed:
@@ -661,29 +667,17 @@ func (d hallDialog) change(c hallChange, args []string) {
 		}
 		d.sendFilled("functions-used.htm", "%val%", used, "%objectId%", objID(d.f))
 		return
-	}
-	file, fee := "functions-apply_confirmed.htm", cost
-	if level == 0 {
-		file, fee = "functions-cancel_confirmed.htm", 0
-	} else if _, priced := decos.Get(c.funcType, link); !priced {
+	case clanhall.RentUnpriced:
 		// A level clanHallDeco.xml does not price (the grade 2 hall's "260%"
-		// fireplace link) would rent for free, with a term of no length; it
-		// is refused.
+		// fireplace link) is refused.
 		d.l.log.Warn().Int32("hall_id", d.hallID()).Int("type", c.funcType).Int("level", link).Msg("clan hall: function level without a fee refused")
 		return
+	case clanhall.RentShortOfAdena:
+		d.sendPage("low_adena.htm")
+		return
+	case clanhall.RentCancelled:
+		file = "functions-cancel_confirmed.htm"
 	}
-	var paid clanhall.Landing
-	if fee > 0 {
-		stack, ok := spendAdena(d.live, fee)
-		if !ok {
-			d.sendPage("low_adena.htm")
-			return
-		}
-		if stack != nil {
-			paid = d.l.landItems(stack)
-		}
-	}
-	d.l.hallFunctions.Update(d.hallID(), c.funcType, level, fee, int64(days)*commons.DayMs, paid)
 	if c.funcType == hallmodel.FuncSupportMagic {
 		d.f.ResetSupportBuffCheck()
 	}

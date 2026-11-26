@@ -168,16 +168,6 @@ func (c *Castle) RemoveTrapUpgrades() {
 	})
 }
 
-// Purchase runs fn alone among the castle's purchases: its gate and trap
-// upgrades, its certificate sales and its vault moves, each a check of the
-// castle's state, a payment and the change it buys. fn must not start
-// another purchase.
-func (c *Castle) Purchase(fn func()) {
-	c.purchase.Lock()
-	defer c.purchase.Unlock()
-	fn()
-}
-
 // DoorUpgradeCost is the adena a castle pays to raise a gate's HP ratio to
 // ratio: gateType 1 is a plain gate, 2 a metal gate, 3 a wall, each priced
 // for ratios 2, 3 and 5. The price is tripled while the dusk owns the Seal
