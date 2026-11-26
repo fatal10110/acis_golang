@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -91,6 +92,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		if !ok || !l.announcements.Delete(int(index)) {
 			return false
 		}
+		l.saveAnnouncements(gm)
 		return l.listAnnouncements(gm)
 	default:
 		sendText(gm, "Possible //announce parameters : <list|all|add|add_auto|del>")
@@ -102,6 +104,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 func (l *GameClientLink) addAnnouncement(gm *livePlayer, a admin.Announcement) {
 	switch err := l.announcements.Add(a); {
 	case err == nil:
+		l.saveAnnouncements(gm)
 	case errors.Is(err, announcement.ErrDelay):
 		// #5126: an automatic announcement repeating with no pause would
 		// flood every player online.
@@ -112,6 +115,12 @@ func (l *GameClientLink) addAnnouncement(gm *livePlayer, a admin.Announcement) {
 	default:
 		sendText(gm, "Invalid //announce message content ; can't be null or empty.")
 	}
+}
+
+// saveAnnouncements rewrites the announcement file after a change gm made,
+// on gm's connection goroutine, off gm's queue (deferLookup).
+func (l *GameClientLink) saveAnnouncements(gm *livePlayer) {
+	gm.deferLookup(func(context.Context) { l.announcements.Save() })
 }
 
 // listAnnouncements shows gm the held announcements, each with its delete

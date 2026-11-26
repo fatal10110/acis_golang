@@ -104,10 +104,11 @@ type reloadType struct {
 	exact bool
 	// done is what the game master is told once the type has reloaded.
 	done string
-	run  func(l *GameClientLink) error
+	// run reloads the type on the game master's connection goroutine.
+	run func(l *GameClientLink) error
 	// runThen, when set, reloads in place of run for the game master gm,
-	// on whose queue the command runs. Unless it fails, it runs then on
-	// gm's queue once the reload is over, which may be after it returns.
+	// on gm's connection goroutine. Unless it fails, it runs then on gm's
+	// queue once the reload is over, which may be after it returns.
 	runThen func(l *GameClientLink, gm *livePlayer, then func()) error
 }
 
@@ -144,50 +145,67 @@ var reloadUsage = []string{
 // and tells gm so; a token naming no type answers the usage and the next
 // one is read. Without a type, or when a reload fails, the usage is sent and
 // the command ends there. A type with no reload hook is logged and answered
-// with ActionFailed, as a command with no handler is.
+// with ActionFailed, as a command with no handler is. The types reload on
+// gm's connection goroutine, off gm's queue (deferLookup): they read files
+// and the database.
 func (l *GameClientLink) adminReload(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
 		sendReloadUsage(gm)
 		return
 	}
-	l.reloadTokens(gm, args)
+	gm.deferLookup(func(ctx context.Context) { l.reloadTokens(ctx, gm, args) })
 }
 
-// reloadTokens reloads the types tokens name, in turn. A type that finishes
-// later tells gm it reloaded, and goes on with the tokens after it, only
-// once it is over, so gm sees what each reload sends before its text and
-// the next reload.
-func (l *GameClientLink) reloadTokens(gm *livePlayer, tokens []string) {
+// reloadTokens reloads the types tokens name, in turn, here on gm's
+// connection goroutine under ctx. What each tells gm is sent on gm's queue
+// once its reload is over, so gm sees what the reload sends before its text
+// and the next reload. A type that finishes later (runThen) with tokens
+// left after it is waited for here, so gm's next request waits with it.
+func (l *GameClientLink) reloadTokens(ctx context.Context, gm *livePlayer, tokens []string) {
 	for i, token := range tokens {
 		typ, ok := reloadTypeOf(token)
 		if !ok {
-			sendReloadUsage(gm)
+			onLive(gm, func() { sendReloadUsage(gm) })
 			continue
 		}
 		var err error
 		if typ.runThen != nil {
-			rest := tokens[i+1:]
+			over := make(chan struct{})
 			err = typ.runThen(l, gm, func() {
 				sendText(gm, typ.done)
-				l.reloadTokens(gm, rest)
+				close(over)
 			})
 			if err == nil {
-				return
+				if i == len(tokens)-1 {
+					return
+				}
+				select {
+				case <-over:
+					continue
+				case <-ctx.Done():
+					return
+				}
 			}
 		} else {
 			err = typ.run(l)
 		}
-		switch {
-		case errors.Is(err, errNoReloadHook):
-			l.log.Warn().Str("type", typ.word).Msg("admin: //reload type has no reload hook")
-			gm.SendFrame(serverpackets.FrameActionFailed())
-		case err != nil:
-			l.log.Error().Err(err).Str("type", typ.word).Msg("admin: //reload failed; the data stays as it was")
-			sendReloadUsage(gm)
+		stop := false
+		onLive(gm, func() {
+			switch {
+			case errors.Is(err, errNoReloadHook):
+				l.log.Warn().Str("type", typ.word).Msg("admin: //reload type has no reload hook")
+				gm.SendFrame(serverpackets.FrameActionFailed())
+			case err != nil:
+				l.log.Error().Err(err).Str("type", typ.word).Msg("admin: //reload failed; the data stays as it was")
+				sendReloadUsage(gm)
+				stop = true
+			default:
+				sendText(gm, typ.done)
+			}
+		})
+		if stop {
 			return
-		default:
-			sendText(gm, typ.done)
 		}
 	}
 }

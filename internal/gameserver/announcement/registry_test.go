@@ -217,6 +217,7 @@ func TestIndexNeverReusedAfterDelete(t *testing.T) {
 	if got := r.List(); !slices.Equal(got, want) {
 		t.Fatalf("List() = %+v, want %+v", got, want)
 	}
+	r.Save()
 	wantSaved := []admin.Announcement{{Message: "login"}, auto("kept", 10, 10, 0), auto("added", 5, 20, 0)}
 	if got := store.saved[len(store.saved)-1]; !slices.Equal(got, wantSaved) {
 		t.Fatalf("last save = %+v, want %+v", got, wantSaved)
@@ -252,6 +253,7 @@ func TestLoadRestartsIndexes(t *testing.T) {
 	r.Add(admin.Announcement{Message: "first"})
 	r.Add(admin.Announcement{Message: "second"})
 	r.Delete(0)
+	r.Save()
 	store.list = store.saved[len(store.saved)-1]
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)

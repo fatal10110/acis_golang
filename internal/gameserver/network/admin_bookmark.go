@@ -37,22 +37,26 @@ func (l *GameClientLink) adminBookmark(gm *livePlayer, line string) {
 		} else {
 			x, y, z := gm.Position()
 			m := bookmark.Bookmark{Name: param, X: int32(x), Y: int32(y), Z: int32(z)}
-			switch err := l.bookmarkBook(gm).Add(m); {
-			case errors.Is(err, bookmark.ErrNameTooLong):
-				sendText(gm, "The bookmark name is too long.")
-				return
-			case errors.Is(err, bookmark.ErrExists):
-				sendText(gm, "The bookmark name already exists.")
-				return
-			}
-			if l.bookmarks != nil {
-				l.queueRowWrite(gm.ObjectID(), "save bookmark", func(ctx context.Context, ownerID int32) error {
-					return l.bookmarks.Insert(ctx, ownerID, m)
-				})
-			}
+			l.withBookmarks(gm, func(book *bookmark.Book) {
+				switch err := book.Add(m); {
+				case errors.Is(err, bookmark.ErrNameTooLong):
+					sendText(gm, "The bookmark name is too long.")
+					return
+				case errors.Is(err, bookmark.ErrExists):
+					sendText(gm, "The bookmark name already exists.")
+					return
+				}
+				if l.bookmarks != nil {
+					l.queueRowWrite(gm.ObjectID(), "save bookmark", func(ctx context.Context, ownerID int32) error {
+						return l.bookmarks.Insert(ctx, ownerID, m)
+					})
+				}
+				l.sendBookmarks(gm, book, 1)
+			})
+			return
 		}
 	}
-	l.sendBookmarks(gm, int(page))
+	l.withBookmarks(gm, func(book *bookmark.Book) { l.sendBookmarks(gm, book, int(page)) })
 }
 
 // adminDeleteBookmark answers //delbk name: it deletes gm's bookmark so
@@ -64,45 +68,56 @@ func (l *GameClientLink) adminDeleteBookmark(gm *livePlayer, line string) {
 		return
 	}
 	name := args[0]
-	if err := l.bookmarkBook(gm).Remove(name); err != nil {
-		sendText(gm, "That bookmark doesn't exist.")
+	l.withBookmarks(gm, func(book *bookmark.Book) {
+		if err := book.Remove(name); err != nil {
+			sendText(gm, "That bookmark doesn't exist.")
+			return
+		}
+		if l.bookmarks != nil {
+			l.queueRowWrite(gm.ObjectID(), "delete bookmark", func(ctx context.Context, ownerID int32) error {
+				return l.bookmarks.Delete(ctx, ownerID, name)
+			})
+		}
+		l.sendBookmarks(gm, book, 1)
+	})
+}
+
+// withBookmarks runs fn on gm's queue with gm's bookmark book. The book is
+// read from the store on first use, on gm's connection goroutine, off gm's
+// queue (deferLookup); fn runs once it is read. A failed read is logged and
+// fn works on an empty book, which gm keeps only until the next command
+// reads again. Only a request that may defer lookups may call it.
+func (l *GameClientLink) withBookmarks(gm *livePlayer, fn func(*bookmark.Book)) {
+	sim.AssertOwner(gm.Queue())
+	if gm.bookmarks == nil && l.bookmarks == nil {
+		gm.bookmarks = bookmark.NewBook(nil)
+	}
+	if gm.bookmarks != nil {
+		fn(gm.bookmarks)
 		return
 	}
-	if l.bookmarks != nil {
-		l.queueRowWrite(gm.ObjectID(), "delete bookmark", func(ctx context.Context, ownerID int32) error {
-			return l.bookmarks.Delete(ctx, ownerID, name)
+	gm.deferLookup(func(ctx context.Context) {
+		ctx, cancel := context.WithTimeout(ctx, characterLookupTimeout)
+		defer cancel()
+		marks, err := l.bookmarks.ListByOwner(ctx, gm.ObjectID())
+		onLive(gm, func() {
+			switch {
+			case err != nil:
+				l.log.Error().Err(err).Int32("object_id", gm.ObjectID()).Msg("admin: list bookmarks")
+				fn(bookmark.NewBook(nil))
+				return
+			case gm.bookmarks == nil:
+				gm.bookmarks = bookmark.NewBook(marks)
+			}
+			fn(gm.bookmarks)
 		})
-	}
-	l.sendBookmarks(gm, 1)
+	})
 }
 
-// bookmarkBook returns gm's bookmark book, read from the store on first
-// use. A failed read is logged and gm works on an empty book until the
-// next command reads again.
-func (l *GameClientLink) bookmarkBook(gm *livePlayer) *bookmark.Book {
-	sim.AssertOwner(gm.Queue())
-	if gm.bookmarks != nil {
-		return gm.bookmarks
-	}
-	if l.bookmarks == nil {
-		gm.bookmarks = bookmark.NewBook(nil)
-		return gm.bookmarks
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), characterLookupTimeout)
-	defer cancel()
-	marks, err := l.bookmarks.ListByOwner(ctx, gm.ObjectID())
-	if err != nil {
-		l.log.Error().Err(err).Int32("object_id", gm.ObjectID()).Msg("admin: list bookmarks")
-		return bookmark.NewBook(nil)
-	}
-	gm.bookmarks = bookmark.NewBook(marks)
-	return gm.bookmarks
-}
-
-// sendBookmarks opens page of gm's bookmarks, fifteen to a page, each
+// sendBookmarks opens page of book, gm's bookmarks, fifteen to a page, each
 // teleporting there or removing it.
-func (l *GameClientLink) sendBookmarks(gm *livePlayer, page int) {
-	marks := l.bookmarkBook(gm).All()
+func (l *GameClientLink) sendBookmarks(gm *livePlayer, book *bookmark.Book, page int) {
+	marks := book.All()
 	pg, ok := handleradmin.Paginate(len(marks), page, adminBookmarkPageLimit)
 	if !ok {
 		// No page below the first exists; the command answers nothing.

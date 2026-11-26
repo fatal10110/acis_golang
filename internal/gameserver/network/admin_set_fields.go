@@ -193,39 +193,22 @@ func (l *GameClientLink) adminSetName(gm *livePlayer, name string, hasName bool)
 // adminRenamePlayer renames target to name for gm. A name that is not 1
 // to 16 ASCII letters or digits, an NPC's name or a character's, online
 // or not, or one a character creation is taking, is refused with
-// INCORRECT_NAME_TRY_AGAIN. Otherwise, on target's
-// queue, target takes the name, is found by it from then on, shows it to
-// itself and the players around it, and is stored before gm is told.
+// INCORRECT_NAME_TRY_AGAIN. Otherwise target takes the name, is found by it
+// from then on, shows it to itself and the players around it, and is
+// stored before gm is told. The name is checked and stored on gm's
+// connection goroutine, off every queue (deferLookup).
 func (l *GameClientLink) adminRenamePlayer(gm, target *livePlayer, name string) {
 	if !shortNamePattern.MatchString(name) || l.npcNamed(name) {
 		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
 		return
 	}
-	// The name is held from before the check until it is stored or the
-	// rename gives up, so no character creation takes it in between.
-	release, ok := l.reserveName(name)
-	if !ok {
-		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
-		return
-	}
-	if l.characterNamed(name) {
-		release()
-		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
-		return
-	}
-	// A target leaving the world drops the rename unrun.
-	onPlayerOr(gm, target, func() {
-		defer release()
-		if !l.renamePlayer(target, name) {
-			// A player that took the name online since the check, or a
-			// name the database did not take.
-			gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
-			return
+	gm.deferLookup(func(ctx context.Context) {
+		if !l.renamePlayer(ctx, gm, target, name) {
+			onLive(gm, func() {
+				gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
+			})
 		}
-		l.broadcastCharacterInfo(target)
-		l.storeLive(target)
-		sendText(gm, "You successfully set your target's name to "+target.CharacterName()+".")
-	}, release)
+	})
 }
 
 // reserveName holds name against character creation and other renames
@@ -250,11 +233,11 @@ func (l *GameClientLink) npcNamed(name string) bool {
 
 // characterNamed reports whether a character is named name. A lookup that
 // cannot answer is logged and counts as named, so the rename is refused.
-func (l *GameClientLink) characterNamed(name string) bool {
+func (l *GameClientLink) characterNamed(ctx context.Context, name string) bool {
 	if l.characterEdits == nil {
 		return false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), characterLookupTimeout)
+	ctx, cancel := context.WithTimeout(ctx, characterLookupTimeout)
 	defer cancel()
 	taken, err := l.characterEdits.NameTaken(ctx, name)
 	if err != nil {
@@ -264,24 +247,59 @@ func (l *GameClientLink) characterNamed(name string) bool {
 	return taken
 }
 
-// renamePlayer names live name, on its queue, together with its name
-// index entry, its stored name and its clan roster row. It refuses a name
-// another online player holds, and one it cannot store, which it takes
-// back.
-func (l *GameClientLink) renamePlayer(live *livePlayer, name string) bool {
-	old := live.CharacterName()
-	if !l.reindexPlayer(live, name) {
+// renamePlayer names target name for gm, here on gm's connection goroutine
+// under ctx: target's name index entry changes on its queue, then its
+// stored name here, then its clan roster row and what it shows on its
+// queue, which tells gm. It reports false when the name is refused: one a
+// character has, one another online player holds, or one it cannot store,
+// which target takes back. The name is held from before the check until
+// the rename is over, so no character creation takes it in between. A
+// target leaving the world before it takes the name drops the rename
+// unrun.
+func (l *GameClientLink) renamePlayer(ctx context.Context, gm, target *livePlayer, name string) bool {
+	release, ok := l.reserveName(name)
+	if !ok {
 		return false
 	}
-	if !l.storeName(live.ObjectID(), name) {
-		if !l.reindexPlayer(live, old) {
-			l.log.Error().Int32("object_id", live.ObjectID()).Str("name", old).Msg("admin: //set name: take back name")
+	defer release()
+	if l.characterNamed(ctx, name) {
+		return false
+	}
+	var old string
+	reindexed, ran := false, false
+	onQueue(target.Queue(), func() {
+		if target.detached() {
+			return
 		}
+		ran = true
+		old = target.CharacterName()
+		reindexed = l.reindexPlayer(target, name)
+	})
+	switch {
+	case !ran:
+		return true
+	case !reindexed:
 		return false
 	}
-	if cl, ok := l.clanService().ClanOf(live.Character); ok {
-		cl.RefreshName(live.ObjectID(), name)
+	if !l.storeName(ctx, target.ObjectID(), name) {
+		onQueue(target.Queue(), func() {
+			if !target.detached() && !l.reindexPlayer(target, old) {
+				l.log.Error().Int32("object_id", target.ObjectID()).Str("name", old).Msg("admin: //set name: take back name")
+			}
+		})
+		return false
 	}
+	// Stored, the name is target's even when it left meanwhile.
+	onQueue(target.Queue(), func() {
+		if cl, ok := l.clanService().ClanOf(target.Character); ok {
+			cl.RefreshName(target.ObjectID(), name)
+		}
+		if !target.detached() {
+			l.broadcastCharacterInfo(target)
+			l.storeLive(target)
+		}
+		sendText(gm, "You successfully set your target's name to "+name+".")
+	})
 	return true
 }
 
@@ -301,11 +319,11 @@ func (l *GameClientLink) reindexPlayer(live *livePlayer, name string) bool {
 // the name is taken there before the rename is reported. No save queued on
 // the lane writes the name, so none can undo it. A failed write is logged
 // and reported.
-func (l *GameClientLink) storeName(objectID int32, name string) bool {
+func (l *GameClientLink) storeName(ctx context.Context, objectID int32, name string) bool {
 	if l.characterEdits == nil {
 		return true
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
+	ctx, cancel := context.WithTimeout(ctx, accessLevelWriteTimeout)
 	defer cancel()
 	if err := l.characterEdits.SetName(ctx, objectID, name); err != nil {
 		l.log.Error().Err(err).Int32("object_id", objectID).Str("name", name).Msg("admin: //set name: store name")
