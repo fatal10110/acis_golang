@@ -82,42 +82,42 @@ func (r ResidenceTalk) castleTalkCond(busy bool, need clan.Privilege) castleTalk
 // a clan hall; ok is false for any other type.
 func (f *Folk) residenceChat(pages Pages, kind InstanceKind, rules ChatRules, state ChatState) (page string, outcome ChatOutcome, ok bool) {
 	switch kind {
-	case "CastleBlacksmith", "CastleChamberlain", "CastleDoorman", "CastleGatekeeper", "CastleMagician", "CastleWarehouseKeeper",
-		"ClanHallDoorman", "ClanHallManagerNpc", "Doorman", "ManorManagerNpc", "MercenaryManagerNpc", "WyvernManagerNpc":
+	case KindCastleBlacksmith, KindCastleChamberlain, KindCastleDoorman, KindCastleGatekeeper, KindCastleMagician, KindCastleWarehouseKeeper,
+		KindClanHallDoorman, KindClanHallManagerNpc, KindDoorman, KindManorManagerNpc, KindMercenaryManagerNpc, KindWyvernManagerNpc:
 	default:
 		return "", ChatShown, false
 	}
-	if kind == "Doorman" {
+	if kind == KindDoorman {
 		return f.page(pages, "data/html/doormen/"+strconv.Itoa(f.NpcID())+".htm"), ChatShown, true
 	}
 	r := state.Residence()
 	switch kind {
-	case "CastleBlacksmith":
+	case KindCastleBlacksmith:
 		page, outcome = f.blacksmithChat(pages, rules, r)
-	case "CastleChamberlain":
+	case KindCastleChamberlain:
 		page, outcome = f.castlePage(pages, r.castleTalkCond(r.SiegeInProgress, clan.PrivNone), "data/html/chamberlain/", "no.htm", "busy.htm", "chamberlain.htm"), ChatShownReleased
-	case "CastleDoorman":
+	case KindCastleDoorman:
 		page, outcome = f.castleDoormanChat(pages, r), ChatShown
-	case "CastleGatekeeper":
+	case KindCastleGatekeeper:
 		page, outcome = f.massGatekeeperChat(pages, r)
-	case "CastleMagician":
+	case KindCastleMagician:
 		page, outcome = f.castlePage(pages, r.castleTalkCond(r.BattlefieldActive, clan.PrivNone), "data/html/castlemagician/", "magician-no.htm", "magician-busy.htm", "magician.htm"), ChatShownReleased
-	case "CastleWarehouseKeeper":
+	case KindCastleWarehouseKeeper:
 		page = f.castlePage(pages, r.castleTalkCond(r.SiegeInProgress, clan.PrivNone), "data/html/castlewarehouse/", "castlewarehouse-no.htm", "castlewarehouse-busy.htm", "castlewarehouse.htm")
 		page, outcome = strings.ReplaceAll(page, "%npcname%", f.CharacterName()), ChatShownReleased
-	case "ClanHallDoorman":
+	case KindClanHallDoorman:
 		page, outcome = f.hallDoormanChat(pages, r)
-	case "ClanHallManagerNpc":
+	case KindClanHallManagerNpc:
 		file := "chamberlain-no.htm"
 		if r.HallID != 0 && r.owns() {
 			file = "chamberlain.htm"
 		}
 		page, outcome = f.page(pages, "data/html/clanHallManager/"+file), ChatShownReleased
-	case "ManorManagerNpc":
+	case KindManorManagerNpc:
 		page, outcome = f.manorManagerChat(pages, rules, r), ChatShown
-	case "MercenaryManagerNpc":
+	case KindMercenaryManagerNpc:
 		page, outcome = f.mercenaryManagerChat(pages, r), ChatPageOnly
-	case "WyvernManagerNpc":
+	case KindWyvernManagerNpc:
 		page, outcome = f.wyvernManagerChat(pages, rules, r), ChatShown
 	}
 	return page, outcome, true
@@ -160,7 +160,7 @@ func (f *Folk) blacksmithChat(pages Pages, rules ChatRules, r ResidenceTalk) (st
 // gates, doormen/<npcId>-no.htm for anyone else.
 func (f *Folk) castleDoormanChat(pages Pages, r ResidenceTalk) string {
 	file := strconv.Itoa(f.NpcID()) + "-no.htm"
-	if doormanOwner("CastleDoorman", r) {
+	if doormanOwner(KindCastleDoorman, r) {
 		file = strconv.Itoa(f.NpcID()) + ".htm"
 	}
 	return f.page(pages, "data/html/doormen/"+file)

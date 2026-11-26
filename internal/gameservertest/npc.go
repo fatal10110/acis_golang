@@ -452,7 +452,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, geo move.Geo) *npc.Hostile {
 	t.Helper()
 	tmpl := inst.Template
-	inst.Kind = npc.InstanceKind(tmpl.Type)
+	inst.Kind = tmpl.Kind()
 	statRef := &movingHostileStatRef{}
 	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, s.npcLiveOptions()...)
 	if err != nil {

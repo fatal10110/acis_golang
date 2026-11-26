@@ -13,7 +13,7 @@ import (
 // seven_signs/necro_no.htm or cata_no.htm. exit takes the talker out. ok is
 // false for every other command, and at any other NPC.
 func (f *Folk) dungeonGatekeeperCommand(pages Pages, kind InstanceKind, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
-	if kind != "DungeonGatekeeper" {
+	if kind != KindDungeonGatekeeper {
 		return reply, false
 	}
 	var seal sevensigns.Seal

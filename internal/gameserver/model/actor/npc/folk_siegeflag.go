@@ -9,16 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
-// siegeFlag is a siege headquarters' type: a civilian NPC a clan leader
-// puts up for the clan during a siege. A player's interact does nothing on
-// it, no effect lands on it, it can be neither healed nor struck by a
-// lethal blow, and its stats are its template's own, with none of a
-// creature's built-in stat bonuses. A hit warns its clan the base is under
-// attack, at most once every headquartersWarnHold. Its clan holds it until
-// it dies, which takes it out of the world at once. The anti-infantry
-// Swoop Cannon siege summon neither hurts it nor sets off the warning.
-const siegeFlag InstanceKind = "SiegeFlag"
-
 // SiegeFlagNpcID is the template id a siege headquarters spawns as.
 const SiegeFlagNpcID = 35062
 
@@ -56,7 +46,7 @@ func SiegeFlagTemplate(clanName string, advanced bool) *Template {
 	return &Template{
 		ID: SiegeFlagNpcID, TemplateID: SiegeFlagNpcID,
 		Name: clanName, UsingServerSideName: true,
-		Type:  string(siegeFlag),
+		Type:  string(KindSiegeFlag),
 		Level: 1,
 
 		BaseDamageRange: []int{0, 0, 80, 120},
@@ -86,7 +76,7 @@ type headquarters struct {
 }
 
 // SiegeFlag reports a siege headquarters.
-func (f *Folk) SiegeFlag() bool { return hostileKind(f.Instance) == siegeFlag }
+func (f *Folk) SiegeFlag() bool { return hostileKind(f.Instance) == KindSiegeFlag }
 
 // StandFor makes the siege headquarters cl's. It reports false, the
 // headquarters standing for no clan, when cl already holds one.

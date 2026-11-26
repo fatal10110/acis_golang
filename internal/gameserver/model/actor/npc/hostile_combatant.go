@@ -32,7 +32,7 @@ func (h *Hostile) CanGiveDamage() bool { return true }
 // skill cast on a guard does not PvP-flag the caster.
 func (h *Hostile) Guard() bool {
 	kind := hostileKind(h.Instance)
-	return kind == "Guard" || kind == "SiegeGuard"
+	return kind == KindGuard || kind == KindSiegeGuard
 }
 
 // Owner reports no owner: NPCs are not summons.

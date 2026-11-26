@@ -19,9 +19,9 @@ const silentMoveDetectRange = 250
 // FriendlyMonster always is; a Guard or SiegeGuard never is.
 func (h *Hostile) Aggressive() bool {
 	switch hostileKind(h.Instance) {
-	case "FestivalMonster", "FriendlyMonster":
+	case KindFestivalMonster, KindFriendlyMonster:
 		return true
-	case "Guard", "SiegeGuard":
+	case KindGuard, KindSiegeGuard:
 		return false
 	}
 	return h.Instance.Template.AggroRange > 0
@@ -108,7 +108,7 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 
 	cfg := h.aiSettings()
 	switch hostileKind(h.Instance) {
-	case "Guard":
+	case KindGuard:
 		if target.Karma() > 0 {
 			return h.CanSee(target)
 		}
@@ -116,7 +116,7 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 			return monster.Aggressive() && h.CanSee(monster)
 		}
 		return false
-	case "FriendlyMonster":
+	case KindFriendlyMonster:
 		return target.Karma() > 0 && h.CanSee(target)
 	}
 

@@ -95,19 +95,19 @@ func (t Talker) residence() ResidenceTalk {
 // leaves to them, and at any other NPC.
 func (f *Folk) residenceCommand(pages Pages, kind InstanceKind, rules ChatRules, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
 	switch kind {
-	case "CastleBlacksmith":
+	case KindCastleBlacksmith:
 		return f.blacksmithCommand(pages, rules, talker.residence(), command, reply)
-	case "CastleMagician":
+	case KindCastleMagician:
 		return f.magicianCommand(pages, talker.residence(), command, reply)
-	case "CastleDoorman", "ClanHallDoorman", "Doorman":
+	case KindCastleDoorman, KindClanHallDoorman, KindDoorman:
 		return f.doormanCommand(pages, kind, rules, talker, command, reply)
-	case "MercenaryManagerNpc":
+	case KindMercenaryManagerNpc:
 		return f.mercenaryCommand(pages, talker.residence(), command, reply)
-	case "CastleGatekeeper":
+	case KindCastleGatekeeper:
 		return f.massGatekeeperCommand(pages, talker.residence(), command, reply)
-	case "WyvernManagerNpc":
+	case KindWyvernManagerNpc:
 		return f.wyvernManagerCommand(pages, rules, talker, command, reply)
-	case "CastleChamberlain":
+	case KindCastleChamberlain:
 		return f.chamberlainBypass(pages, kind, talker.residence(), command, reply)
 	}
 	return reply, false
@@ -138,11 +138,11 @@ func valFile(base string, val int) string {
 // the number. ok is false for any other type.
 func (f *Folk) residenceChatPage(pages Pages, kind InstanceKind, r ResidenceTalk, val int) (string, ChatOutcome, bool) {
 	switch kind {
-	case "CastleWarehouseKeeper":
+	case KindCastleWarehouseKeeper:
 		page := f.castlePage(pages, r.castleTalkCond(r.SiegeInProgress, clan.PrivNone), "data/html/castlewarehouse/",
 			"castlewarehouse-no.htm", "castlewarehouse-busy.htm", valFile("castlewarehouse", val))
 		return strings.ReplaceAll(page, "%npcname%", f.CharacterName()), ChatShownReleased, true
-	case "ClanHallDoorman":
+	case KindClanHallDoorman:
 		page, outcome := f.hallDoormanChat(pages, r)
 		return page, outcome, true
 	}
@@ -200,7 +200,7 @@ func (f *Folk) magicianCommand(pages Pages, r ResidenceTalk, command string, rep
 // to its gates; a clan hall doorman a member of the clan owning its hall.
 func doormanOwner(kind InstanceKind, r ResidenceTalk) bool {
 	switch kind {
-	case "CastleDoorman":
+	case KindCastleDoorman:
 		switch {
 		case r.ClanID == 0:
 			return false
@@ -210,7 +210,7 @@ func doormanOwner(kind InstanceKind, r ResidenceTalk) bool {
 			return r.owns() && r.holds(clan.PrivCastleEntryExit)
 		}
 		return false
-	case "ClanHallDoorman":
+	case KindClanHallDoorman:
 		return r.HallID != 0 && r.owns()
 	}
 	return true
@@ -226,7 +226,7 @@ func doormanOwner(kind InstanceKind, r ResidenceTalk) bool {
 // generic ones.
 func (f *Folk) doormanCommand(pages Pages, kind InstanceKind, rules ChatRules, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
 	r := talker.residence()
-	if kind == "ClanHallDoorman" {
+	if kind == KindClanHallDoorman {
 		if out, ok := f.hallWyvernCommand(pages, rules, talker, r, command, reply); ok {
 			return out, true
 		}
@@ -239,19 +239,19 @@ func (f *Folk) doormanCommand(pages Pages, kind InstanceKind, rules ChatRules, t
 	if !doormanOwner(kind, r) {
 		return reply, true
 	}
-	if kind == "CastleDoorman" && (r.HallID == 0 && r.BattlefieldActive || r.HallID != 0 && r.SiegeInProgress) {
+	if kind == KindCastleDoorman && (r.HallID == 0 && r.BattlefieldActive || r.HallID != 0 && r.SiegeInProgress) {
 		reply.Outcome, reply.HTML = BypassDoorsBusy, f.doormanBusyPage(pages)
 		return reply, true
 	}
 	reply.Outcome, reply.OpenDoors = BypassDoors, open
 	switch kind {
-	case "ClanHallDoorman":
+	case KindClanHallDoorman:
 		page := "data/html/clanHallDoormen/doormen-closed.htm"
 		if open {
 			page = "data/html/clanHallDoormen/doormen-opened.htm"
 		}
 		reply.DoorScope, reply.HTML = DoorsOfHall, f.page(pages, page)
-	case "CastleDoorman":
+	case KindCastleDoorman:
 		reply.DoorScope, reply.doorCommand = DoorsOfResidence, command
 	default:
 		reply.DoorScope, reply.doorCommand = DoorsOfWorld, command
@@ -373,7 +373,7 @@ func (f *Folk) hallWyvernCommand(pages Pages, rules ChatRules, talker Talker, r 
 		return reply, false
 	}
 	reply.Outcome = BypassRefused
-	if !wyvernHall(r.HallID) || !doormanOwner("ClanHallDoorman", r) {
+	if !wyvernHall(r.HallID) || !doormanOwner(KindClanHallDoorman, r) {
 		return reply, true
 	}
 	if val == "" {
@@ -422,7 +422,7 @@ func (f *Folk) wyvernRide(pages Pages, rules ChatRules, talker Talker, r Residen
 // lets through, any other NPC everyone.
 func teleportAllowed(kind InstanceKind, talker Talker) bool {
 	switch kind {
-	case "CastleDoorman", "ClanHallDoorman":
+	case KindCastleDoorman, KindClanHallDoorman:
 		return doormanOwner(kind, talker.residence())
 	}
 	return true
@@ -605,7 +605,7 @@ func (f *Folk) wyvernManagerCommand(pages Pages, rules ChatRules, talker Talker,
 			reply.HTML = missingHTML(path)
 		}
 	default:
-		return f.chamberlainBypass(pages, "WyvernManagerNpc", talker.residence(), command, reply)
+		return f.chamberlainBypass(pages, KindWyvernManagerNpc, talker.residence(), command, reply)
 	}
 	return reply, true
 }

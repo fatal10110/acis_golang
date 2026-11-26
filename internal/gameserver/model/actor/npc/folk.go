@@ -17,55 +17,55 @@ import (
 
 // folkInstanceKinds are the civilian service NPC types: shopkeepers,
 // trainers, gatekeepers, warehouse keepers, village masters, the castle
-// holy artifacts and control towers, and the like. ChristmasTree is left
+// holy artifacts and control towers, and the like. A Christmas tree is left
 // out and skipped at spawn: its click only releases the client (no
 // selection, no talk), and it spawns only from event makers or as a
 // summoned Decoration.
 var folkInstanceKinds = map[InstanceKind]struct{}{
-	"Adventurer":            {},
-	"Auctioneer":            {},
-	"CastleBlacksmith":      {},
-	"CastleChamberlain":     {},
-	"CastleDoorman":         {},
-	"CastleGatekeeper":      {},
-	"CastleMagician":        {},
-	"CastleWarehouseKeeper": {},
-	"ClanHallDoorman":       {},
-	"ClanHallManagerNpc":    {},
-	"ClassMaster":           {},
-	"DawnPriest":            {},
-	"DerbyTrackManagerNpc":  {},
-	"Doorman":               {},
-	"DungeonGatekeeper":     {},
-	"DuskPriest":            {},
-	"FestivalGuide":         {},
-	"Fisherman":             {},
-	"FlameTower":            {},
-	"Folk":                  {},
-	"Gatekeeper":            {},
-	"HolyThing":             {},
-	"LifeTower":             {},
-	"ManorManagerNpc":       {},
-	"MercenaryManagerNpc":   {},
-	"Merchant":              {},
-	"MutedFolk":             {},
-	"OlympiadManagerNpc":    {},
-	"SchemeBuffer":          {},
-	"SiegeFlag":             {},
-	"SiegeNpc":              {},
-	"SignsPriest":           {},
-	"SymbolMaker":           {},
-	"Trainer":               {},
-	"VillageMaster":         {},
-	"VillageMasterDElf":     {},
-	"VillageMasterDwarf":    {},
-	"VillageMasterFighter":  {},
-	"VillageMasterMystic":   {},
-	"VillageMasterOrc":      {},
-	"VillageMasterPriest":   {},
-	"WarehouseKeeper":       {},
-	"WeddingManagerNpc":     {},
-	"WyvernManagerNpc":      {},
+	KindAdventurer:            {},
+	KindAuctioneer:            {},
+	KindCastleBlacksmith:      {},
+	KindCastleChamberlain:     {},
+	KindCastleDoorman:         {},
+	KindCastleGatekeeper:      {},
+	KindCastleMagician:        {},
+	KindCastleWarehouseKeeper: {},
+	KindClanHallDoorman:       {},
+	KindClanHallManagerNpc:    {},
+	KindClassMaster:           {},
+	KindDawnPriest:            {},
+	KindDerbyTrackManagerNpc:  {},
+	KindDoorman:               {},
+	KindDungeonGatekeeper:     {},
+	KindDuskPriest:            {},
+	KindFestivalGuide:         {},
+	KindFisherman:             {},
+	KindFlameTower:            {},
+	KindFolk:                  {},
+	KindGatekeeper:            {},
+	KindHolyThing:             {},
+	KindLifeTower:             {},
+	KindManorManagerNpc:       {},
+	KindMercenaryManagerNpc:   {},
+	KindMerchant:              {},
+	KindMutedFolk:             {},
+	KindOlympiadManagerNpc:    {},
+	KindSchemeBuffer:          {},
+	KindSiegeFlag:             {},
+	KindSiegeNpc:              {},
+	KindSignsPriest:           {},
+	KindSymbolMaker:           {},
+	KindTrainer:               {},
+	KindVillageMaster:         {},
+	KindVillageMasterDElf:     {},
+	KindVillageMasterDwarf:    {},
+	KindVillageMasterFighter:  {},
+	KindVillageMasterMystic:   {},
+	KindVillageMasterOrc:      {},
+	KindVillageMasterPriest:   {},
+	KindWarehouseKeeper:       {},
+	KindWeddingManagerNpc:     {},
+	KindWyvernManagerNpc:      {},
 }
 
 // FolkKind reports whether inst's instance type is a civilian service NPC
@@ -171,22 +171,14 @@ func (f *Folk) CollisionRadius() float64 { return f.Instance.Template.CollisionR
 // CollisionHeight returns the template body height.
 func (f *Folk) CollisionHeight() float64 { return f.Instance.Template.CollisionHeight }
 
-// weddingManager is the wedding manager's type.
-const weddingManager InstanceKind = "WeddingManagerNpc"
-
-// holyThing is the castle holy artifact's type: a civilian NPC no creature
-// may attack or damage and a player's interact does nothing on, shown with
-// ServerObjectInfo, and the only target a HOLY skill accepts.
-const holyThing InstanceKind = "HolyThing"
-
 // HolyThing reports a castle holy artifact.
-func (f *Folk) HolyThing() bool { return hostileKind(f.Instance) == holyThing }
+func (f *Folk) HolyThing() bool { return hostileKind(f.Instance) == KindHolyThing }
 
 // Muted reports a civilian NPC a player's interact does nothing on: a muted
 // civilian, a holy artifact, a siege headquarters or a control tower.
 func (f *Folk) Muted() bool {
 	kind := hostileKind(f.Instance)
-	return kind == "MutedFolk" || kind == holyThing || kind == siegeFlag || f.Tower()
+	return kind == KindMutedFolk || kind == KindHolyThing || kind == KindSiegeFlag || f.Tower()
 }
 
 // ServerObjectView reports an NPC every player is shown with the stationary
@@ -197,7 +189,7 @@ func (f *Folk) ServerObjectView() bool { return f.HolyThing() || (f.Tower() && !
 // QuestTalker reports whether a player's interact goes through the quest
 // dialog first: every civilian NPC but the wedding manager, whose own
 // greeting answers every interact.
-func (f *Folk) QuestTalker() bool { return hostileKind(f.Instance) != weddingManager }
+func (f *Folk) QuestTalker() bool { return hostileKind(f.Instance) != KindWeddingManagerNpc }
 
 // TalkAnimation claims the talk animation an interact plays: a random
 // social action id in [0, 8), only once socialInterval has passed since
@@ -205,7 +197,7 @@ func (f *Folk) QuestTalker() bool { return hostileKind(f.Instance) != weddingMan
 // always. ok is false when none plays, or when f cannot act. A wedding
 // manager greets with its own dialog and plays none.
 func (f *Folk) TalkAnimation() (id int32, ok bool) {
-	if f.Muted() || hostileKind(f.Instance) == weddingManager || f.denyAIAction() {
+	if f.Muted() || hostileKind(f.Instance) == KindWeddingManagerNpc || f.denyAIAction() {
 		return 0, false
 	}
 	ms := f.now().UnixMilli()

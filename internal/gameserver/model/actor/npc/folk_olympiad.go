@@ -107,5 +107,5 @@ func (f *Folk) rawPage(pages Pages, path string) string {
 
 // OlympiadManager reports whether f is an Olympiad manager.
 func (f *Folk) OlympiadManager() bool {
-	return hostileKind(f.Instance) == "OlympiadManagerNpc"
+	return hostileKind(f.Instance) == KindOlympiadManagerNpc
 }

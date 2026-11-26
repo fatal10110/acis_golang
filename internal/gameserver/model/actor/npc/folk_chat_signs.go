@@ -59,17 +59,17 @@ func idSet(ids ...int) map[int]struct{} {
 // festival guide or an Olympiad manager; ok is false for any other type.
 func (f *Folk) signsChat(pages Pages, kind InstanceKind, state ChatState) (page string, outcome ChatOutcome, ok bool) {
 	switch kind {
-	case "DawnPriest":
+	case KindDawnPriest:
 		return f.page(pages, sevenSignsPages+priestPage("dawn", sevensigns.Dawn, state.SevenSigns())), ChatShownReleased, true
-	case "DuskPriest":
+	case KindDuskPriest:
 		return f.page(pages, sevenSignsPages+priestPage("dusk", sevensigns.Dusk, state.SevenSigns())), ChatShownReleased, true
-	case "SignsPriest":
+	case KindSignsPriest:
 		page, outcome = f.mammonChat(pages, state.SevenSigns(), 0)
 		return page, outcome, true
-	case "FestivalGuide":
+	case KindFestivalGuide:
 		page = f.page(pages, festivalGuidePath(f.NpcID()))
 		return strings.ReplaceAll(page, "%festivalMins%", state.FestivalNotice()), ChatShown, true
-	case "OlympiadManagerNpc":
+	case KindOlympiadManagerNpc:
 		hero, inactive := state.Hero()
 		return f.olympiadChat(pages, 0, state.Noble(), hero, inactive), ChatShown, true
 	}

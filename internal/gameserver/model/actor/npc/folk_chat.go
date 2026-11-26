@@ -91,32 +91,32 @@ func canUseWarehouse(r ChatRules) bool { return r.KarmaCanUseWarehouse }
 // it reads it. A type absent here and from siegeMessengers uses the
 // default page.
 var folkChats = map[InstanceKind]folkChat{
-	"Adventurer":           {dir: "adventurer_guildsman"},
-	"ClassMaster":          {dir: "mods/classmaster"},
-	"DungeonGatekeeper":    {dir: "gatekeeper"},
-	"Fisherman":            {dir: "fisherman", pk: canShop},
-	"Gatekeeper":           {dir: "gatekeeper", pk: canUseGK},
-	"ManorManagerNpc":      {dir: "merchant", fixed: "data/html/manormanager/manager.htm", pk: canShop},
-	"Merchant":             {dir: "merchant", pk: canShop},
-	"SchemeBuffer":         {dir: "mods/buffer"},
-	"SymbolMaker":          {fixed: "data/html/symbolmaker/SymbolMaker.htm"},
-	"Trainer":              {dir: "trainer"},
-	"VillageMaster":        {dir: "villagemaster"},
-	"VillageMasterDElf":    {dir: "villagemaster"},
-	"VillageMasterDwarf":   {dir: "villagemaster"},
-	"VillageMasterFighter": {dir: "villagemaster"},
-	"VillageMasterMystic":  {dir: "villagemaster"},
-	"VillageMasterOrc":     {dir: "villagemaster"},
-	"VillageMasterPriest":  {dir: "villagemaster"},
-	"WarehouseKeeper":      {dir: "warehouse", pk: canUseWarehouse},
+	KindAdventurer:           {dir: "adventurer_guildsman"},
+	KindClassMaster:          {dir: "mods/classmaster"},
+	KindDungeonGatekeeper:    {dir: "gatekeeper"},
+	KindFisherman:            {dir: "fisherman", pk: canShop},
+	KindGatekeeper:           {dir: "gatekeeper", pk: canUseGK},
+	KindManorManagerNpc:      {dir: "merchant", fixed: "data/html/manormanager/manager.htm", pk: canShop},
+	KindMerchant:             {dir: "merchant", pk: canShop},
+	KindSchemeBuffer:         {dir: "mods/buffer"},
+	KindSymbolMaker:          {fixed: "data/html/symbolmaker/SymbolMaker.htm"},
+	KindTrainer:              {dir: "trainer"},
+	KindVillageMaster:        {dir: "villagemaster"},
+	KindVillageMasterDElf:    {dir: "villagemaster"},
+	KindVillageMasterDwarf:   {dir: "villagemaster"},
+	KindVillageMasterFighter: {dir: "villagemaster"},
+	KindVillageMasterMystic:  {dir: "villagemaster"},
+	KindVillageMasterOrc:     {dir: "villagemaster"},
+	KindVillageMasterPriest:  {dir: "villagemaster"},
+	KindWarehouseKeeper:      {dir: "warehouse", pk: canUseWarehouse},
 	// A castle warehouse keeper keeps the warehouse keeper's karma gate;
 	// its chat pages are its castle's, see residenceChatPage.
-	"CastleWarehouseKeeper": {dir: "warehouse", pk: canUseWarehouse},
+	KindCastleWarehouseKeeper: {dir: "warehouse", pk: canUseWarehouse},
 	// A chamberlain and a wyvern manager answer the commands their own
 	// dialogs leave as a merchant does; their first chat page is their
 	// residence's, see residenceChat.
-	"CastleChamberlain": {dir: "merchant", pk: canShop},
-	"WyvernManagerNpc":  {dir: "merchant", pk: canShop},
+	KindCastleChamberlain: {dir: "merchant", pk: canShop},
+	KindWyvernManagerNpc:  {dir: "merchant", pk: canShop},
 }
 
 // siegeMessengers are the civilian types whose chat window the network
@@ -125,7 +125,7 @@ var folkChats = map[InstanceKind]folkChat{
 // generic ones, a chat page read from data/html/default as for a type
 // absent from folkChats (#4975).
 var siegeMessengers = map[InstanceKind]struct{}{
-	"SiegeNpc": {},
+	KindSiegeNpc: {},
 }
 
 // ChatWindow resolves the first chat page this NPC shows a talker carrying
@@ -137,10 +137,10 @@ var siegeMessengers = map[InstanceKind]struct{}{
 // is missing" notice naming it.
 func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatState) (string, ChatOutcome) {
 	kind := hostileKind(f.Instance)
-	if kind == weddingManager {
+	if kind == KindWeddingManagerNpc {
 		return "", ChatWedding
 	}
-	if kind == auctioneer {
+	if kind == KindAuctioneer {
 		return f.AuctioneerChat(pages), ChatShown
 	}
 	if _, ok := siegeMessengers[kind]; ok {
@@ -158,9 +158,6 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatSta
 	}
 	return f.chatPage(pages, chat, 0), ChatShown
 }
-
-// auctioneer is the clan hall auctioneer's type.
-const auctioneer InstanceKind = "Auctioneer"
 
 // AuctioneerChat is an auctioneer's chat window: auction/auction.htm with
 // %objectId%, %npcId% and %npcname% naming this NPC.

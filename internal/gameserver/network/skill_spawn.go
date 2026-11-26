@@ -21,7 +21,7 @@ func (l *GameClientLink) placeSkillNPC(npcID int32, x, y, z, heading int, despaw
 		l.log.Error().Int32("npc_id", npcID).Msg("skill spawn: no such npc template")
 		return
 	}
-	if npc.InstanceKind(tmpl.Type) == npc.ChristmasTree {
+	if tmpl.Kind() == npc.KindChristmasTree {
 		var decoration *npc.Decoration
 		if l.ids != nil {
 			decoration = l.placeDecoration(tmpl, tmpl.Title, x, y, z, heading, 0)

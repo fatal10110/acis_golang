@@ -165,9 +165,6 @@ func frameSiegeMessage(m siege.Message) wire.Frame {
 	return serverpackets.FrameSystemMessageParams(m.ID, params...)
 }
 
-// siegeNpcKind is the castle messenger's type.
-const siegeNpcKind = "SiegeNpc"
-
 // showSiegeMessenger answers a talk to a castle's siege messenger, and
 // reports whether f is one: the leader of the clan owning the castle reads
 // siege/01.htm, or siege/03.htm while its siege is under way; anyone else
@@ -176,7 +173,7 @@ const siegeNpcKind = "SiegeNpc"
 // siegable hall's (showHallSiegeMessenger); one of neither is left to the
 // chat window.
 func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool {
-	if f.Instance.Template.Type != siegeNpcKind {
+	if f.Instance.Template.Kind() != npc.KindSiegeNpc {
 		return false
 	}
 	c, ok := l.castles.ByNPC(f.NpcID())

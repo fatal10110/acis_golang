@@ -33,7 +33,7 @@ func (r ResidenceTalk) ChamberlainStanding(kind InstanceKind) ChamberlainStandin
 	switch {
 	case r.ClanID == 0:
 		return StandingStranger
-	case kind == "CastleChamberlain" && r.CastleID == 0:
+	case kind == KindCastleChamberlain && r.CastleID == 0:
 		return StandingStranger
 	case r.CastleID != 0 && r.SiegeInProgress:
 		return StandingUnderSiege
