@@ -20,12 +20,12 @@ func TestControllerHitTimerAbortReachesPlayableAI(t *testing.T) {
 		want  int
 	}{
 		{"player", func(s event.Sink) *Controller {
-			return NewPlayer(&timingPlayer{timingActor: timingActor{attackSpeed: 500}}, s)
+			return NewPlayer(&timingPlayer{timingActor: timingActor{attackSpeed: 500}}, s, nil)
 		}, 1},
 		{"summon", func(s event.Sink) *Controller {
-			return NewPlayable(&timingSummon{timingActor: timingActor{attackSpeed: 500}}, s)
+			return NewPlayable(&timingSummon{timingActor: timingActor{attackSpeed: 500}}, s, nil)
 		}, 1},
-		{"npc", func(s event.Sink) *Controller { return NewAttackable(&timingActor{attackSpeed: 500}, s) }, 0},
+		{"npc", func(s event.Sink) *Controller { return NewAttackable(&timingActor{attackSpeed: 500}, s, nil) }, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			target := &timingTarget{id: 2}
@@ -61,8 +61,7 @@ func TestControllerDualSecondHitLandsOnAKilledTarget(t *testing.T) {
 	target.onDamage = func() { target.dead = true }
 	clock := newTimingClock()
 	rec := &event.Recorder{}
-	ctrl := NewPlayer(actor, rec)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewPlayer(actor, rec, clock.q)
 
 	// attackTime 1000ms.
 	ctrl.DoAttack(target)
@@ -105,8 +104,7 @@ func TestControllerPoleHitLandsOnADeadSplashTarget(t *testing.T) {
 	}}
 	clock := newTimingClock()
 	rec := &event.Recorder{}
-	ctrl := NewPlayer(actor, rec)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewPlayer(actor, rec, clock.q)
 
 	ctrl.DoAttack(primary)
 	secondary.dead = true

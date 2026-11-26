@@ -6,8 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 var _ attack.Target = (*Character)(nil)
@@ -20,44 +18,14 @@ func (c *Character) SetRollSource(f func(int) int) {
 
 // MakeAttackHit resolves one physical attack result.
 func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{TargetID: target.ObjectID()}
-	// Folding this needs the world known-list to hand out formula operands.
-	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
-	// yields attackable.Combatant, narrowed from world.Tracked, and world
-	// cannot name creature.FormulaActor because creature already depends on
-	// world. The pole and split paths draw their extra targets from that
-	// callback, so the narrowing stays here, at the one point where a
-	// combatant becomes a formula operand; see #2362.
-	other, ok := target.(creature.FormulaActor)
-	if !ok {
-		hit.Miss = true
-		return hit
+	if _, ok := target.(creature.FormulaActor); !ok || c.template() == nil {
+		return attack.Hit{TargetID: target.ObjectID(), Miss: true}
 	}
-
-	tmpl := c.template()
-	if tmpl == nil {
-		hit.Miss = true
-		return hit
-	}
-
-	accuracy := c.Accuracy()
-	evasion := other.Against(c.ConditionActor(), nil).Evasion()
-
-	_, _, sz := c.Position()
-	_, _, tz := other.Position()
-	behind, inFront := creature.AttackFacing(other, c)
-	rate := formulas.HitRate(accuracy, evasion, sz-tz, c.EffectList().IsNight(), behind, inFront)
-	if formulas.Missed(rate, c.rollValue(1000)) {
-		hit.Miss = true
-		return hit
-	}
-
-	crit := formulas.CritSucceeds(c.criticalRate(conditions.ActorOf(other)), c.rollValue(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(c, other, crit)
-	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
-	hit.Crit = crit
-	hit.Shield = shield
-	return hit
+	return attack.ResolveHit(c, target, attack.HitRoll{
+		Accuracy: c.Accuracy(),
+		Night:    c.EffectList().IsNight(),
+		CritRate: c.criticalRate,
+	}, split)
 }
 
 func (c *Character) rollValue(n int) int {

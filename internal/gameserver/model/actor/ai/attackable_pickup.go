@@ -42,7 +42,9 @@ func (a *Attackable) thinkPickUp() {
 	x, y, z := a.actor.Position()
 	if (location.Location{X: x, Y: y, Z: z}).Distance3D(at) >= PickUpRange {
 		if !a.actor.MovementDisabled() {
-			_, _ = a.move.MoveStraightToLocation(at)
+			if _, err := a.move.MoveStraightToLocation(at); err != nil {
+				a.logMoveError(err)
+			}
 		}
 		return
 	}

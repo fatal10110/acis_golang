@@ -376,7 +376,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	if err != nil {
 		t.Fatal(err)
 	}
-	attackCtl := attack.NewPlayer(ch, control)
+	attackCtl := attack.NewPlayer(ch, control, nil)
 	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
 	control.combat = combat
 
