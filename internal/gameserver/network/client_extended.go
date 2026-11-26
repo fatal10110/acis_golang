@@ -9,7 +9,8 @@ import (
 )
 
 // handleExtended serves an extended frame: the uint16 sub-opcode after the
-// opcode byte picks its handler in gameExInbound.
+// opcode byte picks its handler in the client state's stateExInbound
+// registry, or in gameExInbound for a state without one.
 func (l *GameClientLink) handleExtended(ctx context.Context, cs *connState, payload []byte) error {
 	client := cs.client
 	r := wire.NewReader(payload[1:])
@@ -19,28 +20,24 @@ func (l *GameClientLink) handleExtended(ctx context.Context, cs *connState, payl
 		cs.acted = false
 		return nil
 	}
-	// While entering, only the manor-list sub-opcode is dispatched;
-	// every other one counts toward the unknown-packet disconnect
-	// threshold instead of being absorbed by an in-game no-op.
-	if client.State() == StateEntering && second != clientpackets.OpcodeRequestManorList {
-		l.log.Info().
-			Uint16("opcode2", second).
-			Str("state", client.State().String()).
-			Msg("game client: accepted extended opcode not handled while entering")
-		cs.acted = false
-		if client.countUnknownPacket() {
-			client.closeNow()
-			return errDisconnect
-		}
-		return nil
+	// A state listed in stateExInbound dispatches only its own
+	// sub-opcodes; every other one counts toward the unknown-packet
+	// disconnect threshold instead of being absorbed by an in-game no-op.
+	reg, limited := stateExInbound[client.State()]
+	if !limited {
+		reg = gameExInbound
 	}
-	if handle, ok := gameExInbound[second]; ok {
+	if handle, ok := reg[second]; ok {
 		return handle(l, ctx, cs, payload)
+	}
+	msg := "game client: accepted extended opcode not implemented yet"
+	if limited {
+		msg = "game client: accepted extended opcode not handled in this state"
 	}
 	l.log.Info().
 		Uint16("opcode2", second).
 		Str("state", client.State().String()).
-		Msg("game client: accepted extended opcode not implemented yet")
+		Msg(msg)
 	// OpcodeExtended is only ever allowed in StateEntering/StateInGame
 	// (see allowedOpcodes), so unlike the top-level Accept gate there is
 	// no pre-auth immediate-disconnect case here; just count toward the

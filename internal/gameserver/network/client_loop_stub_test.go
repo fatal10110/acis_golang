@@ -7,21 +7,24 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/rs/zerolog"
 )
 
 // TestEveryAcceptedOpcodeHasAHandler pins that the state gate and the
-// registry agree in both directions: an opcode a client may send in some
+// registries agree in both directions: an opcode a client may send in some
 // state always reaches a handler, so the read loop's not-implemented
 // fallback stays a guard, and a registered handler is always reachable in
 // some state, so a new register line without its gate entry cannot sit
-// behind a gate that rejects every frame.
+// behind a gate that rejects every frame. A state's own registry
+// (stateInbound) serves only opcodes that state accepts, and a state that
+// limits extended sub-opcodes (stateExInbound) accepts the extended opcode.
 func TestEveryAcceptedOpcodeHasAHandler(t *testing.T) {
 	for state, ops := range allowedOpcodes {
 		for op := range ops {
-			if _, ok := gameInbound[op]; !ok {
-				t.Errorf("opcode %#x accepted in state %s has no gameInbound handler", op, state)
+			if _, ok := inboundFor(state, op)[op]; !ok {
+				t.Errorf("opcode %#x accepted in state %s has no handler", op, state)
 			}
 		}
 	}
@@ -35,6 +38,23 @@ func TestEveryAcceptedOpcodeHasAHandler(t *testing.T) {
 		}
 		if !allowed {
 			t.Errorf("gameInbound handler for opcode %#x is not allowed in any state", op)
+		}
+	}
+	for state, reg := range stateInbound {
+		for op := range reg {
+			if !Allowed(state, op) {
+				t.Errorf("stateInbound handler for opcode %#x is not allowed in state %s", op, state)
+			}
+		}
+	}
+	for state, reg := range stateExInbound {
+		if !Allowed(state, clientpackets.OpcodeExtended) {
+			t.Errorf("stateExInbound lists sub-opcodes for state %s, which does not accept the extended opcode", state)
+		}
+		for sub := range reg {
+			if _, ok := gameExInbound[sub]; !ok {
+				t.Errorf("stateExInbound sub-opcode %#x for state %s has no gameExInbound handler", sub, state)
+			}
 		}
 	}
 }
