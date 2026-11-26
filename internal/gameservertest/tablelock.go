@@ -15,12 +15,25 @@ import (
 // the locked table.
 func (s *Server) LockTable(tb testing.TB, table string) (release func()) {
 	tb.Helper()
+	return s.lockTable(tb, table, "WRITE")
+}
+
+// LockTableRead read-locks table like LockTable: reads of it go on, and
+// every write waits until release runs.
+func (s *Server) LockTableRead(tb testing.TB, table string) (release func()) {
+	tb.Helper()
+	return s.lockTable(tb, table, "READ")
+}
+
+// lockTable locks table in mode from a database connection of its own.
+func (s *Server) lockTable(tb testing.TB, table, mode string) (release func()) {
+	tb.Helper()
 	ctx := context.Background()
 	conn, err := s.DB.Conn(ctx)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	if _, err := conn.ExecContext(ctx, "LOCK TABLES "+table+" WRITE"); err != nil {
+	if _, err := conn.ExecContext(ctx, "LOCK TABLES "+table+" "+mode); err != nil {
 		_ = conn.Close()
 		tb.Fatal(err)
 	}

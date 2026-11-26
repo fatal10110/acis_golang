@@ -1,7 +1,7 @@
 // Package announcement owns the server announcements: the lines read to
 // every player entering the world, and the automatic ones repeated to every
 // player online on their own schedule. Game masters add and delete them at
-// run time; every change rewrites the announcement file.
+// run time; Save rewrites the announcement file after each change.
 package announcement
 
 import (
@@ -58,11 +58,20 @@ type Registry struct {
 	// queue runs the schedules: their timers and announcements.
 	queue *sim.Queue
 
-	// mu guards entries, next, stopped and every entry's schedule.
+	// file serializes the reads and writes of the announcement file, so
+	// they keep the order of the changes. mu is never held across them.
+	file sync.Mutex
+	// saved is the change the file was last written at, or read at. file
+	// guards it.
+	saved uint64
+
+	// mu guards entries, next, change, stopped and every entry's schedule.
 	mu      sync.Mutex
 	entries map[int]*entry
 	// next is the index the next announcement held takes.
-	next    int
+	next int
+	// change counts the changes Add and Delete made.
+	change  uint64
 	stopped bool
 }
 
@@ -94,24 +103,44 @@ func NewRegistry(store Store, out Announcer, log zerolog.Logger, queue *sim.Queu
 // announcements held before are dropped and their schedules stopped first;
 // a file that fails to load is an error and leaves them held and running.
 // An automatic announcement Add would refuse is skipped with a warning, so
-// no stored entry starts a schedule without pause (#5126).
+// no stored entry starts a schedule without pause (#5126). A change not yet
+// saved is saved first, and one made while the file is read is saved and the
+// file read again, so Load reads every change made before it returns.
 func (r *Registry) Load() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	var list []admin.Announcement
-	if r.store != nil {
-		var err error
-		if list, err = r.store.Load(); err != nil {
-			return err
+	r.file.Lock()
+	defer r.file.Unlock()
+	for {
+		r.saveFile()
+		r.mu.Lock()
+		change := r.change
+		r.mu.Unlock()
+		var list []admin.Announcement
+		if r.store != nil {
+			var err error
+			if list, err = r.store.Load(); err != nil {
+				return err
+			}
 		}
+		r.mu.Lock()
+		if r.change != change {
+			r.mu.Unlock()
+			continue
+		}
+		r.loadLocked(list)
+		r.mu.Unlock()
+		return nil
 	}
+}
+
+// loadLocked holds list in place of the announcements held.
+func (r *Registry) loadLocked(list []admin.Announcement) {
 	for _, e := range r.entries {
 		e.stop()
 	}
 	clear(r.entries)
 	r.next = 0
 	if r.store == nil {
-		return nil
+		return
 	}
 	for _, a := range list {
 		if err := check(a); err != nil {
@@ -122,7 +151,6 @@ func (r *Registry) Load() error {
 		r.putLocked(a)
 	}
 	r.log.Info().Msgf("Loaded %d announcements.", len(r.entries))
-	return nil
 }
 
 // Login returns the announcements read to a player entering the world: the
@@ -160,8 +188,8 @@ func (r *Registry) RestartAuto() {
 	}
 }
 
-// Add holds a new announcement, starts its schedule when automatic and
-// rewrites the file. An announcement that is not automatic keeps no
+// Add holds a new announcement and starts its schedule when automatic; Save
+// then rewrites the file. An announcement that is not automatic keeps no
 // schedule values. It refuses, changing nothing, an empty message
 // (ErrEmptyMessage), and an automatic announcement with a delay under a
 // second (ErrDelay) or a negative limit (ErrLimit).
@@ -175,7 +203,7 @@ func (r *Registry) Add(a admin.Announcement) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.putLocked(a)
-	r.saveLocked()
+	r.change++
 	return nil
 }
 
@@ -195,8 +223,8 @@ func check(a admin.Announcement) error {
 	return nil
 }
 
-// Delete drops the announcement at index, stops its schedule and rewrites
-// the file. It reports false, changing nothing, when no announcement holds
+// Delete drops the announcement at index and stops its schedule; Save then
+// rewrites the file. It reports false, changing nothing, when no announcement holds
 // index.
 func (r *Registry) Delete(index int) bool {
 	r.mu.Lock()
@@ -207,7 +235,7 @@ func (r *Registry) Delete(index int) bool {
 	}
 	delete(r.entries, index)
 	e.stop()
-	r.saveLocked()
+	r.change++
 	return true
 }
 
@@ -236,14 +264,31 @@ func (r *Registry) indexesLocked() []int {
 	return slices.Sorted(maps.Keys(r.entries))
 }
 
-func (r *Registry) saveLocked() {
-	if r.store == nil {
+// Save rewrites the announcement file with the announcements held, unless
+// it already holds every change Add and Delete made. It reads and writes
+// the file outside mu, so the players entering the world and the schedules
+// do not wait on it; saves running at once write in turn, the last change
+// last. A write that fails is logged.
+func (r *Registry) Save() {
+	r.file.Lock()
+	defer r.file.Unlock()
+	r.saveFile()
+}
+
+// saveFile is Save with file held.
+func (r *Registry) saveFile() {
+	r.mu.Lock()
+	change := r.change
+	if change == r.saved || r.store == nil {
+		r.mu.Unlock()
 		return
 	}
 	list := make([]admin.Announcement, 0, len(r.entries))
 	for _, i := range r.indexesLocked() {
 		list = append(list, r.entries[i].Announcement)
 	}
+	r.mu.Unlock()
+	r.saved = change
 	if err := r.store.Save(list); err != nil {
 		r.log.Error().Err(err).Msg("Error regenerating XML.")
 	}
