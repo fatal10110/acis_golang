@@ -1,8 +1,10 @@
 package skill
 
-import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+import (
+	"time"
 
-import "time"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // NPCPlacer places one NPC of template npcID at (x, y) on the ground below
 // z, facing heading, as a spawn that never respawns, and deletes it once

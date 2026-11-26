@@ -1,8 +1,9 @@
 package skill
 
-import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // enhanceWeaponQuest is the quest whose started state lets a soul crystal's
 // skill charge the crystal.

@@ -1,8 +1,9 @@
 package skill
 
-import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // appearanceChanger is a player whose face and hair a skill can change.
 type appearanceChanger interface {
