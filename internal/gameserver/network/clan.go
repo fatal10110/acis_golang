@@ -336,7 +336,9 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 	case target == nil && m.Online:
 		// Out of the world on its way out, it keeps what it wears, as a
 		// member online does: its last inventory save, already queued,
-		// stored it worn. The leave was handed to it (clan.Service.Leave).
+		// stored it worn. Its removal row is written already, when it was
+		// removed online before leaving the world, or else by
+		// clan.Service.Leave, the leave having been handed to it.
 	case target == nil && !m.Entering:
 		l.unequipLeaverCirclets(cl, m.ObjectID)
 	case target == nil:
