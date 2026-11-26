@@ -1,4 +1,4 @@
-package xml
+package script
 
 import (
 	"bufio"
@@ -9,21 +9,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
 
-// TestLoadScriptList pins the datapack's scripts.xml: 857 live entries in
+// TestLoadList pins the datapack's scripts.xml: 857 live entries in
 // the order of the reference's registration manifest, and every schedule
 // attribute.
-func TestLoadScriptList(t *testing.T) {
+func TestLoadList(t *testing.T) {
 	t.Parallel()
-	list, err := LoadScriptList(datapackPath(t, filepath.Join("data", "xml", "scripts.xml")), zerolog.Nop())
+	list, err := LoadList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	f, err := os.Open(filepath.Join("..", "..", "script", "testdata", "oracle", "manifest.golden"))
+	f, err := os.Open(filepath.Join("testdata", "oracle", "manifest.golden"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestLoadScriptList(t *testing.T) {
 	}
 
 	var got []string
-	scheduled := map[string]script.Listing{}
+	scheduled := map[string]Listing{}
 	for _, l := range list {
 		got = append(got, l.Path)
 		if l.Schedule != "" || l.Start != "" || l.End != "" {
@@ -54,7 +54,7 @@ func TestLoadScriptList(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatal("scripts.xml order differs from the reference manifest")
 	}
-	wantScheduled := map[string]script.Listing{
+	wantScheduled := map[string]Listing{
 		"quest.Q620_FourGoblets":    {Path: "quest.Q620_FourGoblets", Schedule: "HOURLY", Start: "00:00", End: "50:00"},
 		"task.CastleTaxRefresh":     {Path: "task.CastleTaxRefresh", Schedule: "DAILY", Start: "00:00:00"},
 		"task.ClanLadderRefresh":    {Path: "task.ClanLadderRefresh", Schedule: "DAILY", Start: "00:05:00"},
@@ -73,18 +73,18 @@ func TestLoadScriptList(t *testing.T) {
 	}
 }
 
-// TestLoadScriptListSkipsEntryWithoutPath: an entry with no path is
+// TestLoadListSkipsEntryWithoutPath: an entry with no path is
 // logged and skipped; an empty path is kept, to be reported missing.
-func TestLoadScriptListSkipsEntryWithoutPath(t *testing.T) {
+func TestLoadListSkipsEntryWithoutPath(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "scripts.xml")
-	writeXMLFixture(t, path, `<list><script path="quest.A"/><script schedule="DAILY"/><script path=""/><script path="task.B" schedule="DAILY" start="01:00:00"/></list>`)
+	writeList(t, path, `<list><script path="quest.A"/><script schedule="DAILY"/><script path=""/><script path="task.B" schedule="DAILY" start="01:00:00"/></list>`)
 	var logs bytes.Buffer
-	list, err := LoadScriptList(path, zerolog.New(&logs))
+	list, err := LoadList(path, zerolog.New(&logs))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []script.Listing{{Path: "quest.A"}, {Path: ""}, {Path: "task.B", Schedule: "DAILY", Start: "01:00:00"}}
+	want := []Listing{{Path: "quest.A"}, {Path: ""}, {Path: "task.B", Schedule: "DAILY", Start: "01:00:00"}}
 	if !slices.Equal(list, want) {
 		t.Fatalf("list = %+v, want %+v", list, want)
 	}
@@ -92,8 +92,15 @@ func TestLoadScriptListSkipsEntryWithoutPath(t *testing.T) {
 		t.Fatalf("missing path not logged: %s", logs.String())
 	}
 
-	writeXMLFixture(t, path, `<scripts><script path="quest.A"/></scripts>`)
-	if _, err := LoadScriptList(path, zerolog.Nop()); err == nil {
+	writeList(t, path, `<scripts><script path="quest.A"/></scripts>`)
+	if _, err := LoadList(path, zerolog.Nop()); err == nil {
 		t.Fatal("a file whose root is not <list> loaded")
+	}
+}
+
+func writeList(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

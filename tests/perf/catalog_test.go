@@ -2,7 +2,6 @@ package perf
 
 import (
 	"cmp"
-	"maps"
 	"path/filepath"
 	"slices"
 	"sync/atomic"
@@ -13,23 +12,21 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
 
 // prodCatalog is the catalog variant's data: the shipped scripts.xml, the
-// content catalogs the production boot joins from internal/gameserver/script/
-// catalog, the engine catalogs (quests, features, teleporters, tasks and the
-// base behaviors) from internal/gameserver/script/enginescripts, and the
-// shipped NPC and skill tables.
+// catalog files the production boot joins from internal/gameserver/script/
+// catalog, the engine file (quests, features, teleporters, tasks and the
+// base behaviors) among them, and the shipped NPC and skill tables.
 type prodCatalog struct {
 	list    []script.Listing
 	catalog script.Catalog
 	skills  *modelskill.Table
 	// engineListed counts the listed scripts that come from the engine
-	// catalogs, enginePicked the monster templates bound to one of them.
+	// catalog file, enginePicked the monster templates bound to one of them.
 	engineListed, enginePicked int
 	// templates are the monsters the clients fight: one copy of a shipped
 	// template per scripted behavior, in the order clients take them.
@@ -66,7 +63,7 @@ func newShippedKit(t *testing.T, skills *modelskill.Table) *castKit {
 func loadProdCatalog(t *testing.T, n int) *prodCatalog {
 	t.Helper()
 	root := datapack.Path(t, "data", "xml")
-	list, err := gamexml.LoadScriptList(filepath.Join(root, "scripts.xml"), zerolog.Nop())
+	list, err := script.LoadList(filepath.Join(root, "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,33 +89,19 @@ func loadProdCatalog(t *testing.T, n int) *prodCatalog {
 		t.Fatal(err)
 	}
 
-	// The production boot's join: the engine catalogs, then the content
-	// catalog files, a script ported in neither left out.
-	sagas := thirdclass.NewFamily()
-	joined := script.Catalog{}
-	engineOwned := map[string]bool{}
-	for _, c := range enginescripts.Catalogs(crystals, buffs, sagas) {
-		for path, ctor := range c {
-			if ctor != nil {
-				joined[path] = ctor
-				engineOwned[path] = true
-			}
-		}
+	// The production boot's catalog; the engine file names the scripts
+	// ported with the engine.
+	joined, err := catalog.ScriptCatalog(crystals, buffs)
+	if err != nil {
+		t.Fatal(err)
 	}
-	files := catalog.Scripts(sagas)
-	for _, name := range slices.Sorted(maps.Keys(files)) {
-		for path, ctor := range files[name] {
-			if ctor != nil {
-				joined[path] = ctor
-			}
-		}
-	}
+	engineOwned := catalog.Scripts(nil, nil, thirdclass.NewFamily())["engine"]
 	var listed []script.Listing
 	engineListed := 0
 	for _, l := range list {
 		if joined[l.Path] != nil {
 			listed = append(listed, l)
-			if engineOwned[l.Path] {
+			if engineOwned[l.Path] != nil {
 				engineListed++
 			}
 		}
@@ -183,7 +166,7 @@ func loadProdCatalog(t *testing.T, n int) *prodCatalog {
 	}
 	enginePicked := 0
 	for _, p := range picks {
-		if engineOwned[pickedBy[p.ID]] {
+		if engineOwned[pickedBy[p.ID]] != nil {
 			enginePicked++
 		}
 	}

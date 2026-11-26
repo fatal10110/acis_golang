@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
 )
 
 // manifestChains reads the class chain of every script of the reference
@@ -48,11 +50,11 @@ func manifestChains(t *testing.T) map[string][]string {
 // to no NPC.
 func TestScriptClassesMatchReferenceChains(t *testing.T) {
 	want := manifestChains(t)
-	catalog, err := scriptCatalog(scriptCatalogs(nil, nil))
+	joined, err := catalog.ScriptCatalog(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for path, ctor := range catalog {
+	for path, ctor := range joined {
 		if strings.HasPrefix(path, "quest.") {
 			continue
 		}

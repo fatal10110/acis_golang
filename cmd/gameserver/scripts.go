@@ -2,10 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"maps"
 	"path/filepath"
-	"slices"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
@@ -18,16 +15,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
-	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -36,52 +28,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
-
-// scriptCatalogs are the literal script catalogs: the scripts ported with
-// the engine, then the content catalog files; scriptCatalog joins them.
-// crystals are the soul crystals a quest charges, buffs the buffs the
-// newbie guides cast. The saga core and the sagas share one family.
-func scriptCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTable) []script.Catalog {
-	sagas := thirdclass.NewFamily()
-	out := enginescripts.Catalogs(crystals, buffs, sagas)
-	files := catalog.Scripts(sagas)
-	for _, name := range slices.Sorted(maps.Keys(files)) {
-		out = append(out, files[name])
-	}
-	return out
-}
-
-// scriptCatalog joins catalogs into one, without the entries not ported
-// yet (a nil constructor). A path in two catalogs is an error, ported or
-// not.
-func scriptCatalog(catalogs []script.Catalog) (script.Catalog, error) {
-	return joinCatalogs("script", catalogs)
-}
-
-// makerCatalog joins maker catalogs into one, as scriptCatalog joins
-// script catalogs.
-func makerCatalog(catalogs []script.MakerCatalog) (script.MakerCatalog, error) {
-	return joinCatalogs("maker type", catalogs)
-}
-
-// joinCatalogs joins catalogs into one and drops the nil constructors; a
-// key in two catalogs is an error.
-func joinCatalogs[C ~map[string]func() T, T any](what string, catalogs []C) (C, error) {
-	seen := map[string]bool{}
-	out := C{}
-	for _, c := range catalogs {
-		for key, ctor := range c {
-			if seen[key] {
-				return nil, fmt.Errorf("%s %s is in two catalogs", what, key)
-			}
-			seen[key] = true
-			if ctor != nil {
-				out[key] = ctor
-			}
-		}
-	}
-	return out, nil
-}
 
 // provideScripts builds the script registry from scripts.xml and the
 // catalogs, against the NPC templates the boot loaded. Bindings and the
@@ -94,11 +40,11 @@ func joinCatalogs[C ~map[string]func() T, T any](what string, catalogs []C) (C, 
 // no NPC or player queue) runs on an engine queue of pool, closed on
 // shutdown before the persistence worker drains.
 func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env *script.Env, pool *sim.Pool, log zerolog.Logger) (*script.Registry, error) {
-	list, err := gamexml.LoadScriptList(filepath.Join(paths.DataRoot, "data", "xml", "scripts.xml"), log)
+	list, err := script.LoadList(filepath.Join(paths.DataRoot, "data", "xml", "scripts.xml"), log)
 	if err != nil {
 		return nil, err
 	}
-	joined, err := scriptCatalog(scriptCatalogs(data.SoulCrystals, data.NewbieBuffs))
+	joined, err := catalog.ScriptCatalog(data.SoulCrystals, data.NewbieBuffs)
 	if err != nil {
 		return nil, err
 	}
@@ -107,16 +53,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 		engine.Close()
 		return nil
 	}})
-	return script.Build(list, joined, script.Config{KindOf: script.NPCKindOf(data.NPCs), Log: log, Env: env, HandleOps: handleOps(), Queue: engine}), nil
-}
-
-// handleOps returns the handle operations of every catalog script: those
-// generated for the engine catalogs and those generated beside each content
-// catalog file.
-func handleOps() map[string]script.HandleOps {
-	out := maps.Clone(enginescripts.HandleOps())
-	maps.Copy(out, catalog.HandleOps())
-	return out
+	return script.Build(list, joined, script.Config{KindOf: script.NPCKindOf(data.NPCs), Log: log, Env: env, HandleOps: catalog.HandleOps(), Queue: engine}), nil
 }
 
 // provideScriptSpawner returns the spawner scripts place NPCs with. It is
@@ -213,23 +150,12 @@ func buildScripts(*script.Registry) {}
 // doors, draws from the scripts' random source and reads the wall clock
 // the NPC population runs on.
 func provideMakers(clock *task.GameClock, castles *castle.Manager, sieges *siege.Engine, doors *manager.WorldObjects, log zerolog.Logger) (*script.Makers, error) {
-	makers, err := makerCatalog(makerCatalogs())
+	makers, err := catalog.MakerCatalog()
 	if err != nil {
 		return nil, err
 	}
 	world := script.MakerWorld{Night: clock.IsNight, Castles: castles, Sieges: sieges, Doors: doors, Rand: rnd.Get, Now: time.Now}
 	return script.NewMakers(makers, maker.Default, world, log), nil
-}
-
-// makerCatalogs are the maker catalogs: the makers ported with the engine,
-// then the content catalog files.
-func makerCatalogs() []script.MakerCatalog {
-	out := []script.MakerCatalog{maker.Catalog()}
-	files := catalog.Makers()
-	for _, name := range slices.Sorted(maps.Keys(files)) {
-		out = append(out, files[name])
-	}
-	return out
 }
 
 // startSchedule runs the scheduled tasks against link. It starts once

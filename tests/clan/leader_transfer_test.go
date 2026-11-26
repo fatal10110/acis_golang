@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -30,7 +29,7 @@ var (
 // it, and a catalog holding only that task.
 func shippedTask(t *testing.T, path string, ctor func() script.Script) gameservertest.Option {
 	t.Helper()
-	list, err := gamexml.LoadScriptList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
+	list, err := script.LoadList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("load scripts.xml: %v", err)
 	}

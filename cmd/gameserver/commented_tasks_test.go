@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
@@ -37,7 +37,7 @@ func TestCommentedTasksAreCommentedEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list, err := gamexml.LoadScriptList(file, zerolog.Nop())
+	list, err := script.LoadList(file, zerolog.Nop())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestCommentedTasksRunOnceUncommented(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	joined, err := scriptCatalog(scriptCatalogs(nil, nil))
+	joined, err := catalog.ScriptCatalog(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestCommentedTasksRunOnceUncommented(t *testing.T) {
 			if err := os.WriteFile(file, commentedEntry(tc.path).ReplaceAll(raw, []byte("$1")), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			list, err := gamexml.LoadScriptList(file, zerolog.Nop())
+			list, err := script.LoadList(file, zerolog.Nop())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -96,7 +96,7 @@ func TestCommentedTasksRunOnceUncommented(t *testing.T) {
 				t.Fatalf("the uncommented scripts.xml does not list %s", tc.path)
 			}
 			noTemplates := func(int32) (script.NPCKind, bool) { return script.KindOther, false }
-			r := script.Build(list[i:i+1], joined, script.Config{KindOf: noTemplates, Log: zerolog.Nop(), HandleOps: handleOps()})
+			r := script.Build(list[i:i+1], joined, script.Config{KindOf: noTemplates, Log: zerolog.Nop(), HandleOps: catalog.HandleOps()})
 
 			// Tuesday 2026-10-20, a minute before the entry's start.
 			in := sim.NewInline(time.Date(2026, 10, 20, 16, 59, 0, 0, time.UTC))

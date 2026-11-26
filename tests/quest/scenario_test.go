@@ -64,15 +64,15 @@ var scenarioScripts = withContentScripts(script.Catalog{
 	"quest.ThirdClassQuest":              func() script.Script { return thirdclass.NewCore(scenarioSagas) },
 })
 
-// withContentScripts adds to engine the ported entries of the content
-// catalog files, whose sagas share scenarioSagas. A path in both is a
+// withContentScripts adds to engine the entries of the catalog files but
+// the engine one, whose sagas share scenarioSagas. A path in both is a
 // mistake the server's catalog join refuses too.
 func withContentScripts(engine script.Catalog) script.Catalog {
-	for _, file := range catalog.Scripts(scenarioSagas) {
+	for name, file := range catalog.Scripts(nil, nil, scenarioSagas) {
+		if name == "engine" {
+			continue
+		}
 		for path, ctor := range file {
-			if ctor == nil {
-				continue
-			}
 			if _, dup := engine[path]; dup {
 				panic("scenario catalog: " + path + " is in two catalogs")
 			}
