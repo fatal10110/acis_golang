@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -75,7 +76,7 @@ func groundsHalls(t *testing.T, start time.Time) (*Halls, *clan.Table) {
 	}}, start, 1)
 	clans.RestoreHalls([]clan.HallOwner{{HallID: groundsHall, ClanID: groundsFormer}}, nil)
 	store := &laneStore{
-		rows:  []HallRow{{ID: groundsHall, OwnerID: groundsFormer, PaidUntil: start.UnixMilli() + weekMs, Paid: false}},
+		rows:  []HallRow{{ID: groundsHall, OwnerID: groundsFormer, PaidUntil: start.UnixMilli() + commons.WeekMs, Paid: false}},
 		bidAt: map[int32]int32{},
 	}
 	hs := NewHalls(data, clans, nil, store, nil, zerolog.Nop())

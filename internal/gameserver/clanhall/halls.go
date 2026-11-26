@@ -7,18 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
-)
-
-const (
-	// dayMs and weekMs are a day and a week in milliseconds: a grace day
-	// for an unpaid lease, a paid lease's term and the length of an
-	// auction restarted on its own.
-	dayMs  = int64(24 * time.Hour / time.Millisecond)
-	weekMs = 7 * dayMs
 )
 
 // HallRow is one clanhall row: the hall's owner and lease, and the sale
@@ -427,7 +420,7 @@ func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan, payouts ...credit) {
 	hs.closeDoorsLocked(h)
 	cl.SetHallID(h.id())
 	h.ownerID = cl.ID()
-	h.paidUntil = hs.nowLocked() + weekMs
+	h.paidUntil = hs.nowLocked() + commons.WeekMs
 	h.paid = true
 	hs.scheduleFeeLocked(h, h.paidUntil-hs.nowLocked())
 	hs.tellHallChanged(cl)
@@ -538,8 +531,8 @@ func (hs *Halls) payFee(h *hall, gen uint64) {
 	}
 	switch {
 	case covered:
-		hs.scheduleFeeLocked(h, weekMs)
-		h.paidUntil += weekMs
+		hs.scheduleFeeLocked(h, commons.WeekMs)
+		h.paidUntil += commons.WeekMs
 		h.paid = true
 		store := hs.rowWriteLocked(h)
 		hs.write("store clan hall", h.id(), func(ctx context.Context, st HallStore) error {
@@ -549,8 +542,8 @@ func (hs *Halls) payFee(h *hall, gen uint64) {
 			return store(ctx, st)
 		})
 	case h.paid:
-		hs.scheduleFeeLocked(h, dayMs)
-		h.paidUntil += dayMs
+		hs.scheduleFeeLocked(h, commons.DayMs)
+		h.paidUntil += commons.DayMs
 		h.paid = false
 		hs.updateLocked(h)
 		hs.tellClan(owner, Notice{Kind: NoticeFeeDue, Lease: lease})

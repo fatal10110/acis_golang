@@ -386,9 +386,8 @@ func (d chamberlainDialog) siegeChange() {
 // siege; siegetime2.htm once the date is closed to change; "" while the
 // date is open to change.
 func (d chamberlainDialog) siegeDateClosedPage() string {
-	const dayMs = int64(24 * time.Hour / time.Millisecond)
 	switch {
-	case d.c.SiegeDate()-dayMs < d.l.sieges.Now().UnixMilli():
+	case d.c.SiegeDate()-commons.DayMs < d.l.sieges.Now().UnixMilli():
 		return "siegetime1.htm"
 	case d.c.IsTimeRegistrationOver():
 		return "siegetime2.htm"

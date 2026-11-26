@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	dayMs = int64(24 * time.Hour / time.Millisecond)
 	// The steps towards a siege's start: the registrations close a day
 	// before it, then the calendar wakes 13,600,000 ms, ten minutes, five
 	// minutes and ten seconds before it.
@@ -131,7 +130,7 @@ func (s *Siege) stepLocked(fx *sim.Effects) {
 	}
 	now := s.e.nowLocked().UnixMilli()
 	if !s.castle.IsTimeRegistrationOver() {
-		if remaining := s.castle.SiegeDate() - dayMs - now; remaining > 0 {
+		if remaining := s.castle.SiegeDate() - commons.DayMs - now; remaining > 0 {
 			s.armStartLocked(time.Duration(remaining) * time.Millisecond)
 			return
 		}
@@ -140,8 +139,8 @@ func (s *Siege) stepLocked(fx *sim.Effects) {
 	remaining := s.castle.SiegeDate() - now
 	ms := func(v int64) time.Duration { return time.Duration(v) * time.Millisecond }
 	switch {
-	case remaining > dayMs:
-		s.armStartLocked(ms(remaining - dayMs))
+	case remaining > commons.DayMs:
+		s.armStartLocked(ms(remaining - commons.DayMs))
 	case remaining > registrationEndMs:
 		s.announceLocked(fx, castleMsg(MsgRegistrationTermEnded, s.castle.ID))
 		s.changeStatusLocked(fx, StatusRegistrationOver)

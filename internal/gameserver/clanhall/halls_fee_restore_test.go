@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
@@ -68,7 +69,7 @@ func TestLeaseRestoresWarehouseOutsideTheLock(t *testing.T) {
 	h := hs.byID[crashHall]
 	paidUntil, paid := h.paidUntil, h.paid
 	hs.mu.Unlock()
-	if want := base.halls[crashHall].PaidUntil + weekMs; paidUntil != want || !paid {
+	if want := base.halls[crashHall].PaidUntil + commons.WeekMs; paidUntil != want || !paid {
 		t.Fatalf("term paid until %d (paid %v), want %d and paid", paidUntil, paid, want)
 	}
 }
@@ -108,7 +109,7 @@ func TestLeaseRetriesWhenWarehouseUnread(t *testing.T) {
 	if len(bank.restored) != 2 || !bank.lockFree[1] || !bank.taken || !bank.takenOK {
 		t.Fatalf("restores %v with the lock free %v, fee taken %v after one %v, want the retry to restore then take it", bank.restored, bank.lockFree, bank.taken, bank.takenOK)
 	}
-	if owner, paidUntil, paid := term(); owner != crashSellers || paidUntil != base.halls[crashHall].PaidUntil+weekMs || !paid {
+	if owner, paidUntil, paid := term(); owner != crashSellers || paidUntil != base.halls[crashHall].PaidUntil+commons.WeekMs || !paid {
 		t.Fatalf("after the retry: owner %d, paid until %d (paid %v), want the term paid a week on", owner, paidUntil, paid)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -123,7 +124,7 @@ func (hs *Halls) startAuctionLocked(h *hall) {
 	now := hs.nowLocked()
 	delay := int64(0)
 	if a.endDate <= now {
-		a.endDate = now + weekMs
+		a.endDate = now + commons.WeekMs
 		hallID, end := h.id(), a.endDate
 		hs.write("store clan hall auction end", hallID, func(ctx context.Context, st HallStore) error {
 			return st.UpdateEndDate(ctx, hallID, end)
@@ -220,12 +221,12 @@ func (hs *Halls) restartAuctionLocked(h *hall) {
 	a := h.auction
 	hs.removeBidsLocked(h, nil)
 	a.highest = nil
-	a.endDate = hs.nowLocked() + weekMs
+	a.endDate = hs.nowLocked() + commons.WeekMs
 	hallID, end := h.id(), a.endDate
 	hs.write("store clan hall auction end", hallID, func(ctx context.Context, st HallStore) error {
 		return st.UpdateEndDate(ctx, hallID, end)
 	})
-	hs.armAuctionLocked(h, weekMs)
+	hs.armAuctionLocked(h, commons.WeekMs)
 }
 
 // removeBidsLocked drops every bid on h, stored and live. Each bidding
@@ -394,7 +395,7 @@ func (hs *Halls) DraftSale(cl *clan.Clan, days, minBid int) (endDate int64, ok b
 		return 0, false
 	}
 	info := cl.Info()
-	end := hs.nowLocked() + int64(days)*dayMs
+	end := hs.nowLocked() + int64(days)*commons.DayMs
 	h.auction.draft = &saleDraft{seller: Seller{Name: info.LeaderName, ClanName: info.Name, Bid: minBid}, endDate: end}
 	return end, true
 }

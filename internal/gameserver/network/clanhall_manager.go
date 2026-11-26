@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
@@ -79,9 +79,6 @@ const (
 	removeFixtures   = `[<a action="bypass -h npc_%objectId%_manage deco fixtures_cancel">Remove</a>]`
 	fixtureLevels    = `[<a action="bypass -h npc_%objectId%_manage deco edit_fixtures 1">Level 1</a>][<a action="bypass -h npc_%objectId%_manage deco edit_fixtures 2">Level 2</a>]`
 )
-
-// hallFunctionDayMs is one day of a function's term, in milliseconds.
-const hallFunctionDayMs = int64(24 * time.Hour / time.Millisecond)
 
 // gradeLinks are a function's change links for each hall grade: plain,
 // then siegable. A grade without links leaves the placeholder as is.
@@ -686,7 +683,7 @@ func (d hallDialog) change(c hallChange, args []string) {
 			paid = d.l.landItems(stack)
 		}
 	}
-	d.l.hallFunctions.Update(d.hallID(), c.funcType, level, fee, int64(days)*hallFunctionDayMs, paid)
+	d.l.hallFunctions.Update(d.hallID(), c.funcType, level, fee, int64(days)*commons.DayMs, paid)
 	if c.funcType == hallmodel.FuncSupportMagic {
 		d.f.ResetSupportBuffCheck()
 	}

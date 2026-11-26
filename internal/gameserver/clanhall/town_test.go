@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/rs/zerolog"
@@ -37,7 +38,7 @@ func TestInTownMatchesTownIgnoringCase(t *testing.T) {
 	start := time.Unix(1_700_000_000, 0)
 	clans := clan.NewTable()
 	clans.Restore(clan.Snapshot{Clans: []clan.Row{{ID: owner, Name: "Owner", Level: 4}}}, start, 1)
-	store := &laneStore{rows: []HallRow{{ID: 24, OwnerID: owner, PaidUntil: start.UnixMilli() + weekMs, Paid: true}}, bidAt: map[int32]int32{}}
+	store := &laneStore{rows: []HallRow{{ID: 24, OwnerID: owner, PaidUntil: start.UnixMilli() + commons.WeekMs, Paid: true}}, bidAt: map[int32]int32{}}
 	hs := NewHalls(data, clans, nil, store, nil, zerolog.Nop())
 	if err := hs.Restore(context.Background()); err != nil {
 		t.Fatal(err)
