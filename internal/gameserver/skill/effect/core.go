@@ -217,6 +217,8 @@ const (
 	TypeRecovery Type = "RECOVERY"
 )
 
+// kind describes one effect implementation: the live state its effects
+// carry and the hooks they run. New builds every effect from one.
 type kind struct {
 	typ        Type
 	flag       Flag
@@ -229,81 +231,192 @@ type kind struct {
 	// merge with or replace an existing same-flag effect, they simply
 	// don't apply while one is live.
 	rejectsIfAffected bool
+
+	start  func(*Effect) bool
+	action func(*Effect) bool
+	exit   func(*Effect)
+	// ownStart and ownExit mark a kind whose start or exit hook is entirely
+	// its own: it ignores the template's abnormal visual there. Every other
+	// kind shows the visual on start and clears it on exit, after its own
+	// hook runs (see wireTemplateAbnormal).
+	ownStart, ownExit bool
 }
 
+// signetGround is the kind behind Signet, SignetNoise, SignetAntiSummon,
+// and SignetMDam, the effect-template names the datapack attaches to
+// signet-family skills (454-460, 1419-1424). handler/skill/signet.go builds their real
+// per-tick ground-actor behavior directly — spawning the EffectPoint
+// actor, applying the linked sub-skill, stripping dances, unsummoning
+// pets, or dealing magic damage — bypassing New/coreKinds entirely,
+// because that needs the caster's npc-template registry, id allocator,
+// and world, none of which New's signature carries. These entries exist
+// only so New() (relog restore's generic replay, and shipped-template
+// load validation) accepts the name instead of rejecting it; reached
+// that way — never during a live cast — TypeSignetGround's OnStart
+// declines outright, since there is no actor for it to drive.
+// Like any failed start, it is held until its first tick ends it.
+var signetGround = kind{typ: TypeSignetGround, start: declineStart, ownStart: true, ownExit: true}
+
 var coreKinds = map[string]kind{
-	"Buff":                  {typ: TypeBuff},
-	"Debuff":                {typ: TypeDebuff},
-	"DamOverTime":           {typ: TypeDamOverTime},
-	"ManaDamOverTime":       {typ: TypeManaDamOverTime},
-	"Fear":                  {typ: TypeFear, flag: FlagFear, rejectsIfAffected: true},
-	"Root":                  {typ: TypeRoot, flag: FlagRooted, rejectsIfAffected: true},
-	"Sleep":                 {typ: TypeSleep, flag: FlagSleep, rejectsIfAffected: true},
-	"Stun":                  {typ: TypeStun, flag: FlagStunned, rejectsIfAffected: true},
-	"AbortCast":             {typ: TypeAbortCast},
-	"ImmobileUntilAttacked": {typ: TypeImmobileUntilAttacked, flag: FlagMeditating},
-	"ImobileBuff":           {typ: TypeImmobilizeEffector},
-	"Invincible":            {typ: TypeInvincible},
-	"ManaHealOverTime":      {typ: TypeManaHealOverTime},
-	"Mute":                  {typ: TypeMute, flag: FlagMuted},
-	"NoblesseBless":         {typ: TypeNoblesseBless, flag: flagNoblesseBlessing},
-	"Paralyze":              {typ: TypeParalyze, flag: FlagParalyzed},
-	"Petrification":         {typ: TypePetrification, flag: FlagParalyzed},
-	"PhysicalMute":          {typ: TypePhysicalMute, flag: FlagPhysicalMuted},
-	"RemoveTarget":          {typ: TypeRemoveTarget},
-	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: FlagMuted | FlagPhysicalMuted},
-	"SilentMove":            {typ: TypeSilentMove, flag: FlagSilentMove},
-	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned, selfTarget: true},
-	"Heal":                  {typ: TypeHeal},
-	"HealOverTime":          {typ: TypeHealOverTime},
-	"ManaHeal":              {typ: TypeManaHeal},
-	"IncreaseCharges":       {typ: TypeIncreaseCharges},
-	"TargetMe":              {typ: TypeTargetMe},
-	"Bluff":                 {typ: TypeBluff},
-	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: FlagCharmOfCourage},
-	"CharmOfLuck":           {typ: TypeCharmOfLuck, flag: FlagCharmOfLuck},
-	"PhoenixBless":          {typ: TypePhoenixBless, flag: FlagPhoenixBlessing},
-	"BlockBuff":             {typ: TypeBlockBuff},
-	"BlockDebuff":           {typ: TypeBlockDebuff},
-	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: FlagProtectionBlessing},
-	"Recovery":              {typ: TypeRecovery},
-	"Cancel":                {typ: TypeCancel},
-	"Negate":                {typ: TypeNegate},
-	"Fusion":                {typ: TypeFusion},
-	"ChanceSkillTrigger":    {typ: TypeChanceSkillTrigger},
-	"Spoil":                 {typ: TypeSpoil},
-	"PolearmTargetSingle":   {typ: TypePolearmTargetSingle},
-	"BigHead":               {typ: TypeBigHead, flag: flagBigHead},
-	"CancelDebuff":          {typ: TypeCancelDebuff},
-	"Relax":                 {typ: TypeRelax, flag: flagRelaxing},
-	"ChameleonRest":         {typ: TypeChameleonRest, flag: FlagSilentMove | flagRelaxing},
-	"ImobilePetBuff":        {typ: TypeImmobilizePetBuff},
-	"Distrust":              {typ: TypeDistrust},
-	"Confusion":             {typ: TypeConfusion, flag: FlagConfused},
-	"Betray":                {typ: TypeBetray, flag: FlagBetrayed},
-	"RandomizeHate":         {typ: TypeRandomizeHate},
-	"ThrowUp":               {typ: TypeThrowUp, flag: FlagStunned},
-	"Grow":                  {typ: TypeGrow},
-	"FakeDeath":             {typ: TypeFakeDeath, flag: FlagFakeDeath},
-	"Seed":                  {typ: TypeSeed},
-	// Signet, SignetNoise, SignetAntiSummon, and SignetMDam are the effect-
-	// template names the datapack attaches to signet-family skills
-	// (454-460, 1419-1424). handler/skill/signet.go builds their real
-	// per-tick ground-actor behavior directly — spawning the EffectPoint
-	// actor, applying the linked sub-skill, stripping dances, unsummoning
-	// pets, or dealing magic damage — bypassing New/coreKinds entirely,
-	// because that needs the caster's npc-template registry, id allocator,
-	// and world, none of which New's signature carries. These entries exist
-	// only so New() (relog restore's generic replay, and shipped-template
-	// load validation) accepts the name instead of rejecting it; reached
-	// that way — never during a live cast — TypeSignetGround's OnStart
-	// declines outright, since there is no actor for it to drive.
-	"Signet":           {typ: TypeSignetGround},
-	"SignetNoise":      {typ: TypeSignetGround},
-	"SignetAntiSummon": {typ: TypeSignetGround},
-	"SignetMDam":       {typ: TypeSignetGround},
-	"ClanGate":         {typ: TypeClanGate},
+	"Buff":            {typ: TypeBuff},
+	"Debuff":          {typ: TypeDebuff},
+	"DamOverTime":     {typ: TypeDamOverTime, action: damageOverTimeAction},
+	"ManaDamOverTime": {typ: TypeManaDamOverTime, action: manaDamageOverTimeAction},
+	"Fear": {
+		typ: TypeFear, flag: FlagFear, rejectsIfAffected: true,
+		start: fearStart, action: fearAction, exit: fearExit, ownStart: true, ownExit: true,
+	},
+	"Root": {
+		typ: TypeRoot, flag: FlagRooted, rejectsIfAffected: true,
+		start: rootStart, exit: thinkAndRefreshExit, ownStart: true, ownExit: true,
+	},
+	"Sleep": {
+		typ: TypeSleep, flag: FlagSleep, rejectsIfAffected: true,
+		start: sleepStart, exit: thinkAndRefreshExit, ownStart: true, ownExit: true,
+	},
+	"Stun": {
+		typ: TypeStun, flag: FlagStunned, rejectsIfAffected: true,
+		start: stunStart, exit: refreshExit, ownStart: true, ownExit: true,
+	},
+	"AbortCast": {typ: TypeAbortCast, start: abortCastStart, ownStart: true},
+	"ImmobileUntilAttacked": {
+		typ: TypeImmobileUntilAttacked, flag: FlagMeditating,
+		start: immobileUntilAttackedStart, action: immobileUntilAttackedAction, exit: immobileUntilAttackedExit,
+		ownStart: true, ownExit: true,
+	},
+	"ImobileBuff": {
+		typ:   TypeImmobilizeEffector,
+		start: immobilizeEffectorStart, exit: immobilizeEffectorExit, ownStart: true, ownExit: true,
+	},
+	"Invincible":       {typ: TypeInvincible, start: invincibleStart, exit: invincibleExit},
+	"ManaHealOverTime": {typ: TypeManaHealOverTime, action: manaHealOverTimeAction},
+	"Mute": {
+		typ: TypeMute, flag: FlagMuted,
+		start: muteStart, exit: refreshExit, ownStart: true, ownExit: true,
+	},
+	"NoblesseBless": {typ: TypeNoblesseBless, flag: flagNoblesseBlessing, ownStart: true, ownExit: true},
+	"Paralyze": {
+		typ: TypeParalyze, flag: FlagParalyzed,
+		start: paralyzeStart, exit: paralyzeExit, ownStart: true, ownExit: true,
+	},
+	"Petrification": {
+		typ: TypePetrification, flag: FlagParalyzed,
+		start: petrificationStart, exit: petrificationExit, ownStart: true, ownExit: true,
+	},
+	"PhysicalMute": {
+		typ: TypePhysicalMute, flag: FlagPhysicalMuted,
+		start: physicalMuteStart, exit: refreshExit, ownStart: true, ownExit: true,
+	},
+	"RemoveTarget": {typ: TypeRemoveTarget, start: removeTargetStart, ownStart: true, ownExit: true},
+	"SilenceMagicPhysical": {
+		typ: TypeSilenceAll, flag: FlagMuted | FlagPhysicalMuted,
+		start: silenceAllStart, exit: refreshExit, ownStart: true, ownExit: true,
+	},
+	"SilentMove": {typ: TypeSilentMove, flag: FlagSilentMove, action: silentMoveAction},
+	"StunSelf": {
+		typ: TypeStunSelf, flag: FlagStunned, selfTarget: true,
+		start: stunSelfStart, exit: stunSelfExit, ownStart: true, ownExit: true,
+	},
+	"Heal":            {typ: TypeHeal, start: healStart, ownStart: true},
+	"HealOverTime":    {typ: TypeHealOverTime, start: healOverTimeStart, action: healOverTimeAction, ownStart: true},
+	"ManaHeal":        {typ: TypeManaHeal, start: manaHealStart, ownStart: true},
+	"IncreaseCharges": {typ: TypeIncreaseCharges, start: increaseChargesStart, ownStart: true},
+	"TargetMe":        {typ: TypeTargetMe, start: targetMeStart, ownStart: true, ownExit: true},
+	"Bluff":           {typ: TypeBluff, start: bluffStart, ownStart: true},
+	"CharmOfCourage": {
+		typ: TypeCharmOfCourage, flag: FlagCharmOfCourage,
+		start: charmOfCourageStart, exit: charmOfCourageExit, ownStart: true, ownExit: true,
+	},
+	"CharmOfLuck": {
+		typ: TypeCharmOfLuck, flag: FlagCharmOfLuck,
+		exit: charmOfLuckExit, ownStart: true, ownExit: true,
+	},
+	"PhoenixBless": {
+		typ: TypePhoenixBless, flag: FlagPhoenixBlessing,
+		exit: phoenixBlessExit, ownStart: true, ownExit: true,
+	},
+	"BlockBuff":   {typ: TypeBlockBuff, ownStart: true},
+	"BlockDebuff": {typ: TypeBlockDebuff},
+	// Its start always fails: the blessing is held and flagged, but adds no
+	// stats and runs no exit hook when it simply ends.
+	"ProtectionBlessing": {
+		typ: TypeProtectionBless, flag: FlagProtectionBlessing,
+		start: declineStart, exit: protectionBlessExit, ownStart: true, ownExit: true,
+	},
+	"Recovery": {typ: TypeRecovery, start: recoveryStart, ownStart: true, ownExit: true},
+	"Cancel":   {typ: TypeCancel, start: cancelStart, ownStart: true},
+	"Negate":   {typ: TypeNegate, start: negateStart, ownStart: true},
+	"Fusion":   {typ: TypeFusion, action: fusionAction},
+	"ChanceSkillTrigger": {
+		typ: TypeChanceSkillTrigger, start: chanceSkillTriggerStart, exit: chanceSkillTriggerExit,
+	},
+	"Spoil":               {typ: TypeSpoil, start: spoilStart, ownStart: true},
+	"PolearmTargetSingle": {typ: TypePolearmTargetSingle},
+	"BigHead": {
+		typ: TypeBigHead, flag: flagBigHead,
+		start: bigHeadStart, exit: bigHeadExit, ownStart: true, ownExit: true,
+	},
+	"CancelDebuff": {typ: TypeCancelDebuff, start: cancelDebuffStart, ownStart: true},
+	"Relax":        {typ: TypeRelax, flag: flagRelaxing, start: relaxStart, action: relaxAction},
+	"ChameleonRest": {
+		typ: TypeChameleonRest, flag: FlagSilentMove | flagRelaxing,
+		start: chameleonRestStart, action: chameleonRestAction,
+	},
+	"ImobilePetBuff": {
+		typ:   TypeImmobilizePetBuff,
+		start: immobilizePetBuffStart, exit: immobilizePetBuffExit, ownStart: true, ownExit: true,
+	},
+	"Distrust": {typ: TypeDistrust, start: distrustStart, ownStart: true, ownExit: true},
+	"Confusion": {
+		typ: TypeConfusion, flag: FlagConfused,
+		start: confusionStart, exit: confusionExit, ownStart: true, ownExit: true,
+	},
+	"Betray": {
+		typ: TypeBetray, flag: FlagBetrayed,
+		start: betrayStart, exit: betrayExit, ownStart: true, ownExit: true,
+	},
+	"RandomizeHate": {typ: TypeRandomizeHate, start: randomizeHateStart, ownStart: true, ownExit: true},
+	"ThrowUp": {
+		typ: TypeThrowUp, flag: FlagStunned,
+		start: throwUpStart, exit: throwUpExit, ownStart: true, ownExit: true,
+	},
+	"Grow": {typ: TypeGrow, start: growStart, exit: growExit, ownStart: true, ownExit: true},
+	"FakeDeath": {
+		typ: TypeFakeDeath, flag: FlagFakeDeath,
+		start: fakeDeathStart, action: fakeDeathAction, exit: fakeDeathExit, ownStart: true, ownExit: true,
+	},
+	"Seed":             {typ: TypeSeed},
+	"Signet":           signetGround,
+	"SignetNoise":      signetGround,
+	"SignetAntiSummon": signetGround,
+	"SignetMDam":       signetGround,
+	"ClanGate": {
+		typ:   TypeClanGate,
+		start: clanGateStart, exit: clanGateExit, ownStart: true, ownExit: true,
+	},
 }
+
+// declineStart is the start hook of a kind whose start always fails.
+func declineStart(*Effect) bool { return false }
+
+func manaDamageOverTimeAction(e *Effect) bool { return manaDrain(e, e.Skill.Toggle) }
+
+func bigHeadStart(e *Effect) bool {
+	startAbnormalEffect(e.Effected, modelskill.AbnormalBigHead)
+	return true
+}
+
+func bigHeadExit(e *Effect) { stopAbnormalEffect(e.Effected, modelskill.AbnormalBigHead) }
+
+func clanGateStart(e *Effect) bool {
+	startAbnormalEffect(e.Effected, modelskill.AbnormalMagicCircle)
+	if opener, ok := e.Effected.(clanGateOpener); ok {
+		opener.NotifyClanGateOpened()
+	}
+	return true
+}
+
+func clanGateExit(e *Effect) { stopAbnormalEffect(e.Effected, modelskill.AbnormalMagicCircle) }
 
 // fearSparedPlayableSkillIDs are the skills whose fear never lands on a
 // playable.
@@ -437,13 +550,7 @@ func applyRestored(list *List, effector, effected Actor, meta Skill, templates [
 
 // actsOnTick reports whether an effect built from tmpl has a tick action.
 func actsOnTick(tmpl modelskill.EffectTemplate) bool {
-	k, ok := coreKinds[tmpl.Name]
-	if !ok {
-		return false
-	}
-	probe := &Effect{Type: k.typ}
-	wireHooks(probe)
-	return probe.OnAction != nil
+	return coreKinds[tmpl.Name].action != nil
 }
 
 // Known reports whether New can build an effect named name. The match is
@@ -500,7 +607,8 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}
 	e.Funcs = funcs
-	wireHooks(e)
+	e.OnStart, e.OnAction, e.OnExit = k.start, k.action, k.exit
+	wireTemplateAbnormal(e, k)
 	return e, nil
 }
 
@@ -516,201 +624,14 @@ func (e *Effect) ClassTag() string {
 	return string(e.Type)
 }
 
-func wireHooks(e *Effect) {
-	switch e.Type {
-	case TypeDamOverTime:
-		e.OnAction = damageOverTimeAction
-	case TypeManaDamOverTime:
-		e.OnAction = func(e *Effect) bool { return manaDrain(e, e.Skill.Toggle) }
-	case TypeFear:
-		e.OnStart = fearStart
-		e.OnAction = fearAction
-		e.OnExit = fearExit
-	case TypeRoot:
-		e.OnStart = rootStart
-		e.OnExit = thinkAndRefreshExit
-	case TypeSleep:
-		e.OnStart = sleepStart
-		e.OnExit = thinkAndRefreshExit
-	case TypeStun:
-		e.OnStart = stunStart
-		e.OnExit = refreshExit
-	case TypeAbortCast:
-		e.OnStart = abortCastStart
-	case TypeImmobileUntilAttacked:
-		e.OnStart = immobileUntilAttackedStart
-		e.OnExit = immobileUntilAttackedExit
-		e.OnAction = immobileUntilAttackedAction
-	case TypeImmobilizeEffector:
-		e.OnStart = immobilizeEffectorStart
-		e.OnExit = immobilizeEffectorExit
-	case TypeInvincible:
-		e.OnStart = invincibleStart
-		e.OnExit = invincibleExit
-	case TypeManaHealOverTime:
-		e.OnAction = manaHealOverTimeAction
-	case TypeMute:
-		e.OnStart = muteStart
-		e.OnExit = refreshExit
-	case TypeParalyze:
-		e.OnStart = paralyzeStart
-		e.OnExit = paralyzeExit
-	case TypePetrification:
-		e.OnStart = petrificationStart
-		e.OnExit = petrificationExit
-	case TypePhysicalMute:
-		e.OnStart = physicalMuteStart
-		e.OnExit = refreshExit
-	case TypeRemoveTarget:
-		e.OnStart = removeTargetStart
-	case TypeSilenceAll:
-		e.OnStart = silenceAllStart
-		e.OnExit = refreshExit
-	case TypeSilentMove:
-		e.OnAction = silentMoveAction
-	case TypeStunSelf:
-		e.OnStart = stunSelfStart
-		e.OnExit = stunSelfExit
-	case TypeHeal:
-		e.OnStart = healStart
-	case TypeHealOverTime:
-		e.OnStart = healOverTimeStart
-		e.OnAction = healOverTimeAction
-	case TypeManaHeal:
-		e.OnStart = manaHealStart
-	case TypeIncreaseCharges:
-		e.OnStart = increaseChargesStart
-	case TypeTargetMe:
-		e.OnStart = targetMeStart
-	case TypeBluff:
-		e.OnStart = bluffStart
-	case TypeCharmOfCourage:
-		e.OnStart = charmOfCourageStart
-		e.OnExit = charmOfCourageExit
-	case TypeCharmOfLuck:
-		e.OnExit = charmOfLuckExit
-	case TypePhoenixBless:
-		e.OnExit = phoenixBlessExit
-	case TypeProtectionBless:
-		// Its start always fails: the blessing is held and flagged, but adds
-		// no stats and runs no exit hook when it simply ends.
-		e.OnStart = func(*Effect) bool { return false }
-		e.OnExit = protectionBlessExit
-	case TypeCancel:
-		e.OnStart = cancelStart
-	case TypeNegate:
-		e.OnStart = negateStart
-	case TypeFusion:
-		e.OnAction = fusionAction
-	case TypeChanceSkillTrigger:
-		e.OnStart = chanceSkillTriggerStart
-		e.OnExit = chanceSkillTriggerExit
-	case TypeSpoil:
-		e.OnStart = spoilStart
-	case TypeBigHead:
-		e.OnStart = func(e *Effect) bool {
-			startAbnormalEffect(e.Effected, modelskill.AbnormalBigHead)
-			return true
-		}
-		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, modelskill.AbnormalBigHead) }
-	case TypeCancelDebuff:
-		e.OnStart = cancelDebuffStart
-	case TypeRelax:
-		e.OnStart = relaxStart
-		e.OnAction = relaxAction
-	case TypeChameleonRest:
-		e.OnStart = chameleonRestStart
-		e.OnAction = chameleonRestAction
-	case TypeImmobilizePetBuff:
-		e.OnStart = immobilizePetBuffStart
-		e.OnExit = immobilizePetBuffExit
-	case TypeDistrust:
-		e.OnStart = distrustStart
-	case TypeConfusion:
-		e.OnStart = confusionStart
-		e.OnExit = confusionExit
-	case TypeBetray:
-		e.OnStart = betrayStart
-		e.OnExit = betrayExit
-	case TypeRandomizeHate:
-		e.OnStart = randomizeHateStart
-	case TypeThrowUp:
-		e.OnStart = throwUpStart
-		e.OnExit = throwUpExit
-	case TypeGrow:
-		e.OnStart = growStart
-		e.OnExit = growExit
-	case TypeFakeDeath:
-		e.OnStart = fakeDeathStart
-		e.OnAction = fakeDeathAction
-		e.OnExit = fakeDeathExit
-	case TypeRecovery:
-		e.OnStart = recoveryStart
-	case TypeSignetGround:
-		// Only reached via New() (relog restore, load validation), never a
-		// live cast — see the coreKinds comment above. No actor exists to
-		// drive it here, so its start fails rather than fake-apply: like
-		// any failed start, it is held until its first tick ends it.
-		e.OnStart = func(*Effect) bool { return false }
-	case TypeClanGate:
-		e.OnStart = func(e *Effect) bool {
-			startAbnormalEffect(e.Effected, modelskill.AbnormalMagicCircle)
-			if opener, ok := e.Effected.(clanGateOpener); ok {
-				opener.NotifyClanGateOpened()
-			}
-			return true
-		}
-		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, modelskill.AbnormalMagicCircle) }
-	}
-	wireTemplateAbnormal(e)
-}
-
-// ownStartKinds and ownExitKinds are the kinds whose start or exit hook is
-// entirely their own: they ignore the template's abnormal visual there.
-// Every other kind shows the visual on start and clears it on exit, after
-// its own hook runs.
-var (
-	ownStartKinds = kindSet(
-		TypeAbortCast, TypeBetray, TypeBigHead, TypeBlockBuff, TypeBluff,
-		TypeCancel, TypeCancelDebuff, TypeCharmOfCourage, TypeCharmOfLuck,
-		TypeClanGate, TypeConfusion, TypeDistrust, TypeFakeDeath, TypeFear,
-		TypeGrow, TypeHeal, TypeHealOverTime, TypeImmobileUntilAttacked,
-		TypeImmobilizeEffector, TypeImmobilizePetBuff, TypeIncreaseCharges,
-		TypeManaHeal, TypeMute, TypeNegate, TypeNoblesseBless, TypeParalyze,
-		TypePetrification, TypePhoenixBless, TypePhysicalMute,
-		TypeProtectionBless, TypeRandomizeHate, TypeRecovery,
-		TypeRemoveTarget, TypeRoot, TypeSignetGround, TypeSilenceAll,
-		TypeSleep, TypeSpoil, TypeStun, TypeStunSelf, TypeTargetMe,
-		TypeThrowUp,
-	)
-	ownExitKinds = kindSet(
-		TypeBetray, TypeBigHead, TypeCharmOfCourage, TypeCharmOfLuck,
-		TypeClanGate, TypeConfusion, TypeDistrust, TypeFakeDeath, TypeFear,
-		TypeGrow, TypeImmobileUntilAttacked, TypeImmobilizeEffector,
-		TypeImmobilizePetBuff, TypeMute, TypeNoblesseBless, TypeParalyze,
-		TypePetrification, TypePhoenixBless, TypePhysicalMute,
-		TypeProtectionBless, TypeRandomizeHate, TypeRecovery,
-		TypeRemoveTarget, TypeRoot, TypeSignetGround, TypeSilenceAll,
-		TypeSleep, TypeStun, TypeStunSelf, TypeTargetMe, TypeThrowUp,
-	)
-)
-
-func kindSet(types ...Type) map[Type]bool {
-	set := make(map[Type]bool, len(types))
-	for _, t := range types {
-		set[t] = true
-	}
-	return set
-}
-
 // wireTemplateAbnormal chains the template's abnormal visual onto e's start
-// and exit hooks, unless its kind owns that hook outright.
-func wireTemplateAbnormal(e *Effect) {
+// and exit hooks, unless its kind k owns that hook outright.
+func wireTemplateAbnormal(e *Effect, k kind) {
 	mask := e.Template.AbnormalEffect
 	if mask == 0 {
 		return
 	}
-	if !ownStartKinds[e.Type] {
+	if !k.ownStart {
 		start := e.OnStart
 		e.OnStart = func(e *Effect) bool {
 			if start != nil && !start(e) {
@@ -720,7 +641,7 @@ func wireTemplateAbnormal(e *Effect) {
 			return true
 		}
 	}
-	if !ownExitKinds[e.Type] {
+	if !k.ownExit {
 		exit := e.OnExit
 		e.OnExit = func(e *Effect) {
 			if exit != nil {
