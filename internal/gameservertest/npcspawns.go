@@ -264,22 +264,49 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if deps.spawnStore != nil {
 		spawns.WriteRows(deps.spawnStore, deps.spawnWrites, deps.log)
 	}
-	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(spawns, templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1}), Channels: deps.channels}, time.Now, deps.log,
-		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
-		limits, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
-		script.NewMakers(makers, maker.Default, makerWorld, deps.log), deps.scripts, deps.zones)
+	npcs, err := gamemanager.NewNpcs(gamemanager.NpcsConfig{
+		Spawns:              spawns,
+		Templates:           templates,
+		Geo:                 deps.geo,
+		World:               deps.state,
+		IDs:                 deps.ids,
+		Decay:               decay,
+		Respawn:             respawn,
+		AI:                  ai,
+		Positions:           deps.positions,
+		Items:               deps.items,
+		Ground:              deps.ground,
+		Rewards:             gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1}), Channels: deps.channels},
+		Now:                 time.Now,
+		Log:                 deps.log,
+		CastDefs:            deps.skills,
+		CastEffects:         castEffects,
+		Walker:              walker,
+		NewSink:             link.HostileSinks(deps.state, deps.stance),
+		NewFolkSink:         link.FolkSinks(deps.state, deps.stance),
+		Limits:              limits,
+		RandomWalkRate:      0,
+		MaxGeoPathFailCount: 0,
+		RaidMultipliers:     npc.DefaultRaidMultipliers(),
+		AIConfig:            npc.DefaultAIConfig(),
+		SpawnEvents:         gamemanager.DefaultSpawnEvents(),
+		Effects:             deps.effects,
+		Queues:              deps.queues,
+		Makers:              script.NewMakers(makers, maker.Default, makerWorld, deps.log),
+		Scripts:             deps.scripts,
+		GroundTaker:         link,
+		GuardedSieges:       link.GuardedSiege,
+		ResidenceOwners:     link.NPCResidenceOwner,
+		Regen:               link.PlayerRules(),
+		Zones:               deps.zones,
+	})
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}
 	if deps.spawner != nil {
 		deps.spawner.Bind(npcs)
 	}
-	npcs.SetGroundTaker(link)
-	npcs.SetGuardedSieges(link.GuardedSiege)
-	npcs.SetResidenceOwners(link.NPCResidenceOwner)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
-	npcs.SetRegenSettings(link.PlayerRules())
 	link.SetNpcSpawns(npcs)
 	npcs.SetNoSpawns(deps.noSpawns)
 	npcs.SpawnOnStart()

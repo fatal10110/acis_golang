@@ -5,18 +5,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
-// The control tower types. A castle's control towers stand where its
-// castles.xml entry places them from boot on, for the castle's whole life:
-// dead outside a siege, shown with ServerObjectInfo as their own template,
-// and working while a siege is fought, shown with NpcInfo as their working
-// form. Only a player, or a player's summon, of a clan attacking the
-// castle's siege may attack a working tower; brought down to 1 HP, it
-// falls dead again. A player's interact does nothing on a tower.
-const (
-	lifeTower  InstanceKind = "LifeTower"
-	flameTower InstanceKind = "FlameTower"
-)
-
 // The template ids a control tower is shown as: its working form, and its
 // own dead template.
 const (
@@ -38,9 +26,9 @@ const (
 // standing still for good, and never brought under 1 HP. Every value it
 // does not set is the template default.
 func TowerTemplate(life bool, hp, pDef, mDef float64) *Template {
-	id, kind, name := FlameTowerDeadNpcID, flameTower, "Flame Control Tower"
+	id, kind, name := FlameTowerDeadNpcID, KindFlameTower, "Flame Control Tower"
 	if life {
-		id, kind, name = LifeTowerDeadNpcID, lifeTower, "Life Control Tower"
+		id, kind, name = LifeTowerDeadNpcID, KindLifeTower, "Life Control Tower"
 	}
 	return &Template{
 		ID: id, TemplateID: id,
@@ -70,9 +58,9 @@ func TowerTemplate(life bool, hp, pDef, mDef float64) *Template {
 // inst is no control tower.
 func TowerWorkingNpcID(inst *Instance) (int, bool) {
 	switch hostileKind(inst) {
-	case lifeTower:
+	case KindLifeTower:
 		return LifeTowerWorkingNpcID, true
-	case flameTower:
+	case KindFlameTower:
 		return FlameTowerWorkingNpcID, true
 	}
 	return 0, false
@@ -106,11 +94,11 @@ type tower struct {
 // Tower reports a castle control tower.
 func (f *Folk) Tower() bool {
 	k := hostileKind(f.Instance)
-	return k == lifeTower || k == flameTower
+	return k == KindLifeTower || k == KindFlameTower
 }
 
 // TowerLife reports a life control tower.
-func (f *Folk) TowerLife() bool { return hostileKind(f.Instance) == lifeTower }
+func (f *Folk) TowerLife() bool { return hostileKind(f.Instance) == KindLifeTower }
 
 // TowerWorking reports a control tower shown in a form: its working one, or
 // any other a game master gave it.

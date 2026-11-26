@@ -15,52 +15,21 @@ import (
 // its death drops may land.
 const deathDropOffset = 25
 
-// dropItemsOnDeath rolls the items live's death costs it at e's rates. A
-// game master keeps everything unless e lets it drop. Otherwise
-// the death drops nothing unless its first roll passes; then every item
-// the death may drop is taken in container order: a worn item comes off
-// whether or not it then drops, and each rolls its own chance until the
-// limit has dropped. A drop names the item to live and lands it on the
-// ground near live, as an item live dropped. Nothing else is said: the
+// dropItemsOnDeath drops the items live's death costs it at e's rates
+// (inventory.DeathDrops). A drop names the item to live and lands it on
+// the ground near live, as an item live dropped. Nothing else is said: the
 // inventory changes reach live as the usual batched InventoryUpdate, and
 // observers see the gear change on live's next appearance refresh.
 func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDrop) {
-	if live.accessLevel().IsGM && !e.GMDrops {
-		return
-	}
 	inv := live.Inventory()
-	if inv == nil || l.inventory == nil || l.belongings.groundItems == nil {
+	if l.inventory == nil || l.belongings.groundItems == nil {
 		return
 	}
-	if e.Chance <= 0 || live.Roll(100) >= e.Chance {
-		return
+	unequipped := func(changed []*item.Instance) {
+		l.applyEquipItemStats(live, inv, invops.Result{EquipmentChanged: true, Changed: changed})
 	}
-	dropped := 0
-	for _, inst := range inv.Items() {
-		tmpl, ok := invops.DeathDroppable(inv, inst, e.Kept)
-		// The collar of the pet live has out or rides never drops, whatever
-		// the configured list of kept pet items says (parity exception #4973).
-		if !ok || live.ControlItemInUse(inst.ObjectID) {
-			continue
-		}
-		chance := e.ItemChance
-		if inst.Equipped() {
-			chance = e.EquipChance
-			if tmpl.Weapon != nil {
-				chance = e.WeaponChance
-			}
-			if changed := inv.UnequipItem(inst); len(changed) > 0 {
-				l.applyEquipItemStats(live, inv, invops.Result{EquipmentChanged: true, Changed: changed})
-			}
-		}
-		if live.Roll(100) >= chance {
-			continue
-		}
+	for inst := range invops.DeathDrops(inv, live.accessLevel().IsGM, invops.DeathDropRates(e), live, unequipped) {
 		l.dropDeathItem(live, inv, inst)
-		dropped++
-		if dropped >= e.Limit {
-			break
-		}
 	}
 }
 

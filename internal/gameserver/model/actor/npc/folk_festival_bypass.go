@@ -13,7 +13,7 @@ import (
 // handling. Any command starting with Chat re-opens the guide's or witch's
 // page, whatever page it names.
 func (f *Folk) festivalGuideBypass(pages Pages, kind InstanceKind, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
-	if kind != "FestivalGuide" {
+	if kind != KindFestivalGuide {
 		return reply, false
 	}
 	switch {

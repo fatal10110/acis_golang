@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -36,12 +35,29 @@ func TestNpcSpawnMarksRaidBossPrivatesRaidRelated(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
-	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "RaidBoss", HPMax: 100, RunSpeed: 100},
-		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
-		{ID: 3, TemplateID: 3, Type: "Guard", HPMax: 100, RunSpeed: 100},
-	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers())
+	npcs, err := newStartedNpcs(NpcsConfig{
+		Spawns: NewSpawns(table, nil),
+		Templates: npc.NewTable([]*npc.Template{
+			{ID: 1, TemplateID: 1, Type: "RaidBoss", HPMax: 100, RunSpeed: 100},
+			{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
+			{ID: 3, TemplateID: 3, Type: "Guard", HPMax: 100, RunSpeed: 100},
+		}),
+		Geo:       fakeGeo{},
+		World:     state,
+		IDs:       &sequentialIDs{},
+		Decay:     decay,
+		Respawn:   respawn,
+		AI:        task.NewAI(state, zerolog.Nop()),
+		Positions: task.NewPositionUpdates(state),
+		Items:     item.NewTable(nil),
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    npcQueues(),
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

@@ -6,9 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
-// clanHallManager is the clan hall manager's type.
-const clanHallManager InstanceKind = "ClanHallManagerNpc"
-
 // hallBuffCheckMs is how long, in milliseconds, a clan hall manager waits
 // between two checks of its own support buff.
 const hallBuffCheckMs = 300_000
@@ -16,7 +13,7 @@ const hallBuffCheckMs = 300_000
 // ClanHallManager reports whether f manages a clan hall: its dialog runs
 // the hall's functions, and its AI buffs itself and answers the players it
 // casts support magic on.
-func (f *Folk) ClanHallManager() bool { return hostileKind(f.Instance) == clanHallManager }
+func (f *Folk) ClanHallManager() bool { return hostileKind(f.Instance) == KindClanHallManagerNpc }
 
 // ResetSupportBuffCheck has a clan hall manager check its own support buff
 // the next time its AI idles, as a change to its hall's support magic

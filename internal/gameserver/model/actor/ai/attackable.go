@@ -740,31 +740,6 @@ func (a *Attackable) RandomizeHate(valid func(attackable.Combatant) bool, pick f
 	return true
 }
 
-// ReconsiderTarget is the AI side of in-range target reconsideration,
-// used when this actor can no longer act on its current target (e.g. an
-// immobilize state): swaps in a replacement from the threat table (see
-// ThreatTable.ReconsiderTarget) and drops the previous most-hated attacker's
-// queued attack desire if one existed. It never queues a desire for the
-// chosen target — the hate-list reconsideration only stops hate and adds
-// zero hate on the list, never touches the caller's desire queue; that is
-// left to a future caller, matching RandomizeHate's sibling behavior of
-// leaving target acquisition outside the reconsideration's scope. Reports the new
-// target and whether a swap happened.
-func (a *Attackable) ReconsiderTarget(inRange func(attackable.Combatant) bool, valid func(attackable.Combatant) bool) (attackable.Combatant, bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	prev, chosen, ok := a.threats.Load().ReconsiderTarget(inRange, valid)
-	if !ok {
-		return nil, false
-	}
-
-	if prev != nil {
-		a.desires.Load().Remove(IntentionAttack, prev)
-	}
-	return chosen, true
-}
-
 // AddHate records an attacker in the skill-cast hate table.
 func (a *Attackable) AddHate(attacker attackable.Combatant, hate float64) {
 	a.Hates().Add(attacker, hate)
@@ -1862,11 +1837,11 @@ func (a *Attackable) refreshCombatMemory() {
 	if a.threats.Load().IsEmpty() {
 		a.desires.Load().RemoveKind(IntentionAttack)
 	} else {
-		for _, target := range a.threats.Load().Refresh(a.actor.Knows) {
+		for _, target := range a.threats.Load().RefreshZeroDead(a.actor.Knows) {
 			a.desires.Load().Remove(IntentionAttack, target)
 		}
 	}
-	a.hates.Load().Refresh(a.actor.Knows)
+	a.hates.Load().RefreshDropDead(a.actor.Knows)
 }
 
 // targetLost reports whether an attack or cast step has lost target: there

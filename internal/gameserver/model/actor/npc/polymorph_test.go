@@ -51,7 +51,7 @@ func TestFixedNPCPolymorphView(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ep.Attach(Runtime{World: world.New()})
+			ep.Attach(EffectPointRuntime{World: world.New()})
 			ep.Spawn(10, 10, 0, 0)
 			return ep
 		}},

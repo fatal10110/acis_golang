@@ -92,7 +92,7 @@ func (l *GameClientLink) frameManorProcureCropDetail(cropID int32) wire.Frame {
 // still within its reach.
 func (l *GameClientLink) manorManagerInReach(live *livePlayer) (*npc.Folk, bool) {
 	f := live.currentFolk.Load()
-	if f == nil || f.Instance == nil || f.Instance.Kind != "ManorManagerNpc" || !l.playerCanDoInteract(live, f) {
+	if f == nil || f.Instance == nil || f.Instance.Kind != npc.KindManorManagerNpc || !l.playerCanDoInteract(live, f) {
 		return nil, false
 	}
 	return f, true

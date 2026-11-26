@@ -50,7 +50,7 @@ func (w festivalWorld) Shout(sender, text string) {
 	peace := zone.OfKind[*zone.Peace](l.zones)
 	for _, obj := range l.world.Objects() {
 		f, ok := obj.(*npc.Folk)
-		if !ok || f.Instance.Template.Type != "FestivalGuide" {
+		if !ok || f.Instance.Template.Kind() != npc.KindFestivalGuide {
 			continue
 		}
 		g, ok := festival.GuideOf(f.NpcID())

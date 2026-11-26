@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -70,9 +69,25 @@ func newDespawnFixtureOf(t *testing.T, spawns *Spawns) *despawnFixture {
 		{ID: 3, TemplateID: 3, Type: "ChristmasTree", Name: "Tree", HPMax: 100},
 	})
 	var err error
-	f.npcs, err = NewNpcs(spawns, f.templates, fakeGeo{}, f.state, &sequentialIDs{}, f.decay, f.respawn,
-		task.NewAI(f.state, zerolog.Nop()), task.NewPositionUpdates(f.state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(),
-		nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, f.queues, testMakers())
+	f.npcs, err = newStartedNpcs(NpcsConfig{
+		Spawns:    spawns,
+		Templates: f.templates,
+		Geo:       fakeGeo{},
+		World:     f.state,
+		IDs:       &sequentialIDs{},
+		Decay:     f.decay,
+		Respawn:   f.respawn,
+		AI:        task.NewAI(f.state, zerolog.Nop()),
+		Positions: task.NewPositionUpdates(f.state),
+		Items:     item.NewTable(nil),
+		Ground:    &recordingGround{},
+		Now:       time.Now,
+		Log:       zerolog.Nop(),
+		Walker:    walker,
+		Effects:   effect.Env{Activity: task.NewEffects()},
+		Queues:    f.queues,
+		Makers:    testMakers(),
+	})
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

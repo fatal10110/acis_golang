@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -47,12 +46,33 @@ func TestNpcSpawnInstallsAIConfig(t *testing.T) {
 			tmpl := func(id int, kind string, aggroRange int) *npc.Template {
 				return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, HPMax: 100, RunSpeed: 100, AggroRange: aggroRange}
 			}
-			npcs, err := NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{tmpl(1, "Guard", 300), tmpl(2, "Monster", 300)}),
-				fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-				&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, npc.DefaultLimits(), 30, 0,
-				npc.DefaultRaidMultipliers(), tc.cfg, DefaultSpawnEvents(), effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers(), nil)
+			npcs, err := NewNpcs(NpcsConfig{
+				Spawns:              NewSpawns(table, nil),
+				Templates:           npc.NewTable([]*npc.Template{tmpl(1, "Guard", 300), tmpl(2, "Monster", 300)}),
+				Geo:                 fakeGeo{},
+				World:               state,
+				IDs:                 &sequentialIDs{},
+				Decay:               decay,
+				Respawn:             respawn,
+				AI:                  task.NewAI(state, zerolog.Nop()),
+				Positions:           task.NewPositionUpdates(state),
+				Items:               item.NewTable(nil),
+				Ground:              &recordingGround{},
+				Now:                 time.Now,
+				Log:                 zerolog.Nop(),
+				Walker:              walker,
+				Limits:              npc.DefaultLimits(),
+				RandomWalkRate:      30,
+				MaxGeoPathFailCount: 0,
+				RaidMultipliers:     npc.DefaultRaidMultipliers(),
+				AIConfig:            tc.cfg,
+				SpawnEvents:         DefaultSpawnEvents(),
+				Effects:             effect.Env{Activity: task.NewEffects()},
+				Queues:              npcQueues(),
+				Makers:              testMakers(),
+			})
 			if err != nil {
-				t.Fatalf("NewNpcsWithMaxBuffsAmount() error: %v", err)
+				t.Fatalf("NewNpcs() error: %v", err)
 			}
 			npcs.SpawnOnStart()
 			var guard, mob *npc.Hostile

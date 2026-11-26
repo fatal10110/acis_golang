@@ -38,16 +38,16 @@ const siegeGuardHomeMoveWeight = 1_000_000
 const partyRangeDefault = 1500
 
 var hostileInstanceKinds = map[InstanceKind]struct{}{
-	"Chest":           {},
-	"FeedableBeast":   {},
-	"FestivalMonster": {},
-	"FriendlyMonster": {},
-	"GrandBoss":       {},
-	"Guard":           {},
-	"HalishaChest":    {},
-	"Monster":         {},
-	"RaidBoss":        {},
-	"SiegeGuard":      {},
+	KindChest:           {},
+	KindFeedableBeast:   {},
+	KindFestivalMonster: {},
+	KindFriendlyMonster: {},
+	KindGrandBoss:       {},
+	KindGuard:           {},
+	KindHalishaChest:    {},
+	KindMonster:         {},
+	KindRaidBoss:        {},
+	KindSiegeGuard:      {},
 }
 
 // Hostile is a live attackable NPC with world presence and an AI loop.
@@ -317,7 +317,7 @@ func newHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	// Raid and grand bosses are raid-related from construction; minions
 	// are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())
-	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
+	h.coreAIDisabled.Store(h.Box() || kind == KindHalishaChest)
 	h.running.Store(true)
 	if parts != nil {
 		h.brain = ai.NewAttackableWithParts(h, movement, parts)
@@ -606,7 +606,7 @@ func (h *Hostile) ObjectID() int32 {
 func (h *Hostile) Kind() actor.Kind { return actor.KindNPC }
 
 // Unlockable reports whether this hostile NPC is a chest.
-func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == "Chest" }
+func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == KindChest }
 
 // AI returns the hostile NPC brain.
 func (h *Hostile) AI() *ai.Attackable {
@@ -688,13 +688,13 @@ func (h *Hostile) clearAttackers() {
 // counterpart type is Monster-family, consulted by hostility-redirect
 // effects that only accept a Monster-family actor as their target.
 var monsterInstanceKinds = map[InstanceKind]struct{}{
-	"Chest":           {},
-	"FeedableBeast":   {},
-	"FestivalMonster": {},
-	"GrandBoss":       {},
-	"HalishaChest":    {},
-	"Monster":         {},
-	"RaidBoss":        {},
+	KindChest:           {},
+	KindFeedableBeast:   {},
+	KindFestivalMonster: {},
+	KindGrandBoss:       {},
+	KindHalishaChest:    {},
+	KindMonster:         {},
+	KindRaidBoss:        {},
 }
 
 // MonsterKind reports whether this NPC's instance type is Monster-family
@@ -708,20 +708,20 @@ func (h *Hostile) MonsterKind() bool {
 // FolkOrGuard reports whether this NPC is a town Guard. Folk-family NPCs
 // are not Hostile, so Guard is the only kind that can qualify here.
 func (h *Hostile) FolkOrGuard() bool {
-	return hostileKind(h.Instance) == "Guard"
+	return hostileKind(h.Instance) == KindGuard
 }
 
 // FeedableBeast reports whether this NPC is of the FeedableBeast kind, the
 // only target a beast spice is fed to.
 func (h *Hostile) FeedableBeast() bool {
-	return hostileKind(h.Instance) == "FeedableBeast"
+	return hostileKind(h.Instance) == KindFeedableBeast
 }
 
 // chestKind reports whether this NPC's instance type is specifically the
 // lootable Chest kind. HalishaChest is Monster-family but distinct from
 // Chest, and is not excluded by this check.
 func (h *Hostile) chestKind() bool {
-	return hostileKind(h.Instance) == "Chest"
+	return hostileKind(h.Instance) == KindChest
 }
 
 // RandomNearbyMonster returns a random other Monster-family NPC known
@@ -828,7 +828,7 @@ var (
 
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {
-	h.brain.HatesIfBuilt().StopHate(attacker)
+	h.brain.HatesIfBuilt().Remove(attacker)
 }
 
 // ClearAggroTables drops every threat and skill-cast hate entry.
@@ -839,9 +839,8 @@ func (h *Hostile) ClearAggroTables() {
 
 // RandomizeHate is attack randomization, the behavior behind the
 // randomize-hate effect: swaps a random valid attacker into the most-hated
-// slot ahead of the current target, gated by the same AutoAttackTargetValid
-// rule ReconsiderTarget uses, here at the party range in force with
-// peaceful targets allowed.
+// slot ahead of the current target, gated by AutoAttackTargetValid at the
+// party range in force with peaceful targets allowed.
 // Reports whether a swap happened.
 func (h *Hostile) RandomizeHate() bool {
 	partyRange := h.partyRange()
@@ -1001,7 +1000,7 @@ func (h *Hostile) canRunAI() bool {
 
 // SiegeGuard reports whether this NPC is a defensive siege guard.
 func (h *Hostile) SiegeGuard() bool {
-	return hostileKind(h.Instance) == "SiegeGuard"
+	return hostileKind(h.Instance) == KindSiegeGuard
 }
 
 // RaidRelated reports whether this NPC is tied to a raid encounter (a raid
@@ -1023,7 +1022,7 @@ func (h *Hostile) SetRaidRelated(v bool) {
 // opposed to RaidRelated, which also covers its minions.
 func (h *Hostile) RaidBoss() bool {
 	switch hostileKind(h.Instance) {
-	case "RaidBoss", "GrandBoss":
+	case KindRaidBoss, KindGrandBoss:
 		return true
 	}
 	return false
@@ -1242,7 +1241,7 @@ func (h *Hostile) PoleAttackCountMax() int {
 
 // ReturnHome reports whether this NPC started returning to its spawn.
 func (h *Hostile) ReturnHome() bool {
-	if hostileKind(h.Instance) == "GrandBoss" {
+	if hostileKind(h.Instance) == KindGrandBoss {
 		return false
 	}
 	if h.SiegeGuard() {
@@ -1272,7 +1271,7 @@ func hostileKind(inst *Instance) InstanceKind {
 	if inst.Kind != "" {
 		return inst.Kind
 	}
-	return InstanceKind(inst.Template.Type)
+	return inst.Template.Kind()
 }
 
 func (h *Hostile) location() location.Location {
@@ -1302,7 +1301,7 @@ func (h *Hostile) IsMoving() bool { return h.Move().Moving() }
 const guardDriftRange = 20
 
 func (h *Hostile) driftRange() int {
-	if kind := hostileKind(h.Instance); kind == "Guard" || kind == "SiegeGuard" {
+	if kind := hostileKind(h.Instance); kind == KindGuard || kind == KindSiegeGuard {
 		return guardDriftRange
 	}
 	return h.Instance.MaxDriftRange()

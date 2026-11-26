@@ -109,7 +109,7 @@ func (d *deathRewards) payOfferings(receiver attackable.Combatant) bool {
 // death credited to receiver drops a cursed weapon. A grand boss or a
 // feedable beast never drops one.
 func (d *deathRewards) rollCursedWeapon(receiver attackable.Combatant) {
-	if d.config.CursedWeapons == nil || !d.hostile.MonsterKind() || d.hostile.FeedableBeast() || d.tmpl.Type == "GrandBoss" {
+	if d.config.CursedWeapons == nil || !d.hostile.MonsterKind() || d.hostile.FeedableBeast() || d.tmpl.Kind() == npc.KindGrandBoss {
 		return
 	}
 	p, ok := actingCharacter(receiver)

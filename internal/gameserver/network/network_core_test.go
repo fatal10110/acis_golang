@@ -904,7 +904,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
+			ep.Attach(npc.EffectPointRuntime{World: state, Sink: EffectPointSinks(state)(ep)})
 			ep.Spawn(0, 0, 0, 0)
 			drain() // the spawn sequence's NpcInfo frames
 			ep.BroadcastSkillLaunched(1, 1, []int32{1})

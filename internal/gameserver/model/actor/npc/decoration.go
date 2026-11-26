@@ -21,11 +21,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// ChristmasTree is the kind of the decoration a Christmas tree item places
-// and an administrator spawns. A click on one is answered ActionFailed and
-// never selects it.
-const ChristmasTree InstanceKind = "ChristmasTree"
-
 // Decoration is an immobile, non-attackable NPC placed by an item. It holds
 // no effects, so its stats are fixed at spawn. Only an administrator's
 // //kill takes its HP; it then dies once and its corpse decays.

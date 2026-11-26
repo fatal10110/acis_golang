@@ -9,12 +9,12 @@ import (
 // merchantKinds are the civilian types built on the merchant: a buylist
 // purchase or try-on may target any of them.
 var merchantKinds = map[InstanceKind]struct{}{
-	"Merchant":           {},
-	"Fisherman":          {},
-	"CastleChamberlain":  {},
-	"ClanHallManagerNpc": {},
-	"ManorManagerNpc":    {},
-	"WyvernManagerNpc":   {},
+	KindMerchant:           {},
+	KindFisherman:          {},
+	KindCastleChamberlain:  {},
+	KindClanHallManagerNpc: {},
+	KindManorManagerNpc:    {},
+	KindWyvernManagerNpc:   {},
 }
 
 // Merchant reports whether f is a merchant type, one a buylist purchase or
@@ -31,9 +31,9 @@ func (f *Folk) Merchant() bool {
 // refuses no one here.
 func (f *Folk) BuyRefused(r ResidenceTalk) bool {
 	switch kind := hostileKind(f.Instance); kind {
-	case "CastleChamberlain":
+	case KindCastleChamberlain:
 		return r.ChamberlainRefusal(kind, clan.PrivCastleFunctions) != ""
-	case "MercenaryManagerNpc":
+	case KindMercenaryManagerNpc:
 		return r.castleTalkCond(r.SiegeInProgress, clan.PrivCastleMercenary) != talkOwner || !r.SealValidation
 	}
 	return false
@@ -42,7 +42,7 @@ func (f *Folk) BuyRefused(r ResidenceTalk) bool {
 // MercenaryManager reports whether f is a castle mercenary manager, which
 // a buylist purchase may also target.
 func (f *Folk) MercenaryManager() bool {
-	return hostileKind(f.Instance) == "MercenaryManagerNpc"
+	return hostileKind(f.Instance) == KindMercenaryManagerNpc
 }
 
 // BoughtPage is the page f shows after a purchase, data/html/<dir>/<npcId>-bought.htm
@@ -51,7 +51,7 @@ func (f *Folk) MercenaryManager() bool {
 func (f *Folk) BoughtPage() (string, bool) {
 	dir := "merchant"
 	switch {
-	case hostileKind(f.Instance) == "Fisherman":
+	case hostileKind(f.Instance) == KindFisherman:
 		dir = "fisherman"
 	case !f.Merchant():
 		return "", false
