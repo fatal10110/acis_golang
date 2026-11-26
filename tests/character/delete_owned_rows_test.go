@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
+
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
@@ -113,7 +115,7 @@ func TestDeletePurgesOwnedRowsAndRetiresID(t *testing.T) {
 			execOwned(t, db, "INSERT INTO mods_wedding (id, requesterId, partnerId) VALUES (?, ?, ?)", ownedCoupleID, ownedSpouseID, ownedGhostID)
 			execOwned(t, db, "INSERT INTO mods_wedding (id, requesterId, partnerId) VALUES (?, ?, ?)", ownedCoupleID+1, ownedGhostID, ownedSpouseID)
 
-			ids, err := idfactory.New(ctx, db, zerolog.Nop())
+			ids, err := objectids.NewAllocator(ctx, db, zerolog.Nop())
 			if err != nil {
 				t.Fatalf("restart allocator: %v", err)
 			}

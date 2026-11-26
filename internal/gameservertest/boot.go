@@ -19,9 +19,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
+
 	"github.com/rs/zerolog"
 
-	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -2052,7 +2053,7 @@ func (s *sequentialIDs) reserve(ids []int64) []int32 {
 func (s *sequentialIDs) reserveStored(tb testing.TB, db *sql.DB) []int32 {
 	tb.Helper()
 	var stored []int64
-	if err := idfactory.ScanUsedIDs(context.Background(), db, func(id int64) { stored = append(stored, id) }); err != nil {
+	if err := objectids.ScanUsedIDs(context.Background(), db, func(id int64) { stored = append(stored, id) }); err != nil {
 		tb.Fatalf("gameservertest: scan stored object ids: %v", err)
 	}
 	return s.reserve(stored)

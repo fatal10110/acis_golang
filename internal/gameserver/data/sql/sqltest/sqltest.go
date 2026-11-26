@@ -7,7 +7,8 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
+
 	"github.com/fatal10110/acis_golang/internal/dbtest"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -535,7 +536,7 @@ var pool = dbtest.NewPool(dbtest.PoolConfig{Schema: append(append([]string(nil),
 
 // serverSchemaStmts are the tables the server creates itself at boot,
 // which the shipped schema, and so schemaStmts, does not carry.
-var serverSchemaStmts = []string{idfactory.RetiredIDsSchema}
+var serverSchemaStmts = []string{objectids.RetiredIDsSchema}
 
 var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,

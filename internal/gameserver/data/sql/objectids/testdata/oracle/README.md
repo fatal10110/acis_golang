@@ -1,7 +1,7 @@
 # IdFactory statement oracle
 
 `../statements.golden` is the expected output of `TestBootStatementsMatchReferenceProbe`
-(`../../idfactory_oracle_test.go`): the SQL the reference IdFactory runs at boot, in
+(`../../objectids_oracle_test.go`): the SQL the reference IdFactory runs at boot, in
 order, one line per statement (`update <sql>`, `prepare <sql>` for the expired
 timestamp delete, `query <sql>` for the used id scans).
 
