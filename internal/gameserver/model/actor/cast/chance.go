@@ -86,14 +86,19 @@ type chanceOwner interface {
 	Roll(n int) int
 	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int)
 	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32)
-	// SkillLevels are a player's known skills: its passive skills that
-	// carry a chanceType are chance procs too. Other creatures know none.
+}
+
+// skillKnower is a chance owner with known skills, a player: its passive
+// skills that carry a chanceType are chance procs too. Other creatures know
+// none.
+type skillKnower interface {
 	SkillLevels() player.SkillLevels
 }
 
 // The creatures that hold chance procs.
 var (
 	_ chanceOwner = (*player.Character)(nil)
+	_ skillKnower = (*player.Character)(nil)
 	_ chanceOwner = (*npc.Hostile)(nil)
 	_ chanceOwner = (*npc.Folk)(nil)
 	_ chanceOwner = (*summon.Actor)(nil)
@@ -313,11 +318,12 @@ func (p *ChanceProcs) rolls(owner chanceOwner, cond modelskill.ChanceCondition, 
 
 // chanceSkills returns owner's known passive chance skills, by skill id.
 func (p *ChanceProcs) chanceSkills(owner chanceOwner) []*modelskill.Definition {
-	if p.Definitions == nil {
+	known, ok := owner.(skillKnower)
+	if p.Definitions == nil || !ok {
 		return nil
 	}
 	var out []*modelskill.Definition
-	for id, level := range owner.SkillLevels() {
+	for id, level := range known.SkillLevels() {
 		def, ok := p.Definitions.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: level})
 		if ok && def.Activation == modelskill.ActivationPassive && def.Extra().ChanceType != "" {
 			out = append(out, def)

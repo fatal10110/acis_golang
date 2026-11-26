@@ -2,6 +2,7 @@ package npc
 
 import (
 	"math"
+	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -16,20 +17,9 @@ import (
 
 var _ effect.StatOwner = (*Folk)(nil)
 
-// statCalc returns s's Calculator, creating it with s's builtin finalize
-// step on first use.
-func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
-	f.statMu.Lock()
-	defer f.statMu.Unlock()
-	if f.statCalcs == nil {
-		f.statCalcs = new([stat.Count]*effect.Calculator)
-	}
-	if calc := f.statCalcs[s]; calc != nil {
-		return calc
-	}
-	calc := effect.NewCalculator(f.builtin(s))
-	f.statCalcs[s] = &calc
-	return &calc
+// newStatCalc returns a fresh chain for s: its builtin finalize step alone.
+func (f *Folk) newStatCalc(s stat.Stat) effect.Calculator {
+	return effect.NewCalculator(f.builtin(s))
 }
 
 // builtin returns s's builtin finalize step for the NPC, nil for none.
@@ -39,16 +29,6 @@ func (f *Folk) builtin(s stat.Stat) funcs.Func {
 		return nil
 	}
 	return defaultBuiltin(s)
-}
-
-// calcSlots returns the NPC's stat slots.
-func (f *Folk) calcSlots() [stat.Count]*effect.Calculator {
-	f.statMu.RLock()
-	defer f.statMu.RUnlock()
-	if f.statCalcs == nil {
-		return [stat.Count]*effect.Calculator{}
-	}
-	return *f.statCalcs
 }
 
 // CalcStat finalizes base for s through the NPC's builtin funcs and the
@@ -61,12 +41,7 @@ func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
 // conditional func tests f against them. A non-positive stat that can't go
 // negative is floored at one.
 func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
-	f.statMu.RLock()
-	var calc *effect.Calculator
-	if f.statCalcs != nil {
-		calc = f.statCalcs[s]
-	}
-	f.statMu.RUnlock()
+	calc := f.statSlots.Lookup(s)
 	var value float64
 	if calc != nil {
 		value = calc.Calc(f.statActor(), base, target, skill)
@@ -86,9 +61,7 @@ func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill
 // AttachStatFuncs attaches fns to the NPC's stat calculators without
 // reporting the change.
 func (f *Folk) AttachStatFuncs(fns []effect.Mod) {
-	for _, fn := range fns {
-		f.statCalc(fn.Stat).AddMod(fn)
-	}
+	f.statSlots.Attach(fns, f.newStatCalc)
 }
 
 // StatFuncsAttached shows observers the stats fns changed.
@@ -103,13 +76,7 @@ func (f *Folk) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	var modified []stat.Stat
-	calcs := f.calcSlots()
-	for s := range owner.OwnedStats() {
-		if calc := calcs[s]; calc != nil && calc.RemoveOwner(owner) > 0 {
-			modified = append(modified, s)
-		}
-	}
+	modified := slices.Compact(f.statSlots.RemoveOwner(owner))
 	if owner.Stripped() {
 		if len(modified) > 0 {
 			f.refreshMoveSpeed()

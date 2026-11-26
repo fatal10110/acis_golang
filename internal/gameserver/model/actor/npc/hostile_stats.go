@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"slices"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
@@ -41,9 +43,7 @@ func (h *Hostile) attachPassives(passives *compiledPassives) {
 // AttachStatFuncs attaches fns to h's live stat calculators without
 // reporting the change.
 func (h *Hostile) AttachStatFuncs(fns []effect.Mod) {
-	for _, fn := range fns {
-		h.statCalcOrCreate(fn.Stat).AddMod(fn)
-	}
+	h.statSlots.Attach(fns, h.newStatCalc)
 }
 
 // StatFuncsAttached reports the stat change of attached fns.
@@ -58,13 +58,12 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	var modified []stat.Stat
-	calcs := h.ownerCalcs(owner)
-	for s := range owner.OwnedStats() {
-		if calc := calcs[s]; calc != nil && calc.RemoveOwner(owner) > 0 {
-			modified = append(modified, s)
-		}
+	// A slot for every Stat a template passive of owner modifies, so that
+	// its Mods can be dropped.
+	for s := range h.templatePassives().StatsOwnedBy(owner) {
+		h.statSlots.Get(s, h.newStatCalc)
 	}
+	modified := slices.Compact(h.statSlots.RemoveOwner(owner))
 	if owner.Stripped() {
 		if len(modified) > 0 {
 			h.refreshMoveSpeed()
@@ -131,38 +130,17 @@ func (h *Hostile) MaxBuffCount() int {
 	return h.Instance.maxBuffsBase() + h.Instance.Template.Skills[int(modelskill.DivineInspirationSkillID)]
 }
 
-// ownerCalcs returns h's stat slots, with one created for every Stat a
-// template passive of owner modifies so that its Mods can be dropped.
-func (h *Hostile) ownerCalcs(owner effect.ModOwner) [stat.Count]*effect.Calculator {
-	h.statMu.RLock()
-	passives := h.passives
-	h.statMu.RUnlock()
-	for s := range passives.StatsOwnedBy(owner) {
-		h.statCalcOrCreate(s)
-	}
+// templatePassives returns h's template passives.
+func (h *Hostile) templatePassives() *effect.StatMods {
 	h.statMu.RLock()
 	defer h.statMu.RUnlock()
-	if h.statCalcs == nil {
-		return [stat.Count]*effect.Calculator{}
-	}
-	return *h.statCalcs
+	return h.passives
 }
 
-// statCalcOrCreate returns s's Calculator, creating it from s's template
-// passives and builtin finalize step on first use; the slot is created at
-// most once per Stat per Hostile.
-func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
-	h.statMu.Lock()
-	defer h.statMu.Unlock()
-	if h.statCalcs == nil {
-		h.statCalcs = new([stat.Count]*effect.Calculator)
-	}
-	if calc := h.statCalcs[s]; calc != nil {
-		return calc
-	}
-	calc := h.passives.NewCalculator(s, defaultBuiltin(s))
-	h.statCalcs[s] = &calc
-	return &calc
+// newStatCalc returns a fresh chain for s: s's template passives, then its
+// builtin finalize step.
+func (h *Hostile) newStatCalc(s stat.Stat) effect.Calculator {
+	return h.templatePassives().NewCalculator(s, defaultBuiltin(s))
 }
 
 // calcStat runs s's finalization chain (the base funcs every NPC attaches
@@ -175,13 +153,8 @@ func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
 // calcFor is calcStat for a calculation against target run for skill (nil
 // for none).
 func (h *Hostile) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
-	h.statMu.RLock()
-	var calc *effect.Calculator
-	if h.statCalcs != nil {
-		calc = h.statCalcs[s]
-	}
-	passives := h.passives
-	h.statMu.RUnlock()
+	calc := h.statSlots.Lookup(s)
+	passives := h.templatePassives()
 	actor := hostileStatActor{h: h}
 	var value float64
 	if calc != nil {

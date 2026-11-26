@@ -218,15 +218,13 @@ type Hostile struct {
 	currentSpiritshots int
 	shotsMask          int32
 
-	// statMu guards statCalcs, its slots and passives; each slot's own
-	// Calculator then guards its own Mods independently, so a read only
-	// ever takes statMu's read lock. A Stat without a slot computes from
-	// passives, the template's shared Mods; the slots are created on the
-	// first change to a Stat's chain. An attacker's formulas read these
-	// stats from the attacker's queue.
-	statMu    sync.RWMutex
-	statCalcs *[stat.Count]*effect.Calculator
-	passives  *effect.StatMods
+	// statSlots are h's live stat chains. A Stat without a slot computes
+	// from passives, the template's shared Mods; the slots are created on
+	// the first change to a Stat's chain, starting from those Mods.
+	statSlots effect.StatSlots
+	// statMu guards passives.
+	statMu   sync.RWMutex
+	passives *effect.StatMods
 
 	// collisionRadiusOverride is the runtime body-radius override a live
 	// effect (e.g. Grow) installs; nil means "use the template value".

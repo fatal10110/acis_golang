@@ -11,15 +11,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
-
-// subclassMinLevel is the level the active class and every subclass held
-// must have reached before another subclass may be added.
-const subclassMinLevel = 75
 
 // classChangeTimeout bounds the persistence work of one class change.
 const classChangeTimeout = 5 * time.Second
@@ -130,7 +125,8 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 		if !l.subclassActionAllowed(live) {
 			return true
 		}
-		if !l.mayAddSubclass(live, subs) || !f.ValidNewSubclass(base, subs, cmd.One) {
+		// every refusal reason answers the same page
+		if live.AddSubclassRefusal(subs, l.playerConfig().SubclassWithoutQuests) != player.SubclassAddAllowed || !f.ValidNewSubclass(base, subs, cmd.One) {
 			page = f.SubclassPage(pages, "SubClass_Fail", "")
 			break
 		}
@@ -212,38 +208,8 @@ func (l *GameClientLink) subclassActionAllowed(live *livePlayer) bool {
 	return live.performFloodProtected(floodProtectorSubclass, l.playerConfig().SubclassDelay, time.Now())
 }
 
-// mayAddSubclass reports whether live may add a subclass: fewer than the
-// most it may hold, the active class and every subclass at least level 75,
-// and the quests the subclass needs done.
-func (l *GameClientLink) mayAddSubclass(live *livePlayer, subs []player.SubClass) bool {
-	if len(subs) >= player.MaxSubclasses || live.Level() < subclassMinLevel {
-		return false
-	}
-	for _, sub := range subs {
-		if sub.Level < subclassMinLevel {
-			return false
-		}
-	}
-	if l.playerConfig().SubclassWithoutQuests || live.IsNoble() {
-		return true
-	}
-	return questCompleted(live.Character, fatesWhisperQuest) && questCompleted(live.Character, mimirsElixirQuest)
-}
-
-// The quests a subclass reads by name: the two a character who is not
-// noble completes before adding one, and the one every class change ends.
-const (
-	fatesWhisperQuest   = "Q234_FatesWhisper"
-	mimirsElixirQuest   = "Q235_MimirsElixir"
-	repentYourSinsQuest = "Q422_RepentYourSins"
-)
-
-// questCompleted reports whether c's state in the quest named name is
-// completed.
-func questCompleted(c *player.Character, name string) bool {
-	st := c.Quests().State(name)
-	return st != nil && st.Status() == questlog.StatusCompleted
-}
+// repentYourSinsQuest is the quest every class change ends.
+const repentYourSinsQuest = "Q422_RepentYourSins"
 
 // beginClassChange starts ch on live's queue: it takes the class-change
 // lock, puts an added or replacing subclass in its slot, copies the state

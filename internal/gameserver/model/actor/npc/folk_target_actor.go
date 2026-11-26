@@ -3,7 +3,6 @@ package npc
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -100,7 +99,3 @@ func (f *Folk) FestivalParticipant() bool                { return false }
 
 // A folk NPC keeps no attacker list.
 func (f *Folk) RecordAttacker(attackable.Combatant) {}
-
-// SkillLevels is empty: an NPC's chance procs are its effects' triggers
-// only.
-func (f *Folk) SkillLevels() player.SkillLevels { return nil }

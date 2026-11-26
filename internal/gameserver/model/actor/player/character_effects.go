@@ -53,9 +53,7 @@ func (c *Character) AddStatFuncs(fns []effect.Mod) {
 // AttachStatFuncs attaches fns to c's live stat calculators without
 // reporting the change.
 func (c *Character) AttachStatFuncs(fns []effect.Mod) {
-	for _, fn := range fns {
-		c.statCalcOrCreate(fn.Stat).AddMod(fn)
-	}
+	c.statSlots.Attach(fns, newStatCalc)
 }
 
 // StatFuncsAttached reports the stat change of attached fns.
@@ -70,15 +68,7 @@ func (c *Character) StatFuncsAttached(fns []effect.Mod) {
 // HasStatsByOwner reports whether any stat func added for owner is still
 // attached.
 func (c *Character) HasStatsByOwner(owner effect.ModOwner) bool {
-	c.statMu.RLock()
-	calcs := c.statCalcs
-	c.statMu.RUnlock()
-	for _, calc := range calcs {
-		if calc != nil && calc.Owns(owner) {
-			return true
-		}
-	}
-	return false
+	return c.statSlots.Owns(owner)
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner. An
@@ -88,19 +78,7 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
 	}
-	c.statMu.RLock()
-	calcs := c.statCalcs
-	c.statMu.RUnlock()
-	var stats []stat.Stat
-	for s := range owner.OwnedStats() {
-		calc := calcs[s]
-		if calc == nil {
-			continue
-		}
-		for range calc.RemoveOwner(owner) {
-			stats = append(stats, s)
-		}
-	}
+	stats := c.statSlots.RemoveOwner(owner)
 	if owner.Stripped() {
 		if len(stats) > 0 {
 			c.refreshMoveSpeed()

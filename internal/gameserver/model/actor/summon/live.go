@@ -308,7 +308,7 @@ type Actor struct {
 	feedPeriod time.Duration
 
 	stats              CombatStats
-	statCalc           summonStatCalcs
+	statSlots          effect.StatSlots
 	vitals             summonVitals
 	effects            *effect.List
 	skillDefs          skillLookup

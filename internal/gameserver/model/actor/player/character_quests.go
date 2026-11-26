@@ -19,6 +19,13 @@ func (c *Character) QuestStarted(name string) bool {
 	return st != nil && st.Status() == questlog.StatusStarted
 }
 
+// QuestCompleted reports whether c's state in the quest named name is
+// completed.
+func (c *Character) QuestCompleted(name string) bool {
+	st := c.quests.State(name)
+	return st != nil && st.Status() == questlog.StatusCompleted
+}
+
 // NotifyQuestList shows c the quest window entries.
 func (c *Character) NotifyQuestList(entries []questlog.Entry) {
 	c.emit(event.QuestListChanged{Entries: entries})
