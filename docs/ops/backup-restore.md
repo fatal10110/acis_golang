@@ -30,6 +30,19 @@ of backup:
   all players and world state before the process exits. Take one before upgrades, migrations or
   any restore you plan ahead.
 
+A hot backup loses recent changes to this state, because the game server writes it only at a
+graceful stop, and its tracking issue is still open:
+
+| Tables | State | Tracking issue |
+| --- | --- | --- |
+| `grandboss_list` | boss-zone player lists | [#4684](https://github.com/fatal10110/acis_golang/issues/4684) |
+| `character_relations` | friend and block lists | [#4706](https://github.com/fatal10110/acis_golang/issues/4706) |
+| `petition`, `petition_message` | petitions | [#4706](https://github.com/fatal10110/acis_golang/issues/4706) |
+| `mods_wedding` | couples | [#4706](https://github.com/fatal10110/acis_golang/issues/4706) |
+
+Grand and raid boss state (`spawn_data`), buffer schemes (`buffer_schemes`) and Olympiad points
+and match records are written as they change and are not on this list.
+
 ## Taking a backup
 
 Save this as `backup.sh` in the checkout root and make it executable (`chmod +x backup.sh`). Run it
