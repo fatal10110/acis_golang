@@ -67,16 +67,19 @@ const (
 	jonasSteakRecipe = 1457
 )
 
-// chances returns, by NPC id, the two bounds a kill's hundred-sided roll is
-// read against: the first and the second ingredient of that monster.
-func chances() map[int32][]int32 {
-	m := make(map[int32][]int32, 6)
-	m[20204] = []int32{92, 100}
-	m[20229] = []int32{80, 95}
-	m[20223] = []int32{70, 77}
-	m[20154] = []int32{70, 77}
-	m[20155] = []int32{87, 96}
-	m[20156] = []int32{77, 85}
+// rollBounds holds the two bounds a kill's hundred-sided roll is read
+// against: the first and the second ingredient of that monster.
+type rollBounds struct{ first, second int32 }
+
+// chances returns each monster's roll bounds, by NPC id.
+func chances() map[int32]rollBounds {
+	m := make(map[int32]rollBounds, 6)
+	m[20204] = rollBounds{92, 100}
+	m[20229] = rollBounds{80, 95}
+	m[20223] = rollBounds{70, 77}
+	m[20154] = rollBounds{70, 77}
+	m[20155] = rollBounds{87, 96}
+	m[20156] = rollBounds{77, 85}
 	return m
 }
 
@@ -446,9 +449,9 @@ func onMyDying(s *script.Script, e script.MyDying) {
 		if p.HasItem(jacobInsectBook) {
 			random := int32(s.Rnd(100))
 			chances := chances()[npcID]
-			if random < chances[0] {
+			if random < chances.first {
 				s.DropItemsAlways(p, nectar, 1, 20)
-			} else if random < chances[1] {
+			} else if random < chances.second {
 				s.DropItemsAlways(p, royalJelly, 1, 10)
 			}
 		}
@@ -456,9 +459,9 @@ func onMyDying(s *script.Script, e script.MyDying) {
 		if p.HasItem(soniaBotanyBook) {
 			random := int32(s.Rnd(100))
 			chances := chances()[npcID]
-			if random < chances[1] {
+			if random < chances.second {
 				root := int32(whiteMandragoraRoot)
-				if random < chances[0] {
+				if random < chances.first {
 					root = redMandragoraRoot
 				}
 				s.DropItemsAlways(p, root, 1, 40)

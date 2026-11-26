@@ -311,15 +311,15 @@ func onMyDying(s *script.Script, e script.MyDying) {
 			st.SetCond(3)
 		}
 	case harpy, harpyMatriarch:
-		if st.Cond() == 6 && s.DropItems(p, harpyEgg, 1, 30, 500000) && p.ItemCount(medusaVenom) == 30 && p.ItemCount(windsusBile) == 30 {
+		if st.Cond() == 6 && s.DropItems(p, harpyEgg, 1, 30, 500000) && othersCollected(p, partGoals(), harpyEgg) {
 			st.SetCond(7)
 		}
 	case medusa:
-		if st.Cond() == 6 && s.DropItems(p, medusaVenom, 1, 30, 500000) && p.ItemCount(harpyEgg) == 30 && p.ItemCount(windsusBile) == 30 {
+		if st.Cond() == 6 && s.DropItems(p, medusaVenom, 1, 30, 500000) && othersCollected(p, partGoals(), medusaVenom) {
 			st.SetCond(7)
 		}
 	case windsus:
-		if st.Cond() == 6 && s.DropItems(p, windsusBile, 1, 30, 500000) && p.ItemCount(harpyEgg) == 30 && p.ItemCount(medusaVenom) == 30 {
+		if st.Cond() == 6 && s.DropItems(p, windsusBile, 1, 30, 500000) && othersCollected(p, partGoals(), windsusBile) {
 			st.SetCond(7)
 		}
 	case roadCollector, roadScavenger:
@@ -331,4 +331,20 @@ func onMyDying(s *script.Script, e script.MyDying) {
 			st.SetCond(13)
 		}
 	}
+}
+
+// itemGoal is a quest item and the count a collecting cond needs of it.
+type itemGoal struct{ item, count int32 }
+
+func partGoals() []itemGoal { return []itemGoal{{medusaVenom, 30}, {windsusBile, 30}, {harpyEgg, 30}} }
+
+// othersCollected reports whether p holds exactly the goal count of every
+// item of goals except dropped, the item the kill just dropped.
+func othersCollected(p *script.Player, goals []itemGoal, dropped int32) bool {
+	for _, g := range goals {
+		if g.item != dropped && p.ItemCount(g.item) != g.count {
+			return false
+		}
+	}
+	return true
 }

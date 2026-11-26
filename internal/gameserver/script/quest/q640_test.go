@@ -8,9 +8,11 @@ import (
 )
 
 // TestQ640MatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes.
+// class: literals, engine calls and hook shapes. The reference reads its
+// reward rows by position; the port names the fields, so the third field's index
+// is not one of its literals.
 func TestQ640MatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check("q640", []string{"quest.Q640_TheZeroHour"})
+	problems, err := scriptfp.Check("q640", []string{"quest.Q640_TheZeroHour"}, "number 2")
 	if err != nil {
 		t.Fatal(err)
 	}

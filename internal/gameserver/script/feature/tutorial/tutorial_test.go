@@ -19,9 +19,10 @@ import (
 const path = "script.feature.Tutorial"
 
 // TestMatchesReferenceFingerprints compares the package with the reference
-// class: literals, engine calls and hook shapes.
+// class: literals, engine calls and hook shapes. The sit client event id is
+// the character's own constant, shared with the code that raises it.
 func TestMatchesReferenceFingerprints(t *testing.T) {
-	problems, err := scriptfp.Check(".", []string{path})
+	problems, err := scriptfp.Check(".", []string{path}, "number 8388608")
 	if err != nil {
 		t.Fatal(err)
 	}

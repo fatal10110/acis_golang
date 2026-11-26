@@ -3,6 +3,8 @@
 package q324
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
@@ -32,7 +34,7 @@ func New() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {30351}, // Astaron
 			script.EventTalked:     {30351},
-			script.EventMyDying:    {20034, 20038, 20043},
+			script.EventMyDying:    slices.Sorted(maps.Keys(chances())),
 		},
 		Hooks: script.Hooks{OnEvent: onAdvEvent, OnTalk: onTalk, OnMyDying: onMyDying},
 	}

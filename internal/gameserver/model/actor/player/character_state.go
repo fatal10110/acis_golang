@@ -81,7 +81,7 @@ func (c *Character) ChangePosture(standing bool) bool {
 func (c *Character) Sit() bool {
 	changed := c.changePosture(false, true)
 	c.broadcastStanceChange(event.StanceSitting)
-	c.NotifyTutorial(TutorialSat)
+	c.NotifyTutorial(TutorialClientEvent(TutorialSitID))
 	return changed
 }
 

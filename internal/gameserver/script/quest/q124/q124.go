@@ -35,6 +35,17 @@ func New() script.Script {
 	}
 }
 
+// condPages returns, for each page that only advances the quest, the cond
+// it sets, with the middle sound.
+func condPages() map[string]int32 {
+	return map[string]int32{
+		"32113-04.htm": 2,
+		"32114-02.htm": 3,
+		"32115-04.htm": 4,
+		"32117-03.htm": 5,
+	}
+}
+
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
@@ -47,26 +58,22 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetStatus(questlog.StatusStarted)
 		st.SetCond(1)
 		s.PlaySound(p, script.SoundAccept)
-	case strings.EqualFold(e.Name, "32113-04.htm"):
-		st.SetCond(2)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32114-02.htm"):
-		st.SetCond(3)
-		s.PlaySound(p, script.SoundMiddle)
-	case strings.EqualFold(e.Name, "32115-04.htm"):
-		st.SetCond(4)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32117-02.htm"):
 		if st.Cond() == 4 {
 			st.Set("progress", strconv.Itoa(1))
 		}
-	case strings.EqualFold(e.Name, "32117-03.htm"):
-		st.SetCond(5)
-		s.PlaySound(p, script.SoundMiddle)
 	case strings.EqualFold(e.Name, "32118-02.htm"):
 		st.SetCond(6)
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, 8778, 1) // Egg
+	default:
+		for page, cond := range condPages() {
+			if strings.EqualFold(e.Name, page) {
+				st.SetCond(cond)
+				s.PlaySound(p, script.SoundMiddle)
+				break
+			}
+		}
 	}
 	return htmltext
 }

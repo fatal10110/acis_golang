@@ -1,89 +1,59 @@
 package player
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"strconv"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/memo"
 )
 
 // TutorialEvents takes the tutorial events characters raise.
 type TutorialEvents interface {
-	// TutorialEvent hands the event name to c's tutorial quest, when c has
-	// a state in it; otherwise nothing happens.
-	TutorialEvent(c *Character, name string)
+	// TutorialEvent hands the event to c's tutorial quest, when c has a
+	// state in it; otherwise nothing happens.
+	TutorialEvent(c *Character, e TutorialEvent)
 }
 
-// The tutorial events the character raises itself.
+// TutorialEvent is an event a character's tutorial quest hears, under the
+// name the quest's event hook receives.
+type TutorialEvent string
+
+// TutorialEnterWorld: the character entered the world.
+const TutorialEnterWorld TutorialEvent = "UC"
+
+// TutorialClientEvent returns the tutorial event of client event id: "CE"
+// and the id.
+func TutorialClientEvent(id int32) TutorialEvent {
+	return TutorialEvent("CE" + strconv.Itoa(int(id)))
+}
+
+// The client event ids of the tutorial events the character raises itself.
 const (
-	// TutorialEnterWorld: the character entered the world.
-	TutorialEnterWorld = "UC"
 	// tutorialDied: HP damage killed the character outside an Olympiad
 	// match.
-	tutorialDied = "CE30"
+	tutorialDied = 30
 	// tutorialLeveledUp: the character's level went up.
-	tutorialLeveledUp = "CE40"
+	tutorialLeveledUp = 40
 	// tutorialLowHP: an HP write left the character below lowHPRatio of its
 	// maximum HP.
-	tutorialLowHP = "CE45"
-	// TutorialSat: the character sat down.
-	TutorialSat = "CE8388608"
+	tutorialLowHP = 45
+	// TutorialSitID: the character sat down. The tutorial also enables it
+	// as a client event and keeps it in its journal while it waits for it.
+	TutorialSitID = 8388608
 )
 
-// lowHPRatio is the share of maximum HP below which an HP write raises
-// tutorialLowHP.
-const lowHPRatio = 0.3
-
-// NotifyTutorial hands the tutorial event name to c's tutorial quest. It
-// runs on the caller, which must hold none of c's locks.
-func (c *Character) NotifyTutorial(name string) {
+// NotifyTutorial hands the tutorial event e to c's tutorial quest. It runs
+// on the caller, which must hold none of c's locks.
+func (c *Character) NotifyTutorial(e TutorialEvent) {
 	if c.tutorial != nil {
-		c.tutorial.TutorialEvent(c, name)
+		c.tutorial.TutorialEvent(c, e)
 	}
 }
 
 // NotifyTutorialOnQueue is NotifyTutorial for a caller running a task of
 // c's own queue: the tutorial's hook runs as a hook on that queue (see
 // RunOnOwnQueue), so what it asks of c runs inside the call.
-func (c *Character) NotifyTutorialOnQueue(name string) {
-	c.RunOnOwnQueue(func() { c.NotifyTutorial(name) })
-}
-
-// writeHPLocked is the one place c's current HP is written, except the HP
-// clear of a character restored dead (MarkDead). It marks the write for
-// lowHPNotice, which SettleRegen runs after vitalsMu is released. A writer
-// that reports its own status reaches it after that report. AddHP, SetHP and
-// ReduceCurrentHP leave it to their caller's status report (BroadcastStatus),
-// so the event follows the StatusUpdate, as a reported HP write raises it.
-// The caller holds vitalsMu.
-func (c *Character) writeHPLocked(hp float64) {
-	c.curHP = hp
-	c.hpWritten.Store(true)
-}
-
-// lowHPNotice raises tutorialLowHP once per marked HP write that left c
-// below lowHPRatio of its maximum HP. It runs after vitalsMu is released,
-// right after the writer's own status report when it sends one.
-func (c *Character) lowHPNotice() {
-	if !c.hpWritten.Swap(false) || c.tutorial == nil {
-		return
-	}
-	if res := c.ResourceValues(); res.CurrentHP/res.MaxHP < lowHPRatio {
-		c.NotifyTutorial(tutorialLowHP)
-	}
-}
-
-// NotifyRestoredHP raises tutorialLowHP when hp, the HP c's selection
-// restored, is below lowHPRatio of c's maximum HP, dead or not. Restoring
-// the saved HP measures it against the maximum the restored equipment and
-// effects make, so it runs once both apply. Its caller keeps the tutorial's
-// answer from the client; the journal writes stay.
-func (c *Character) NotifyRestoredHP(hp float64) {
-	if c.tutorial == nil {
-		return
-	}
-	if maxHP := c.ResourceValues().MaxHP; min(hp, maxHP)/maxHP < lowHPRatio {
-		c.NotifyTutorial(tutorialLowHP)
-	}
+func (c *Character) NotifyTutorialOnQueue(e TutorialEvent) {
+	c.RunOnOwnQueue(func() { c.NotifyTutorial(e) })
 }
 
 // ShowTutorialPage opens c's tutorial window on the datapack page file.
@@ -121,24 +91,4 @@ func (c *Character) AddRadarMarker(x, y, z int32) {
 // RemoveRadarMarker removes the mark at x, y, z from c's radar.
 func (c *Character) RemoveRadarMarker(x, y, z int32) {
 	c.emit(event.RadarMarkerRemoved{X: x, Y: y, Z: z})
-}
-
-// Memos returns c's memos.
-func (c *Character) Memos() *memo.Memos {
-	return &c.memos
-}
-
-// DieFromDamage runs Die for HP damage that emptied c's HP, then hands c's
-// tutorial quest the death event. A competitor of an Olympiad match only
-// falls (fallInOlympiad): no death sequence and no tutorial event. It
-// reports whether this call killed c.
-func (c *Character) DieFromDamage(killer attackable.Combatant) bool {
-	if c.OlympiadMode() {
-		return c.fallInOlympiad()
-	}
-	if !c.Die(killer) {
-		return false
-	}
-	c.NotifyTutorial(tutorialDied)
-	return true
 }

@@ -300,7 +300,7 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 		}
 		// The tutorial hears of a level gain, never of a loss, between the
 		// HP/MP refill and the CP refill, ahead of the level-up announcement.
-		hooks.add(func() { c.NotifyTutorial(tutorialLeveledUp) })
+		hooks.add(func() { c.NotifyTutorial(TutorialClientEvent(tutorialLeveledUp)) })
 		if refill {
 			hooks.add(c.refillCPForLevel)
 		}

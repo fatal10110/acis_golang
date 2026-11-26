@@ -6,7 +6,9 @@
 package q628
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -80,9 +82,7 @@ func New() script.Script {
 			script.EventQuestStart: {kahman},
 			script.EventFirstTalk:  {pierce, kahman, abercrombie, selina},
 			script.EventTalked:     {kahman, abercrombie, selina},
-			script.EventMyDying: {
-				21508, 21509, 21510, 21511, 21512, 21513, 21514, 21515, 21516, 21517,
-			},
+			script.EventMyDying:    slices.Sorted(maps.Keys(chances())),
 		},
 		Hooks: script.Hooks{
 			OnEvent: onAdvEvent, OnFirstTalk: onFirstTalk, OnTalk: onTalk, OnMyDying: onMyDying,

@@ -1,6 +1,8 @@
 package bingo
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -106,10 +108,7 @@ func Q384() script.Script {
 		Bind: script.Bindings{
 			script.EventQuestStart: {cliff},
 			script.EventTalked:     {cliff, baxt},
-			script.EventMyDying: {
-				20947, 20948, 20945, 20946, 20635, 20773, 20774, 20760, 20758, 20759, 20242, 20281, 20556,
-				20668, 20241, 20286, 20949, 20950, 20942, 20943, 20944, 20559, 20243, 20282, 20677, 20605,
-			},
+			script.EventMyDying:    slices.Sorted(maps.Keys(q384Chances())),
 		},
 		Hooks: script.Hooks{OnEvent: q384Event, OnTalk: q384Talk, OnMyDying: q384Dying},
 	}

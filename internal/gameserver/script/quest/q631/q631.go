@@ -20,9 +20,12 @@ const tunatun = 31537
 // Items.
 const topQualityMeat = 7546
 
+// reward is an item and the count of it one choice gives.
+type reward struct{ itemID, count int32 }
+
 // rewards returns the scroll and its count the page picks by index.
-func rewards() [][2]int32 {
-	return [][2]int32{
+func rewards() []reward {
+	return []reward{
 		{4039, 15},
 		{4043, 15},
 		{4044, 15},
@@ -133,8 +136,8 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			if err != nil {
 				panic(err)
 			}
-			reward := rewards()[index]
-			s.RewardItems(e.Player, reward[0], reward[1])
+			r := rewards()[index]
+			s.RewardItems(e.Player, r.itemID, r.count)
 
 			s.PlaySound(e.Player, script.SoundFinish)
 			st.Exit(true)

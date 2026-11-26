@@ -289,7 +289,7 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	l.broadcastLiveWaitType(live, stand)
 	if !stand {
 		// The sit request runs on live's queue.
-		live.NotifyTutorialOnQueue(player.TutorialSat)
+		live.NotifyTutorialOnQueue(player.TutorialClientEvent(player.TutorialSitID))
 	}
 	return true
 }

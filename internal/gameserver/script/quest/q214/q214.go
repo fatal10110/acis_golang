@@ -619,50 +619,58 @@ func onMyDying(s *script.Script, e script.MyDying) {
 			st.SetCond(12)
 		}
 	case shackle1, shackle2:
-		if st.Cond() == 16 && s.DropItems(p, shackleScalp, 1, 2, 500000) {
-			if p.ItemCount(monsterEyeDestroyerSkin) == 5 && p.ItemCount(shamanNecklace) == 5 {
-				st.SetCond(17)
-			}
+		if st.Cond() == 16 && s.DropItems(p, shackleScalp, 1, 2, 500000) && othersCollected(p, orcGoals(), shackleScalp) {
+			st.SetCond(17)
 		}
 	case monsterEyeDestroyer:
-		if st.Cond() == 16 && s.DropItems(p, monsterEyeDestroyerSkin, 1, 5, 500000) {
-			if p.ItemCount(shackleScalp) == 2 && p.ItemCount(shamanNecklace) == 5 {
-				st.SetCond(17)
-			}
+		if st.Cond() == 16 && s.DropItems(p, monsterEyeDestroyerSkin, 1, 5, 500000) && othersCollected(p, orcGoals(), monsterEyeDestroyerSkin) {
+			st.SetCond(17)
 		}
 	case brekaOrcShaman:
-		if st.Cond() == 16 && s.DropItems(p, shamanNecklace, 1, 5, 500000) {
-			if p.ItemCount(shackleScalp) == 2 && p.ItemCount(monsterEyeDestroyerSkin) == 5 {
-				st.SetCond(17)
-			}
+		if st.Cond() == 16 && s.DropItems(p, shamanNecklace, 1, 5, 500000) && othersCollected(p, orcGoals(), shamanNecklace) {
+			st.SetCond(17)
 		}
 	case grandis:
 		if p.HasItem(triffRing) {
 			s.DropItems(p, scriptureChapter3, 1, 1, 300000)
 		}
 	case medusa:
-		if st.Cond() == 28 && s.DropItemsAlways(p, medusaBlood, 1, 12) {
-			if p.ItemCount(ghoulSkin) == 10 && p.ItemCount(fetteredSoulIchor) == 5 && p.ItemCount(enchantedGargoyleNail) == 5 {
-				st.SetCond(29)
-			}
+		if st.Cond() == 28 && s.DropItemsAlways(p, medusaBlood, 1, 12) && othersCollected(p, undeadGoals(), medusaBlood) {
+			st.SetCond(29)
 		}
 	case ghoul:
-		if st.Cond() == 28 && s.DropItemsAlways(p, ghoulSkin, 1, 10) {
-			if p.ItemCount(medusaBlood) == 12 && p.ItemCount(fetteredSoulIchor) == 5 && p.ItemCount(enchantedGargoyleNail) == 5 {
-				st.SetCond(29)
-			}
+		if st.Cond() == 28 && s.DropItemsAlways(p, ghoulSkin, 1, 10) && othersCollected(p, undeadGoals(), ghoulSkin) {
+			st.SetCond(29)
 		}
 	case fetteredSoul:
-		if st.Cond() == 28 && s.DropItemsAlways(p, fetteredSoulIchor, 1, 5) {
-			if p.ItemCount(medusaBlood) == 12 && p.ItemCount(ghoulSkin) == 10 && p.ItemCount(enchantedGargoyleNail) == 5 {
-				st.SetCond(29)
-			}
+		if st.Cond() == 28 && s.DropItemsAlways(p, fetteredSoulIchor, 1, 5) && othersCollected(p, undeadGoals(), fetteredSoulIchor) {
+			st.SetCond(29)
 		}
 	case enchantedGargoyle:
-		if st.Cond() == 28 && s.DropItemsAlways(p, enchantedGargoyleNail, 1, 5) {
-			if p.ItemCount(medusaBlood) == 12 && p.ItemCount(ghoulSkin) == 10 && p.ItemCount(fetteredSoulIchor) == 5 {
-				st.SetCond(29)
-			}
+		if st.Cond() == 28 && s.DropItemsAlways(p, enchantedGargoyleNail, 1, 5) && othersCollected(p, undeadGoals(), enchantedGargoyleNail) {
+			st.SetCond(29)
 		}
 	}
+}
+
+// itemGoal is a quest item and the count a collecting cond needs of it.
+type itemGoal struct{ item, count int32 }
+
+func orcGoals() []itemGoal {
+	return []itemGoal{{monsterEyeDestroyerSkin, 5}, {shamanNecklace, 5}, {shackleScalp, 2}}
+}
+
+func undeadGoals() []itemGoal {
+	return []itemGoal{{ghoulSkin, 10}, {fetteredSoulIchor, 5}, {enchantedGargoyleNail, 5}, {medusaBlood, 12}}
+}
+
+// othersCollected reports whether p holds exactly the goal count of every
+// item of goals except dropped, the item the kill just dropped.
+func othersCollected(p *script.Player, goals []itemGoal, dropped int32) bool {
+	for _, g := range goals {
+		if g.item != dropped && p.ItemCount(g.item) != g.count {
+			return false
+		}
+	}
+	return true
 }

@@ -225,6 +225,10 @@ func onTimer(s *script.Script, e script.Timer) string {
 	return ""
 }
 
+// sitEvent is the client event of sitting down: the low-HP step enables it
+// and keeps it in the "sit" variable until the player sits.
+const sitEvent = player.TutorialSitID
+
 // eventNumber reads the number after an event's two-letter prefix; ok is
 // false, and the event does nothing more, when it is not a 32-bit integer.
 func eventNumber(event string) (n int64, ok bool) {
@@ -422,9 +426,9 @@ func clientEvent(s *script.Script, st *script.QuestState, p *script.Player, clas
 	case 45:
 		if level < 6 && st.GetInt("HP") == 0 {
 			setInt(st, "HP", 1)
-			setInt(st, "sit", 8388608)
+			setInt(st, "sit", sitEvent)
 			p.ShowQuestionMark(10)
-			p.EnableTutorialEvent(8388608)
+			p.EnableTutorialEvent(sitEvent)
 			s.PlaySound(p, script.SoundTutorial)
 			p.PlayTutorialVoice("tutorial_voice_017")
 		}
@@ -448,8 +452,8 @@ func clientEvent(s *script.Script, st *script.QuestState, p *script.Player, clas
 			s.PlaySound(p, script.SoundTutorial)
 			p.PlayTutorialVoice("tutorial_voice_013")
 		}
-	case 8388608:
-		if level < 6 && st.GetInt("sit") == 8388608 {
+	case sitEvent:
+		if level < 6 && st.GetInt("sit") == sitEvent {
 			setInt(st, "sit", 1)
 			p.EnableTutorialEvent(0)
 			s.PlaySound(p, script.SoundTutorial)
