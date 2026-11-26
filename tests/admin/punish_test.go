@@ -129,21 +129,16 @@ func storedPunishment(t *testing.T, srv *gameservertest.Server, objID int32) (le
 	return level, timer
 }
 
-// waitPunishment waits for objID's stored punishment level to become
-// level, and returns the stored timer.
+// waitPunishment requires objID's stored punishment level to be level once
+// the handled commands have settled, and returns the stored timer.
 func waitPunishment(t *testing.T, srv *gameservertest.Server, objID int32, level int) int64 {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		got, timer := storedPunishment(t, srv, objID)
-		if got == level {
-			return timer
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("stored punishment of %d = %d, want %d", objID, got, level)
-		}
-		time.Sleep(accessPollPeriod)
+	srv.Settle(t)
+	got, timer := storedPunishment(t, srv, objID)
+	if got != level {
+		t.Fatalf("stored punishment of %d = %d, want %d", objID, got, level)
 	}
+	return timer
 }
 
 // storedPosition reads objID's stored position.

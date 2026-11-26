@@ -151,25 +151,25 @@ func encodeTradeRequest(objectID int32) []byte {
 	return w.Bytes()
 }
 
-// storedAccessLevel waits for objID's stored access level to become want.
+// storedAccessLevel requires objID's stored access level to be want once the
+// handled commands have settled and their writes have landed.
 func storedAccessLevel(t *testing.T, srv *gameservertest.Server, objID int32, want int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	srv.Settle(t)
+	srv.FlushPersistence(t)
 	var got int
-	for time.Now().Before(deadline) {
-		if err := srv.DB.QueryRowContext(context.Background(), "SELECT accesslevel FROM characters WHERE obj_Id = ?", objID).Scan(&got); err != nil {
-			t.Fatalf("read access level: %v", err)
-		}
-		if got == want {
-			return
-		}
-		time.Sleep(accessPollPeriod)
+	if err := srv.DB.QueryRowContext(context.Background(), "SELECT accesslevel FROM characters WHERE obj_Id = ?", objID).Scan(&got); err != nil {
+		t.Fatalf("read access level: %v", err)
 	}
-	t.Fatalf("stored access level of %d = %d, want %d", objID, got, want)
+	if got != want {
+		t.Fatalf("stored access level of %d = %d, want %d", objID, got, want)
+	}
 }
 
 // accountAccessLevel waits for the login server's access level of account
-// to become want.
+// to become want: the change travels over the game server's link to the login
+// server, which writes it on its own goroutine, so there is no game-server
+// side point to settle on.
 func accountAccessLevel(t *testing.T, srv *gameservertest.Server, account string, want int) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -186,17 +186,14 @@ func accountAccessLevel(t *testing.T, srv *gameservertest.Server, account string
 	t.Fatalf("account %s access level = %d, want %d", account, got, want)
 }
 
-// leftWorld waits for the player called name to leave the world.
+// leftWorld requires the player called name to have left the world once the
+// handled commands have settled.
 func leftWorld(t *testing.T, srv *gameservertest.Server, name string) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, ok := srv.State.PlayerByName(name); !ok {
-			return
-		}
-		time.Sleep(accessPollPeriod)
+	srv.Settle(t)
+	if _, ok := srv.State.PlayerByName(name); ok {
+		t.Fatalf("%s still in the world", name)
 	}
-	t.Fatalf("%s still in the world", name)
 }
 
 func seedAccount(t *testing.T, srv *gameservertest.Server, login string) {

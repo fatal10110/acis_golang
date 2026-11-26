@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -288,20 +287,15 @@ func enterChief(t *testing.T, srv *gameservertest.Server) *testsupport.ScriptedC
 	return c
 }
 
-// clanReputation reads clan 7001's stored reputation score, waiting for
-// the write to land.
+// clanReputation requires clan 7001's stored reputation score to be want once
+// the handled packets have settled and the clan write has landed.
 func clanReputation(t *testing.T, srv *gameservertest.Server, want int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	srv.Settle(t)
+	srv.FlushPersistence(t)
 	var got int
-	for {
-		if err := srv.DB.QueryRow(`SELECT reputation_score FROM clan_data WHERE clan_id = 7001`).Scan(&got); err != nil {
-			t.Fatal(err)
-		}
-		if got == want || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
+	if err := srv.DB.QueryRow(`SELECT reputation_score FROM clan_data WHERE clan_id = 7001`).Scan(&got); err != nil {
+		t.Fatal(err)
 	}
 	if got != want {
 		t.Fatalf("stored reputation = %d, want %d", got, want)
