@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: Player.restore (Player.java:4144-4150) relinks a pet still in
@@ -20,7 +21,7 @@ import (
 // world and everything its departure queued has run.
 func (o *offlinePetWorld) selectAndDrop(t *testing.T) {
 	t.Helper()
-	o.client.Send(encodeRequestGameStart(0))
+	o.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, o.client, serverpackets.OpcodeCharSelected, "CharSelected")
 	// The selection registers the player only after it sends CharSelected:
 	// wait for it to finish, or the wait below could pass before the player

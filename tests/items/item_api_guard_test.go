@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const (
@@ -181,7 +182,7 @@ func TestItemAPILoginWaitsOutAnOfflineEdit(t *testing.T) {
 	}()
 	<-entered
 
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	srv.Client.ExpectNoFrame()
 	close(release)
 	got := <-done

@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestEnteringPlayerSeesWalkingFolkMove pins what a player coming to know a
@@ -29,7 +30,7 @@ func TestEnteringPlayerSeesWalkingFolkMove(t *testing.T) {
 
 	w.srv.SeedCharacterFor(t, "player2", "Arriving", playerLevel, 0)
 	c := w.srv.DialClient(t, "player2", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	for frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = c.Read() {
 	}
 	frames := enterWorld(t, w.srv, c)
@@ -61,7 +62,7 @@ func TestEnteringPlayerSeesStandingFolkInfoOnly(t *testing.T) {
 
 	w.srv.SeedCharacterFor(t, "player2", "Arriving", playerLevel, 0)
 	c := w.srv.DialClient(t, "player2", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	for frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = c.Read() {
 	}
 	frames := enterWorld(t, w.srv, c)

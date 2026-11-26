@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/rs/zerolog"
 )
 
@@ -157,7 +158,7 @@ func TestGameStartShowsValidationWinnerSky(t *testing.T) {
 		}),
 	)
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if got, want := c.Read(), []byte{serverpackets.OpcodeSSQInfo, 0x01, 0x01}; !bytes.Equal(got, want) {
 		t.Fatalf("game start SSQInfo = % x, want % x (dusk sky 257)", got, want)
 	}

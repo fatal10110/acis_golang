@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // partyRange is the party range the harness configures the helpers with.
@@ -153,9 +154,9 @@ func partyPair(t *testing.T, leaderCond, mateCond string, opts ...gameservertest
 	}
 	enterWorld(t, srv)
 	mateClient = srv.DialClient(t, "mate", 1)
-	mateClient.Send(encodeRequestGameStart(0))
+	mateClient.Send(clientwire.RequestGameStart(0))
 	readUntil(t, mateClient, serverpackets.OpcodeCharSelected)
-	mateClient.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	mateClient.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, mateClient)
 	srv.ReadQueued(t, srv.Client)
 
@@ -274,9 +275,9 @@ func TestClanLeaderLookups(t *testing.T) {
 	})
 
 	chiefClient := srv.DialClient(t, "chief", 1)
-	chiefClient.Send(encodeRequestGameStart(0))
+	chiefClient.Send(clientwire.RequestGameStart(0))
 	readUntil(t, chiefClient, serverpackets.OpcodeCharSelected)
-	chiefClient.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	chiefClient.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, chiefClient)
 
 	run(t, srv, member, func(sc *script.Script, p *script.Player) {

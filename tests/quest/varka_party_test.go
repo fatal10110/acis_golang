@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/ketravarka"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // What the Slay the Enemy Commander (Q608) and Alliance with Ketra Orcs
@@ -78,9 +79,9 @@ func formParty(t *testing.T, srv *gameservertest.Server, leaderName string, mate
 	clients = map[int32]*testsupport.ScriptedClient{leader: srv.Client}
 	for _, m := range mates {
 		c := srv.DialClient(t, m.account, 1)
-		c.Send(encodeRequestGameStart(0))
+		c.Send(clientwire.RequestGameStart(0))
 		readUntil(t, c, serverpackets.OpcodeCharSelected)
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 		srv.ReadQueued(t, c)
 		srv.ReadQueued(t, srv.Client)
 		srv.Client.Send(encodeJoinParty(m.name))

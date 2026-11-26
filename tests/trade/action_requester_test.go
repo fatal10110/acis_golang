@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestActionRefusedWhileHoldingRequest pins Action.runImpl
@@ -45,7 +46,7 @@ func clickOpcodes(t *testing.T, c *testsupport.ScriptedClient, objectID int32) [
 	t.Helper()
 	frames := testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(encodeAction(objectID))
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList)
 	got := make([]byte, 0, len(frames))
 	for _, frame := range frames {
@@ -59,6 +60,6 @@ func clickOpcodes(t *testing.T, c *testsupport.ScriptedClient, objectID int32) [
 func syncTrader(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	testsupport.SyncBarrierFrames(t, c, func() {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList)
 }

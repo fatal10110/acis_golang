@@ -27,6 +27,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
@@ -316,7 +317,7 @@ func (w *q635World) arrive(t *testing.T) [][]byte {
 		if id == w.ids["Leader"] {
 			leader = frames
 		}
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 		w.srv.ReadQueued(t, c)
 	}
 	return leader

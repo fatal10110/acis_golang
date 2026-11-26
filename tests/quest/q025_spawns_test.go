@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q025"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Hiding Behind the Truth's Triol's pawn and coffin (Q025_HidingBehindTheTruth
@@ -257,9 +258,9 @@ func TestQ025TriolsPawnAnswersOnlyItsPlayer(t *testing.T) {
 		journalRow{mate, q025Name, "state", val("8")},
 		journalRow{mate, q025Name, "bookshelf", val("31533")})
 	c := srv.DialClient(t, "mate", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, c)
 	srv.ReadQueued(t, srv.Client)
 	w.roles[mate] = "mate"

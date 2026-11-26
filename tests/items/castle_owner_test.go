@@ -19,6 +19,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -119,8 +120,8 @@ func (w *castleWorld) enter(t *testing.T) {
 	enterAsClanMember(w.leader)
 	drainUntilQuiet(t, w.leader)
 	w.gm = w.srv.DialClient(t, "gm", 1)
-	w.gm.Send(encodeRequestGameStart(0))
-	w.gm.Send(encodeEnterWorld())
+	w.gm.Send(clientwire.RequestGameStart(0))
+	w.gm.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, w.gm)
 	w.gm.Send(encodeAction(w.leaderID, 0, 0, 0, false))
 	drainUntilQuiet(t, w.gm)

@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTutorialDeathMarkOnTheLoadingScreenShownInTheBurst: a restored lethal
@@ -74,14 +75,14 @@ func TestTutorialDeathMarkOnTheLoadingScreenShownInTheBurst(t *testing.T) {
 	}
 
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
 	srv.Advance(t, killingDue)
 	if queued := c.ReadQueued(); len(queued) != 0 {
 		t.Fatalf("frame %#x sent on the loading screen, want nothing before the EnterWorld burst", queued[0][0])
 	}
 
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	frames := srv.ReadQueued(t, c)
 	if got := heard.take(); !slices.Contains(got, "CE30") {
 		t.Fatalf("tutorial heard %q, want its death event CE30", got)

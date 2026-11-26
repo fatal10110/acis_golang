@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // lowHPSkill is the one skill a low-HP order case casts.
@@ -271,12 +272,12 @@ func TestTutorialLowHPAtRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	selection := srv.ReadQueued(t, c)
 	if got := tutorialFrames(selection); len(got) != 0 {
 		t.Fatalf("selection sent tutorial frames %x, want none", got)
 	}
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	burst := srv.ReadQueued(t, c)
 	if got := srv.QuestVars(t, objID, tutorial); got["HP"] != "1" || got["sit"] != "8388608" {
 		t.Fatalf("tutorial after entering = %v, want HP 1 and sit 8388608", got)

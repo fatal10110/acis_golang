@@ -10,6 +10,7 @@ import (
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestScheduledSaveHoldsNoQueue holds the Seven Signs status table under a
@@ -55,7 +56,7 @@ func TestScheduledSaveHoldsNoQueue(t *testing.T) {
 	// The start runs on the test goroutine: were the save made on the
 	// schedule's queue, this would wait on the lock.
 	srv.ScheduleClock.Advance(hour.Sub(srv.ScheduleClock.Now()))
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, srv.Client, serverpackets.OpcodeCharSelected)
 	var held string
 	if err := lock.QueryRowContext(ctx, `SELECT active_period FROM seven_signs_status WHERE id = 0`).Scan(&held); err != nil {

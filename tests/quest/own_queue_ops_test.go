@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const (
@@ -303,9 +304,9 @@ func TestTutorialEventsOfThePlayersOwnActionsRunOnItsQueue(t *testing.T) {
 		}
 	}
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	expect("entry", "UC", srv.ReadQueued(t, c))
 
 	c.Send(encodeTutorialString(clientpackets.OpcodeRequestTutorialPassCmdToServer, "go"))

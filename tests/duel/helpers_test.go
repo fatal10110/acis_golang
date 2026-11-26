@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // player is one dialed client and its character.
@@ -135,16 +136,6 @@ func (a *arena) party(t *testing.T, from, to int) {
 	a.quiet(t)
 }
 
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
 func encodeDuelStart(name string, party bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
 	w.WriteUint16(clientpackets.OpcodeRequestDuelStart)
@@ -200,7 +191,7 @@ func encodeChangePartyLeader(name string) []byte {
 
 func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
 	}

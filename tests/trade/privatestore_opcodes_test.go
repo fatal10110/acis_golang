@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestBuyStoreManageAndQuitRequests drives the two buy-store requests that
@@ -19,7 +20,7 @@ func TestBuyStoreManageAndQuitRequests(t *testing.T) {
 	h := bootTraders(t)
 	h.enterAll(t)
 
-	h.first.Send(encodeSingleOpcode(clientpackets.OpcodeRequestPrivateStoreManageBuy))
+	h.first.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestPrivateStoreManageBuy))
 	h.srv.Settle(t)
 	owner := drainFrames(t, h.first)
 	if len(framesWith(owner, serverpackets.OpcodePrivateStoreManageListBuy)) != 1 {
@@ -30,7 +31,7 @@ func TestBuyStoreManageAndQuitRequests(t *testing.T) {
 	}
 	drainFrames(t, h.second)
 
-	h.first.Send(encodeSingleOpcode(clientpackets.OpcodeRequestPrivateStoreQuitBuy))
+	h.first.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestPrivateStoreQuitBuy))
 	h.srv.Settle(t)
 	if got := h.srv.PlayerOperateType(t, h.firstID); got != privatestore.OperateNone {
 		t.Fatalf("operate type after quitting = %d, want none", got)
@@ -69,13 +70,13 @@ func TestRecipeShopManagePrevRequest(t *testing.T) {
 	h := bootTraders(t)
 	h.enterAll(t)
 
-	h.first.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRecipeShopManagePrev))
+	h.first.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRecipeShopManagePrev))
 	assertSilent(t, h.first, "preview without a target")
 
 	h.first.Send(encodeAction(h.secondID))
 	h.srv.Settle(t)
 	drainFrames(t, h.first)
-	h.first.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRecipeShopManagePrev))
+	h.first.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRecipeShopManagePrev))
 	frame := h.first.Read()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeRecipeShopSellList, "preview of an empty workshop")
 	r := wire.NewReader(frame[1:])

@@ -17,6 +17,7 @@ import (
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
@@ -218,9 +219,9 @@ func enterSecondPlayer(t *testing.T, srv *gameservertest.Server, name string) (i
 	t.Helper()
 	id := srv.SeedCharacterFor(t, strings.ToLower(name), name, 20, 0).ID
 	c := srv.DialClient(t, strings.ToLower(name), 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, c)
 	srv.ReadQueued(t, srv.Client)
 	return id, c

@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // replayBuffID is a ten-minute stacked self buff with an icon, saved on the
@@ -72,7 +73,7 @@ func TestSubclassSwitchAnnouncesTheReplayedEffects(t *testing.T) {
 	// The login replay of the same buff sends no felt message.
 	w.c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
 	drainFrames(t, w.c)
-	w.c.Send(encodeRequestGameStart(0))
+	w.c.Send(clientwire.RequestGameStart(0))
 	if reply := w.c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
 	}

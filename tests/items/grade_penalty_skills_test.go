@@ -13,6 +13,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // A D-grade weapon carrying an item skill, worn by a character whose
@@ -126,7 +127,7 @@ func TestAugmentedOverGradeWeaponSurvivesRelog(t *testing.T) {
 		t.Fatalf("max HP wearing the weapon above Expertise = %d, want %d", got, want)
 	}
 
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	for srv.Client.Read()[0] != serverpackets.OpcodeLeaveWorld {
 	}
 	srv.Client.ExpectClosed()

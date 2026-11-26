@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q403"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Path to a Rogue (Q403_PathToARogue.onAttacked, onMyDying): a skeleton hit
@@ -76,9 +77,9 @@ func q403SharedKill(t *testing.T, strikers []bool) (*gameservertest.Server, int3
 	enterWorld(t, srv)
 	if len(strikers) > 0 && containsTrue(strikers) {
 		mate := srv.DialClient(t, "mate", 1)
-		mate.Send(encodeRequestGameStart(0))
+		mate.Send(clientwire.RequestGameStart(0))
 		readUntil(t, mate, serverpackets.OpcodeCharSelected)
-		mate.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+		mate.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 		srv.ReadQueued(t, mate)
 		srv.ReadQueued(t, srv.Client)
 	}

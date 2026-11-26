@@ -11,6 +11,7 @@ import (
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -67,8 +68,8 @@ func bootHallExpRestarter(t *testing.T, castleID, restoreLevel int) (*gameserver
 		}),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
-	c.Send(encodeRequestGameStart(0))
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.RequestGameStart(0))
+	c.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, c)
 	if !srv.PlayerDead(t, objID) {
 		t.Fatal("restarter logged in alive")
@@ -110,7 +111,7 @@ func TestRestartToClanHallRestoresExp(t *testing.T) {
 			if srv.PlayerDead(t, objID) {
 				t.Fatal("player still dead after the restart")
 			}
-			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+			c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 			drainUntilQuiet(t, c)
 			exp, before := persistedExp(t, srv, c, objID)
 			if exp != tt.wantExp {

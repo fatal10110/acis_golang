@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -563,7 +564,7 @@ func TestSubclassRestartKeepsPlayingTheSubclass(t *testing.T) {
 	}
 
 	// Selecting it plays the subclass again, with its skills.
-	w.c.Send(encodeRequestGameStart(0))
+	w.c.Send(clientwire.RequestGameStart(0))
 	if reply := w.c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
 	}

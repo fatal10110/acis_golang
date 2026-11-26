@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -125,8 +126,8 @@ func bootRestarter(t *testing.T, r restarter) (*gameservertest.Server, int32) {
 		}),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
-	c.Send(encodeRequestGameStart(0))
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.RequestGameStart(0))
+	c.Send(clientwire.EnterWorld())
 	return srv, objID
 }
 
@@ -308,7 +309,7 @@ var jailPoint = location.Location{X: -114356, Y: -249645, Z: -2984}
 // the teleport the restart and movement requests wait on.
 func appearInJail(t *testing.T, c *scriptedClient) {
 	t.Helper()
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	drainUntilQuiet(t, c)
 }
 

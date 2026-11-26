@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: WarehouseKeeper.onBypassFeedback (WarehouseKeeper.java:48-175):
@@ -88,7 +89,7 @@ func bootKeeper(t *testing.T, adena int32, stacks [][2]int32, extra ...gameserve
 // opens the page admitting every dialog command.
 func (w *whWorld) enter(t *testing.T) {
 	t.Helper()
-	w.c.Send(encodeRequestGameStart(0))
+	w.c.Send(clientwire.RequestGameStart(0))
 	enterFrom(t, w.srv, w.c)
 	x, y, z := w.srv.PlayerPosition(t, w.player)
 	w.at.X, w.at.Y, w.at.Z = x, y, z
@@ -657,7 +658,7 @@ func (w *freightWorld) loginReceiver(t *testing.T) *whWorld {
 	}
 	slot := slices.IndexFunc(chars, func(ch *player.Character) bool { return ch.ID == w.receiver.ID })
 	rw := &whWorld{folkWorld: &folkWorld{srv: w.srv, c: c, player: w.receiver.ID}, items: map[int32]int32{}}
-	c.Send(encodeRequestGameStart(int32(slot)))
+	c.Send(clientwire.RequestGameStart(int32(slot)))
 	enterFrom(t, w.srv, c)
 	x, y, z := w.srv.PlayerPosition(t, rw.player)
 	rw.at.X, rw.at.Y, rw.at.Z = x, y, z
@@ -756,7 +757,7 @@ func TestSelectionWaitsForAccountSessionToLeave(t *testing.T) {
 		t.Fatalf("list characters: %v", err)
 	}
 	slot := int32(slices.IndexFunc(chars, func(ch *player.Character) bool { return ch.ID == w.receiver.ID }))
-	c.Send(encodeRequestGameStart(slot))
+	c.Send(clientwire.RequestGameStart(slot))
 	// The sender's queue is held, so Settle would wait on it; the selection
 	// itself runs on the connection, and once it is handled its answer, if
 	// any, is already on the way.
@@ -769,7 +770,7 @@ func TestSelectionWaitsForAccountSessionToLeave(t *testing.T) {
 		_, ok := w.srv.State.Player(w.player)
 		return !ok
 	})
-	c.Send(encodeRequestGameStart(slot))
+	c.Send(clientwire.RequestGameStart(slot))
 	enterFrom(t, w.srv, c)
 	if _, ok := w.srv.State.Player(w.receiver.ID); !ok {
 		t.Fatal("receiver not in the world after its selection")

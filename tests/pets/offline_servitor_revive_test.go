@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: Player.deleteMe (Player.java:6281-6292) calls Summon.unSummon,
@@ -69,7 +70,7 @@ func leaveServitorDead(t *testing.T) *leftServitor {
 	servitor := o.summonServitor(t)
 	drainUntilQuiet(t, healerClient)
 	o.killServitor(t, servitor)
-	o.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	o.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, o.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if !servitor.OwnerLeft() {
 		t.Fatal("dead servitor does not answer to the session that left it")
@@ -85,9 +86,9 @@ func leaveServitorDead(t *testing.T) *leftServitor {
 // returns every frame of its EnterWorld burst.
 func (l *leftServitor) relogIn(t *testing.T) [][]byte {
 	t.Helper()
-	l.client.Send(encodeRequestGameStart(0))
+	l.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, l.client, serverpackets.OpcodeCharSelected, "CharSelected")
-	l.client.Send(encodeEnterWorld())
+	l.client.Send(clientwire.EnterWorld())
 	frames := readUntilOpcode(t, l.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	return append(frames, drainFrames(t, l.client)...)
 }

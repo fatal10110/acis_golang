@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestPlayerTeleportDropsItsThreatInNearbyHostiles pins reward attribution
@@ -38,7 +39,7 @@ func TestPlayerTeleportDropsItsThreatInNearbyHostiles(t *testing.T) {
 	joinBystander(t, srv)
 	player.TeleportTo(hostileX+300, hostileY, hostileZ, 0)
 	readUntil(t, srv.Client, serverpackets.OpcodeTeleportToLocation, "TeleportToLocation")
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	readUntil(t, srv.Client, serverpackets.OpcodeUserInfo, "Appearing UserInfo")
 	if !monster.Knows(player) {
 		t.Fatal("player out of the monster's sight after the teleport; the case needs it still known")

@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/rs/zerolog"
 )
 
@@ -217,7 +218,7 @@ func bootLife(t *testing.T, extra ...gameservertest.Option) *lifeWorld {
 	srv := gameservertest.Boot(t, opts...)
 	w := &lifeWorld{srv: srv, log: log, player: srv.SoleObjectID(t)}
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	w.burst = enterWorld(t, srv, c)

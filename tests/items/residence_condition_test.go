@@ -12,6 +12,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -84,8 +85,8 @@ func bootResidenceItems(t *testing.T, clan *residenceClan) *gameservertest.Serve
 // enterAsClanMember enters the world without pinning the burst, which a
 // clan member's pledge packets lengthen.
 func enterAsClanMember(c *testsupport.ScriptedClient) {
-	c.Send(encodeRequestGameStart(0))
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.RequestGameStart(0))
+	c.Send(clientwire.EnterWorld())
 }
 
 // TestResidenceItemConditionsGateEquip pins the item <cond> clan

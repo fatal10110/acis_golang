@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference for the tests below (#3069): a pet collar passes SummonItems'
@@ -133,7 +134,7 @@ func TestHeldCollarDroppedByTeleport(t *testing.T) {
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	h.character(t).TeleportTo(x+300, y, z, 0)
 	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner TeleportToLocation")
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	h.srv.SettlePosture(t, h.ownerID)
 	for _, frame := range drainFrames(t, h.client) {
 		if frame[0] == serverpackets.OpcodeMagicSkillUse {

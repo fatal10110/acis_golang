@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
@@ -125,8 +126,8 @@ func TestSoulshotPackageConditionGatesAICast(t *testing.T) {
 			tt.fill(t, srv, objID)
 			// An overloaded character's EnterWorld burst carries extra
 			// weight-penalty packets, so drain it rather than pin it.
-			c.Send(encodeRequestGameStart(0))
-			c.Send(encodeEnterWorld())
+			c.Send(clientwire.RequestGameStart(0))
+			c.Send(clientwire.EnterWorld())
 			drainUntilQuiet(t, c)
 
 			c.Send(encodeUseItem(pkg, false))

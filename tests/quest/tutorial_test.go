@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const tutorial = "Tutorial"
@@ -237,9 +238,9 @@ func TestTutorialHearsEnterWorldLastInTheBurst(t *testing.T) {
 	t.Parallel()
 	srv, _, heard := bootTutorial(t, true)
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	burst := srv.ReadQueued(t, c)
 	last := slices.IndexFunc(burst, func(f []byte) bool { return f[0] == serverpackets.OpcodeTutorialShowQuestionMark })
 	if last < 0 || last+2 != len(burst) {
@@ -427,7 +428,7 @@ func TestMemosSurviveRelog(t *testing.T) {
 func TestMemoLoadFailureRefusesSelection(t *testing.T) {
 	t.Parallel()
 	srv, objID, _ := bootTutorial(t, false, gameservertest.WithMemoLoadFault(errors.New("memos unreadable")))
-	srv.Client.Send(encodeRequestGameStart(0))
+	srv.Client.Send(clientwire.RequestGameStart(0))
 	if frame := srv.Client.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("refused selection: opcode %#x, want CharSelectInfo (%#x)", frame[0], serverpackets.OpcodeCharSelectInfo)
 	}

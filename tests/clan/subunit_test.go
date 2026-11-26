@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // academySeed is the seeded clan's academy, "School".
@@ -303,7 +304,7 @@ func TestLoginListsSubunits(t *testing.T) {
 func TestCaptainOnLoadingScreenIsNotRefreshed(t *testing.T) {
 	w, _ := bootSubunitWorld(t, 1, seedSubunitClan(t))
 	squire := w.srv.DialClient(t, "squire", 1)
-	squire.Send(encodeRequestGameStart(0))
+	squire.Send(clientwire.RequestGameStart(0))
 	if reply := squire.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
 	}

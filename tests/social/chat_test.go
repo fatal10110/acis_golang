@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 	"github.com/rs/zerolog"
 )
 
@@ -399,7 +400,7 @@ func TestChatClan(t *testing.T) {
 	// Alice enters as a clan leader, whose burst carries the clan's own
 	// packets.
 	for _, c := range []*testsupport.ScriptedClient{p.alice, p.bobby} {
-		c.Send(encodeRequestGameStart(0))
+		c.Send(clientwire.RequestGameStart(0))
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
 		drainUntilQuiet(t, c)
 	}

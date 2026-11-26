@@ -9,28 +9,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
-
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
-func encodeEnterWorld() []byte {
-	return wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes()
-}
 
 func encodeLogout() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeLogout).Bytes()
-}
-
-func encodeSingleOpcode(opcode byte) []byte {
-	return wire.NewPacketWriter(opcode).Bytes()
 }
 
 func encodeAction(objectID int32, x, y, z int32, shift bool) []byte {
@@ -113,14 +96,14 @@ func encodeRequestRestartPoint(requestType int32) []byte {
 // flow's frames from a quiet stream.
 func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
 	}
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	readEnterWorldBurst(t, c)
 	drainUntilQuiet(t, c)
 }

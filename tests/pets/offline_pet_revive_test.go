@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference: Resurrect.useSkill's non-player branch (Resurrect.java:43-51)
@@ -78,7 +79,7 @@ func leaveWolfDead(t *testing.T) *offlinePetWorld {
 		t.Fatalf("dead wolf exp %d level %d, want %d at level %d", wolf.Exp(), wolf.Level(), died.After, died.Level)
 	}
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if !wolf.OwnerLeft() {
 		t.Fatal("dead wolf does not answer to the session that left it")
@@ -287,7 +288,7 @@ func TestRelinkedBabyPetKeepsHealing(t *testing.T) {
 	t.Parallel()
 	s := bootBabyPet(t, 0, gameservertest.WithReuseDelays(0, 0))
 	killPet(t, s.petWorld, s.baby)
-	s.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	s.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, s.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 
 	npcResurrect(t, s.srv, s.baby)
@@ -309,9 +310,9 @@ func TestRelinkedBabyPetKeepsHealing(t *testing.T) {
 // returns every frame of its EnterWorld burst.
 func (h *petWorld) relogIn(t *testing.T) [][]byte {
 	t.Helper()
-	h.client.Send(encodeRequestGameStart(0))
+	h.client.Send(clientwire.RequestGameStart(0))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
-	h.client.Send(encodeEnterWorld())
+	h.client.Send(clientwire.EnterWorld())
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
 	return append(frames, drainFrames(t, h.client)...)
 }

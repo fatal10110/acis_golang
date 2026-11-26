@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 const overloadFolkID = 31_888
@@ -29,10 +30,10 @@ func bootOverloaded(t *testing.T) (*gameservertest.Server, *scriptedClient, int3
 	srv.GiveItem(t, objID, 9500, 100_000)
 	// The overload adds its status and band refresh to the world-entry
 	// burst, so the burst is drained rather than matched.
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	drainUntilQuiet(t, c)
 	pc := onlinePlayer(t, srv, objID)
 	if pc.WeightPenalty() != 4 || pc.MoveSpeed() != 0 {
@@ -48,7 +49,7 @@ func assertRefusedApproach(t *testing.T, srv *gameservertest.Server, c *scripted
 	t.Helper()
 	frames := testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(req)
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+		c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList)
 	failed := false
 	for _, frame := range frames {

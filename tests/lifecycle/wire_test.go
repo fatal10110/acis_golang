@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // spawnX/Y/Z is the class template's single spawn point: dropped items land
@@ -19,26 +20,8 @@ const (
 	spawnZ = 30
 )
 
-func encodeRequestGameStart(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(slot)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
-func encodeEnterWorld() []byte {
-	return wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes()
-}
-
-func encodeSingleOpcode(opcode byte) []byte {
-	return wire.NewPacketWriter(opcode).Bytes()
-}
-
 func encodeRequestItemList() []byte {
-	return encodeSingleOpcode(clientpackets.OpcodeRequestItemList)
+	return clientwire.SingleOpcode(clientpackets.OpcodeRequestItemList)
 }
 
 func encodeUseItem(objectID int32, ctrl bool) []byte {
@@ -189,10 +172,10 @@ func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 // flow's frames from a quiet stream.
 func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	frames := readEnterWorldBurst(t, c)
 	drainUntilQuiet(t, c)
 	return frames

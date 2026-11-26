@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestCursedWeaponEndsWhileHolderIsSelected: a holder's weapon whose hunger
@@ -43,7 +44,7 @@ func TestCursedWeaponEndsWhileHolderIsSelected(t *testing.T) {
 	seedHolder(t, srv, id, 61, base.Add(50*time.Hour))
 
 	armed.Store(true)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, mustRead(t, c, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, c, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
 	armed.Store(false)
@@ -55,7 +56,7 @@ func TestCursedWeaponEndsWhileHolderIsSelected(t *testing.T) {
 	}
 	srv.Settle(t)
 	frames := readQuiet(c)
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	frames = append(frames, readUntil(t, c, serverpackets.OpcodeSkillCoolTime, "login burst")...)
 	srv.Settle(t)
 	frames = append(frames, readQuiet(c)...)

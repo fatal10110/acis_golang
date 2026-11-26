@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // enterAfterRestart drives a dead player back into play through a restart
@@ -16,10 +17,10 @@ import (
 func enterAfterRestart(t *testing.T, srv *gameservertest.Server) [][]byte {
 	t.Helper()
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	assertFrameOpcode(t, mustRead(t, c, "SSQInfo"), serverpackets.OpcodeSSQInfo, "SSQInfo")
 	assertFrameOpcode(t, mustRead(t, c, "CharSelected"), serverpackets.OpcodeCharSelected, "CharSelected")
-	c.Send(encodeEnterWorld())
+	c.Send(clientwire.EnterWorld())
 	// With a protection window configured, EnterWorld activates it just
 	// ahead of the spawn, and its status snapshot (UserInfo) goes out there.
 	readProtectedEnterWorldBurst(t, c)
@@ -34,7 +35,7 @@ func enterAfterRestart(t *testing.T, srv *gameservertest.Server) [][]byte {
 		t.Fatalf("restart protection message = %q", got)
 	}
 	assertFrameOpcode(t, mustRead(t, c, "acted UserInfo"), serverpackets.OpcodeUserInfo, "acted UserInfo")
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	assertFrameOpcode(t, mustRead(t, c, "post-teleport UserInfo"), serverpackets.OpcodeUserInfo, "post-teleport UserInfo")
 	return c.ReadQueued()
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTutorialLowHPAtRestoreCountsRestoredBuff: the restored HP is measured
@@ -46,7 +47,7 @@ func TestTutorialLowHPAtRestoreCountsRestoredBuff(t *testing.T) {
 	if got := srv.QuestVars(t, objID, tutorial); got["HP"] != "" {
 		t.Fatalf("tutorial after the first entry = %v, want no HP step yet", got)
 	}
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntil(t, c, serverpackets.OpcodeCharSelectInfo)
 	srv.FlushPersistence(t)
 	saved := (maxHP + 1) / 2
@@ -62,11 +63,11 @@ func TestTutorialLowHPAtRestoreCountsRestoredBuff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if got := tutorialFrames(srv.ReadQueued(t, c)); len(got) != 0 {
 		t.Fatalf("selection sent tutorial frames %x, want none", got)
 	}
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	burst := srv.ReadQueued(t, c)
 	for _, f := range tutorialFrames(burst) {
 		arg := wire.NewReader(f[1:]).ReadInt32()

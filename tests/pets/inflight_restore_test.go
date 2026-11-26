@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestDestroyedCollarIsNotRestoredWhileItsDeleteIsQueued drives the one
@@ -43,7 +44,7 @@ func TestDestroyedCollarIsNotRestoredWhileItsDeleteIsQueued(t *testing.T) {
 	_ = h.srv.ItemInstances.Save(ctx)
 	cancel()
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if !persistedRowExists(t, h, h.collarID) {
 		t.Fatalf("precondition failed: row %d was already deleted, so the queued-delete window never happened", h.collarID)

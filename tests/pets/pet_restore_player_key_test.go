@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestDeadPetItemsSavedUnderOwnerWhileCorpseWaits gives the wolf adena, kills
@@ -20,7 +21,7 @@ func TestDeadPetItemsSavedUnderOwnerWhileCorpseWaits(t *testing.T) {
 	h.giveToPet(t, h.seededItem(t, item.AdenaID), 30)
 	killPet(t, h, wolf)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
 	if got := petItemCount(wolf, item.AdenaID); got != 30 {
 		t.Fatalf("waiting corpse carries %d adena, want 30", got)

@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // striderNPCID is the Wind Strider, a pet a player can ride.
@@ -278,7 +279,7 @@ func TestStriderRiderLogoutStoresFeed(t *testing.T) {
 	h.mountStrider(t, encodeUserCommand(cmdMount))
 	h.advanceTicks(t, 4)
 
-	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	h.client.Send(clientwire.SingleOpcode(clientpackets.OpcodeLogout))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeLeaveWorld, "LeaveWorld")
 	h.srv.AdvanceUntil(t, "owner left world", func() bool {
 		_, ok := h.srv.State.Player(h.ownerID)

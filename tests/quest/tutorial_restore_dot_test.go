@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // TestTutorialLowHPAtRestoreAheadOfLoadingScreenTicks: restoring the saved
@@ -53,12 +54,12 @@ func TestTutorialLowHPAtRestoreAheadOfLoadingScreenTicks(t *testing.T) {
 	}
 
 	c := srv.Client
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	if got := tutorialFrames(srv.ReadQueued(t, c)); len(got) != 0 {
 		t.Fatalf("selection sent tutorial frames %x, want none", got)
 	}
 	srv.Advance(t, 3*time.Second)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	burst := srv.ReadQueued(t, c)
 	if hp, maxHP := srv.PlayerCurrentHP(t, objID), srv.PlayerMaxHP(t, objID); hp >= savedHP || 10*savedHP >= 3*maxHP {
 		t.Fatalf("HP %d of %d after the loading screen, want the poison's ticks under a saved %d below 30%%", hp, maxHP, savedHP)

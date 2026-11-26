@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // manorListFence is a request every in-world client is answered at once:
@@ -77,7 +78,7 @@ func TestRequestNewCharacterAnswersTemplates(t *testing.T) {
 	}
 	srv := gameservertest.Boot(t, gameservertest.WithAccount("creator"), gameservertest.WithCharacter("Creator", 5, 0), gameservertest.WithWantChars(1),
 		gameservertest.WithClassTemplates(roots...))
-	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestNewCharacter))
+	srv.Client.Send(clientwire.SingleOpcode(clientpackets.OpcodeRequestNewCharacter))
 	frame := srv.Client.Read()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeNewCharacterSuccess, "RequestNewCharacter answer")
 	r := wire.NewReader(frame[1:])

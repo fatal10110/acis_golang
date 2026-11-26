@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // The beginner shots RewardNewbieShots hands out.
@@ -279,9 +280,9 @@ func clanOf(t *testing.T, level int) gameservertest.Option {
 func enterChief(t *testing.T, srv *gameservertest.Server) *testsupport.ScriptedClient {
 	t.Helper()
 	c := srv.DialClient(t, "chief", 1)
-	c.Send(encodeRequestGameStart(0))
+	c.Send(clientwire.RequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeEnterWorld))
 	srv.ReadQueued(t, c)
 	srv.ReadQueued(t, srv.Client)
 	return c

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // A stopped cast reaches the AI while it still counts as in flight
@@ -240,7 +241,7 @@ func TestTeleportMidCastActionFailedCounts(t *testing.T) {
 			if string(got) != string(tc.want) {
 				t.Fatalf("teleport mid-cast sent opcodes %x up to TeleportToLocation, want %x", got, tc.want)
 			}
-			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+			c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 			drainUntilQuiet(t, c)
 			assertNoAttackFor(t, srv, c, 2*time.Second, "after the teleport")
 			if pc.CastingNow() {

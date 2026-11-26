@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
 
 // Reference for the tests below (#3069): an ItemSkills cast that is not a
@@ -175,7 +176,7 @@ func TestHeldItemSkillCastDroppedByTeleport(t *testing.T) {
 	if got, want := opcodesOf(jump), []byte{af, af, af, af, af, serverpackets.OpcodeTeleportToLocation}; string(got) != string(want) {
 		t.Fatalf("teleport during the stand-up sent opcodes %x up to TeleportToLocation, want %x", got, want)
 	}
-	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	c.Send(clientwire.SingleOpcode(clientpackets.OpcodeAppearing))
 	srv.SettlePosture(t, objID)
 	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
 		t.Fatal("held item cast started after the teleport")
