@@ -283,7 +283,12 @@ func provideClientLink(
 	roster *loginserver.LinkRoster,
 	log zerolog.Logger,
 ) *loginserver.ClientLink {
-	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
+	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, loginserver.ClientConfig{
+		AutoCreateAccounts: cfg.AutoCreateAccounts,
+		ShowLicence:        cfg.ShowLicence,
+		LoginTryBeforeBan:  cfg.LoginTryBeforeBan,
+		LoginBlockAfterBan: cfg.LoginBlockAfterBan,
+	}, log)
 }
 
 func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, bans *manager.IPBanList, filter *netutil.AcceptFilter, log zerolog.Logger) {

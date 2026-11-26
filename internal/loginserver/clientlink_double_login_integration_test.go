@@ -55,20 +55,13 @@ func newTestLinkPair(t *testing.T, accounts accountStore) (clientAddr string, l 
 	roster := NewLinkRoster()
 
 	gsLink := NewGameServerLink(servers, names, gsKeys, sessions, bans, nil, nil, false, nil, roster, zerolog.Nop())
-	l = &ClientLink{
-		accounts:           accounts,
-		servers:            servers,
-		sessions:           sessions,
-		bans:               bans,
-		roster:             roster,
-		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
-		loginBlockAfterBan: DefaultLoginBlockAfterBan,
-		log:                zerolog.Nop(),
-		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
-		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
-		newSessionID:       func() int32 { return testInitSessionID },
-		handshakeTimeout:   connectionHandshakeTimeout,
-	}
+	l = NewClientLink(accounts, servers, sessions, bans, fixedLoginKey{keyPair}, roster, ClientConfig{
+		ShowLicence:        true,
+		LoginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		LoginBlockAfterBan: DefaultLoginBlockAfterBan,
+	}, zerolog.Nop())
+	l.newSessionKey = func() ([]byte, error) { return testSessionKey, nil }
+	l.newSessionID = func() int32 { return testInitSessionID }
 
 	gsLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -195,9 +188,6 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 	crypt, err := logincrypt.NewLoginCrypt(testSessionKey)
 	if err != nil {
 		t.Fatalf("NewLoginCrypt: %v", err)
-	}
-	if l.holders == nil {
-		l.holders = make(map[string]*clientConn)
 	}
 	l.holders["player1"] = &clientConn{conn: stalled, crypt: crypt}
 	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2}, 1)
