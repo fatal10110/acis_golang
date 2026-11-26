@@ -55,7 +55,7 @@ func TestStateStringNamesEachState(t *testing.T) {
 
 func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	server, client := net.Pipe()
-	conn := newConn(server, zerolog.Nop())
+	conn := newConn(server, zerolog.Nop(), testRejects())
 	t.Cleanup(func() { _ = client.Close() })
 	t.Cleanup(func() { _ = conn.Close() })
 	// Nothing closes this pipe on a missing reply, so a regression must fail
@@ -722,7 +722,7 @@ func benchmarkSession(b *testing.B) *Session {
 	if err != nil {
 		b.Fatalf("NewCipher: %v", err)
 	}
-	conn := newConn(discardConn{}, zerolog.Nop())
+	conn := newConn(discardConn{}, zerolog.Nop(), testRejects())
 	b.Cleanup(func() { conn.Close() })
 	return NewSession(conn, cipher)
 }
@@ -807,7 +807,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 		if err != nil {
 			t.Fatalf("NewCipher: %v", err)
 		}
-		conn := newConn(discardConn{}, zerolog.Nop())
+		conn := newConn(discardConn{}, zerolog.Nop(), testRejects())
 		t.Cleanup(func() { conn.Close() })
 		return NewClient(NewSession(conn, cipher))
 	}
@@ -871,6 +871,8 @@ type retainingReceiver struct {
 
 func (r *retainingReceiver) ObjectID() int32 { return r.id }
 func (*retainingReceiver) Kind() actor.Kind  { return actor.KindPlayer }
+
+func (*retainingReceiver) frameRejects() *frameRejectReporter { return testRejects() }
 
 func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
 	r.mu.Lock()

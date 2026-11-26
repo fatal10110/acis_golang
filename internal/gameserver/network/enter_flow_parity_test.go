@@ -456,7 +456,7 @@ func twoClientServer(t *testing.T) (addr string, chars *gamesql.CharacterStore, 
 // written.
 func TestSessionCloseSendsServerCloseThenCloses(t *testing.T) {
 	client, server := net.Pipe()
-	conn := newConn(server, zerolog.Nop())
+	conn := newConn(server, zerolog.Nop(), testRejects())
 	t.Cleanup(func() { client.Close() })
 	cipher, err := gamecipher.NewCipher(make([]byte, gamecipher.KeySize))
 	if err != nil {

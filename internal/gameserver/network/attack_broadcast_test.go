@@ -3,34 +3,10 @@ package network
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/rs/zerolog"
 )
-
-// captureOutboundRejects points the process-wide reporter at a fresh log for
-// the rest of the test, with its rate limit cleared, and restores it after.
-// It swaps only the atomic log and the mutex-guarded window, so it never
-// races a concurrent reader of outboundRejects.
-func captureOutboundRejects(t *testing.T) *rejectLog {
-	t.Helper()
-	r := &rejectLog{}
-	prevLog := outboundRejects.log.Load()
-	outboundRejects.mu.Lock()
-	prevNext, prevSuppressed := outboundRejects.next, outboundRejects.suppressed
-	outboundRejects.next, outboundRejects.suppressed = time.Time{}, 0
-	outboundRejects.mu.Unlock()
-	outboundRejects.setLog(zerolog.New(r))
-	t.Cleanup(func() {
-		outboundRejects.log.Store(prevLog)
-		outboundRejects.mu.Lock()
-		outboundRejects.next, outboundRejects.suppressed = prevNext, prevSuppressed
-		outboundRejects.mu.Unlock()
-	})
-	return r
-}
 
 // TestBroadcastAttackGoesThroughSharedFanout pins the attack broadcast to the
 // shared fan-out (#1549, #1819): a valid Attack reaches the attacker and each
@@ -39,8 +15,9 @@ func captureOutboundRejects(t *testing.T) *rejectLog {
 // cause and reaches no one, rather than each recipient getting an empty frame.
 func TestBroadcastAttackGoesThroughSharedFanout(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
-		r := captureOutboundRejects(t)
+		r := newRejectLog()
 		f := newDetachFilterFixture(t)
+		f.live.link.rejects = r.reporter
 		snapshot := event.Attack{AttackerID: 1, Hits: []event.AttackHit{{TargetID: 2, Damage: 7}}}
 		f.live.Emit(snapshot)
 
@@ -61,8 +38,9 @@ func TestBroadcastAttackGoesThroughSharedFanout(t *testing.T) {
 	})
 
 	t.Run("invalid", func(t *testing.T) {
-		r := captureOutboundRejects(t)
+		r := newRejectLog()
 		f := newDetachFilterFixture(t)
+		f.live.link.rejects = r.reporter
 		// One hit more than the packet's uint16 extra-hit count can carry.
 		snapshot := event.Attack{AttackerID: 1, Hits: make([]event.AttackHit, 1<<16+1)}
 		cause := serverpackets.FrameAttack(snapshot).Err()

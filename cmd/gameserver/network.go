@@ -162,7 +162,6 @@ func provideGameClientLink(
 	itemLog itemLogger,
 ) (*network.GameClientLink, error) {
 	playerConfig := newPlayerConfig(cfg, gameplay, pvpOptions)
-	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Flow: network.CharacterFlowConfig{
 			Validator:   validator,

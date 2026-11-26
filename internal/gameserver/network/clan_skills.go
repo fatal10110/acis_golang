@@ -94,6 +94,8 @@ func onMemberQueue(actor, member *livePlayer, fn func()) {
 // clan skill changes already posted there; actor's arrive inline.
 type queuedMember struct{ actor, member *livePlayer }
 
+func (q queuedMember) frameRejects() *frameRejectReporter { return q.member.frameRejects() }
+
 func (q queuedMember) BroadcastFrame(frame wire.Frame) bool {
 	if q.member == q.actor {
 		return q.member.SendFrame(frame)

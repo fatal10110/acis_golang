@@ -2,7 +2,6 @@ package network
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,7 +19,7 @@ const frameRejectInterval = time.Minute
 // frame is a server bug — some client misses a packet — so it must be
 // visible, but bounded.
 type frameRejectReporter struct {
-	log atomic.Pointer[zerolog.Logger]
+	log zerolog.Logger
 	now func() time.Time
 
 	mu         sync.Mutex
@@ -28,25 +27,11 @@ type frameRejectReporter struct {
 	suppressed int       // rejections since the last diagnostic, not yet logged
 }
 
-func newFrameRejectReporter(now func() time.Time) *frameRejectReporter {
-	return &frameRejectReporter{now: now}
-}
-
-// outboundRejects is the process-wide reporter every outbound send path
-// reports to. Its log is unset, so diagnostics are dropped, until
-// SetOutboundRejectLog installs one.
-var outboundRejects = newFrameRejectReporter(time.Now)
-
-// SetOutboundRejectLog directs the diagnostics for outbound frames refused
-// before reaching the wire — invalid broadcast sources, too-short frames, and
-// frames carrying an error — to log. The composition root calls it once at
-// boot; until then those diagnostics are dropped.
-func SetOutboundRejectLog(log zerolog.Logger) {
-	outboundRejects.setLog(log)
-}
-
-func (r *frameRejectReporter) setLog(log zerolog.Logger) {
-	r.log.Store(&log)
+// newFrameRejectReporter returns a reporter logging to log, with its own
+// rate-limit window. A game-client link owns one for its broadcasts and a
+// listener one for its connections' sends.
+func newFrameRejectReporter(log zerolog.Logger, now func() time.Time) *frameRejectReporter {
+	return &frameRejectReporter{log: log, now: now}
 }
 
 // report records one refused frame and why. boundary names the send path
@@ -64,8 +49,6 @@ func (r *frameRejectReporter) report(boundary string, cause error) {
 	r.next = now.Add(frameRejectInterval)
 	r.mu.Unlock()
 
-	if log := r.log.Load(); log != nil {
-		log.Error().Err(cause).Str("boundary", boundary).Int("suppressed", suppressed).
-			Msg("outbound frame rejected")
-	}
+	r.log.Error().Err(cause).Str("boundary", boundary).Int("suppressed", suppressed).
+		Msg("outbound frame rejected")
 }

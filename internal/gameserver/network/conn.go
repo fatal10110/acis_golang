@@ -127,11 +127,11 @@ type Conn struct {
 	observePersistWait func(owners []int32) (done func())
 }
 
-func newConn(c net.Conn, log zerolog.Logger) *Conn {
+func newConn(c net.Conn, log zerolog.Logger, rejects *frameRejectReporter) *Conn {
 	conn := &Conn{
 		Conn:     c,
 		log:      log,
-		rejects:  outboundRejects,
+		rejects:  rejects,
 		wake:     make(chan struct{}, 1),
 		stopping: make(chan struct{}),
 		stopped:  make(chan struct{}),

@@ -416,6 +416,9 @@ type GameClientLink struct {
 	summoning        summoning
 	combat           combat
 	log              zerolog.Logger
+	// rejects reports broadcast source frames no recipient copy can be made
+	// of, rate-limited across the whole link.
+	rejects *frameRejectReporter
 
 	// now supplies wall time for packet accounting; nil falls back to
 	// time.Now at the call site. Overridden in tests for deterministic
@@ -920,6 +923,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		summoning:        newSummoning(cfg),
 		combat:           newCombat(cfg),
 		log:              cfg.Log,
+		rejects:          newFrameRejectReporter(cfg.Log, time.Now),
 		now:              cfg.Now,
 		readIdleTimeout:  cfg.ReadIdleTimeout,
 	}
