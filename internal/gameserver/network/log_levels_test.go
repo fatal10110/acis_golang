@@ -67,7 +67,7 @@ func TestConnWriteFailureLogLevel(t *testing.T) {
 			server, client := net.Pipe()
 			t.Cleanup(func() { _ = client.Close() })
 			var logs lockedBuffer
-			c := newConn(failingWriteConn{Conn: server, err: tc.err}, zerolog.New(&logs))
+			c := newConn(failingWriteConn{Conn: server, err: tc.err}, zerolog.New(&logs), testRejects())
 			sendWithin(t, c, pooledFrame(0x03, 16, 64))
 			awaitStopped(t, c)
 			for _, entry := range logs.lines(t) {

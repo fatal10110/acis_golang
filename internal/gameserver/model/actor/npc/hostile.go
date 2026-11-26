@@ -170,7 +170,6 @@ type Hostile struct {
 	corpseDeadline time.Time
 
 	health creature.Health
-	hp     float64
 	// hpBar is the health-bar segment state PublishHP advances from
 	// whichever goroutine changed HP.
 	hpBar creature.HPBar
@@ -319,7 +318,6 @@ func newHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	// are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())
 	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
-	h.health = creature.NewHealth(&h.hp)
 	h.running.Store(true)
 	if parts != nil {
 		h.brain = ai.NewAttackableWithParts(h, movement, parts)
@@ -341,7 +339,7 @@ func newHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveC
 	// Seed from calculated Max HP/MP after template passives attach:
 	// MaxHpMul/MaxMpMul scale by CON/MEN bonus, and int-truncated maxima
 	// match the persisted spawn current-hp/mp contract.
-	h.hp = float64(h.MaxHP())
+	h.health = creature.NewHealth(float64(h.MaxHP()))
 	h.mp = float64(int(h.MaxMPValue()))
 	h.hpBar.Calibrate(float64(h.MaxHP()))
 	return h, nil

@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // --- client link + game server link sharing one registry and roster ---
@@ -54,20 +55,13 @@ func newTestLinkPair(t *testing.T, accounts accountStore) (clientAddr string, l 
 	roster := NewLinkRoster()
 
 	gsLink := NewGameServerLink(servers, names, gsKeys, sessions, bans, nil, nil, false, nil, roster, zerolog.Nop())
-	l = &ClientLink{
-		accounts:           accounts,
-		servers:            servers,
-		sessions:           sessions,
-		bans:               bans,
-		roster:             roster,
-		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
-		loginBlockAfterBan: DefaultLoginBlockAfterBan,
-		log:                zerolog.Nop(),
-		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
-		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
-		newSessionID:       func() int32 { return testInitSessionID },
-		handshakeTimeout:   connectionHandshakeTimeout,
-	}
+	l = NewClientLink(accounts, servers, sessions, bans, fixedLoginKey{keyPair}, roster, ClientConfig{
+		ShowLicence:        true,
+		LoginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		LoginBlockAfterBan: DefaultLoginBlockAfterBan,
+	}, zerolog.Nop())
+	l.newSessionKey = func() ([]byte, error) { return testSessionKey, nil }
+	l.newSessionID = func() int32 { return testInitSessionID }
 
 	gsLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -195,9 +189,6 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLoginCrypt: %v", err)
 	}
-	if l.holders == nil {
-		l.holders = make(map[string]*clientConn)
-	}
 	l.holders["player1"] = &clientConn{conn: stalled, crypt: crypt}
 	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2}, 1)
 
@@ -221,7 +212,7 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 			_ = wire.WriteFrame(conn, buf)
 		}
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if _, err := wire.ReadFrame(conn); err != nil { // Init
+		if _, err := testsupport.ReadFrame(conn); err != nil { // Init
 			return
 		}
 		send(encodeAuthGameGuard(testInitSessionID))

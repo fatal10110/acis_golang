@@ -116,12 +116,10 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 	if err := f.Attach(rt); err != nil {
 		return nil, err
 	}
-	swing := attack.NewNPC(f, folkAttackEvents{ai: f.AttackEvents(), f: f, chance: s.CastEffects.Chance})
-	swing.SetQueue(rt.Queue)
+	swing := attack.NewNPC(f, folkAttackEvents{ai: f.AttackEvents(), f: f, chance: s.CastEffects.Chance}, rt.Queue)
 	f.SetAttacker(swing)
 	if s.Skills != nil {
-		ctl := actorcast.NewController(actorcast.FolkActor{Folk: f}, f.CastEvents())
-		ctl.SetQueue(rt.Queue)
+		ctl := actorcast.NewController(actorcast.FolkActor{Folk: f}, f.CastEvents(), rt.Queue)
 		// A delete closes the NPC's queue without stopping its cast.
 		ctl.OutliveQueueClose()
 		f.SetCaster(ctl, &actorcast.AIController{

@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // --- fake account store: no DB needed to exercise ClientLink's own logic ---
@@ -195,7 +196,7 @@ func dialLoginClient(t *testing.T, addr string) *fakeLoginClient {
 	t.Cleanup(func() { conn.Close() })
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := wire.ReadFrame(conn); err != nil {
+	if _, err := testsupport.ReadFrame(conn); err != nil {
 		t.Fatalf("read Init frame: %v", err)
 	}
 
@@ -220,7 +221,7 @@ func (f *fakeLoginClient) send(payload []byte) {
 func (f *fakeLoginClient) read() []byte {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := testsupport.ReadFrame(f.conn)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}
@@ -327,21 +328,15 @@ func newTestClientLinkOn(t *testing.T, wrap func(net.Listener) net.Listener, acc
 	sessions = manager.NewSessionStore()
 	bans = manager.NewIPBanList(zerolog.Nop())
 
-	l = &ClientLink{
-		accounts:           accounts,
-		servers:            servers,
-		sessions:           sessions,
-		bans:               bans,
-		autoCreateAccounts: autoCreate,
-		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
-		loginBlockAfterBan: DefaultLoginBlockAfterBan,
-		log:                zerolog.Nop(),
-		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
-		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
-		newSessionID:       func() int32 { return testInitSessionID },
-		hashPassword:       minCostHashPassword,
-		handshakeTimeout:   connectionHandshakeTimeout,
-	}
+	l = NewClientLink(accounts, servers, sessions, bans, fixedLoginKey{keyPair}, nil, ClientConfig{
+		AutoCreateAccounts: autoCreate,
+		ShowLicence:        true,
+		LoginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		LoginBlockAfterBan: DefaultLoginBlockAfterBan,
+	}, zerolog.Nop())
+	l.newSessionKey = func() ([]byte, error) { return testSessionKey, nil }
+	l.newSessionID = func() int32 { return testInitSessionID }
+	l.hashPassword = minCostHashPassword
 	for _, opt := range opts {
 		opt(l)
 	}
@@ -365,7 +360,22 @@ func newTestClientLinkOn(t *testing.T, wrap func(net.Listener) net.Listener, acc
 // loginKeyPair exposes the test ClientLink's fixed RSA key pair for
 // building RequestAuthLogin payloads.
 func (l *ClientLink) loginKeyPair() *commoncrypt.LoginKeyPair {
-	return l.newKeyPair()
+	return l.keys.Random()
+}
+
+// fixedLoginKey hands every connection the same RSA key pair.
+type fixedLoginKey struct{ pair *commoncrypt.LoginKeyPair }
+
+func (k fixedLoginKey) Random() *commoncrypt.LoginKeyPair { return k.pair }
+
+// newBareClientLink builds a ClientLink that is never served, for tests
+// that drive one of its methods directly.
+func newBareClientLink(servers *manager.ServerRegistry) *ClientLink {
+	return NewClientLink(newFakeAccountStore(), servers, manager.NewSessionStore(), manager.NewIPBanList(zerolog.Nop()), fixedLoginKey{}, nil, ClientConfig{
+		ShowLicence:        true,
+		LoginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		LoginBlockAfterBan: DefaultLoginBlockAfterBan,
+	}, zerolog.Nop())
 }
 
 func loginFailReason(t *testing.T, reply []byte) serverpackets.LoginFailReason {

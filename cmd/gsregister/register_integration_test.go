@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
@@ -29,11 +30,11 @@ func registerOnce(t *testing.T, store *sql.GameServerStore, id int, path string)
 // HexID properties.
 func hexIDFile(t *testing.T, path string) (id int, hexText string) {
 	t.Helper()
-	fileID, key, err := readHexIDFile(path)
+	fileID, key, err := link.ReadHexIDFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
-	return fileID, model.HexKeyText(key)
+	return fileID, link.HexKeyText(key)
 }
 
 func TestRegisterFlagRegistersAndRerunIsNoOp(t *testing.T) {
@@ -57,12 +58,12 @@ func TestRegisterFlagRegistersAndRerunIsNoOp(t *testing.T) {
 	if n := len(row.HexID); n == 0 || n > authKeyLen {
 		t.Fatalf("registered key is %d bytes, want 1..%d", n, authKeyLen)
 	}
-	if reparsed, err := model.ParseHexKey(model.HexKeyText(row.HexID)); err != nil || !bytes.Equal(reparsed, row.HexID) {
+	if reparsed, err := link.ParseHexKey(link.HexKeyText(row.HexID)); err != nil || !bytes.Equal(reparsed, row.HexID) {
 		t.Fatalf("registered key %x is not in normalized form: reparsed %x, err %v", row.HexID, reparsed, err)
 	}
 	id, hexText := hexIDFile(t, path)
-	if id != 1 || hexText != model.HexKeyText(row.HexID) {
-		t.Fatalf("hexid file = ServerID %d HexID %s, want 1 %s", id, hexText, model.HexKeyText(row.HexID))
+	if id != 1 || hexText != link.HexKeyText(row.HexID) {
+		t.Fatalf("hexid file = ServerID %d HexID %s, want 1 %s", id, hexText, link.HexKeyText(row.HexID))
 	}
 	before, err := os.ReadFile(path)
 	if err != nil {
@@ -101,8 +102,8 @@ func TestRegisterFlagRewritesMissingFileFromDatabase(t *testing.T) {
 		t.Fatalf("register: %v\n%s", err, out)
 	}
 	id, hexText := hexIDFile(t, path)
-	if id != 1 || hexText != model.HexKeyText(key) {
-		t.Fatalf("hexid file = ServerID %d HexID %s, want the stored key %s", id, hexText, model.HexKeyText(key))
+	if id != 1 || hexText != link.HexKeyText(key) {
+		t.Fatalf("hexid file = ServerID %d HexID %s, want the stored key %s", id, hexText, link.HexKeyText(key))
 	}
 }
 
@@ -110,7 +111,7 @@ func TestRegisterFlagRegistersExistingFileKey(t *testing.T) {
 	store := newIntegrationStore(t)
 	path := filepath.Join(t.TempDir(), "hexid.txt")
 	key := []byte{0x11, 0x22, 0x33}
-	if err := model.WriteHexIDFile(path, 1, key, registerNow); err != nil {
+	if err := link.WriteHexIDFile(path, 1, key, registerNow); err != nil {
 		t.Fatal(err)
 	}
 	before, err := os.ReadFile(path)
@@ -125,8 +126,8 @@ func TestRegisterFlagRegistersExistingFileKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GameServer(1): %v", err)
 	}
-	if model.HexKeyText(row.HexID) != model.HexKeyText(key) {
-		t.Errorf("registered key %s, want the file's %s", model.HexKeyText(row.HexID), model.HexKeyText(key))
+	if link.HexKeyText(row.HexID) != link.HexKeyText(key) {
+		t.Errorf("registered key %s, want the file's %s", link.HexKeyText(row.HexID), link.HexKeyText(key))
 	}
 	after, err := os.ReadFile(path)
 	if err != nil {
@@ -155,7 +156,7 @@ func TestRegisterFlagRejectsDifferentHexID(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(dir, tc.name+".txt")
-			if err := model.WriteHexIDFile(path, tc.id, tc.key, registerNow); err != nil {
+			if err := link.WriteHexIDFile(path, tc.id, tc.key, registerNow); err != nil {
 				t.Fatal(err)
 			}
 			before, err := os.ReadFile(path)
@@ -184,7 +185,7 @@ func TestRegisterFlagRejectsDifferentHexID(t *testing.T) {
 func TestRegisterFlagRejectsFileForAnotherUnregisteredServer(t *testing.T) {
 	store := newIntegrationStore(t)
 	path := filepath.Join(t.TempDir(), "hexid.txt")
-	if err := model.WriteHexIDFile(path, 2, []byte{0x05}, registerNow); err != nil {
+	if err := link.WriteHexIDFile(path, 2, []byte{0x05}, registerNow); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := registerOnce(t, store, 1, path); err == nil || !strings.Contains(err.Error(), "differs") {

@@ -177,7 +177,7 @@ func (a PlayerActor) BlessedSpiritshotCharged() bool {
 }
 
 func (a PlayerActor) SkillMastery(def *modelskill.Definition) bool {
-	if a.Character == nil || def.SkillType == "FISHING" {
+	if a.Character == nil || def.SkillType == modelskill.SkillTypeFishing {
 		return false
 	}
 	rate := formulas.SkillMasteryRate(a.Character.CalcStat(stat.SkillMastery, 0), player.ClassMage(a.Character.ClassID()), a.Character.INT(), a.Character.STR())

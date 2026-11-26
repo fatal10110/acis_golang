@@ -21,7 +21,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -37,6 +36,7 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
@@ -2052,7 +2052,7 @@ func (s *sequentialIDs) reserve(ids []int64) []int32 {
 func (s *sequentialIDs) reserveStored(tb testing.TB, db *sql.DB) []int32 {
 	tb.Helper()
 	var stored []int64
-	if err := idfactory.ScanUsedIDs(context.Background(), db, func(id int64) { stored = append(stored, id) }); err != nil {
+	if err := objectids.ScanUsedIDs(context.Background(), db, func(id int64) { stored = append(stored, id) }); err != nil {
 		tb.Fatalf("gameservertest: scan stored object ids: %v", err)
 	}
 	return s.reserve(stored)
@@ -2651,6 +2651,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	quests.bindResidences(worldObjects, gclConfig.Castles, o.clanHallData, gclConfig.Sieges, halls, gclConfig.Clans.Table())
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
 	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
+	fillLinkStandIns(&gclConfig, queues, o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)

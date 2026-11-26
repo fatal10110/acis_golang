@@ -15,7 +15,7 @@ func TestRegistrySetMagicFailuresReachesNextCast(t *testing.T) {
 		registry.SetMagicFailures(on)
 		for _, skillType := range []string{"MDAM", "DRAIN"} {
 			target := &skillTarget{hp: 2000}
-			registry.Use(Cast{Caster: &skillTarget{hp: 2000}, Skill: modelskill.Definition{SkillType: skillType}, Targets: []Actor{target}})
+			registry.Use(Cast{Caster: &skillTarget{hp: 2000}, Skill: modelskill.Definition{SkillType: modelskill.SkillType(skillType)}, Targets: []Actor{target}})
 			if target.magicFailures == nil || *target.magicFailures != on {
 				t.Fatalf("%s after SetMagicFailures(%v): MagicDamageInput magicFailures = %v", skillType, on, target.magicFailures)
 			}

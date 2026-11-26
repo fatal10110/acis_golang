@@ -67,20 +67,19 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 			sendText(gm, "Access level "+strconv.Itoa(int(level))+" is out of range; "+name+"'s access level is unaltered.")
 			return
 		}
-		found, ok := l.adminByName(name, func(target *livePlayer) {
+		l.adminByName(gm, name, func(target *livePlayer) {
 			l.moveToAccessLevel(gm, target, int(level), nil)
 		}, func(objectID int32) {
 			l.storeOfflineAccessLevel(objectID, int(level), func() {
 				sendText(gm, name+"'s access level could not be stored; it is unaltered.")
 			})
-		})
-		switch {
-		case !ok:
-		case !found:
-			sendText(gm, name+"couldn't be found - its access level is unaltered.")
-		default:
+		}, func(found bool) {
+			if !found {
+				sendText(gm, name+"couldn't be found - its access level is unaltered.")
+				return
+			}
 			sendText(gm, name+"'s access level is now set to "+strconv.Itoa(int(level))+".")
-		}
+		})
 	}
 }
 
@@ -342,20 +341,19 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 	// A session found by the character's id rather than by name, or one a
 	// selection under way ends with, takes a ban as an online target does;
 	// it is not banned, so an unban leaves it as it is.
-	found, ok := l.adminByName(name, func(target *livePlayer) {
+	l.adminByName(gm, name, func(target *livePlayer) {
 		if level < 0 {
 			l.moveToAccessLevel(gm, target, level, nil)
 		}
 	}, func(objectID int32) {
 		l.storeOfflineAccessLevel(objectID, level, nil)
-	})
-	switch {
-	case !ok:
-	case !found:
-		sendText(gm, "This Player isn't found, or the AccessLevel was unaltered.")
-	default:
+	}, func(found bool) {
+		if !found {
+			sendText(gm, "This Player isn't found, or the AccessLevel was unaltered.")
+			return
+		}
 		sendText(gm, name+" now has an access level of "+strconv.Itoa(level)+".")
-	}
+	})
 }
 
 // orNull is s as an admin message prints it, where a missing argument

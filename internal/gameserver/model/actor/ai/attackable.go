@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -189,7 +190,7 @@ type CastController interface {
 	StopsMovement(ref skill.Ref) bool
 	// SkillType returns ref's raw skillType tag, used to grant SUMMON_FRIEND
 	// casts a target-lost bypass (the rotation-target exemption).
-	SkillType(ref skill.Ref) string
+	SkillType(ref skill.Ref) skill.SkillType
 	// CanCast validates the final HP/MP/mute/reuse/item gates, immediately
 	// before the cast commits.
 	CanCast(target attackable.Combatant, ref skill.Ref) bool
@@ -287,6 +288,10 @@ type Attackable struct {
 	// route is the walker route route desires walk, nil for none; set once
 	// before the actor is published.
 	route Route
+	// log records the movement errors the think loop has no caller to
+	// return to; set once before the actor is published. Nil discards
+	// them.
+	log *zerolog.Logger
 
 	// cast is read without mu so AbortAll can run from inside the think
 	// loop, which holds mu (a return-home teleport aborts the actor). A loop
@@ -404,6 +409,20 @@ func newAttackable(actor AttackableActor, move AttackableMoveController) *Attack
 		now:            actor.Now,
 		randomWalkRate: defaultRandomWalkRate,
 		roll:           rnd.Get,
+	}
+}
+
+// SetLogger gives the AI the logger its dropped movement errors reach. Call
+// it once, before the actor is published.
+func (a *Attackable) SetLogger(log *zerolog.Logger) {
+	a.log = log
+}
+
+// logMoveError records a movement the think loop asked for and the
+// controller refused (a zero speed, an overlong duration).
+func (a *Attackable) logMoveError(err error) {
+	if a.log != nil {
+		a.log.Warn().Err(err).Int32("npc", a.actor.ObjectID()).Msg("ai: attackable move")
 	}
 }
 
@@ -1646,7 +1665,9 @@ func (a *Attackable) thinkMoveTo() {
 	if a.actor.MovementDisabled() {
 		return
 	}
-	_, _ = a.move.MoveToLocation(a.current.loc)
+	if _, err := a.move.MoveToLocation(a.current.loc); err != nil {
+		a.logMoveError(err)
+	}
 }
 
 // standsOn reports whether the actor stands on loc facing heading.
@@ -1722,7 +1743,9 @@ func (a *Attackable) thinkFlee() {
 	}
 	a.actor.ForceRunStance()
 	tx, ty, _ := target.Position()
-	_, _ = a.move.MoveToLocation(from.FleeFrom(tx, ty, int(distance)))
+	if _, err := a.move.MoveToLocation(from.FleeFrom(tx, ty, int(distance))); err != nil {
+		a.logMoveError(err)
+	}
 }
 
 // thinkSocial is the social step: the desire leaves the queue, and an actor
@@ -1850,11 +1873,11 @@ func (a *Attackable) refreshCombatMemory() {
 // is none, it is no longer in the world, or the actor does not know it. A
 // SUMMON_FRIEND cast (skillType) keeps a target the actor does not know. It
 // changes nothing.
-func (a *Attackable) targetLost(target attackable.Combatant, skillType string) bool {
+func (a *Attackable) targetLost(target attackable.Combatant, skillType skill.SkillType) bool {
 	if target == nil || !a.actor.InWorld(target) {
 		return true
 	}
-	if skillType == "SUMMON_FRIEND" {
+	if skillType == skill.SkillTypeSummonFriend {
 		return false
 	}
 	return !a.actor.Knows(target)

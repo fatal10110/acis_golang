@@ -28,7 +28,7 @@ const (
 	doorDebuffLevel   = 3
 )
 
-func doorDebuffSkill(skillType string) modelskill.Definition {
+func doorDebuffSkill(skillType modelskill.SkillType) modelskill.Definition {
 	return modelskill.Definition{
 		ID: doorDebuffSkillID, Level: doorDebuffLevel, Activation: modelskill.ActivationActive,
 		Target: modelskill.TargetOne, SkillType: skillType, Power: 80, Offensive: true,
@@ -75,13 +75,13 @@ func castOnDoor(t *testing.T, srv *gameservertest.Server, objID int32, def model
 func TestDisablerOnDoorIsResistedAsOnCreature(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		skillType string
+		skillType modelskill.SkillType
 		level     int32
 	}{
 		{skillType: "STUN", level: 1},
 		{skillType: "ERASE", level: doorDebuffLevel},
 	} {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			t.Parallel()
 			def := doorDebuffSkill(tc.skillType)
 			srv, objID, gate := bootDoorDebuff(t, def, 99)

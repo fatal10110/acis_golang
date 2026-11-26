@@ -46,7 +46,7 @@ func unlockDoorTemplate(opened bool) *door.Template {
 	}
 }
 
-func unlockSkill(id int32, skillType string, level, power int) modelskill.Definition {
+func unlockSkill(id int32, skillType modelskill.SkillType, level, power int) modelskill.Definition {
 	return modelskill.Definition{
 		ID: modelskill.ID(id), Level: level, Activation: modelskill.ActivationActive,
 		Target: modelskill.TargetUnlockable, SkillType: skillType, Power: float32(power),

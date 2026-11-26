@@ -128,7 +128,7 @@ func (*fakeSummonOwner) ClearReviveOffer()                          {}
 func (*fakeSummonOwner) ReviveOffer() (bool, bool)                  { return false, false }
 func (*fakeSummonOwner) InDuel() bool                               { return false }
 func (*fakeSummonOwner) NoteServitorPvPAttack(attackable.Combatant) {}
-func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
+func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {
 }
 
 // The fake owner is in no duel, party, clan or alliance, does not see

@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/config"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
@@ -100,5 +101,5 @@ func provideGameServerDatabase(lc fx.Lifecycle, ctx bootContext, cfg gameServerC
 func requireDatabase(*sql.DB) {}
 
 func provideIDAllocator(ctx bootContext, pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
-	return idfactory.New(ctx, pool, log)
+	return objectids.NewAllocator(ctx, pool, log)
 }

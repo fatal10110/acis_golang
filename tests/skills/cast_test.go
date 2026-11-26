@@ -300,7 +300,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		name      string
-		skillType string
+		skillType modelskill.SkillType
 		power     float64
 		roll      float64
 		mastery   bool

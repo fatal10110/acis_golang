@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 
@@ -56,7 +57,7 @@ func dialGameServer(t *testing.T, addr string) *fakeGameServer {
 func (f *fakeGameServer) readFrame() []byte {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := testsupport.ReadFrame(f.conn)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}
@@ -315,14 +316,18 @@ func newTestLink(t *testing.T, allowNewServers bool) (addr string, l *GameServer
 
 func newTestLinkCommon(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations *sql.GameServerStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
+	var levels accessLevelStore
+	if accounts != nil {
+		levels = accounts
+	}
 	var store registrationStore
 	if registrations != nil {
 		store = registrations
 	}
-	return newTestLinkWithRegistrationStore(t, allowNewServers, accounts, store, configure...)
+	return newTestLinkWithRegistrationStore(t, allowNewServers, levels, store, configure...)
 }
 
-func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations registrationStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts accessLevelStore, registrations registrationStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
 
 	dir := t.TempDir()

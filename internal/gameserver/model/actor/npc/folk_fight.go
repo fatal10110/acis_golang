@@ -8,12 +8,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -473,25 +470,8 @@ func (f *Folk) BroadcastAttack(e event.Attack) { f.emit(e) }
 // roll, a critical roll and the physical damage. A target with no combat
 // stats is always missed.
 func (f *Folk) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{TargetID: target.ObjectID()}
-	other, ok := target.(creature.FormulaActor)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-	accuracy := int(f.CalcStat(stat.AccuracyCombat, 0))
-	_, _, sz := f.Position()
-	_, _, tz := other.Position()
-	behind, inFront := creature.AttackFacing(other, f)
-	rate := formulas.HitRate(accuracy, other.Against(f.ConditionActor(), nil).Evasion(), sz-tz, f.effects.IsNight(), behind, inFront)
-	if formulas.Missed(rate, f.Roll(1000)) {
-		hit.Miss = true
-		return hit
-	}
-	crit := formulas.CritSucceeds(f.Against(conditions.ActorOf(other), nil).CriticalRate(), f.Roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(f, other, crit)
-	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
-	hit.Crit = crit
-	hit.Shield = shield
-	return hit
+	return attack.ResolveHit(f, target, attack.HitRoll{
+		Accuracy: int(f.CalcStat(stat.AccuracyCombat, 0)),
+		Night:    f.effects.IsNight(),
+	}, split)
 }

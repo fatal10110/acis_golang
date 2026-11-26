@@ -106,7 +106,7 @@ func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
 // ---- from karma_teleport_test.go ----
 func TestIsTeleportOrRecallSkillType(t *testing.T) {
 	tests := []struct {
-		skillType string
+		skillType modelskill.SkillType
 		want      bool
 	}{
 		{"TELEPORT", true},
@@ -123,7 +123,7 @@ func TestIsTeleportOrRecallSkillType(t *testing.T) {
 
 func TestIsRecallSkillType(t *testing.T) {
 	tests := []struct {
-		skillType string
+		skillType modelskill.SkillType
 		want      bool
 	}{
 		{"RECALL", true},
@@ -173,7 +173,7 @@ func TestItemBlockedByKarmaTeleport(t *testing.T) {
 func TestRecallCastBlockedByKarma(t *testing.T) {
 	tests := []struct {
 		name                   string
-		skillType              string
+		skillType              modelskill.SkillType
 		karma                  int
 		karmaPlayerCanTeleport bool
 		want                   bool

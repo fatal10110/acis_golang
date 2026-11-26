@@ -543,7 +543,7 @@ func TestTemplateAbnormalSkippedWhenKindDeclinesStart(t *testing.T) {
 			return false
 		},
 	}
-	wireTemplateAbnormal(e)
+	wireTemplateAbnormal(e, coreKinds["Invincible"])
 
 	if e.OnStart(e) {
 		t.Fatal("OnStart() = true, want false: the kind's own hook declined")

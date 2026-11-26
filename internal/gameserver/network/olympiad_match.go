@@ -280,6 +280,8 @@ func (a olympiadArena) toStadium(id int, build func() wire.Frame) {
 // player's queue, behind what was posted there before.
 type queuedReceiver struct{ live *livePlayer }
 
+func (r queuedReceiver) frameRejects() *frameRejectReporter { return r.live.frameRejects() }
+
 func (r queuedReceiver) BroadcastFrame(frame wire.Frame) bool {
 	live := r.live
 	if !postLive(live, func() { live.SendFrame(frame) }) {

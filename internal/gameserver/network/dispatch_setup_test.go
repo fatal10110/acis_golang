@@ -212,7 +212,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		t.Fatalf("restore seven signs status: %v", err)
 	}
 	queues := testQueues(t)
-	gcl, err := NewGameClientLink(GameClientLinkConfig{
+	gcl := newBareGameClientLink(t, GameClientLinkConfig{
 		Flow: CharacterFlowConfig{Validator: validator},
 		Belongings: BelongingsConfig{
 			Items:            items,
@@ -242,9 +242,6 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		Log:           log,
 		Now:           testLinkNow,
 	})
-	if err != nil {
-		t.Fatalf("new game client link: %v", err)
-	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -379,7 +376,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	if err != nil {
 		t.Fatal(err)
 	}
-	attackCtl := attack.NewPlayer(ch, control)
+	attackCtl := attack.NewPlayer(ch, control, nil)
 	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
 	control.combat = combat
 

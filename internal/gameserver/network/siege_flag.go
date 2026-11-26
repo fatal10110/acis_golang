@@ -8,6 +8,7 @@ import (
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
@@ -94,7 +95,9 @@ func (l *GameClientLink) siegeFlagAfterCanCast(live *livePlayer) func() error {
 // it was put up for is no longer one the clan attacks.
 type siegeFlagHandler struct{ l *GameClientLink }
 
-func (siegeFlagHandler) Types() []string { return []string{"SIEGE_FLAG"} }
+func (siegeFlagHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSiegeFlag}
+}
 
 func (h siegeFlagHandler) Use(c skillhandler.Cast) {
 	if c.Caster == nil || c.Caster.Kind() != actor.KindPlayer {

@@ -1,6 +1,7 @@
 # RaidPrivateHealer (25008), two healers of one master in a peace zone, every draw 0, the second moved off its spawn
 # location: a hit on the first (the party call) puts the second back on its spawn location, with no attack desire (its
 # heal and curse desires are the ones a hit draws outside peace).
+driven
 character Hunter 20
 random always 0
 script script.ai.individual.DefaultNpc

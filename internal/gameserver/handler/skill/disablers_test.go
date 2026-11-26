@@ -108,7 +108,7 @@ func TestControlDisablersReportFailedRollToPlayer(t *testing.T) {
 		t.Run(skillType, func(t *testing.T) {
 			caster := &skillTarget{isPlayer: true}
 			target := &skillTarget{name: "Victim", effects: newTestList(nil), skillSuccessOK: true, skillSuccessChance: chanceOf(0)}
-			def := modelskill.Definition{ID: 44, Level: 7, SkillType: skillType}
+			def := modelskill.Definition{ID: 44, Level: 7, SkillType: modelskill.SkillType(skillType)}
 			result, ok := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
 			if !ok || len(result.Resisted) != 1 || result.Resisted[0] != (Resisted{TargetName: "Victim", SkillID: 44, SkillLevel: 1}) {
 				t.Fatalf("UseResult() = %+v, %t; want one level-1 resisted message", result.Resisted, ok)
@@ -128,7 +128,7 @@ func TestControlDisablersReportFailedRollToPlayer(t *testing.T) {
 func TestDisablersReportFailedRollAtCastLevel(t *testing.T) {
 	for _, skillType := range []string{"BETRAY", "CONFUSION", "AGGREDUCE_CHAR", "AGGREMOVE", "ERASE"} {
 		t.Run(skillType, func(t *testing.T) {
-			def := modelskill.Definition{ID: 1380, Level: 7, SkillType: skillType}
+			def := modelskill.Definition{ID: 1380, Level: 7, SkillType: modelskill.SkillType(skillType)}
 			targets := func(fail bool) []Actor {
 				var out []Actor
 				for i, name := range []string{"First", "Second"} {
@@ -273,7 +273,7 @@ func TestReflectedMuteUsesOriginalTargetsPreSwapShieldBlock(t *testing.T) {
 func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 	registry := NewDefaultRegistry()
 	tests := []struct {
-		skillType  string
+		skillType  modelskill.SkillType
 		effectName string
 	}{
 		{skillType: "STUN", effectName: "Stun"},
@@ -283,7 +283,7 @@ func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.skillType, func(t *testing.T) {
+		t.Run(string(tt.skillType), func(t *testing.T) {
 			target := newTestHostile(t, 100, 0)
 
 			registry.Use(Cast{
@@ -296,7 +296,7 @@ func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 						Time: 10,
 					}},
 				}.WithExtra(modelskill.Extra{
-					EffectType:  tt.skillType,
+					EffectType:  string(tt.skillType),
 					EffectPower: 100,
 				}),
 				Targets: []Actor{target},
@@ -608,7 +608,7 @@ func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
 // every effect, including a type with no landing roll of its own.
 func TestDisablersPassBlessedShotAndShieldToTemplateLanding(t *testing.T) {
 	for _, tc := range []struct {
-		skillType  string
+		skillType  modelskill.SkillType
 		shield     formulas.ShieldDefense
 		attackable bool
 		wantInputs []templateLanding

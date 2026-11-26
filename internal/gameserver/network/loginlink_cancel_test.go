@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestMaintainStopsDuringStalledHandshake cancels Maintain while the login
@@ -34,7 +35,7 @@ func TestMaintainStopsDuringStalledHandshake(t *testing.T) {
 			if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				t.Fatal(err)
 			}
-			payload, err := wire.ReadFrame(conn)
+			payload, err := testsupport.ReadFrame(conn)
 			if err != nil {
 				t.Fatalf("read BlowFishKey: %v", err)
 			}

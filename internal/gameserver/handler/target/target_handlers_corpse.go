@@ -78,7 +78,7 @@ func corpseMobCastRejection(target Actor, skill *modelskill.Definition) CastReje
 	if !target.HasCorpse() || target.IsPet() {
 		return CastRejectInvalidTarget
 	}
-	if skill != nil && skill.SkillType == "HARVEST" {
+	if skill != nil && skill.SkillType == modelskill.SkillTypeHarvest {
 		if !target.MonsterKind() {
 			return CastRejectHarvestNotMonster
 		}
@@ -87,7 +87,7 @@ func corpseMobCastRejection(target Actor, skill *modelskill.Definition) CastReje
 	if corpseTooOld(target) && !corpseAgeBypass(target) {
 		return CastRejectCorpseTooOld
 	}
-	if skill != nil && skill.SkillType == "SWEEP" && !target.MonsterKind() {
+	if skill != nil && skill.SkillType == modelskill.SkillTypeSweep && !target.MonsterKind() {
 		return CastRejectSweepNotMonster
 	}
 	return CastRejectNone

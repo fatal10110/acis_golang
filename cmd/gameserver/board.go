@@ -56,6 +56,10 @@ func provideCommunityBoard(ctx bootContext, paths gameServerPaths, pool *sql.DB,
 	}
 	board := communityBoard{Config: cfg, ShowServerNews: news}
 	if !cfg.Enabled {
+		// A disabled board keeps nothing: its forums and favorites hold no
+		// store and restore no rows.
+		board.Forums = bbs.NewForums(nil, nil, log)
+		board.Favorites = bbs.NewFavorites(nil, nil, log)
 		return board, nil
 	}
 	store := gamesql.NewMailStore(pool)

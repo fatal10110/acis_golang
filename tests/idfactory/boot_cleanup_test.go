@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/rs/zerolog"
 )
@@ -116,7 +116,7 @@ func TestBootCleanupRestoresDatabaseIntegrity(t *testing.T) {
 		"INSERT INTO character_skills_save (char_obj_id, skill_id, skill_level, restore_type, systime) VALUES (?, 248, 3, 1, ?)",
 		charID, time.Now().Add(-time.Hour).UnixMilli())
 
-	if _, err := idfactory.New(ctx, db, zerolog.Nop()); err != nil {
+	if _, err := objectids.NewAllocator(ctx, db, zerolog.Nop()); err != nil {
 		t.Fatalf("boot allocator: %v", err)
 	}
 

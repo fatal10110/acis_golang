@@ -80,7 +80,7 @@ func TestHealLandsSkillEffectsBeforeRestoringHP(t *testing.T) {
 				Skill: modelskill.Definition{
 					ID:        1217,
 					Level:     1,
-					SkillType: skillType,
+					SkillType: modelskill.SkillType(skillType),
 					Power:     30,
 					Effects:   []modelskill.EffectTemplate{{Name: "HealOverTime", Value: 10, Count: 3, Time: 1, Icon: true}},
 				}.WithExtra(modelskill.Extra{
@@ -119,7 +119,7 @@ func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
 		name      string
 		scaling   formulas.HealShotScaling
 		shot      item.ShotKind
-		skillType string
+		skillType modelskill.SkillType
 		want      float64
 		wantShots []item.ShotKind
 	}{
@@ -226,7 +226,7 @@ func TestResourceHealNotificationsMatchCasterBranches(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			caster := &skillTarget{isPlayer: tc.casterPlayer, name: "Caster", healAmount: 50, healOK: true}
 			target := &skillTarget{isPlayer: true, hp: 90, maxHP: 100, mp: 90, maxMP: 100, cp: 90, maxCP: 100}
-			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: tc.skillType, Power: 50}, Targets: []Actor{target}})
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: modelskill.SkillType(tc.skillType), Power: 50}, Targets: []Actor{target}})
 			if target.noticeKind != tc.kind || target.noticeName != "Caster" || target.noticeAmount != 10 || target.noticeOther != tc.wantOther {
 				t.Fatalf("notice = %q/%q/%d/%v, want %q/Caster/10/%v", target.noticeKind, target.noticeName, target.noticeAmount, target.noticeOther, tc.kind, tc.wantOther)
 			}
@@ -373,7 +373,7 @@ func TestResourceHandlersRunBuffPassFirst(t *testing.T) {
 					Skill: modelskill.Definition{
 						ID:          1,
 						Level:       1,
-						SkillType:   skillType,
+						SkillType:   modelskill.SkillType(skillType),
 						Power:       20,
 						Potion:      shot.potion,
 						StaticReuse: shot.staticReuse,

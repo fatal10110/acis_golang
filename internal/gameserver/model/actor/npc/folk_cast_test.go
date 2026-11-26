@@ -65,7 +65,7 @@ type scriptedFolkCastAI struct {
 	castRange int
 	skillMP   int
 	// skillType is every skill's type; empty reads as HEAL.
-	skillType string
+	skillType modelskill.SkillType
 	casts     []modelskill.Ref
 }
 
@@ -89,7 +89,7 @@ func (a *scriptedFolkCastAI) CanCast(attackable.Combatant, modelskill.Ref) bool 
 
 func (a *scriptedFolkCastAI) Range(modelskill.Ref) int          { return a.castRange }
 func (a *scriptedFolkCastAI) StopsMovement(modelskill.Ref) bool { return false }
-func (a *scriptedFolkCastAI) SkillType(modelskill.Ref) string {
+func (a *scriptedFolkCastAI) SkillType(modelskill.Ref) modelskill.SkillType {
 	if a.skillType == "" {
 		return "HEAL"
 	}

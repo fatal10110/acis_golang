@@ -44,8 +44,8 @@ const (
 )
 
 // accountStore is the account persistence ClientLink needs. *sql.AccountStore
-// satisfies it in production; tests substitute an in-memory fake so the
-// login flow can be exercised without a database.
+// satisfies it in production; tests pass an in-memory fake to NewClientLink
+// so the login flow can be exercised without a database.
 type accountStore interface {
 	Account(ctx context.Context, login string) (model.Account, error)
 	CreateAccount(ctx context.Context, login, hashedPassword string, createdAt time.Time) (model.Account, error)
@@ -110,10 +110,10 @@ type ClientLink struct {
 	// kept for the game server to claim until the login timeout.
 	unclaimed map[string]unclaimedSession
 
-	// newKeyPair, newSessionKey, and newSessionID supply each connection's
-	// RSA key pair, dynamic Blowfish key, and Init session id; overridden in
-	// tests for a deterministic handshake.
-	newKeyPair    func() *commoncrypt.LoginKeyPair
+	// keys supplies each connection's RSA key pair; newSessionKey and
+	// newSessionID its dynamic Blowfish key and Init session id, overridden
+	// in tests for a deterministic handshake.
+	keys          loginKeySource
 	newSessionKey func() ([]byte, error)
 	newSessionID  func() int32
 
@@ -123,23 +123,35 @@ type ClientLink struct {
 	hashPassword func(string) (string, error)
 }
 
-// NewClientLink builds a ClientLink from its collaborators. autoCreateAccounts
-// mirrors the AutoCreateAccounts config flag: an unrecognized login is
-// registered on its first successful RequestAuthLogin rather than rejected.
-// skipLicenceCheck is the inverse of the ShowLicence config flag: when
-// ShowLicence is false, a successful login replies ServerList instead of
-// LoginOk and the session-key pair on RequestServerLogin is not enforced.
+// ClientConfig is the login policy a ClientLink enforces.
+type ClientConfig struct {
+	// AutoCreateAccounts registers an unrecognized login on its first
+	// successful RequestAuthLogin instead of rejecting it.
+	AutoCreateAccounts bool
+	// ShowLicence answers a successful login with LoginOk. When false the
+	// reply is ServerList and the session-key pair on RequestServerLogin is
+	// not enforced.
+	ShowLicence bool
+	// LoginTryBeforeBan is how many failed credential attempts one IP may
+	// make before it is banned for LoginBlockAfterBan.
+	LoginTryBeforeBan  int
+	LoginBlockAfterBan time.Duration
+}
+
+// loginKeySource hands out the RSA key pair a connection's handshake uses.
+type loginKeySource interface {
+	Random() *commoncrypt.LoginKeyPair
+}
+
+// NewClientLink builds a ClientLink from its collaborators and policy.
 func NewClientLink(
-	accounts *loginsql.AccountStore,
+	accounts accountStore,
 	servers *manager.ServerRegistry,
 	sessions *manager.SessionStore,
 	bans *manager.IPBanList,
-	keys *manager.LoginKeyPool,
+	keys loginKeySource,
 	roster *LinkRoster,
-	autoCreateAccounts bool,
-	showLicence bool,
-	loginTryBeforeBan int,
-	loginBlockAfterBan time.Duration,
+	cfg ClientConfig,
 	log zerolog.Logger,
 ) *ClientLink {
 	return &ClientLink{
@@ -148,10 +160,10 @@ func NewClientLink(
 		sessions:           sessions,
 		bans:               bans,
 		roster:             roster,
-		autoCreateAccounts: autoCreateAccounts,
-		skipLicenceCheck:   !showLicence,
-		loginTryBeforeBan:  loginTryBeforeBan,
-		loginBlockAfterBan: loginBlockAfterBan,
+		autoCreateAccounts: cfg.AutoCreateAccounts,
+		skipLicenceCheck:   !cfg.ShowLicence,
+		loginTryBeforeBan:  cfg.LoginTryBeforeBan,
+		loginBlockAfterBan: cfg.LoginBlockAfterBan,
 		log:                log,
 		failedAttempts:     make(map[string]failedAttempt),
 		loginTimeout:       LoginTimeout,
@@ -160,7 +172,7 @@ func NewClientLink(
 		live:               make(map[string]int),
 		holders:            make(map[string]*clientConn),
 		unclaimed:          make(map[string]unclaimedSession),
-		newKeyPair:         keys.Random,
+		keys:               keys,
 		newSessionKey:      logincrypt.NewSessionKey,
 		newSessionID:       randomInt32,
 		hashPassword:       model.HashPassword,
@@ -235,9 +247,6 @@ func (l *ClientLink) purgeStale(now time.Time) {
 // registerPurgeable adds c to the purge set.
 func (l *ClientLink) registerPurgeable(c *clientConn) {
 	l.purgeMu.Lock()
-	if l.purgeable == nil {
-		l.purgeable = make(map[*clientConn]struct{})
-	}
 	l.purgeable[c] = struct{}{}
 	l.purgeMu.Unlock()
 }
@@ -245,9 +254,6 @@ func (l *ClientLink) registerPurgeable(c *clientConn) {
 // trackConnection counts an open connection from ip.
 func (l *ClientLink) trackConnection(ip net.IP) {
 	l.liveMu.Lock()
-	if l.live == nil {
-		l.live = make(map[string]int)
-	}
 	l.live[ip.String()]++
 	l.liveMu.Unlock()
 }
@@ -310,9 +316,6 @@ func (l *ClientLink) releaseSession(c *clientConn, now time.Time) {
 	if now.After(expires) {
 		l.sessions.Take(c.account, key)
 		return
-	}
-	if l.unclaimed == nil {
-		l.unclaimed = make(map[string]unclaimedSession)
 	}
 	l.unclaimed[c.account] = unclaimedSession{key: key, expires: expires}
 }
@@ -501,7 +504,7 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 		conn:        conn,
 		remoteIP:    ip,
 		crypt:       cr,
-		key:         l.newKeyPair(),
+		key:         l.keys.Random(),
 		sessionID:   l.newSessionID(),
 		connectedAt: time.Now(),
 	}
@@ -662,9 +665,6 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		// client learns from PlayOk once its server choice is admitted.
 		c.loginKey1, c.loginKey2 = randomInt32(), randomInt32()
 		c.playKey1, c.playKey2 = randomInt32(), randomInt32()
-		if l.holders == nil {
-			l.holders = make(map[string]*clientConn)
-		}
 		l.sessions.Put(c.account, c.sessionKey(), manager.NoServer)
 		l.holders[c.account] = c
 	}
@@ -813,9 +813,6 @@ func (l *ClientLink) recordFailedAttempt(ip net.IP, account string, now time.Tim
 	window, expires := l.failedAttemptWindow()
 
 	l.failedMu.Lock()
-	if l.failedAttempts == nil {
-		l.failedAttempts = make(map[string]failedAttempt)
-	}
 	entry := l.failedAttempts[key]
 	if expires && now.Sub(entry.last) > window {
 		entry = failedAttempt{}

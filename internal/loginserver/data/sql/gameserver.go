@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 )
 
@@ -33,7 +34,7 @@ func (s *GameServerStore) GameServer(ctx context.Context, id int) (model.GameSer
 		return model.GameServer{}, fmt.Errorf("query game server %d: %w", id, err)
 	}
 
-	key, err := model.ParseHexKey(hexID)
+	key, err := link.ParseHexKey(hexID)
 	if err != nil {
 		return model.GameServer{}, fmt.Errorf("parse game server %d hex id: %w", id, err)
 	}
@@ -55,7 +56,7 @@ func (s *GameServerStore) GameServers(ctx context.Context) (map[int]model.GameSe
 		if err := rows.Scan(&id, &hexID, &host); err != nil {
 			return nil, fmt.Errorf("scan game server: %w", err)
 		}
-		key, err := model.ParseHexKey(hexID)
+		key, err := link.ParseHexKey(hexID)
 		if err != nil {
 			return servers, fmt.Errorf("parse game server %d hex id: %w", id, err)
 		}
@@ -71,7 +72,7 @@ func (s *GameServerStore) GameServers(ctx context.Context) (map[int]model.GameSe
 func (s *GameServerStore) CreateGameServer(ctx context.Context, server model.GameServer) error {
 	if _, err := s.db.ExecContext(ctx,
 		"INSERT INTO gameservers (hexid, server_id, host) VALUES (?, ?, ?)",
-		model.HexKeyText(server.HexID),
+		link.HexKeyText(server.HexID),
 		server.ID,
 		server.Host,
 	); err != nil {

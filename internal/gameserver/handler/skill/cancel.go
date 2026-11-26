@@ -4,21 +4,24 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 type cancelHandler struct{}
 
-func (cancelHandler) Types() []string { return []string{"CANCEL", "MAGE_BANE", "WARRIOR_BANE"} }
+func (cancelHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeCancel, modelskill.SkillTypeMageBane, modelskill.SkillTypeWarriorBane}
+}
 
 // Use rolls to strip a random subset of each target's active non-toggle,
 // non-debuff effects, then optionally refreshes the caster's own
 // self-targeted copy of this skill's effects.
 func (cancelHandler) Use(cast Cast) {
-	skillType := skillTypeKey(cast.Skill.SkillType)
+	skillType := cast.Skill.SkillType.Normalized()
 	minRate, maxRate := 25, 75
-	if skillType != "CANCEL" {
+	if skillType != modelskill.SkillTypeCancel {
 		minRate, maxRate = 40, 95
 	}
 
@@ -37,8 +40,8 @@ func (cancelHandler) Use(cast Cast) {
 // cancelOne rolls each eligible effect of target against the cast's rate; the
 // roll comes from the caster's combat random source (see landingRoll), so a
 // pinned caster decides every strip.
-func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRate int) {
-	vuln := target.CancelVulnerability(skillType)
+func cancelOne(cast Cast, target effect.Actor, skillType modelskill.SkillType, minRate, maxRate int) {
+	vuln := target.CancelVulnerability(string(skillType))
 
 	diffLevel := cast.Skill.MagicLevel - target.Level()
 	count := cast.Skill.Extra().MaxNegatedEffects
@@ -56,13 +59,13 @@ func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRat
 		}
 
 		switch skillType {
-		case "MAGE_BANE":
+		case modelskill.SkillTypeMageBane:
 			switch strings.ToLower(e.Template.StackType) {
 			case "casting_time_down", "ma_up":
 			default:
 				continue
 			}
-		case "WARRIOR_BANE":
+		case modelskill.SkillTypeWarriorBane:
 			switch strings.ToLower(e.Template.StackType) {
 			case "attack_time_down", "speed_up":
 			default:

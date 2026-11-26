@@ -17,13 +17,13 @@ func TestMonsterOnlySkillRejection(t *testing.T) {
 	summon := &targetActor{id: 2, kind: actor.KindSummon, owner: player}
 	npc := &targetActor{id: 3, kind: actor.KindNPC, attackableBy: true}
 	monster := &targetActor{id: 4, kind: actor.KindNPC, attackableBy: true, monster: true}
-	skill := func(skillType string) *modelskill.Definition {
+	skill := func(skillType modelskill.SkillType) *modelskill.Definition {
 		return &modelskill.Definition{SkillType: skillType, Offensive: true, Target: modelskill.TargetOne}
 	}
 	for _, tc := range []struct {
 		name           string
 		caster, target Actor
-		skillType      string
+		skillType      modelskill.SkillType
 		want           CastRejection
 	}{
 		{"player spoil on non-monster", player, npc, "SPOIL", CastRejectInvalidTarget},

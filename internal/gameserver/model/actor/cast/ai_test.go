@@ -18,7 +18,7 @@ import (
 // ---- from ai_test.go ----
 func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor, nil)
+	ctrl := NewController(actor, nil, nil)
 	ai := &AIController{Controller: ctrl, Definitions: definitions()}
 
 	if ai.Disabled() {
@@ -36,7 +36,7 @@ func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 
 func TestAIControllerDisabledReflectsAllSkillsDisabled(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ai := &AIController{Controller: NewController(actor, nil), Definitions: definitions()}
+	ai := &AIController{Controller: NewController(actor, nil, nil), Definitions: definitions()}
 
 	if ai.Disabled() {
 		t.Fatal("Disabled() = true before the lock is set")
@@ -81,7 +81,7 @@ func TestAIControllerCanAttemptReflectsCooldown(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1}
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor, nil)
+	ctrl := NewController(actor, nil, nil)
 	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}
 
@@ -99,7 +99,7 @@ func TestAIControllerCanCastReflectsControllerGates(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
 	actor := &testActor{mp: 5, hp: 100}
-	ctrl := NewController(actor, nil)
+	ctrl := NewController(actor, nil, nil)
 	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}
 
@@ -117,7 +117,7 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
 	actor := &testActor{mp: 10, hp: 100, disabledKeys: map[int32]bool{ReuseKey(&def): true}}
-	ctrl := NewController(actor, nil)
+	ctrl := NewController(actor, nil, nil)
 	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}
 
@@ -150,8 +150,7 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -205,8 +204,7 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -277,8 +275,7 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -345,8 +342,7 @@ func (k *mutableKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Actor, _ 
 func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -355,7 +351,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	def.Radius = 900
 	def.SkillType = "DUMMYCAST"
 
-	rec := &recordingSkillHandler{skillTypes: []string{"DUMMYCAST"}}
+	rec := &recordingSkillHandler{skillTypes: []modelskill.SkillType{"DUMMYCAST"}}
 	selected := &fakeCastCreature{id: 2, x: 10, kind: modelactor.KindPlayer}
 	bystander := &fakeCastCreature{id: 3, x: 20, kind: modelactor.KindPlayer}
 	caster, events := newAICaster(t, 1, selected, bystander)
@@ -398,8 +394,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -438,8 +433,7 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 	clock := newCastClock()
 	rec := &event.Recorder{}
-	ctrl := NewController(scalingActor(), rec)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(scalingActor(), rec, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -468,8 +462,7 @@ func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 
 func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	clock := newCastClock()
-	ctrl := NewController(scalingActor(), nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(scalingActor(), nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -504,8 +497,7 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 func TestAIControllerCastReportsHitResult(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -551,8 +543,7 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 func TestAIControllerCastStreamsHandlerMessagesToOnHitResult(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -636,8 +627,7 @@ func (m *mdamMarkerTarget) ReduceHP(float64, attackable.Combatant, modelskill.De
 func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	clock := newCastClock()
 	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewController(actor, nil, clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -675,7 +665,7 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 
 func TestAIControllerCastNoOpsForUnknownSkill(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor, nil)
+	ctrl := NewController(actor, nil, nil)
 	ai := &AIController{Controller: ctrl, Definitions: definitions()}
 	target := &fakeCastCreature{id: 2}
 

@@ -631,7 +631,7 @@ func (f *Folk) BroadcastSkillCanceled() {
 func (f *Folk) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool { return false }
 
 // NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
-func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {}
 
 // ConsumeHP takes a skill's HP cost from f, never below its floor. The
 // cost is a consumption, not a hit: it raises no attacked hook and makes no

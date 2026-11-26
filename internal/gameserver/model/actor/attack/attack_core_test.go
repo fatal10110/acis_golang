@@ -33,7 +33,7 @@ func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			actor := &curseTimingPlayer{timingPlayer: timingPlayer{timingActor: timingActor{attackSpeed: 500}}, blocks: tt.blocks}
 			target := &timingTarget{id: 2, raidRelated: true}
-			ctrl := NewPlayable(actor, nil)
+			ctrl := NewPlayable(actor, nil, nil)
 
 			ctrl.deliverFirstHits(0, []Hit{{Target: target, Damage: 1}}, func() {})
 
@@ -173,7 +173,7 @@ func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
 
 func TestControllerStopIsSilent(t *testing.T) {
 	actor := &timingPlayer{}
-	NewPlayer(actor, nil).Stop()
+	NewPlayer(actor, nil, nil).Stop()
 
 	if actor.actionFailed != 0 {
 		t.Fatalf("Stop() ActionFailed notifications = %d, want 0", actor.actionFailed)
@@ -191,8 +191,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 		reuse:       1500 * time.Millisecond,
 	}}
 	target := &timingTarget{id: 2}
-	ctrl := NewPlayer(actor, nil)
-	ctrl.SetQueue(newTimingClock().q)
+	ctrl := NewPlayer(actor, nil, newTimingClock().q)
 
 	ctrl.DoAttack(target)
 	if got, want := actor.events, []string{"consume", "mp", "hit", "draw", "broadcast"}; !slices.Equal(got, want) {
@@ -226,8 +225,7 @@ func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
 	}}
 	target := &timingTarget{id: 2}
 	clock := newTimingClock()
-	ctrl := NewPlayer(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewPlayer(actor, nil, clock.q)
 
 	ctrl.DoAttack(target)
 	if actor.drawMs != 2035 {
@@ -688,8 +686,7 @@ func TestControllerFinishClosesHitAnimation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			clock := newTimingClock()
-			ctrl := NewAttackable(tt.actor, nil)
-			ctrl.SetQueue(clock.q)
+			ctrl := NewAttackable(tt.actor, nil, clock.q)
 
 			ctrl.DoAttack(&timingTarget{id: 2})
 			clock.fire(tt.finishAt - time.Millisecond)
@@ -710,9 +707,9 @@ func TestControllerFinishClosesHitAnimation(t *testing.T) {
 // AttackFinished, and a bow's reuse ending AttackFinished{BowReuse}.
 func TestControllerAttackRethinkOnlyForNPCs(t *testing.T) {
 	newCtrl := map[string]func(*timingPlayer) *Controller{
-		"npc":      func(a *timingPlayer) *Controller { return NewAttackable(&a.timingActor, nil) },
+		"npc":      func(a *timingPlayer) *Controller { return NewAttackable(&a.timingActor, nil, nil) },
 		"creature": func(a *timingPlayer) *Controller { return newCreatureController(&a.timingActor, nil) },
-		"player":   func(a *timingPlayer) *Controller { return NewPlayer(a, nil) },
+		"player":   func(a *timingPlayer) *Controller { return NewPlayer(a, nil, nil) },
 	}
 	for name, build := range newCtrl {
 		npc := name == "npc"
@@ -806,68 +803,68 @@ func TestControllerReportsHitFeedbackPerActorKind(t *testing.T) {
 	}{
 		{
 			name:  "player miss",
-			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil, nil) },
 			hit:   Hit{Miss: true},
 			want:  []event.HitDealt{{TargetID: 2, Miss: true}},
 		},
 		{
 			name:  "player critical",
-			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil, nil) },
 			hit:   Hit{Damage: 120, Crit: true},
 			want:  []event.HitDealt{{TargetID: 2, Damage: 120, Crit: true}},
 		},
 		{
 			name:  "player normal hit",
-			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil, nil) },
 			hit:   Hit{Damage: 45},
 			want:  []event.HitDealt{{TargetID: 2, Damage: 45}},
 		},
 		{
 			name:   "player against invulnerable target",
-			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil, nil) },
 			hit:    Hit{Damage: 45},
 			target: &timingTarget{id: 2, invul: true},
 			want:   []event.HitDealt{{TargetID: 2, Damage: 45, Blocked: true}},
 		},
 		{
 			name:   "player against petrified target",
-			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil, nil) },
 			hit:    Hit{Damage: 45, Crit: true},
 			target: &timingTarget{id: 2, invul: true, paralyzed: true},
 			want:   []event.HitDealt{{TargetID: 2, Damage: 45, Crit: true, Blocked: true, Petrified: true}},
 		},
 		{
 			name:   "paralyzed but vulnerable target takes the plain message",
-			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil, nil) },
 			hit:    Hit{Damage: 45},
 			target: &timingTarget{id: 2, paralyzed: true},
 			want:   []event.HitDealt{{TargetID: 2, Damage: 45}},
 		},
 		{
 			name:  "summon critical on another target",
-			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
+			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil, nil) },
 			hit:   Hit{Damage: 80, Crit: true},
 			want:  []event.HitDealt{{TargetID: 2, Damage: 80, Crit: true}},
 		},
 		{
 			name:  "summon miss is silent",
-			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
+			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil, nil) },
 			hit:   Hit{Miss: true},
 		},
 		{
 			name:   "summon hitting its owner is silent",
-			build:  func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
+			build:  func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil, nil) },
 			hit:    Hit{Damage: 80},
 			target: &timingTarget{id: owner.id},
 		},
 		{
 			name:  "ownerless summon is silent",
-			build: func() *Controller { return NewPlayable(&timingSummon{}, nil) },
+			build: func() *Controller { return NewPlayable(&timingSummon{}, nil, nil) },
 			hit:   Hit{Damage: 80},
 		},
 		{
 			name:  "npc is silent",
-			build: func() *Controller { return NewAttackable(&timingActor{}, nil) },
+			build: func() *Controller { return NewAttackable(&timingActor{}, nil, nil) },
 			hit:   Hit{Damage: 80, Crit: true},
 		},
 	}
@@ -918,8 +915,7 @@ func TestControllerReportsEachPoleHit(t *testing.T) {
 		known:       []attackable.Combatant{secondary},
 	}}
 	clock := newTimingClock()
-	ctrl := NewPlayer(actor, nil)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewPlayer(actor, nil, clock.q)
 	rec := &event.Recorder{}
 	ctrl.sink = rec
 
@@ -993,7 +989,7 @@ func (s orderSink) Emit(e event.Event) {
 func TestControllerNotifiesHitTargets(t *testing.T) {
 	var log []string
 	actor := &timingPlayer{}
-	ctrl := NewPlayer(actor, orderSink{log: &log})
+	ctrl := NewPlayer(actor, orderSink{log: &log}, nil)
 	primary := &reactingTarget{timingTarget: timingTarget{id: 2}, log: &log}
 	secondary := &reactingTarget{timingTarget: timingTarget{id: 3}, log: &log}
 	zero := &reactingTarget{timingTarget: timingTarget{id: 4}, log: &log}
@@ -1138,15 +1134,15 @@ func TestControllerReflectAbsorbOrder(t *testing.T) {
 			case "summon":
 				actor := &timingSummon{owner: &timingActor{level: tc.ownerLevel}}
 				events = setup(&actor.timingActor)
-				ctrl = NewPlayable(actor, hitLandedLog{events: events})
+				ctrl = NewPlayable(actor, hitLandedLog{events: events}, nil)
 			case "npc":
 				actor := &timingActor{}
 				events = setup(actor)
-				ctrl = NewAttackable(actor, hitLandedLog{events: events})
+				ctrl = NewAttackable(actor, hitLandedLog{events: events}, nil)
 			default:
 				actor := &timingPlayer{}
 				events = setup(&actor.timingActor)
-				ctrl = NewPlayer(actor, hitLandedLog{events: events})
+				ctrl = NewPlayer(actor, hitLandedLog{events: events}, nil)
 			}
 			target := &reflectTarget{
 				timingTarget: timingTarget{id: 2, invul: tc.invul, raidRelated: tc.raid},
@@ -1190,8 +1186,7 @@ func TestControllerSwingSpendsAndRechargesShotsOnce(t *testing.T) {
 	actor := &shotTimingPlayer{timingPlayer: timingPlayer{timingActor: timingActor{attackType: item.WeaponDual, attackSpeed: 500}}}
 	clock := newTimingClock()
 	rec := &event.Recorder{}
-	ctrl := NewPlayer(actor, rec)
-	ctrl.SetQueue(clock.q)
+	ctrl := NewPlayer(actor, rec, clock.q)
 
 	ctrl.DoAttack(&timingTarget{id: 2})
 	clock.fire(250 * time.Millisecond)
@@ -1207,8 +1202,7 @@ func TestControllerSwingSpendsAndRechargesShotsOnce(t *testing.T) {
 	}
 
 	npcRec := &event.Recorder{}
-	npc := NewAttackable(&timingActor{attackSpeed: 500}, npcRec)
-	npc.SetQueue(clock.q)
+	npc := NewAttackable(&timingActor{attackSpeed: 500}, npcRec, clock.q)
 	npcTarget := &timingTarget{id: 3}
 	npc.DoAttack(npcTarget)
 	clock.fire(1500 * time.Millisecond)

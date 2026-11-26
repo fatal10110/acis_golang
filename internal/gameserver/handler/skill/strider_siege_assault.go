@@ -24,7 +24,9 @@ func NewStriderSiegeAssault(check SiegeAssaultCheck) Handler {
 	return striderSiegeAssaultHandler{check: check}
 }
 
-func (striderSiegeAssaultHandler) Types() []string { return []string{"STRIDER_SIEGE_ASSAULT"} }
+func (striderSiegeAssaultHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeStriderSiegeAssault}
+}
 
 func (h striderSiegeAssaultHandler) Use(cast Cast) { h.UseResult(cast) }
 

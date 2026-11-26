@@ -22,7 +22,7 @@ var errSiegeCastRefused = errors.New("siege cast refused")
 // the reason alone, before the cast pays anything.
 func (l *GameClientLink) siegeCastAfterCanCast(live *livePlayer, def modelskill.Definition, target func() skilltarget.Actor) func() error {
 	switch def.SkillType {
-	case "RESURRECT":
+	case modelskill.SkillTypeResurrect:
 		return func() error {
 			if msg := l.siegeResurrectRefusal(live); msg != 0 {
 				live.SendFrame(serverpackets.FrameSystemMessage(msg))
@@ -30,7 +30,7 @@ func (l *GameClientLink) siegeCastAfterCanCast(live *livePlayer, def modelskill.
 			}
 			return nil
 		}
-	case "SUMMON_FRIEND":
+	case modelskill.SkillTypeSummonFriend:
 		// SUMMON_PARTY has no such gate: its refusals come from the
 		// handler, once the cast paid.
 		return func() error {
@@ -41,7 +41,7 @@ func (l *GameClientLink) siegeCastAfterCanCast(live *livePlayer, def modelskill.
 			sendSummonRefusal(sendFrameTo, live, r)
 			return errSiegeCastRefused
 		}
-	case "STRIDER_SIEGE_ASSAULT":
+	case modelskill.SkillTypeStriderSiegeAssault:
 		return func() error {
 			if _, ok := l.siegeAssaultDoor(live, target(), def); !ok {
 				return errSiegeCastRefused

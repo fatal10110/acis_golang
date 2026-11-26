@@ -322,15 +322,18 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 // for; when the member entered or left the world in between, the presence
 // is read again. A member entering meanwhile is so either removed online,
 // or removed before it is marked online, its removal kept for its
-// selection; never removed as offline once online.
+// selection; never removed as offline once online. A member listed online
+// that online finds out of the world is leaving it, not yet marked offline
+// (Leave): its removal is handed to it (handOffLocked).
 func (s *Service) removeMember(cl *Clan, objectID int32, joinExpiry int64, online func(int32) *player.Character, now time.Time) (Member, bool) {
 	for {
 		m, ok := cl.Member(objectID)
 		if !ok {
 			return Member{}, false
 		}
+		resolved := m.Online && online != nil
 		var live *player.Character
-		if m.Online && online != nil {
+		if resolved {
 			live = online(objectID)
 		}
 		cl.mu.Lock()
@@ -338,7 +341,13 @@ func (s *Service) removeMember(cl *Clan, objectID int32, joinExpiry int64, onlin
 			cl.mu.Unlock()
 			continue
 		}
-		out, removed := s.removeLocked(cl, objectID, joinExpiry, live, now)
+		var out Member
+		var removed bool
+		if resolved && live == nil {
+			out, removed = s.handOffLocked(cl, objectID, joinExpiry, now)
+		} else {
+			out, removed = s.removeLocked(cl, objectID, joinExpiry, live, now)
+		}
 		cl.mu.Unlock()
 		return out, removed
 	}
@@ -346,18 +355,55 @@ func (s *Service) removeMember(cl *Clan, objectID int32, joinExpiry int64, onlin
 
 // removeLocked is remove with cl.mu held.
 func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live *player.Character, now time.Time) (Member, bool) {
-	m, ok := cl.members[objectID]
-	wasLeader := objectID == cl.leaderID
+	m, wasLeader, ok := s.dropLocked(cl, objectID)
 	if !ok {
 		return Member{}, false
 	}
+	row := s.removalRow(m, wasLeader, joinExpiry, live, now)
+	if live == nil {
+		m.Entering = s.entries.depart(row)
+	}
+	s.write(objectID, "remove clan member", func(ctx context.Context, st Store) error { return st.RemoveMembership(ctx, row) })
+	return m, true
+}
+
+// handOffLocked is removeLocked, with cl.mu held, for a member listed
+// online whose character already left the world and is yet to be marked
+// offline. No row is written here: the removal is kept for that character,
+// which writes it as an online member's when it is marked offline (Leave),
+// as the saves it queued on its way out took it online.
+func (s *Service) handOffLocked(cl *Clan, objectID int32, joinExpiry int64, now time.Time) (Member, bool) {
+	m, wasLeader, ok := s.dropLocked(cl, objectID)
+	if !ok {
+		return Member{}, false
+	}
+	s.entries.handOff(handOff{member: m, leader: wasLeader, joinExpiry: joinExpiry, now: now})
+	return m, true
+}
+
+// dropLocked takes objectID off cl's roster, with cl.mu held, returning
+// the member it was and whether it led cl.
+func (s *Service) dropLocked(cl *Clan, objectID int32) (m Member, wasLeader, ok bool) {
+	mp, ok := cl.members[objectID]
+	if !ok {
+		return Member{}, false, false
+	}
+	wasLeader = objectID == cl.leaderID
 	delete(cl.members, objectID)
 	cl.memberOrder.Remove(objectID)
 	delete(cl.loginGrades, objectID)
-	s.unlinkLeaverLocked(cl, m)
-	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil}
+	s.unlinkLeaverLocked(cl, mp)
+	return *mp, wasLeader, true
+}
+
+// removalRow is the row removing m at now stores: live is its character
+// when online, nil otherwise. A leader takes the creation penalty a leader
+// leaving takes; a member online keeps its own, and in the academy its own
+// join penalty too.
+func (s *Service) removalRow(m Member, leader bool, joinExpiry int64, live *player.Character, now time.Time) RemovalRow {
+	row := RemovalRow{ObjectID: m.ObjectID, JoinExpiry: joinExpiry, Online: live != nil}
 	switch {
-	case wasLeader:
+	case leader:
 		row.CreateExpiry = now.UnixMilli() + int64(s.cfg.CreateDays)*dayMillis
 	case live != nil:
 		row.CreateExpiry = live.ClanCreateExpiryTime()
@@ -365,12 +411,7 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 			row.JoinExpiry = live.ClanJoinExpiryTime()
 		}
 	}
-	out := *m
-	if live == nil {
-		out.Entering = s.entries.depart(row)
-	}
-	s.write(objectID, "remove clan member", func(ctx context.Context, st Store) error { return st.RemoveMembership(ctx, row) })
-	return out, true
+	return row
 }
 
 // ApplyLeft clears the clan state of m, removed at now, on its live

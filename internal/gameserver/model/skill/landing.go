@@ -1,7 +1,5 @@
 package skill
 
-import "strings"
-
 // LandingPower is the base percent chance a skill's own landing roll starts
 // from: the first positive effect power among its effect templates, else
 // its own positive effectPower, else 20 for PDAM and MDAM, else its power
@@ -15,8 +13,8 @@ func (d Definition) LandingPower() float64 {
 	if d.Extra().EffectPower > 0 {
 		return float64(d.Extra().EffectPower)
 	}
-	switch strings.ToUpper(strings.TrimSpace(d.SkillType)) {
-	case "PDAM", "MDAM":
+	switch d.SkillType.Normalized() {
+	case SkillTypePDam, SkillTypeMDam:
 		return 20
 	}
 	if d.Power <= 0 || d.Power > 100 {
@@ -38,11 +36,11 @@ func (d Definition) LandingEffectType() string {
 	if d.Extra().EffectType != "" {
 		return d.Extra().EffectType
 	}
-	switch strings.ToUpper(strings.TrimSpace(d.SkillType)) {
-	case "PDAM":
-		return "STUN"
-	case "MDAM":
-		return "PARALYZE"
+	switch d.SkillType.Normalized() {
+	case SkillTypePDam:
+		return string(SkillTypeStun)
+	case SkillTypeMDam:
+		return string(SkillTypeParalyze)
 	}
-	return d.SkillType
+	return string(d.SkillType)
 }

@@ -28,7 +28,9 @@ const recallScatter = 20
 
 type recallHandler struct{}
 
-func (recallHandler) Types() []string { return []string{"RECALL", "TELEPORT"} }
+func (recallHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeRecall, modelskill.SkillTypeTeleport}
+}
 
 // Use sends each player target to the skill's fixed coordinates or, without
 // them, to the town, castle or clan hall its recall type names. A player

@@ -1,13 +1,16 @@
 package skill
 
 import (
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 type seedHandler struct{}
 
-func (seedHandler) Types() []string { return []string{"SEED"} }
+func (seedHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSeed}
+}
 
 // Use casts a seed skill: a target that already carries a live seed effect
 // from this exact skill grows its power in place instead of getting a

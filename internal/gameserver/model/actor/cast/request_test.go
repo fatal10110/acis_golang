@@ -20,7 +20,7 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
 	target := &requestTarget{id: 20}
-	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 	defs := requestDefinitions{
 		{ID: 3, Level: 1}: {
 			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -61,7 +61,7 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
-	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 	defs := requestDefinitions{{ID: 3, Level: 1}: {
 		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 	}}
@@ -104,7 +104,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 		if !ch.RecentFakeDeath() {
 			t.Fatal("MarkRecentFakeDeath did not set the grace")
 		}
-		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 		defs := requestDefinitions{{ID: 3, Level: 1}: def}
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
@@ -122,7 +122,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 		ch := newRequestCharacter(10)
 		ch.SetSkillLevel(3, 1)
 		ch.MarkRecentFakeDeath()
-		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 		defs := requestDefinitions{{ID: 3, Level: 1}: def}
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
@@ -142,7 +142,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 		ch := newRequestCharacter(10)
 		ch.SetSkillLevel(3, 1)
 		ch.MarkRecentFakeDeath()
-		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 		defs := requestDefinitions{{ID: 3, Level: 1}: fusionDef}
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
@@ -186,7 +186,7 @@ func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 			if tt.dead {
 				ch.MarkDead()
 			}
-			ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+			ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 
 			if _, err := StartPlayerSkill(PlayerSkillRequest{
 				Now:         time.Unix(1000, 0),
@@ -207,7 +207,7 @@ func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
-	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 	defs := requestDefinitions{
 		{ID: 3, Level: 1}: {ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne},
 	}
@@ -233,7 +233,7 @@ func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 func TestStartItemSkillAcceptsResolvedSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
 	target := &requestTarget{id: 20}
-	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 	def := modelskill.Definition{
 		ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		StaticHitTime: true, HitTime: 800, StaticReuse: true, ReuseDelay: 0,
@@ -287,7 +287,7 @@ func TestStartItemSkillRejectsUnavailableSkill(t *testing.T) {
 			if tt.dead {
 				ch.MarkDead()
 			}
-			ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+			ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 
 			if _, err := StartItemSkill(ItemSkillRequest{
 				Now:         time.Unix(1000, 0),
@@ -307,7 +307,7 @@ func TestStartItemSkillRejectsUnavailableSkill(t *testing.T) {
 
 func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 	ch := newRequestCharacter(10)
-	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 	defs := requestDefinitions{
 		{ID: 7, Level: 1}: {ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne},
 	}
@@ -333,7 +333,7 @@ func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 func TestStartItemSkillKeepsResolverRejection(t *testing.T) {
 	ch := newRequestCharacter(10)
 	target := &requestTarget{id: 20}
-	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil, nil)
 	defs := requestDefinitions{
 		{ID: 7, Level: 1}: {ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetUnlockable},
 	}

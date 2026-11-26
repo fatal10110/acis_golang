@@ -87,7 +87,7 @@ func TestWriteReadFrameRoundTrip(t *testing.T) {
 				t.Fatalf("WriteFrame() error = %v", err)
 			}
 
-			got, err := ReadFrame(&buf)
+			got, err := NewFrameReader(&buf).ReadFrame()
 			if err != nil {
 				t.Fatalf("ReadFrame() error = %v", err)
 			}
@@ -113,7 +113,7 @@ func TestWriteFrameHeader(t *testing.T) {
 func TestReadFrameRejectsShortHeader(t *testing.T) {
 	// Header claims a length shorter than the header itself.
 	r := bytes.NewReader([]byte{0x01, 0x00})
-	if _, err := ReadFrame(r); err == nil {
+	if _, err := NewFrameReader(r).ReadFrame(); err == nil {
 		t.Fatal("ReadFrame() expected error for length < header size, got nil")
 	}
 }
@@ -121,14 +121,14 @@ func TestReadFrameRejectsShortHeader(t *testing.T) {
 func TestReadFrameRejectsTruncatedPayload(t *testing.T) {
 	// Header claims 6 bytes total (4 payload bytes) but only 2 are present.
 	r := bytes.NewReader([]byte{0x06, 0x00, 0x01, 0x02})
-	if _, err := ReadFrame(r); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := NewFrameReader(r).ReadFrame(); !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("ReadFrame() error = %v, want io.ErrUnexpectedEOF", err)
 	}
 }
 
 func TestReadFrameEOFOnEmptyStream(t *testing.T) {
 	r := bytes.NewReader(nil)
-	if _, err := ReadFrame(r); !errors.Is(err, io.EOF) {
+	if _, err := NewFrameReader(r).ReadFrame(); !errors.Is(err, io.EOF) {
 		t.Fatalf("ReadFrame() error = %v, want io.EOF", err)
 	}
 }
@@ -237,7 +237,7 @@ func BenchmarkReadFrame(b *testing.B) {
 		if _, err := r.Seek(0, io.SeekStart); err != nil {
 			b.Fatalf("seek: %v", err)
 		}
-		if _, err := ReadFrame(r); err != nil {
+		if _, err := NewFrameReader(r).ReadFrame(); err != nil {
 			b.Fatalf("ReadFrame: %v", err)
 		}
 	}

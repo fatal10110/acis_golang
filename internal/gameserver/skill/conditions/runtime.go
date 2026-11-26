@@ -36,12 +36,14 @@ func EvaluateSkill(def *modelskill.Definition, caster Source, target any) (model
 	}
 	effector := ActorOf(caster)
 	effected := ActorOf(target)
-	for _, clause := range def.Conditions {
-		cond, err := Compile(clause.Root)
+	skill := SkillOf(def.Extra().Stat)
+	for i := range def.Conditions {
+		clause := def.Conditions[i]
+		cond, err := CompiledClause(&def.Conditions[i])
 		if err != nil || effector == nil {
 			return clause, false
 		}
-		held, aborted := Evaluate(cond, effector, effected, SkillOf(def.Extra().Stat))
+		held, aborted := Evaluate(cond, effector, effected, skill)
 		if aborted {
 			return modelskill.ConditionClause{Root: clause.Root}, false
 		}
@@ -54,15 +56,19 @@ func EvaluateSkill(def *modelskill.Definition, caster Source, target any) (model
 
 // SkillOf is the skill under test whose "stat" set value is constant, an
 // upper-case stat constant name. An empty or unknown value names no stat.
-func SkillOf(constant string) Skill { return definitionSkill{constant} }
-
-// definitionSkill is a skill definition under test (see SkillOf).
-type definitionSkill struct{ stat string }
-
-func (s definitionSkill) Stat() (stat.Stat, bool) {
-	st, err := stat.ByConstantName(s.stat)
-	return st, err == nil
+func SkillOf(constant string) Skill {
+	st, err := stat.ByConstantName(constant)
+	return definitionSkill{stat: st, ok: err == nil}
 }
+
+// definitionSkill is a skill definition under test (see SkillOf), its stat
+// resolved once.
+type definitionSkill struct {
+	stat stat.Stat
+	ok   bool
+}
+
+func (s definitionSkill) Stat() (stat.Stat, bool) { return s.stat, s.ok }
 
 // EvaluateItem tests an item's use conditions against effector using the
 // item on effected, with no skill under test. It reports the first clause
@@ -73,8 +79,9 @@ func (s definitionSkill) Stat() (stat.Stat, bool) {
 // without that clause's feedback. A nil effector fails the first clause
 // that holds a condition.
 func EvaluateItem(uses []item.UseCondition, effector, effected Actor) (failed item.UseCondition, held, aborted bool) {
-	for _, uc := range uses {
-		cond, err := Compile(ItemCondition(uc.Root))
+	for i := range uses {
+		uc := uses[i]
+		cond, err := CompiledItemUse(&uses[i])
 		if err != nil || (cond != nil && effector == nil) {
 			return uc, false, false
 		}

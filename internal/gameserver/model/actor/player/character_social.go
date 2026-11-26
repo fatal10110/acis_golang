@@ -242,16 +242,13 @@ func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target
 	if caster.InPvPZone() && inPvPZone(t) {
 		return true
 	}
-	if targetPlayer.ProtectionBlessing() && c.Level()-targetPlayer.Level() >= 10 && c.Karma() > 0 {
+	if attackable.BlessingShields(targetPlayer, c) || attackable.BlessingShields(c, targetPlayer) {
 		return false
 	}
-	if c.ProtectionBlessing() && targetPlayer.Level()-c.Level() >= 10 && targetPlayer.Karma() > 0 {
+	if targetPlayer.CursedWeaponEquipped() && attackable.CursedWeaponNewbie(c.Level()) {
 		return false
 	}
-	if targetPlayer.CursedWeaponEquipped() && c.Level() <= 20 {
-		return false
-	}
-	if c.CursedWeaponEquipped() && targetPlayer.Level() <= 20 {
+	if c.CursedWeaponEquipped() && attackable.CursedWeaponNewbie(targetPlayer.Level()) {
 		return false
 	}
 	if targetPlayer.PvPFlagState() != task.PvPFlagNone || targetPlayer.Karma() > 0 {

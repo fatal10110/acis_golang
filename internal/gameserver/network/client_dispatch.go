@@ -103,30 +103,30 @@ func newGameInbound() inboundRegistry[byte] {
 	registerFrame(reg, clientpackets.OpcodeExtended, (*GameClientLink).handleExtended)
 	register(reg, clientpackets.OpcodeSnoopQuit, clientpackets.DecodeSnoopQuit, ignoreRequest)
 	register(reg, clientpackets.OpcodeRequestMagicSkillUse, clientpackets.DecodeRequestMagicSkillUse, whenLive((*GameClientLink).handleMagicSkillUse))
-	register(reg, clientpackets.OpcodeAction, clientpackets.DecodeAction, (*GameClientLink).handleAction)
-	register(reg, clientpackets.OpcodeAttackRequest, clientpackets.DecodeAttackRequest, (*GameClientLink).handleAttackRequest)
+	register(reg, clientpackets.OpcodeAction, clientpackets.DecodeAction, whenLiveCtx((*GameClientLink).handleAction))
+	register(reg, clientpackets.OpcodeAttackRequest, clientpackets.DecodeAttackRequest, whenLiveCtx((*GameClientLink).handleAttackRequest))
 	register(reg, clientpackets.OpcodeLogout, noPayload, (*GameClientLink).handleLogout)
 	register(reg, clientpackets.OpcodeMoveBackwardToLocation, clientpackets.DecodeMoveBackwardToLocation, (*GameClientLink).handleMoveBackwardToLocation)
-	register(reg, clientpackets.OpcodeCannotMoveAnymore, clientpackets.DecodeCannotMoveAnymore, (*GameClientLink).handleCannotMoveAnymore)
+	register(reg, clientpackets.OpcodeCannotMoveAnymore, clientpackets.DecodeCannotMoveAnymore, whenLive((*GameClientLink).handleCannotMoveAnymore))
 	register(reg, clientpackets.OpcodeRequestMoveInVehicle, clientpackets.DecodeRequestMoveToLocationInVehicle, whenLive((*GameClientLink).requestMoveInVehicle))
 	register(reg, clientpackets.OpcodeCannotMoveInVehicle, clientpackets.DecodeCannotMoveAnymoreInVehicle, whenLive((*GameClientLink).cannotMoveInVehicle))
 	register(reg, clientpackets.OpcodeRequestGetOnVehicle, clientpackets.DecodeRequestGetOnVehicle, whenLive((*GameClientLink).requestGetOnVehicle))
 	register(reg, clientpackets.OpcodeRequestGetOffVehicle, clientpackets.DecodeRequestGetOffVehicle, whenLive((*GameClientLink).requestGetOffVehicle))
-	register(reg, clientpackets.OpcodeValidatePosition, clientpackets.DecodeValidatePosition, (*GameClientLink).handleValidatePosition)
+	register(reg, clientpackets.OpcodeValidatePosition, clientpackets.DecodeValidatePosition, whenLive((*GameClientLink).handleValidatePosition))
 	register(reg, clientpackets.OpcodeRequestItemList, noPayload, (*GameClientLink).handleRequestItemList)
 	register(reg, clientpackets.OpcodeUseItem, clientpackets.DecodeUseItem, (*GameClientLink).handleUseItem)
-	register(reg, clientpackets.OpcodeRequestUnEquipItem, clientpackets.DecodeUnequipItem, (*GameClientLink).handleRequestUnEquipItem)
+	register(reg, clientpackets.OpcodeRequestUnEquipItem, clientpackets.DecodeUnequipItem, whenLive((*GameClientLink).handleRequestUnEquipItem))
 	register(reg, clientpackets.OpcodeRequestDropItem, clientpackets.DecodeRequestDropItem, (*GameClientLink).handleRequestDropItem)
-	register(reg, clientpackets.OpcodeRequestDestroyItem, clientpackets.DecodeRequestDestroyItem, (*GameClientLink).handleRequestDestroyItem)
+	register(reg, clientpackets.OpcodeRequestDestroyItem, clientpackets.DecodeRequestDestroyItem, whenLive((*GameClientLink).handleRequestDestroyItem))
 	register(reg, clientpackets.OpcodeRequestCrystallizeItem, clientpackets.DecodeRequestCrystallizeItem, whenLive((*GameClientLink).crystallizeLiveItem))
 	register(reg, clientpackets.OpcodeRequestRecipeBookOpen, clientpackets.DecodeRequestRecipeBookOpen, whenLive((*GameClientLink).openRecipeBook))
 	register(reg, clientpackets.OpcodeRequestRecipeBookDestroy, clientpackets.DecodeRequestRecipeBookDestroy, whenLive((*GameClientLink).destroyRecipe))
 	register(reg, clientpackets.OpcodeRequestRecipeItemMakeInfo, clientpackets.DecodeRequestRecipeItemMakeInfo, whenLive((*GameClientLink).sendRecipeItemMakeInfo))
 	register(reg, clientpackets.OpcodeRequestRecipeItemMakeSelf, clientpackets.DecodeRequestRecipeItemMakeSelf, (*GameClientLink).handleRequestRecipeItemMakeSelf)
-	register(reg, clientpackets.OpcodeRequestHennaItemList, clientpackets.DecodeRequestHennaItemList, (*GameClientLink).handleRequestHennaItemList)
+	register(reg, clientpackets.OpcodeRequestHennaItemList, clientpackets.DecodeRequestHennaItemList, whenLive((*GameClientLink).handleRequestHennaItemList))
 	register(reg, clientpackets.OpcodeRequestHennaItemInfo, clientpackets.DecodeRequestHennaItemInfo, whenLive((*GameClientLink).sendHennaItemInfo))
 	register(reg, clientpackets.OpcodeRequestHennaEquip, clientpackets.DecodeRequestHennaEquip, whenLive((*GameClientLink).drawHenna))
-	register(reg, clientpackets.OpcodeRequestHennaUnequipList, clientpackets.DecodeRequestHennaUnequipList, (*GameClientLink).handleRequestHennaUnequipList)
+	register(reg, clientpackets.OpcodeRequestHennaUnequipList, clientpackets.DecodeRequestHennaUnequipList, whenLive((*GameClientLink).handleRequestHennaUnequipList))
 	register(reg, clientpackets.OpcodeRequestHennaUnequipInfo, clientpackets.DecodeRequestHennaUnequipInfo, whenLive((*GameClientLink).sendHennaUnequipInfo))
 	register(reg, clientpackets.OpcodeRequestHennaUnequip, clientpackets.DecodeRequestHennaUnequip, whenLive((*GameClientLink).deleteHenna))
 	// Private store and workshop requests share one decoder table.
@@ -152,16 +152,16 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestJoinSiege, clientpackets.DecodeRequestJoinSiege, whenLive((*GameClientLink).requestJoinSiege))
 	register(reg, clientpackets.OpcodeRequestConfirmSiegeWaitingList, clientpackets.DecodeRequestConfirmSiegeWaitingList, whenLive((*GameClientLink).requestConfirmSiegeWaitingList))
 	register(reg, clientpackets.OpcodeMultiSellChoose, clientpackets.DecodeMultiSellChoose, (*GameClientLink).handleMultiSellChoose)
-	register(reg, clientpackets.OpcodeRequestEnchantItem, clientpackets.DecodeRequestEnchantItem, (*GameClientLink).handleRequestEnchantItem)
+	register(reg, clientpackets.OpcodeRequestEnchantItem, clientpackets.DecodeRequestEnchantItem, whenLiveCtx((*GameClientLink).handleRequestEnchantItem))
 	register(reg, clientpackets.OpcodeRequestSkillList, noPayload, (*GameClientLink).handleRequestSkillList)
 	register(reg, clientpackets.OpcodeRequestAcquireSkillInfo, clientpackets.DecodeRequestAcquireSkillInfo, whenLive((*GameClientLink).sendAcquireSkillInfo))
 	register(reg, clientpackets.OpcodeRequestAcquireSkill, clientpackets.DecodeRequestAcquireSkill, whenLive((*GameClientLink).learnAcquireSkill))
-	register(reg, clientpackets.OpcodeRequestActionUse, clientpackets.DecodeRequestActionUse, (*GameClientLink).handleRequestActionUse)
+	register(reg, clientpackets.OpcodeRequestActionUse, clientpackets.DecodeRequestActionUse, whenLiveCtx((*GameClientLink).handleRequestActionUse))
 	register(reg, clientpackets.OpcodeRequestRestartPoint, clientpackets.DecodeRequestRestartPoint, whenLive((*GameClientLink).restartLivePlayer))
 	register(reg, clientpackets.OpcodeRequestSocialAction, clientpackets.DecodeRequestSocialAction, (*GameClientLink).handleRequestSocialAction)
-	register(reg, clientpackets.OpcodeRequestChangeMoveType, clientpackets.DecodeRequestChangeMoveType, (*GameClientLink).handleRequestChangeMoveType)
-	register(reg, clientpackets.OpcodeRequestChangeWaitType, clientpackets.DecodeRequestChangeWaitType, (*GameClientLink).handleRequestChangeWaitType)
-	register(reg, clientpackets.OpcodeRequestLinkHtml, clientpackets.DecodeRequestLinkHTML, (*GameClientLink).handleRequestLinkHTML)
+	register(reg, clientpackets.OpcodeRequestChangeMoveType, clientpackets.DecodeRequestChangeMoveType, whenLive((*GameClientLink).handleRequestChangeMoveType))
+	register(reg, clientpackets.OpcodeRequestChangeWaitType, clientpackets.DecodeRequestChangeWaitType, whenLive((*GameClientLink).handleRequestChangeWaitType))
+	register(reg, clientpackets.OpcodeRequestLinkHtml, clientpackets.DecodeRequestLinkHTML, whenLive((*GameClientLink).handleRequestLinkHTML))
 	register(reg, clientpackets.OpcodeRequestBypassToServer, clientpackets.DecodeRequestBypassToServer, (*GameClientLink).handleRequestBypassToServer)
 	register(reg, clientpackets.OpcodeRequestShowBoard, clientpackets.DecodeRequestShowBoard, whenLiveDeferring(func(l *GameClientLink, live *livePlayer, _ struct{}) {
 		l.requestShowBoard(live)
@@ -174,17 +174,17 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestPetitionCancel, noPayload, whenLiveNoBody((*GameClientLink).requestPetitionCancel))
 	register(reg, clientpackets.OpcodePetitionVote, clientpackets.DecodePetitionVote, whenLive((*GameClientLink).petitionVote))
 	register(reg, clientpackets.OpcodeRequestTargetCancel, clientpackets.DecodeRequestTargetCancel, whenLive((*GameClientLink).requestTargetCancel))
-	register(reg, clientpackets.OpcodeAppearing, clientpackets.DecodeAppearing, (*GameClientLink).handleAppearing)
-	register(reg, clientpackets.OpcodeObserverReturn, clientpackets.DecodeObserverReturn, (*GameClientLink).handleObserverReturn)
-	register(reg, clientpackets.OpcodeStartRotating, clientpackets.DecodeStartRotating, (*GameClientLink).handleStartRotating)
-	register(reg, clientpackets.OpcodeFinishRotating, clientpackets.DecodeFinishRotating, (*GameClientLink).handleFinishRotating)
+	register(reg, clientpackets.OpcodeAppearing, clientpackets.DecodeAppearing, whenLive((*GameClientLink).handleAppearing))
+	register(reg, clientpackets.OpcodeObserverReturn, clientpackets.DecodeObserverReturn, whenLive((*GameClientLink).handleObserverReturn))
+	register(reg, clientpackets.OpcodeStartRotating, clientpackets.DecodeStartRotating, whenLive((*GameClientLink).handleStartRotating))
+	register(reg, clientpackets.OpcodeFinishRotating, clientpackets.DecodeFinishRotating, whenLive((*GameClientLink).handleFinishRotating))
 	register(reg, clientpackets.OpcodeRequestRestart, noPayload, (*GameClientLink).handleRequestRestart)
 	register(reg, clientpackets.OpcodeSendTimeCheck, clientpackets.DecodeSendTimeCheck, (*GameClientLink).handleSendTimeCheck)
-	register(reg, clientpackets.OpcodeRequestPackageItemList, clientpackets.DecodeRequestPackageSendableItemList, (*GameClientLink).handleRequestPackageItemList)
-	register(reg, clientpackets.OpcodeRequestPetUseItem, clientpackets.DecodeRequestPetUseItem, (*GameClientLink).handleRequestPetUseItem)
-	register(reg, clientpackets.OpcodeRequestGiveItemToPet, clientpackets.DecodeRequestGiveItemToPet, (*GameClientLink).handleRequestGiveItemToPet)
-	register(reg, clientpackets.OpcodeRequestGetItemFromPet, clientpackets.DecodeRequestGetItemFromPet, (*GameClientLink).handleRequestGetItemFromPet)
-	register(reg, clientpackets.OpcodeRequestPetGetItem, clientpackets.DecodeRequestPetGetItem, (*GameClientLink).handleRequestPetGetItem)
+	register(reg, clientpackets.OpcodeRequestPackageItemList, clientpackets.DecodeRequestPackageSendableItemList, whenLive((*GameClientLink).handleRequestPackageItemList))
+	register(reg, clientpackets.OpcodeRequestPetUseItem, clientpackets.DecodeRequestPetUseItem, whenLiveCtx((*GameClientLink).handleRequestPetUseItem))
+	register(reg, clientpackets.OpcodeRequestGiveItemToPet, clientpackets.DecodeRequestGiveItemToPet, whenLiveCtx((*GameClientLink).handleRequestGiveItemToPet))
+	register(reg, clientpackets.OpcodeRequestGetItemFromPet, clientpackets.DecodeRequestGetItemFromPet, whenLiveCtx((*GameClientLink).handleRequestGetItemFromPet))
+	register(reg, clientpackets.OpcodeRequestPetGetItem, clientpackets.DecodeRequestPetGetItem, whenLiveCtx((*GameClientLink).handleRequestPetGetItem))
 	register(reg, clientpackets.OpcodeRequestJoinParty, clientpackets.DecodeRequestJoinParty, whenLive((*GameClientLink).requestJoinParty))
 	register(reg, clientpackets.OpcodeRequestAnswerJoinParty, clientpackets.DecodeRequestAnswerJoinParty, whenLive((*GameClientLink).requestAnswerJoinParty))
 	// A player in no party leaves nothing and hears nothing: the menu
@@ -197,7 +197,7 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeTradeRequest, clientpackets.DecodeTradeRequest, whenLive((*GameClientLink).handleTradeRequest))
 	register(reg, clientpackets.OpcodeAnswerTradeRequest, clientpackets.DecodeAnswerTradeRequest, whenLive((*GameClientLink).handleAnswerTradeRequest))
 	register(reg, clientpackets.OpcodeAddTradeItem, clientpackets.DecodeAddTradeItem, whenLive((*GameClientLink).handleAddTradeItem))
-	register(reg, clientpackets.OpcodeTradeDone, clientpackets.DecodeTradeDone, (*GameClientLink).serveTradeDone)
+	register(reg, clientpackets.OpcodeTradeDone, clientpackets.DecodeTradeDone, whenLiveCtx((*GameClientLink).serveTradeDone))
 	register(reg, clientpackets.OpcodeRequestShortCutReg, clientpackets.DecodeRequestShortCutReg, whenLive((*GameClientLink).registerShortcut))
 	register(reg, clientpackets.OpcodeRequestShortCutDel, clientpackets.DecodeRequestShortCutDel, whenLive((*GameClientLink).deleteShortcut))
 	register(reg, clientpackets.OpcodeRequestMakeMacro, clientpackets.DecodeRequestMakeMacro, whenLive((*GameClientLink).makeMacro))
@@ -243,18 +243,18 @@ func newGameInbound() inboundRegistry[byte] {
 			return nil
 		})
 	}
-	register(reg, clientpackets.OpcodeRequestShowMiniMap, noPayload, (*GameClientLink).handleRequestShowMiniMap)
+	register(reg, clientpackets.OpcodeRequestShowMiniMap, noPayload, whenLiveNoBody((*GameClientLink).handleRequestShowMiniMap))
 	register(reg, clientpackets.OpcodeRequestRecordInfo, noPayload, whenLiveNoBody((*GameClientLink).requestRecordInfo))
 	register(reg, clientpackets.OpcodeSay2, clientpackets.DecodeSay2, (*GameClientLink).serveSay2)
-	register(reg, clientpackets.OpcodeRequestUserCommand, clientpackets.DecodeRequestUserCommand, (*GameClientLink).handleRequestUserCommand)
-	register(reg, clientpackets.OpcodeRequestQuestListInGame, noPayload, (*GameClientLink).handleRequestQuestListInGame)
+	register(reg, clientpackets.OpcodeRequestUserCommand, clientpackets.DecodeRequestUserCommand, whenLive((*GameClientLink).handleRequestUserCommand))
+	register(reg, clientpackets.OpcodeRequestQuestListInGame, noPayload, whenLiveNoBody((*GameClientLink).handleRequestQuestListInGame))
 	for _, op := range []byte{
 		clientpackets.OpcodeRequestTutorialLinkHTML, clientpackets.OpcodeRequestTutorialPassCmdToServer,
 		clientpackets.OpcodeRequestTutorialQuestionMark, clientpackets.OpcodeRequestTutorialClientEvent,
 	} {
-		register(reg, op, tutorialDecoder(op), (*GameClientLink).handleTutorialEvent)
+		register(reg, op, tutorialDecoder(op), whenLive((*GameClientLink).handleTutorialEvent))
 	}
-	register(reg, clientpackets.OpcodeRequestQuestAbort, clientpackets.DecodeRequestQuestAbort, (*GameClientLink).handleRequestQuestAbort)
+	register(reg, clientpackets.OpcodeRequestQuestAbort, clientpackets.DecodeRequestQuestAbort, whenLive((*GameClientLink).handleRequestQuestAbort))
 	for _, op := range unwiredOpcodes {
 		registerFrame(reg, op, func(*GameClientLink, context.Context, *connState, []byte) error { return nil })
 	}
@@ -339,7 +339,7 @@ func newGameExInbound() inboundRegistry[uint16] {
 	register(reg, clientpackets.OpcodeRequestExEnchantSkillInfo, clientpackets.DecodeRequestExEnchantSkillInfo, whenLive((*GameClientLink).sendEnchantSkillInfo))
 	register(reg, clientpackets.OpcodeRequestExEnchantSkill, clientpackets.DecodeRequestExEnchantSkill, whenLive((*GameClientLink).applyEnchantSkill))
 	register(reg, clientpackets.OpcodeRequestManorList, noPayload, (*GameClientLink).handleRequestManorList)
-	registerCapped(reg, clientpackets.OpcodeRequestSetSeed, clientpackets.DecodeRequestSetSeed, (*GameClientLink).handleRequestSetSeed)
+	registerCapped(reg, clientpackets.OpcodeRequestSetSeed, clientpackets.DecodeRequestSetSeed, whenLive((*GameClientLink).handleRequestSetSeed))
 	registerCapped(reg, clientpackets.OpcodeRequestSetCrop, clientpackets.DecodeRequestSetCrop, whenLive((*GameClientLink).requestSetCrop))
 	registerCapped(reg, clientpackets.OpcodeRequestProcureCropList, clientpackets.DecodeRequestProcureCropList, whenLive((*GameClientLink).requestProcureCropList))
 	register(reg, clientpackets.OpcodeRequestExPledgeCrestLarge, clientpackets.DecodeRequestExPledgeCrestLarge, (*GameClientLink).handleRequestExPledgeCrestLarge)
@@ -351,7 +351,7 @@ func newGameExInbound() inboundRegistry[uint16] {
 	register(reg, clientpackets.OpcodeRequestPledgeWarList, clientpackets.DecodeRequestPledgeWarList, whenLive((*GameClientLink).requestPledgeWarList))
 	register(reg, clientpackets.OpcodeRequestPledgeReorganizeMember, clientpackets.DecodeRequestPledgeReorganizeMember, whenLive((*GameClientLink).requestPledgeReorganizeMember))
 	register(reg, clientpackets.OpcodeRequestPledgeSetAcademyMaster, clientpackets.DecodeRequestPledgeSetAcademyMaster, whenLive((*GameClientLink).requestPledgeSetAcademyMaster))
-	register(reg, clientpackets.OpcodeRequestGetBossRecord, clientpackets.DecodeRequestGetBossRecord, (*GameClientLink).handleRequestGetBossRecord)
+	register(reg, clientpackets.OpcodeRequestGetBossRecord, clientpackets.DecodeRequestGetBossRecord, whenLive((*GameClientLink).handleRequestGetBossRecord))
 	register(reg, clientpackets.OpcodeRequestWriteHeroWords, clientpackets.DecodeRequestWriteHeroWords, whenLive((*GameClientLink).writeHeroWords))
 	register(reg, clientpackets.OpcodeRequestExFishRanking, noPayload, whenLiveNoBody((*GameClientLink).requestFishRanking))
 	register(reg, clientpackets.OpcodeRequestPCCafeCouponUse, clientpackets.DecodeRequestPCCafeCouponUse, ignoreRequest)
@@ -377,7 +377,7 @@ func newGameExInbound() inboundRegistry[uint16] {
 	register(reg, clientpackets.OpcodeRequestAskJoinPartyRoom, clientpackets.DecodeRequestAskJoinPartyRoom, whenLive((*GameClientLink).requestAskJoinPartyRoom))
 	register(reg, clientpackets.OpcodeAnswerJoinPartyRoom, clientpackets.DecodeAnswerJoinPartyRoom, whenLive((*GameClientLink).answerJoinPartyRoom))
 	register(reg, clientpackets.OpcodeRequestListPartyMatchingWaitingRoom, clientpackets.DecodeRequestListPartyMatchingWaitingRoom, whenLive((*GameClientLink).requestListWaitingPlayers))
-	register(reg, clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom, noPayload, (*GameClientLink).handleRequestExitPartyMatchingWaitingRoom)
+	register(reg, clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom, noPayload, whenLiveNoBody((*GameClientLink).handleRequestExitPartyMatchingWaitingRoom))
 	register(reg, clientpackets.OpcodeRequestCursedWeaponLocation, noPayload, whenLiveNoBody((*GameClientLink).sendCursedWeaponLocations))
 	register(reg, clientpackets.OpcodeRequestOlympiadObserverEnd, noPayload, whenLiveNoBody((*GameClientLink).requestOlympiadObserverEnd))
 	register(reg, clientpackets.OpcodeRequestOlympiadMatchList, noPayload, whenLiveNoBody((*GameClientLink).requestOlympiadMatchList))
@@ -445,18 +445,27 @@ func decodeAndHandle[T any](
 	return handle(l, ctx, cs, req)
 }
 
-// whenLive adapts handle to run on the queue of the player in the world.
-// With no player in the world the decoded request is dropped.
-func whenLive[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameClientLink, context.Context, *connState, T) error {
-	return func(l *GameClientLink, _ context.Context, cs *connState, req T) error {
+// whenLiveCtx adapts handle to run on the queue of the player in the world,
+// under the connection's context. With no player in the world the decoded
+// request is dropped.
+func whenLiveCtx[T any](handle func(*GameClientLink, context.Context, *livePlayer, T)) func(*GameClientLink, context.Context, *connState, T) error {
+	return func(l *GameClientLink, ctx context.Context, cs *connState, req T) error {
 		if live := cs.live; live != nil {
 			onLive(live, func() {
 				sim.Attribute(live.Queue(), handle)
-				handle(l, live, req)
+				handle(l, ctx, live, req)
 			})
 		}
 		return nil
 	}
+}
+
+// whenLive is whenLiveCtx for a handler that needs no context.
+func whenLive[T any](handle func(*GameClientLink, *livePlayer, T)) func(*GameClientLink, context.Context, *connState, T) error {
+	return whenLiveCtx(func(l *GameClientLink, _ context.Context, live *livePlayer, req T) {
+		sim.Attribute(live.Queue(), handle)
+		handle(l, live, req)
+	})
 }
 
 // whenLiveDeferring is whenLive for a request whose work may defer lookups

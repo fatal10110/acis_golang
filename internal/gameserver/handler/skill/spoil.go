@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -21,7 +22,9 @@ type weaponGradePenalized interface {
 
 type spoilHandler struct{ roll func(int) int }
 
-func (spoilHandler) Types() []string { return []string{"SPOIL"} }
+func (spoilHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSpoil}
+}
 
 // Use marks every live, unspoiled target as spoiled by the caster when the
 // magic-resist roll succeeds.
@@ -82,7 +85,9 @@ type partyLooter interface {
 	LootForParty(itemID int32, count int, spoil bool, origin party.LootOrigin) bool
 }
 
-func (sweepHandler) Types() []string { return []string{"SWEEP"} }
+func (sweepHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeSweep}
+}
 
 // Use drains every target's spoil pool into a player caster's inventory as
 // earned items, then fully clears the pool — including its spoiler marker,

@@ -22,7 +22,7 @@ func newDispatchTestClient(t *testing.T) *Client {
 	if err != nil {
 		t.Fatalf("NewCipher: %v", err)
 	}
-	conn := newConn(discardConn{}, zerolog.Nop())
+	conn := newConn(discardConn{}, zerolog.Nop(), testRejects())
 	t.Cleanup(func() { conn.Close() })
 	return NewClient(NewSession(conn, cipher))
 }

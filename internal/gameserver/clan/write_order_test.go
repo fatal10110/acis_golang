@@ -256,7 +256,14 @@ func TestJoinRacingOustKeepsExpelledMemberOut(t *testing.T) {
 	writes.holdOwner = recruit.ID
 	writes.hook = func() {
 		done = runCompeting(func() {
-			_, _, oust = s.Oust(leader, "Recruit", func(int32) *player.Character { return nil }, func(int32) bool { return true }, time.Now())
+			// The recruit, listed online once it joined, is in the world.
+			online := func(id int32) *player.Character {
+				if id == recruit.ID {
+					return recruit
+				}
+				return nil
+			}
+			_, _, oust = s.Oust(leader, "Recruit", online, func(int32) bool { return true }, time.Now())
 		})
 	}
 

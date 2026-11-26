@@ -208,7 +208,7 @@ func silenceAllStart(e *Effect) bool {
 }
 
 func silentMoveAction(e *Effect) bool {
-	if e.Skill.SkillType != "CONT" {
+	if e.Skill.SkillType != modelskill.SkillTypeCont {
 		return false
 	}
 	return manaDrain(e, true)

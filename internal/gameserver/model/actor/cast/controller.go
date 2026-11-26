@@ -229,9 +229,11 @@ type Controller struct {
 //     CASTING_INTERRUPTED once the owner's AI has moved on (a player's
 //     comes after its CastStopAck, which carries Broken too).
 //
-// A nil sink drops them all.
-func NewController(actor Actor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, sink: sink}
+// A nil sink drops them all. The queue, the owning actor's, runs the
+// controller's scheduled launch, hit and finish callbacks; a scheduled cast
+// needs one.
+func NewController(actor Actor, sink event.Sink, queue *sim.Queue) *Controller {
+	return &Controller{actor: actor, sink: sink, queue: queue}
 }
 
 func (c *Controller) emit(e event.Event) {
@@ -240,8 +242,8 @@ func (c *Controller) emit(e event.Event) {
 	}
 }
 
-// SetQueue runs the controller's scheduled launch, hit and finish callbacks
-// as tasks on q, the owning actor's queue. A scheduled cast needs one.
+// SetQueue moves the controller's scheduled launch, hit and finish
+// callbacks onto q, the queue its actor has just moved to.
 func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -894,7 +896,7 @@ func (c *Controller) CurrentSkillIsMagic() bool {
 // registration where damage on a live FUSION cast reads as non-fusion.
 func (c *Controller) InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool {
 	c.mu.RLock()
-	fusion := c.casting && c.current.SkillType == "FUSION"
+	fusion := c.casting && c.current.SkillType == modelskill.SkillTypeFusion
 	c.mu.RUnlock()
 	return c.InterruptOnDamage(c.Now(), DamageInterrupt{
 		Damage:       damage,
@@ -958,7 +960,7 @@ func ReuseKey(def *modelskill.Definition) int32 {
 // starts, keeps the template hit time, cool time and reuse unscaled, and
 // takes nothing for the skill's consume item, which it only has to hold.
 func FusionTimeline(def *modelskill.Definition) bool {
-	return def.SkillType == "FUSION" || def.SkillType == "SIGNET_CASTTIME"
+	return def.SkillType == modelskill.SkillTypeFusion || def.SkillType == modelskill.SkillTypeSignetCastTime
 }
 
 // Cast timing constants, in milliseconds unless noted.

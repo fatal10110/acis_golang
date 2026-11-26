@@ -9,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -103,9 +104,10 @@ func (f *Folk) RemoveStatsByOwner(owner effect.ModOwner) {
 		return
 	}
 	var modified []stat.Stat
-	for s, calc := range f.calcSlots() {
-		if calc != nil && calc.RemoveOwner(owner) > 0 {
-			modified = append(modified, stat.Stat(s))
+	calcs := f.calcSlots()
+	for s := range owner.OwnedStats() {
+		if calc := calcs[s]; calc != nil && calc.RemoveOwner(owner) > 0 {
+			modified = append(modified, s)
 		}
 	}
 	if owner.Stripped() {
@@ -239,7 +241,7 @@ func (f *Folk) AttackSpeed() int {
 
 // MagicAttackSpeed returns the casting speed.
 func (f *Folk) MagicAttackSpeed() int {
-	return int(f.CalcStat(stat.MagicAttackSpeed, magicAttackSpeedBase))
+	return int(f.CalcStat(stat.MagicAttackSpeed, formulas.AttackSpeedBase))
 }
 
 // MaxHPValue returns the maximum HP in whole points.

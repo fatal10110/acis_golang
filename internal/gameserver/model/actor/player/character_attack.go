@@ -15,14 +15,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
-const (
-	defaultPlayerAttackSpeed      = 300
-	defaultPlayerMagicAttackSpeed = 333
-)
+const defaultPlayerAttackSpeed = 300
 
 var weaponRange = map[item.WeaponType]int{
 	item.WeaponBow:  500,
@@ -374,7 +372,7 @@ func (c *Character) AttackSpeed() int {
 // MagicAttackSpeed returns the casting speed used by magic-skill timing.
 // A rider's hungry mount halves its base.
 func (c *Character) MagicAttackSpeed() int {
-	base := float64(defaultPlayerMagicAttackSpeed)
+	base := float64(formulas.AttackSpeedBase)
 	if m, ok := c.ridden(); ok && m.hungry {
 		base /= 2
 	}

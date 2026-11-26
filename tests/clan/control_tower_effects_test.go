@@ -29,7 +29,7 @@ const (
 // towerEffectSkills are a poison, a heal over time and a sleep, each cast
 // on one target with no cost.
 func towerEffectSkills() []modelskill.Definition {
-	def := func(id int, offensive bool, skillType string, effect modelskill.EffectTemplate) modelskill.Definition {
+	def := func(id int, offensive bool, skillType modelskill.SkillType, effect modelskill.EffectTemplate) modelskill.Definition {
 		return modelskill.Definition{
 			ID: modelskill.ID(id), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			Offensive: offensive, SkillType: skillType, Power: 100, CastRange: 900, HitTime: 500,

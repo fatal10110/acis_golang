@@ -1,5 +1,7 @@
 package skill
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
 // FishingCast asks for a player caster's Fishing skill to cast its line, or
 // to take it out of the water when one is already cast.
 type FishingCast struct{}
@@ -14,7 +16,9 @@ type FishingAction struct {
 
 type fishingHandler struct{}
 
-func (fishingHandler) Types() []string { return []string{"FISHING"} }
+func (fishingHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypeFishing}
+}
 
 // Use hands a player caster's Fishing cast to the fishing stance.
 func (fishingHandler) Use(cast Cast) {
@@ -25,7 +29,9 @@ func (fishingHandler) Use(cast Cast) {
 
 type fishingSkillHandler struct{}
 
-func (fishingSkillHandler) Types() []string { return []string{"PUMPING", "REELING"} }
+func (fishingSkillHandler) Types() []modelskill.SkillType {
+	return []modelskill.SkillType{modelskill.SkillTypePumping, modelskill.SkillTypeReeling}
+}
 
 // Use hands a player caster's pumping or reeling cast to the fishing
 // stance.
@@ -34,7 +40,7 @@ func (fishingSkillHandler) Use(cast Cast) {
 		return
 	}
 	cast.record(FishingAction{
-		Reeling: skillTypeKey(cast.Skill.SkillType) == "REELING",
+		Reeling: cast.Skill.SkillType.Normalized() == modelskill.SkillTypeReeling,
 		Power:   cast.Skill.Power,
 		Level:   cast.Skill.Level,
 	})

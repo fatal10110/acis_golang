@@ -246,7 +246,7 @@ func TestHealCastWithBlessedSpiritshotAddsHealSpsBonus(t *testing.T) {
 func TestContinuousAndDisablerCastsSpendChargedSpiritshot(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
-		skillType string
+		skillType modelskill.SkillType
 		shot      item.ShotKind
 	}{
 		{name: "buff blessed", skillType: "BUFF", shot: item.ShotBlessedSpirit},
@@ -293,7 +293,7 @@ func TestContinuousAndDisablerCastsSpendChargedSpiritshot(t *testing.T) {
 			caster.SetChargedShot(tc.shot, true)
 
 			c.Send(encodeRequestMagicSkillUse(skillID))
-			srv.AdvanceUntil(t, "spiritshot spent by the "+tc.skillType, func() bool { return !caster.ChargedShot(tc.shot) })
+			srv.AdvanceUntil(t, "spiritshot spent by the "+string(tc.skillType), func() bool { return !caster.ChargedShot(tc.shot) })
 			drainUntilQuiet(t, c)
 		})
 	}

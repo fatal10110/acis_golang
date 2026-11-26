@@ -116,16 +116,6 @@ func userInfoRelation(leader bool, siegeState int32) int32 {
 	return relation
 }
 
-// EncodeUserInfo builds the UserInfo packet payload for an unframed send,
-// or nil when s cannot be encoded.
-func EncodeUserInfo(s UserInfoSnapshot) []byte {
-	w := wire.NewPacketWriter(OpcodeUserInfo)
-	if err := writeUserInfo(w, s); err != nil {
-		return nil
-	}
-	return w.Bytes()
-}
-
 // FrameUserInfo builds the UserInfo packet for s as an owned frame.
 func FrameUserInfo(s UserInfoSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeUserInfo)

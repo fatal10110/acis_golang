@@ -120,6 +120,8 @@ func (p *livePlayer) BroadcastFrame(frame wire.Frame) bool {
 	return p.SendFrame(frame)
 }
 
+func (p *livePlayer) frameRejects() *frameRejectReporter { return p.link.rejects }
+
 // sessionOnly reports whether ev is delivered only while p's session is
 // attached. Every other event keeps reaching observers after detach.
 func sessionOnly(ev event.Event) bool {

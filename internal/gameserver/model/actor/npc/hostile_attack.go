@@ -7,12 +7,10 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -162,7 +160,7 @@ func (h *Hostile) AttackSpeed() int {
 // every creature's base casting speed rather than the template's physical
 // attack speed.
 func (h *Hostile) MagicAttackSpeed() int {
-	return int(h.calcStat(stat.MagicAttackSpeed, magicAttackSpeedBase))
+	return int(h.calcStat(stat.MagicAttackSpeed, formulas.AttackSpeedBase))
 }
 
 // ActiveWeaponItem returns this NPC's resolved right-hand weapon, nil when
@@ -264,39 +262,10 @@ func (h *Hostile) Evasion() int { return hostileSkillStats{h: h}.Evasion() }
 // physical-damage formula. A target that can't exchange physical damage (no
 // formula stats) always misses.
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
-	hit := attack.Hit{TargetID: target.ObjectID()}
-
-	// Folding this needs the world known-list to hand out formula operands.
-	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
-	// yields attackable.Combatant, narrowed from world.Tracked, and world
-	// cannot name creature.FormulaActor because creature already depends on
-	// world. The pole and split paths draw their extra targets from that
-	// callback, so the narrowing stays here, at the one point where a
-	// combatant becomes a formula operand; see #2362.
-	other, ok := target.(creature.FormulaActor)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-
-	accuracy := int(h.calcStat(stat.AccuracyCombat, 0))
-	evasion := other.Against(h.ConditionActor(), nil).Evasion()
-
-	_, _, sz := h.Position()
-	_, _, tz := other.Position()
-	behind, inFront := creature.AttackFacing(other, h)
-	rate := formulas.HitRate(accuracy, evasion, sz-tz, h.EffectList().IsNight(), behind, inFront)
-	if formulas.Missed(rate, h.roll(1000)) {
-		hit.Miss = true
-		return hit
-	}
-
-	crit := formulas.CritSucceeds(h.Against(conditions.ActorOf(other), nil).CriticalRate(), h.roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(h, other, crit)
-	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
-	hit.Crit = crit
-	hit.Shield = shield
-	return hit
+	return attack.ResolveHit(h, target, attack.HitRoll{
+		Accuracy: int(h.calcStat(stat.AccuracyCombat, 0)),
+		Night:    h.EffectList().IsNight(),
+	}, split)
 }
 
 // BroadcastAttack reports one resolved attack swing.

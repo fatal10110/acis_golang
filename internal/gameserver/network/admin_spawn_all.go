@@ -13,8 +13,15 @@ const respawnAllTimeout = 30 * time.Second
 
 // adminUnspawnAll answers //unspawnall: every player is told the NPC server
 // is not operating, every NPC leaves the world for good, and every game
-// master online, hidden ones too, is told the unspawn is complete.
-func (l *GameClientLink) adminUnspawnAll(_ *livePlayer, _ string) {
+// master online, hidden ones too, is told the unspawn is complete. It runs
+// on gm's connection goroutine, off gm's queue (deferLookup), since it may
+// wait for a //respawnall under way.
+func (l *GameClientLink) adminUnspawnAll(gm *livePlayer, _ string) {
+	gm.deferLookup(func(context.Context) { l.unspawnAll() })
+}
+
+// unspawnAll runs //unspawnall.
+func (l *GameClientLink) unspawnAll() {
 	l.spawnAll.Lock()
 	defer l.spawnAll.Unlock()
 	l.toAllPlayers(func() wire.Frame {
@@ -35,7 +42,16 @@ func (l *GameClientLink) adminUnspawnAll(_ *livePlayer, _ string) {
 // no game master is told anything. One
 // //respawnall or //unspawnall runs at a time: a second one waits for the
 // first to finish, so it despawns what the first placed.
-func (l *GameClientLink) adminRespawnAll(_ *livePlayer, _ string) {
+//
+// It runs on gm's connection goroutine, off gm's queue (deferLookup): the
+// reads and the wait take long. A game master leaving meanwhile does not cut
+// it short, so the NPCs are not left despawned.
+func (l *GameClientLink) adminRespawnAll(gm *livePlayer, _ string) {
+	gm.deferLookup(func(ctx context.Context) { l.respawnAll(context.WithoutCancel(ctx)) })
+}
+
+// respawnAll runs //respawnall under ctx.
+func (l *GameClientLink) respawnAll(ctx context.Context) {
 	l.spawnAll.Lock()
 	defer l.spawnAll.Unlock()
 	npcs := l.npcSpawns.Load()
@@ -51,7 +67,7 @@ func (l *GameClientLink) adminRespawnAll(_ *livePlayer, _ string) {
 	if npcs != nil {
 		spawns := npcs.Spawns()
 		if l.reloads.SpawnList != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), respawnAllTimeout)
+			ctx, cancel := context.WithTimeout(ctx, respawnAllTimeout)
 			defer cancel()
 			fresh, err := l.reloads.SpawnList(ctx, spawns)
 			if err != nil {

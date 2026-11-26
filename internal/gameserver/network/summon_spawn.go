@@ -575,8 +575,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 			sink.move = controller
 		}
 	}
-	attackController := attack.NewPlayable(actor, sink)
-	attackController.SetQueue(queue)
+	attackController := attack.NewPlayable(actor, sink, queue)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	brain.SetBoatEntrance(summonBoatEntrance{link: l, actor: actor})
 	if actor.IsPet() {
@@ -589,8 +588,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIControll
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
 	brain.SetLogger(l.log)
-	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, sink)
-	castController.SetQueue(queue)
+	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, sink, queue)
 	sink.cast = castController
 	aiController := &actorcast.AIController{
 		Controller:  castController,

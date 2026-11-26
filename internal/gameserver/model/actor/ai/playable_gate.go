@@ -33,17 +33,14 @@ func refusesPlayableTarget(attacker, target attackable.Combatant) bool {
 		return false
 	}
 	if !inPvPZone(target) {
-		if targetPlayer.ProtectionBlessing() && actorPlayer.Level()-targetPlayer.Level() >= 10 && actorPlayer.Karma() > 0 {
-			return true
-		}
-		if actorPlayer.ProtectionBlessing() && targetPlayer.Level()-actorPlayer.Level() >= 10 && targetPlayer.Karma() > 0 {
+		if attackable.BlessingShields(targetPlayer, actorPlayer) || attackable.BlessingShields(actorPlayer, targetPlayer) {
 			return true
 		}
 	}
-	if targetPlayer.CursedWeaponEquipped() && actorPlayer.Level() <= 20 {
+	if targetPlayer.CursedWeaponEquipped() && attackable.CursedWeaponNewbie(actorPlayer.Level()) {
 		return true
 	}
-	return actorPlayer.CursedWeaponEquipped() && targetPlayer.Level() <= 20
+	return actorPlayer.CursedWeaponEquipped() && attackable.CursedWeaponNewbie(targetPlayer.Level())
 }
 
 // actingGatePlayer returns the player acting through c: its owner for a

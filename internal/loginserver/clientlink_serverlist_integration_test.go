@@ -42,7 +42,7 @@ func TestClientLinkServerEntriesUseAdvertisedStatusForOnlineByte(t *testing.T) {
 	servers.Register(7, []byte{0x01})
 	servers.MarkOnline(7, "127.0.0.1", net.ParseIP("127.0.0.1"), 7777, 100)
 
-	l := &ClientLink{servers: servers}
+	l := newBareClientLink(servers)
 	entries := l.serverEntries(0, net.ParseIP("127.0.0.1"))
 	if len(entries) != 1 {
 		t.Fatalf("serverEntries length = %d, want 1", len(entries))
@@ -65,7 +65,7 @@ func TestClientLinkServerEntriesFallbackToLoopbackForNonIPv4Host(t *testing.T) {
 	servers.Register(7, []byte{0x01})
 	servers.MarkOnline(7, "not-an-ip", net.ParseIP("127.0.0.1"), 7777, 100)
 
-	l := &ClientLink{servers: servers}
+	l := newBareClientLink(servers)
 	entries := l.serverEntries(0, net.ParseIP("127.0.0.1"))
 	if len(entries) != 1 {
 		t.Fatalf("serverEntries length = %d, want 1", len(entries))
@@ -337,7 +337,7 @@ func TestClientLinkServerEntriesMaskGMOnlyForPlainAccounts(t *testing.T) {
 	servers.MarkOnline(7, "93.184.216.34", net.ParseIP("10.0.0.5"), 7777, 100)
 	servers.ApplyStatus(7, link.ServerStatus{Status: &gmOnly})
 
-	l := &ClientLink{servers: servers}
+	l := newBareClientLink(servers)
 
 	entries := l.serverEntries(0, net.ParseIP("203.0.113.50"))
 	if len(entries) != 1 || entries[0].Online {
@@ -355,7 +355,7 @@ func TestClientLinkServerEntriesPointLocalClientsAtConnectionIP(t *testing.T) {
 	servers.Register(7, []byte{0x01})
 	servers.MarkOnline(7, "93.184.216.34", net.ParseIP("192.168.1.10"), 7777, 100)
 
-	l := &ClientLink{servers: servers}
+	l := newBareClientLink(servers)
 
 	local := [4]byte{192, 168, 1, 10}
 	if entries := l.serverEntries(0, net.ParseIP("127.0.0.1")); entries[0].IP != local {

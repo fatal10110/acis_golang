@@ -514,7 +514,7 @@ func TestManadamStopsSleepBeforeTheDrainMessages(t *testing.T) {
 // caster the effected, as Pdam/Mdam/Blow/L2SkillChargeDmg/L2SkillDrain's
 // getEffects(targetCreature, creature) does.
 type reflectedDamageCase struct {
-	skillType string
+	skillType modelskill.SkillType
 	reflector func() *skillTarget
 }
 
@@ -552,7 +552,7 @@ func reflectCaster() *skillTarget {
 // none.
 func TestReflectedDamageSkillSwapsEffectorAndEffected(t *testing.T) {
 	for _, tc := range reflectedDamageCases() {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			caster := reflectCaster()
 			caster.skillSuccessChance = chanceOf(0)
 			reflector := tc.reflector()
@@ -582,7 +582,7 @@ func TestReflectedDamageSkillSwapsEffectorAndEffected(t *testing.T) {
 // effector, naming the caster at the cast level — never the caster.
 func TestReflectedDamageSkillReportsResistToTheReflector(t *testing.T) {
 	for _, tc := range reflectedDamageCases() {
-		t.Run(tc.skillType, func(t *testing.T) {
+		t.Run(string(tc.skillType), func(t *testing.T) {
 			caster := reflectCaster()
 			reflector := tc.reflector()
 			result, _ := NewDefaultRegistry().UseResult(Cast{

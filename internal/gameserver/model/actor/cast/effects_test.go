@@ -41,10 +41,10 @@ type pvpEffectsActor struct {
 type pvpSkillCall struct {
 	targets   []attackable.Combatant
 	offensive bool
-	skillType string
+	skillType modelskill.SkillType
 }
 
-func (a *pvpEffectsActor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+func (a *pvpEffectsActor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType modelskill.SkillType) {
 	a.calls = append(a.calls, pvpSkillCall{targets: append([]attackable.Combatant(nil), targets...), offensive: offensive, skillType: skillType})
 }
 
@@ -489,7 +489,7 @@ func (castHostileMove) MoveStraightToLocation(location.Location) (bool, error) {
 	return false, nil
 }
 
-func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, modelskill.SkillType) {}
 
 func (*effectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
 	return false

@@ -1,4 +1,4 @@
-package idfactory
+package objectids
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func (emptyRows) Next([]driver.Value) error { return io.EOF }
 
 // TestBootStatementsMatchReferenceProbe replays testdata/statements.golden,
 // the output of testdata/oracle/IdFactoryProbe.java: every statement the
-// reference IdFactory runs at boot, in order. New must run the same
+// reference IdFactory runs at boot, in order. NewAllocator must run the same
 // statements in the same order (the reference's trailing semicolons aside),
 // plus the owner-decided #4676 additions, each at its stated place.
 func TestBootStatementsMatchReferenceProbe(t *testing.T) {
@@ -84,7 +84,7 @@ func TestBootStatementsMatchReferenceProbe(t *testing.T) {
 	rec := &recorder{}
 	db := sql.OpenDB(connector{rec})
 	defer db.Close()
-	if _, err := New(context.Background(), db, zerolog.Nop()); err != nil {
+	if _, err := NewAllocator(context.Background(), db, zerolog.Nop()); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(rec.seen, want) {
@@ -103,7 +103,7 @@ func TestBootStatementsMatchReferenceProbe(t *testing.T) {
 	}
 }
 
-// issue4676Additions are the statements New runs beyond the reference
+// issue4676Additions are the statements NewAllocator runs beyond the reference
 // probe's, by owner decision on #4676: the boot cleanup removes a missing
 // character's bookmarks, schemes and marriage, and the id scan counts the
 // retired ids of deleted characters, creating their table first. Each runs
