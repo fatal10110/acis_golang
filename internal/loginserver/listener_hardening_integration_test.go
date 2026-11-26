@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestGameServerLinkBlowFishKeyFailureDropsConnection(t *testing.T) {
@@ -115,7 +116,7 @@ func TestClientLinkPurgeDuringActiveTrafficKeepsFramesIntact(t *testing.T) {
 	}
 	read := func() ([]byte, error) {
 		c.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-		payload, err := wire.ReadFrame(c.conn)
+		payload, err := testsupport.ReadFrame(c.conn)
 		if err != nil {
 			return nil, err
 		}

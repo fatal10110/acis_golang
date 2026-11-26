@@ -43,9 +43,6 @@ var _ attackable.Playable = (*livePlayer)(nil)
 type livePlayer struct {
 	*player.Character
 	link *GameClientLink
-	// ctx is the owning connection's context, used by event arms that reach
-	// persistence.
-	ctx context.Context
 	// session sends one frame to this player's client; see SendFrame.
 	session func(wire.Frame) bool
 	npcs    *npc.Table

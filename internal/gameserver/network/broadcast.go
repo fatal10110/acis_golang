@@ -6,9 +6,11 @@ import (
 )
 
 // frameReceiver is a broadcast recipient: it takes ownership of one frame
-// copy made for it alone.
+// copy made for it alone, and names the reporter a source frame no copy can
+// be made of goes to.
 type frameReceiver interface {
 	BroadcastFrame(wire.Frame) bool
+	frameRejects() *frameRejectReporter
 }
 
 // broadcastFrame builds one frame, only once recipients names a first
@@ -22,7 +24,7 @@ func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver)
 // broadcastBuiltFrame hands every receiver recipients names its own copy of
 // an already-built frame, taking ownership of frame.
 func broadcastBuiltFrame(frame wire.Frame, recipients func(func(frameReceiver))) {
-	f := fanout{frame: frame, built: true, rejects: outboundRejects}
+	f := fanout{frame: frame, built: true}
 	defer f.release()
 	recipients(f.send)
 }
@@ -30,10 +32,10 @@ func broadcastBuiltFrame(frame wire.Frame, recipients func(func(frameReceiver)))
 // fanout is the one broadcast fan-out: it builds a frame on first use and
 // hands each recipient an independent pooled copy, because a session
 // encrypts its outgoing bytes in place. A frame no copy can be made of is
-// reported once, with the copy's cause, and reaches no recipient.
+// reported once, with the copy's cause, to the first recipient's reporter,
+// and reaches no recipient.
 type fanout struct {
-	build   func() wire.Frame
-	rejects *frameRejectReporter
+	build func() wire.Frame
 
 	frame  wire.Frame
 	built  bool
@@ -41,7 +43,7 @@ type fanout struct {
 }
 
 func newFanout(build func() wire.Frame) fanout {
-	return fanout{build: build, rejects: outboundRejects}
+	return fanout{build: build}
 }
 
 // send hands receiver its own copy of the frame, building the frame first if
@@ -59,7 +61,7 @@ func (f *fanout) send(receiver frameReceiver) {
 		// Every later copy of the same source would fail the same way, so
 		// the rejection is reported once per broadcast, not per recipient.
 		f.failed = true
-		f.rejects.report("broadcast", err)
+		receiver.frameRejects().report("broadcast", err)
 		return
 	}
 	receiver.BroadcastFrame(frame)

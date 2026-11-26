@@ -11,6 +11,7 @@ import (
 
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
@@ -233,7 +234,7 @@ func TestClientLinkCloseRequestedDuringBlockedWriteIsNotLost(t *testing.T) {
 	go l.handleConnection(ctx, conn)
 
 	clientEnd.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if _, err := wire.ReadFrame(clientEnd); err != nil {
+	if _, err := testsupport.ReadFrame(clientEnd); err != nil {
 		t.Fatalf("read Init frame: %v", err)
 	}
 	cipher, err := commoncrypt.NewBlowfishCipher(testSessionKey)

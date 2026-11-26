@@ -72,7 +72,7 @@ func awaitStopped(t *testing.T, c *Conn) {
 func TestConnChargesWireBytesAgainstHighWater(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
-	c := newConn(server, zerolog.Nop())
+	c := newConn(server, zerolog.Nop(), testRejects())
 
 	const frameSize, writerCap = 1024, 2048
 	want := outboundHighWater / (frameSize + int(unsafe.Sizeof(wire.Frame{})))
@@ -97,7 +97,7 @@ func TestConnBacklogAbortLogsBacklog(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
 	var logs lockedBuffer
-	c := newConn(server, zerolog.New(&logs))
+	c := newConn(server, zerolog.New(&logs), testRejects())
 	session := NewSession(c, nil) // cleartext: the cipher is not enabled yet
 	NewClient(session).SetAuthenticated("bot0042", link.SessionKey{})
 
@@ -180,7 +180,7 @@ func TestConnBacklogAbortLogsBacklog(t *testing.T) {
 func TestConnWriteFailureWithoutAbortIsLogged(t *testing.T) {
 	server, client := net.Pipe()
 	var logs lockedBuffer
-	c := newConn(server, zerolog.New(&logs))
+	c := newConn(server, zerolog.New(&logs), testRejects())
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
 	}

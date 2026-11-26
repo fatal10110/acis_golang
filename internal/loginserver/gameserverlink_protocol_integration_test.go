@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 
@@ -56,7 +57,7 @@ func dialGameServer(t *testing.T, addr string) *fakeGameServer {
 func (f *fakeGameServer) readFrame() []byte {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := testsupport.ReadFrame(f.conn)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}

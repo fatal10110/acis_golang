@@ -1,7 +1,6 @@
 package network
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -55,7 +54,7 @@ func TestStateStringNamesEachState(t *testing.T) {
 
 func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	server, client := net.Pipe()
-	conn := newConn(server, zerolog.Nop())
+	conn := newConn(server, zerolog.Nop(), testRejects())
 	t.Cleanup(func() { _ = client.Close() })
 	t.Cleanup(func() { _ = conn.Close() })
 	// Nothing closes this pipe on a missing reply, so a regression must fail
@@ -78,7 +77,7 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	if err := wire.WriteFrame(client, encodeProtocolVersion(746)); err != nil {
 		t.Fatalf("send protocol version: %v", err)
 	}
-	version, err := wire.ReadFrame(client)
+	version, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read VersionCheck: %v", err)
 	}
@@ -89,14 +88,14 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	if err := wire.WriteFrame(client, encodeAuthLogin("offline", link.SessionKey{})); err != nil {
 		t.Fatalf("send AuthLogin: %v", err)
 	}
-	failure, err := wire.ReadFrame(client)
+	failure, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read AuthLoginFail: %v", err)
 	}
 	if len(failure) == 0 || failure[0] != serverpackets.OpcodeAuthLoginFail {
 		t.Fatalf("AuthLoginFail = %x, want cleartext opcode %#x", failure, serverpackets.OpcodeAuthLoginFail)
 	}
-	closing, err := wire.ReadFrame(client)
+	closing, err := testsupport.ReadFrame(client)
 	if err != nil {
 		t.Fatalf("read ServerClose: %v", err)
 	}
@@ -722,7 +721,7 @@ func benchmarkSession(b *testing.B) *Session {
 	if err != nil {
 		b.Fatalf("NewCipher: %v", err)
 	}
-	conn := newConn(discardConn{}, zerolog.Nop())
+	conn := newConn(discardConn{}, zerolog.Nop(), testRejects())
 	b.Cleanup(func() { conn.Close() })
 	return NewSession(conn, cipher)
 }
@@ -746,20 +745,6 @@ func benchmarkUserInfoSnapshot() serverpackets.UserInfoSnapshot {
 	c := &player.Character{}
 	c.SetName("Benchmark")
 	return serverpackets.UserInfoSnapshot{Character: c}
-}
-
-func benchmarkUserInfoPayload(s serverpackets.UserInfoSnapshot) []byte {
-	return serverpackets.EncodeUserInfo(s)
-}
-
-func TestBenchmarkUserInfoPayloadMatchesFrame(t *testing.T) {
-	snapshot := benchmarkUserInfoSnapshot()
-	frame := serverpackets.FrameUserInfo(snapshot)
-	defer frame.Release()
-
-	if got, want := benchmarkUserInfoPayload(snapshot), frame.Bytes()[frameHeaderSize:]; !bytes.Equal(got, want) {
-		t.Fatal("unpooled UserInfo payload differs from FrameUserInfo")
-	}
 }
 
 func BenchmarkSessionSendUserInfoFrame(b *testing.B) {
@@ -807,7 +792,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 		if err != nil {
 			t.Fatalf("NewCipher: %v", err)
 		}
-		conn := newConn(discardConn{}, zerolog.Nop())
+		conn := newConn(discardConn{}, zerolog.Nop(), testRejects())
 		t.Cleanup(func() { conn.Close() })
 		return NewClient(NewSession(conn, cipher))
 	}
@@ -871,6 +856,8 @@ type retainingReceiver struct {
 
 func (r *retainingReceiver) ObjectID() int32 { return r.id }
 func (*retainingReceiver) Kind() actor.Kind  { return actor.KindPlayer }
+
+func (*retainingReceiver) frameRejects() *frameRejectReporter { return testRejects() }
 
 func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
 	r.mu.Lock()

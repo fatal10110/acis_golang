@@ -67,7 +67,7 @@ const (
 	// ping, id scan, ground-item restore, spawn-state load). These run inside fx.New's constructor graph,
 	// before fx.StartTimeout applies and before Run installs signal handling,
 	// so with context.Background() a stuck database hung the process with no
-	// way to interrupt it. idfactory.New alone runs six full-table scans plus
+	// way to interrupt it. The object id allocator alone runs six full-table scans plus
 	// dozens of orphan-cleanup DELETEs against unindexed owner columns, so the
 	// budget is minutes rather than seconds: generous enough that only a
 	// genuinely hung database ever trips it, not a large but healthy one.

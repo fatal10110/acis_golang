@@ -25,9 +25,13 @@ type rejectLog struct {
 
 func newRejectLog() *rejectLog {
 	r := &rejectLog{now: time.Unix(1_000_000, 0)}
-	r.reporter = newFrameRejectReporter(func() time.Time { return r.now })
-	r.reporter.setLog(zerolog.New(r))
+	r.reporter = newFrameRejectReporter(zerolog.New(r), func() time.Time { return r.now })
 	return r
+}
+
+// testRejects is a reporter for a connection whose rejections no test reads.
+func testRejects() *frameRejectReporter {
+	return newFrameRejectReporter(zerolog.Nop(), time.Now)
 }
 
 func (r *rejectLog) Write(p []byte) (int, error) {
@@ -86,7 +90,12 @@ func TestFrameRejectReporterBoundsDiagnostics(t *testing.T) {
 }
 
 // countingReceiver counts the copies a broadcast hands it.
-type countingReceiver struct{ got int }
+type countingReceiver struct {
+	got     int
+	rejects *frameRejectReporter
+}
+
+func (c *countingReceiver) frameRejects() *frameRejectReporter { return c.rejects }
 
 func (c *countingReceiver) BroadcastFrame(frame wire.Frame) bool {
 	c.got++
@@ -129,11 +138,11 @@ func TestBroadcastFanoutReportsRejectedSourceOnce(t *testing.T) {
 				released, builds := 0, 0
 				var f fanout
 				if eager {
-					f = fanout{frame: tc.frame(&released), built: true, rejects: r.reporter}
+					f = fanout{frame: tc.frame(&released), built: true}
 				} else {
-					f = fanout{build: func() wire.Frame { builds++; return tc.frame(&released) }, rejects: r.reporter}
+					f = fanout{build: func() wire.Frame { builds++; return tc.frame(&released) }}
 				}
-				receivers := []*countingReceiver{{}, {}, {}}
+				receivers := []*countingReceiver{{rejects: r.reporter}, {rejects: r.reporter}, {rejects: r.reporter}}
 				for _, receiver := range receivers {
 					f.send(receiver)
 				}
@@ -164,8 +173,8 @@ func TestBroadcastFanoutReportsRejectedSourceOnce(t *testing.T) {
 func TestBroadcastFanoutCopiesValidSourceToEachRecipient(t *testing.T) {
 	r := newRejectLog()
 	builds := 0
-	f := fanout{build: func() wire.Frame { builds++; return wire.BorrowedFrame([]byte{3, 0, 0x2f}) }, rejects: r.reporter}
-	receivers := []*countingReceiver{{}, {}, {}}
+	f := fanout{build: func() wire.Frame { builds++; return wire.BorrowedFrame([]byte{3, 0, 0x2f}) }}
+	receivers := []*countingReceiver{{rejects: r.reporter}, {rejects: r.reporter}, {rejects: r.reporter}}
 	for _, receiver := range receivers {
 		f.send(receiver)
 	}
@@ -183,7 +192,7 @@ func TestBroadcastFanoutCopiesValidSourceToEachRecipient(t *testing.T) {
 	}
 
 	// Never reaching a recipient, a lazy fan-out never builds.
-	idle := fanout{build: func() wire.Frame { t.Fatal("built with no recipient"); return wire.Frame{} }, rejects: r.reporter}
+	idle := fanout{build: func() wire.Frame { t.Fatal("built with no recipient"); return wire.Frame{} }}
 	idle.release()
 }
 
@@ -242,8 +251,7 @@ func TestSendRejectsInvalidFrameObservably(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRejectLog()
-			conn := newConn(discardConn{}, zerolog.Nop())
-			conn.rejects = r.reporter
+			conn := newConn(discardConn{}, zerolog.Nop(), r.reporter)
 			t.Cleanup(func() { conn.Close() })
 			session := NewSession(conn, nil)
 

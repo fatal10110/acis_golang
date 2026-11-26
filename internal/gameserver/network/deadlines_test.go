@@ -38,7 +38,7 @@ func (c *deadlineConn) SetWriteDeadline(deadline time.Time) error {
 
 func TestSessionReadFrameSetsHandshakeDeadline(t *testing.T) {
 	server, client := net.Pipe()
-	conn := newConn(&deadlineConn{Conn: server, readDeadline: make(chan time.Time, 1)}, zerolog.Nop())
+	conn := newConn(&deadlineConn{Conn: server, readDeadline: make(chan time.Time, 1)}, zerolog.Nop(), testRejects())
 	t.Cleanup(func() {
 		_ = client.Close()
 		_ = conn.Close()
@@ -62,7 +62,7 @@ func TestSessionReadFrameSetsHandshakeDeadline(t *testing.T) {
 func TestSessionKeepsHandshakeDeadlineUntilExplicitlyCompleted(t *testing.T) {
 	server, client := net.Pipe()
 	tracked := &deadlineConn{Conn: server, readDeadline: make(chan time.Time, 2)}
-	conn := newConn(tracked, zerolog.Nop())
+	conn := newConn(tracked, zerolog.Nop(), testRejects())
 	t.Cleanup(func() {
 		_ = client.Close()
 		_ = conn.Close()
@@ -132,7 +132,7 @@ func TestSessionReadTimeoutOverride(t *testing.T) {
 func TestSessionSendFrameSetsWriteDeadline(t *testing.T) {
 	server, client := net.Pipe()
 	tracked := &deadlineConn{Conn: server, writeDeadline: make(chan time.Time, 1)}
-	conn := newConn(tracked, zerolog.Nop())
+	conn := newConn(tracked, zerolog.Nop(), testRejects())
 	t.Cleanup(func() {
 		_ = client.Close()
 		_ = conn.Close()

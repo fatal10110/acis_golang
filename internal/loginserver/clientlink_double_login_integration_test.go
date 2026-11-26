@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // --- client link + game server link sharing one registry and roster ---
@@ -221,7 +222,7 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 			_ = wire.WriteFrame(conn, buf)
 		}
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if _, err := wire.ReadFrame(conn); err != nil { // Init
+		if _, err := testsupport.ReadFrame(conn); err != nil { // Init
 			return
 		}
 		send(encodeAuthGameGuard(testInitSessionID))

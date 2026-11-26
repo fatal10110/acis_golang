@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 
@@ -49,7 +50,7 @@ func sendWithin(t *testing.T, c *Conn, frame wire.Frame) bool {
 func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
-	c := newConn(server, zerolog.Nop())
+	c := newConn(server, zerolog.Nop(), testRejects())
 
 	const frames = 200
 	var released atomic.Int64
@@ -62,7 +63,7 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 	closed := make(chan error, 1)
 	go func() { closed <- c.Close() }()
 	for i := range frames {
-		payload, err := wire.ReadFrame(client)
+		payload, err := testsupport.ReadFrame(client)
 		if err != nil {
 			t.Fatalf("read frame %d: %v", i, err)
 		}
@@ -70,7 +71,7 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 			t.Fatalf("frame %d arrived as sequence %d", i, got)
 		}
 	}
-	if _, err := wire.ReadFrame(client); err == nil {
+	if _, err := testsupport.ReadFrame(client); err == nil {
 		t.Fatal("read after Close drained the queue succeeded, want connection closed")
 	}
 	if err := <-closed; err != nil {
@@ -87,7 +88,7 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 func TestConnSendLastDropsLaterSends(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
-	c := newConn(server, zerolog.Nop())
+	c := newConn(server, zerolog.Nop(), testRejects())
 
 	var released atomic.Int64
 	if !sendWithin(t, c, countedFrame(t, 16, 0, &released)) {
@@ -106,7 +107,7 @@ func TestConnSendLastDropsLaterSends(t *testing.T) {
 	closed := make(chan error, 1)
 	go func() { closed <- c.Close() }()
 	for want := range uint32(2) {
-		payload, err := wire.ReadFrame(client)
+		payload, err := testsupport.ReadFrame(client)
 		if err != nil {
 			t.Fatalf("read frame %d: %v", want, err)
 		}
@@ -114,7 +115,7 @@ func TestConnSendLastDropsLaterSends(t *testing.T) {
 			t.Fatalf("frame %d arrived as sequence %d", want, got)
 		}
 	}
-	if _, err := wire.ReadFrame(client); err == nil {
+	if _, err := testsupport.ReadFrame(client); err == nil {
 		t.Fatal("read past the last frame succeeded, want connection closed")
 	}
 	if err := <-closed; err != nil {
@@ -131,7 +132,7 @@ func TestConnSendLastDropsLaterSends(t *testing.T) {
 func TestConnAbortsStalledReaderAtHighWater(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
-	c := newConn(server, zerolog.Nop())
+	c := newConn(server, zerolog.Nop(), testRejects())
 
 	const frameSize = wire.MaxFrameLength
 	// These frames own no pooled writer, so each costs its bytes plus its
@@ -209,7 +210,7 @@ func (g *gatedWriteConn) Close() error {
 func TestConnWriteErrorClosesConnAndReleasesBacklog(t *testing.T) {
 	server, client := net.Pipe()
 	gated := &gatedWriteConn{Conn: server, entered: make(chan struct{}, 1), proceed: make(chan struct{})}
-	c := newConn(gated, zerolog.Nop())
+	c := newConn(gated, zerolog.Nop(), testRejects())
 
 	var released [4]atomic.Int64
 	if !sendWithin(t, c, countedFrame(t, 16, 0, &released[0])) {
@@ -280,7 +281,7 @@ func TestConnWriteErrorClosesConnAndReleasesBacklog(t *testing.T) {
 func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
-	c := newConn(server, zerolog.Nop())
+	c := newConn(server, zerolog.Nop(), testRejects())
 
 	const writerCap = 4096
 	tinyFrame := func() wire.Frame {
@@ -331,7 +332,7 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 	}
 	peerCipher.Encrypt(nil) // arm it, as the client does once VersionCheck arrives
 	server, client := net.Pipe()
-	session := NewSession(newConn(server, zerolog.Nop()), serverCipher)
+	session := NewSession(newConn(server, zerolog.Nop(), testRejects()), serverCipher)
 	t.Cleanup(func() {
 		client.Close()
 		_ = session.conn.Close() // joins the writer goroutine
@@ -342,7 +343,7 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 	go func() {
 		next := make([]uint32, senders)
 		for range senders * perSender {
-			payload, err := wire.ReadFrame(client)
+			payload, err := testsupport.ReadFrame(client)
 			if err != nil {
 				received <- err
 				return
