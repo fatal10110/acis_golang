@@ -9,33 +9,23 @@ import "sync"
 const DeathHP = 0.5
 
 // Health guards one actor's current hit points. An attacker's hit damages
-// them from the attacker's queue.
+// them from the attacker's queue. The zero value holds no hit points: a dead
+// actor.
 type Health struct {
 	mu      sync.Mutex
-	current *float64
+	current float64
 }
 
-// NewHealth returns a Health component backed by current.
-func NewHealth(current *float64) Health {
+// NewHealth returns a Health holding current hit points.
+func NewHealth(current float64) Health {
 	return Health{current: current}
 }
 
-// Bind points h at current. It lets restored or literal actors bind after
-// construction.
-func (h *Health) Bind(current *float64) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.current = current
-}
-
-// Current returns the current hit points, or zero when h is not bound.
+// Current returns the current hit points.
 func (h *Health) Current() float64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil {
-		return 0
-	}
-	return *h.current
+	return h.current
 }
 
 // Revive sets current hit points to v even on a dead actor: the revive that
@@ -46,9 +36,7 @@ func (h *Health) Current() float64 {
 func (h *Health) Revive(v float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current != nil {
-		*h.current = v
-	}
+	h.current = v
 }
 
 // SetCurrent overrides current hit points unless the actor is already dead,
@@ -56,10 +44,10 @@ func (h *Health) Revive(v float64) {
 func (h *Health) SetCurrent(v float64) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil || *h.current <= 0 {
+	if h.current <= 0 {
 		return false
 	}
-	*h.current = v
+	h.current = v
 	return true
 }
 
@@ -73,13 +61,13 @@ func (h *Health) Add(amount, max float64) float64 {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil || *h.current <= 0 || *h.current >= max {
+	if h.current <= 0 || h.current >= max {
 		return 0
 	}
-	if *h.current+amount > max {
-		amount = max - *h.current
+	if h.current+amount > max {
+		amount = max - h.current
 	}
-	*h.current += amount
+	h.current += amount
 	return amount
 }
 
@@ -91,14 +79,14 @@ func (h *Health) Add(amount, max float64) float64 {
 func (h *Health) Shift(delta, max float64) (written, lethal bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil || *h.current <= 0 {
+	if h.current <= 0 {
 		return false, false
 	}
-	hp := *h.current + delta
+	hp := h.current + delta
 	if hp <= 0 {
 		return false, true
 	}
-	*h.current = min(hp, max)
+	h.current = min(hp, max)
 	return true, false
 }
 
@@ -109,7 +97,7 @@ func (h *Health) Shift(delta, max float64) (written, lethal bool) {
 func (h *Health) WhileAlive(fn func()) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil || *h.current <= 0 {
+	if h.current <= 0 {
 		return false
 	}
 	fn()
@@ -139,14 +127,14 @@ func (h *Health) DamageValueAbove(dmg, floor float64) bool {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil || *h.current <= 0 {
+	if h.current <= 0 {
 		return false
 	}
 
-	*h.current = max(*h.current-dmg, floor)
-	if *h.current >= DeathHP {
+	h.current = max(h.current-dmg, floor)
+	if h.current >= DeathHP {
 		return false
 	}
-	*h.current = 0
+	h.current = 0
 	return true
 }
