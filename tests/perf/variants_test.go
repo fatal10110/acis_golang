@@ -40,9 +40,9 @@ import (
 //	         catalog package, the shipped NPC and skill tables), so the real
 //	         behaviors' hooks run on every hit. The monsters have no cast
 //	         seam: a shipped skill would one-shot the 36-HP test class (the
-//	         cast variant covers casting). The engine catalogs (quests,
-//	         features, teleporters, tasks, base behaviors) join the content
-//	         catalogs, as the production boot joins them. It skips without
+//	         cast variant covers casting). The engine catalog file (quests,
+//	         features, teleporters, tasks, base behaviors) is joined with
+//	         the others, as the production boot joins them. It skips without
 //	         a datapack.
 //	         ACIS_PERF_CATALOG_NPCS bounds how many templates. It implies
 //	         spread, one region per client unless ACIS_PERF_REGIONS says

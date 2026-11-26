@@ -1,4 +1,4 @@
-package maker
+package catalog
 
 import (
 	"path/filepath"
@@ -6,21 +6,22 @@ import (
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
 
-// TestCatalogAgainstShippedSpawnlist pins the maker each shipped npcmaker
+// TestEngineMakersAgainstShippedSpawnlist pins the maker each shipped npcmaker
 // runs: the 13 no_on_start_maker and 231 event_maker npcmakers their own
 // makers, and the 7,621 default_maker npcmakers and the 958 permanent
 // default ones (random_spawn_treasurebox, random_maker) the default maker.
-func TestCatalogAgainstShippedSpawnlist(t *testing.T) {
+func TestEngineMakersAgainstShippedSpawnlist(t *testing.T) {
 	dp := datapack.Require(t)
 	table, err := gamexml.LoadSpawnlist(filepath.Join(dp, "data", "xml", "spawnlist"), zerolog.Nop(), 1)
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}
-	makers := script.NewMakers(Catalog(), Default, script.MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
+	makers := script.NewMakers(engineMakers(), maker.Default, script.MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
 	byType := map[string]int{}
 	for _, m := range table.Makers() {
 		byType[m.AIType]++
@@ -46,7 +47,7 @@ func TestCatalogAgainstShippedSpawnlist(t *testing.T) {
 			t.Errorf("npcmakers of %v = %d, want %d", tc.types, count, tc.count)
 		}
 	}
-	if len(Catalog()) != 2 {
-		t.Errorf("catalog types = %d, want 2", len(Catalog()))
+	if n := len(engineMakers()); n != 2 {
+		t.Errorf("engine maker types = %d, want 2", n)
 	}
 }

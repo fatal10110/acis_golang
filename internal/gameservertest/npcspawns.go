@@ -242,7 +242,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 			t.Fatalf("load spawn data: %v", err)
 		}
 	}
-	makers := maker.Catalog()
+	makers := script.MakerCatalog{"no_on_start_maker": maker.NoOnStart, "event_maker": maker.Event}
 	maps.Copy(makers, deps.makerCatalog)
 	night := deps.night
 	if night == nil {

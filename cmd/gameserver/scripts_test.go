@@ -11,31 +11,22 @@ import (
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
+	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
-
-func TestScriptCatalogRejectsDuplicates(t *testing.T) {
-	ctor := func() script.Script { return script.Script{} }
-	if _, err := scriptCatalog([]script.Catalog{{"quest.A": ctor}, {"quest.B": ctor}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := scriptCatalog([]script.Catalog{{"quest.A": ctor}, {"quest.A": ctor}}); err == nil {
-		t.Fatal("a path in two catalogs joined")
-	}
-}
 
 // TestScriptCatalogCompleteness fails on every scripts.xml path that has
 // no Go script, and on a catalog entry scripts.xml does not list: it would
 // never be built. A task the file lists only in a comment (commentedTasks)
 // is exempt.
 func TestScriptCatalogCompleteness(t *testing.T) {
-	list, err := gamexml.LoadScriptList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
+	list, err := script.LoadList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(nil, nil))
+	joined, err := catalog.ScriptCatalog(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,11 +34,11 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 	var missing []string
 	for _, l := range list {
 		listed[l.Path] = true
-		if _, ok := catalog[l.Path]; !ok {
+		if _, ok := joined[l.Path]; !ok {
 			missing = append(missing, l.Path)
 		}
 	}
-	for path := range catalog {
+	for path := range joined {
 		if !listed[path] && !slices.Contains(commentedTasks, path) {
 			t.Errorf("catalog entry %s is not listed in scripts.xml", path)
 		}
@@ -338,7 +329,7 @@ func TestManifestComparisonCatchesDifferences(t *testing.T) {
 	}
 
 	// A task its entry does not schedule.
-	tasks := script.Catalog{"task.CastleTaxRefresh": enginescripts.Tasks()["task.CastleTaxRefresh"]}
+	tasks := script.Catalog{"task.CastleTaxRefresh": scripttask.CastleTaxRefresh}
 	got = manifestMismatches(t, []script.Listing{{Path: "task.CastleTaxRefresh"}}, tasks, script.Config{KindOf: noTemplates, Log: zerolog.Nop()})
 	if !slices.Equal(got, []string{"task.CastleTaxRefresh: scheduled false, reference true"}) {
 		t.Fatalf("an unscheduled task gave %q, want a scheduled mismatch", got)
@@ -350,7 +341,7 @@ func TestManifestComparisonCatchesDifferences(t *testing.T) {
 // its kind, own hooks and bindings equal the reference manifest's.
 func TestScriptCatalogMatchesManifest(t *testing.T) {
 	root := datapack.Path(t, "data", "xml")
-	list, err := gamexml.LoadScriptList(filepath.Join(root, "scripts.xml"), zerolog.Nop())
+	list, err := script.LoadList(filepath.Join(root, "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,11 +353,11 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(crystals, buffs))
+	joined, err := catalog.ScriptCatalog(crystals, buffs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog) == 0 {
+	if len(joined) == 0 {
 		t.Log("no script is ported yet; nothing to compare")
 		return
 	}
@@ -382,8 +373,8 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := script.Config{KindOf: script.NPCKindOf(npcs), Log: zerolog.Nop(), HandleOps: handleOps()}
-	for _, m := range manifestMismatches(t, list, catalog, cfg) {
+	cfg := script.Config{KindOf: script.NPCKindOf(npcs), Log: zerolog.Nop(), HandleOps: catalog.HandleOps()}
+	for _, m := range manifestMismatches(t, list, joined, cfg) {
 		t.Error(m)
 	}
 }

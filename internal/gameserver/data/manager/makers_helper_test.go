@@ -6,7 +6,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// testMakers is the production maker registry.
+// testMakers is the maker registry of the makers ported with the engine.
 func testMakers() MakerBehaviors {
-	return script.NewMakers(maker.Catalog(), maker.Default, script.MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
+	makers := script.MakerCatalog{"no_on_start_maker": maker.NoOnStart, "event_maker": maker.Event}
+	return script.NewMakers(makers, maker.Default, script.MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
 }

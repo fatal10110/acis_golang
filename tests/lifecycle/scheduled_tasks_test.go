@@ -23,7 +23,7 @@ import (
 // datapack lists it, the task clock starting at start.
 func shippedTask(t *testing.T, path string, ctor func() script.Script, start time.Time) []gameservertest.Option {
 	t.Helper()
-	list, err := gamexml.LoadScriptList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
+	list, err := script.LoadList(datapack.Path(t, "data", "xml", "scripts.xml"), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("load scripts.xml: %v", err)
 	}

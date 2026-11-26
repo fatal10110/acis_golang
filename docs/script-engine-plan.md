@@ -166,7 +166,7 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
   is enforced by the compiler.
 - **Catalog files are pre-created, one per owner issue** (`script/catalog/quests_301_up.go`,
   `ai_individual_1.go`, `makers_2.go`), in one scaffold PR. Each lists its owner's paths or
-  maker types with a nil constructor until ported. A content lane edits only its own catalog
+  maker types. A content lane edits only its own catalog
   file and the handle-operations file generated beside it.
 - **Quest journal:** new leaf package `model/questlog`, held by `player.Character`.
 
@@ -432,7 +432,7 @@ uses.
    - One unit test covers the four hand-kept `Hooks` lists (fields, invokers, `With`, bound
      set).
    - The kind-specific handle operations each hook reaches, which the handle half of the
-     seam gate reads at boot (`internal/gameserver/script/enginescripts/catalogs_handleops.go`), equal a `go/types`
+     seam gate reads at boot (the `*_handleops.go` files beside each `internal/gameserver/script/catalog` file), equal a `go/types`
      scan of the script sources.
 3. **Engine contracts, once.** About 45 reference-derived goldens: cond and flags bits; set
    cond and exit packet and SQL order; quest list contents; four drop types with roll counts

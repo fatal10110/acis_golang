@@ -291,7 +291,7 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	if v.catalog {
 		heard := cat.attacked.Load()
-		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed (%d from the engine catalogs, %d monsters bound to one), attacked hooks=%d", len(cat.templates), clients, len(cat.list), cat.engineListed, cat.enginePicked, heard)
+		t.Logf("  catalog: %d scripted monster templates over %d clients, %d scripts listed (%d from the engine catalog file, %d monsters bound to one), attacked hooks=%d", len(cat.templates), clients, len(cat.list), cat.engineListed, cat.enginePicked, heard)
 		if heard == 0 {
 			t.Errorf("the catalog variant ran no script hook: the shipped scripts were not bound")
 		}

@@ -12,62 +12,31 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// engineOwner names the catalogs of the scripts and makers ported with the
-// engine, in the owner reports.
-const engineOwner = "engine"
-
 // TestScriptCatalogOwners: every script of the reference manifest (the
-// scripts.xml listing) has exactly one owner, the engine catalogs or
-// one content catalog file, and no catalog holds a script the manifest does
-// not list, but for the tasks scripts.xml lists only in a comment
-// (commentedTasks). A script not ported (a nil constructor) fails it: no
-// NPC id is left without the behavior the reference binds to it.
+// scripts.xml listing) has exactly one owner, one catalog file, and no
+// catalog holds a script the manifest does not list, but for the tasks
+// scripts.xml lists only in a comment (commentedTasks).
 func TestScriptCatalogOwners(t *testing.T) {
-	sagas := thirdclass.NewFamily()
-	owned := map[string]script.Catalog{engineOwner: {}}
-	for _, c := range enginescripts.Catalogs(nil, nil, sagas) {
-		maps.Copy(owned[engineOwner], c)
-	}
-	maps.Copy(owned, catalog.Scripts(sagas))
 	want := append(slices.Collect(maps.Keys(readScriptManifest(t))), commentedTasks...)
-	checkOwners(t, "script", want, owned)
+	checkOwners(t, "script", want, catalog.Scripts(nil, nil, thirdclass.NewFamily()))
 }
 
 // TestMakerCatalogOwners: every npcmaker type the reference gives a maker of
-// its own has exactly one owner, the maker package or one content catalog
-// file, and no catalog holds another type. A type not ported (a nil
-// constructor) fails it: no such type falls to the default maker.
+// its own has exactly one owner, one catalog file, and no catalog holds
+// another type.
 func TestMakerCatalogOwners(t *testing.T) {
-	owned := map[string]script.MakerCatalog{engineOwner: maker.Catalog()}
-	maps.Copy(owned, catalog.Makers())
-	checkOwners(t, "maker type", readMakerTypes(t), owned)
+	checkOwners(t, "maker type", readMakerTypes(t), catalog.Makers())
 }
 
-// checkOwners fails on every owner problem and on every key not ported (a
-// nil constructor), by owner.
+// checkOwners fails on every owner problem.
 func checkOwners[C ~map[string]func() T, T any](t *testing.T, what string, want []string, owned map[string]C) {
 	t.Helper()
 	for _, p := range ownerProblems(what, want, owned) {
 		t.Error(p)
-	}
-	for _, name := range slices.Sorted(maps.Keys(owned)) {
-		var unported []string
-		for key, ctor := range owned[name] {
-			if ctor == nil {
-				unported = append(unported, key)
-			}
-		}
-		if len(unported) == 0 {
-			continue
-		}
-		slices.Sort(unported)
-		t.Errorf("%s: %d of %d not ported: %s", name, len(unported), len(owned[name]), strings.Join(unported, ", "))
 	}
 }
 
@@ -116,25 +85,6 @@ func TestOwnerProblemsCatchesMistakes(t *testing.T) {
 		if got := ownerProblems("maker type", []string{"x", "y"}, tc.owned); !slices.Equal(got, tc.want) {
 			t.Errorf("owned %v: problems %q, want %q", tc.owned, got, tc.want)
 		}
-	}
-}
-
-// TestScriptCatalogDropsUnported: the join leaves out the entries not
-// ported yet, and still rejects one in two catalogs.
-func TestScriptCatalogDropsUnported(t *testing.T) {
-	ctor := func() script.Script { return script.Script{} }
-	got, err := scriptCatalog([]script.Catalog{{"quest.A": ctor}, {"quest.B": nil}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if keys := slices.Sorted(maps.Keys(got)); !slices.Equal(keys, []string{"quest.A"}) {
-		t.Fatalf("joined %v, want only the ported quest.A", keys)
-	}
-	if _, err := scriptCatalog([]script.Catalog{{"quest.A": ctor}, {"quest.A": nil}}); err == nil {
-		t.Fatal("a path ported in one catalog and not in another joined")
-	}
-	if _, err := makerCatalog([]script.MakerCatalog{{"a_maker": nil}, {"a_maker": nil}}); err == nil {
-		t.Fatal("a maker type in two catalogs joined")
 	}
 }
 

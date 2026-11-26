@@ -17,17 +17,14 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/enginescripts"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
 	"github.com/fatal10110/acis_golang/internal/testsupport/handleops"
 	"github.com/rs/zerolog"
 )
 
-// catalogDir is the content catalog package, engineDir the one holding the
-// catalogs of the scripts ported with the engine.
-var (
-	catalogDir = filepath.Join("..", "..", "internal", "gameserver", "script", "catalog")
-	engineDir  = filepath.Join("..", "..", "internal", "gameserver", "script", "enginescripts")
-)
+// catalogDir is the catalog package.
+var catalogDir = filepath.Join("..", "..", "internal", "gameserver", "script", "catalog")
 
 // handleOpsTarget is a Go file holding script catalogs and the generated
 // file beside it that holds the handle operations of their scripts: name
@@ -36,11 +33,11 @@ type handleOpsTarget struct {
 	source, out, pkg, name string
 }
 
-// handleOpsTargets returns the engine catalogs file and every catalog file of the content
-// catalog package that holds script catalogs.
+// handleOpsTargets returns every file of the catalog package that holds a
+// script catalog.
 func handleOpsTargets(t *testing.T) []handleOpsTarget {
 	t.Helper()
-	out := []handleOpsTarget{{source: filepath.Join(engineDir, "catalogs.go"), out: filepath.Join(engineDir, "catalogs_handleops.go"), pkg: "enginescripts", name: "HandleOps"}}
+	var out []handleOpsTarget
 	files, err := filepath.Glob(filepath.Join(catalogDir, "*.go"))
 	if err != nil {
 		t.Fatal(err)
@@ -70,15 +67,14 @@ func handleOpsTargets(t *testing.T) []handleOpsTarget {
 // TestScriptHandleOpsAreCurrent derives, from the script sources, the
 // kind-specific handle operations each catalog script's hooks reach, and
 // fails when the generated files the seam gate reads at boot say
-// otherwise: the engine package's catalogs_handleops.go for the scripts ported with the engine, and one
-// file beside each content catalog file for its scripts.
+// otherwise: one file beside each catalog file for its scripts.
 // ACIS_CAPTURE_GOLDEN=1 rewrites the files.
 func TestScriptHandleOpsAreCurrent(t *testing.T) {
 	prog, err := handleops.Load(filepath.Join("..", ".."), "./internal/gameserver/script/...")
 	if err != nil {
 		t.Fatal(err)
 	}
-	built, err := scriptCatalog(scriptCatalogs(nil, nil))
+	built, err := catalog.ScriptCatalog(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,9 +152,9 @@ func generateHandleOps(t *testing.T, prog *handleops.Program, catalog map[string
 func TestManifestComparisonReportsHandleRefusal(t *testing.T) {
 	const path = "script.feature.NewbieHelper"
 	list := []script.Listing{{Path: path}}
-	catalog := script.Catalog{path: enginescripts.Features(nil)[path]}
+	helper := script.Catalog{path: func() script.Script { return newbiehelper.New(nil) }}
 	folk := func(int32) (script.NPCKind, bool) { return script.KindFolk, true }
-	got := manifestMismatches(t, list, catalog, script.Config{KindOf: folk, Log: zerolog.Nop(), HandleOps: enginescripts.HandleOps()})
+	got := manifestMismatches(t, list, helper, script.Config{KindOf: folk, Log: zerolog.Nop(), HandleOps: catalog.HandleOps()})
 	if !slices.Equal(got, []string{"script " + path + " refused"}) {
 		t.Fatalf("a script calling a hostile-only operation on civilian npcs gave %q", got)
 	}
