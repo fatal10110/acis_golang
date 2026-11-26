@@ -7,7 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -139,7 +139,7 @@ func (l *GameClientLink) requestAskJoinPartyRoom(live *livePlayer, req clientpac
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
 	}
-	if l.tradeBook().Invite(tradebook.KindPartyRoom, live.ObjectID(), target.ObjectID(), false).Status != tradebook.RequestStarted {
+	if l.tradeBook().Invite(request.KindPartyRoom, live.ObjectID(), target.ObjectID(), false).Status != request.RequestStarted {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
@@ -151,7 +151,7 @@ func (l *GameClientLink) requestAskJoinPartyRoom(live *livePlayer, req clientpac
 // refusal tells the inviter; an acceptance enters live into the inviter's
 // room as requestJoinPartyRoom does.
 func (l *GameClientLink) answerJoinPartyRoom(live *livePlayer, req clientpackets.Response) {
-	requesterID, ok := l.tradeBook().TakeInvite(tradebook.KindPartyRoom, live.ObjectID())
+	requesterID, ok := l.tradeBook().TakeInvite(request.KindPartyRoom, live.ObjectID())
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return

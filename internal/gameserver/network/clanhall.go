@@ -96,18 +96,11 @@ func (l *GameClientLink) ReturnAdena(clanID int32, adena int) clanhall.Landing {
 	if adena <= 0 {
 		return nil
 	}
-	var id int32
-	if wh.Adena() == 0 {
-		if id, err = l.nextObjectID(); err != nil {
-			l.log.Error().Err(err).Int32("clan_id", clanID).Int("adena", adena).Msg("clan hall: no object id for a refund")
-			return nil
-		}
+	stack, err := wh.AddCreated(item.AdenaID, adena, l.nextObjectID)
+	if err != nil {
+		l.log.Error().Err(err).Int32("clan_id", clanID).Int("adena", adena).Msg("clan hall: no object id for a refund")
 	}
-	stack := wh.AddNew(item.AdenaID, adena, id)
 	if stack == nil {
-		if id != 0 {
-			l.releaseObjectID(id)
-		}
 		return nil
 	}
 	return l.landItems(stack)

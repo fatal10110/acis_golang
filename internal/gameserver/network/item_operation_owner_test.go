@@ -7,8 +7,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
 
 // TestSettleConfirmedTradeHoldsBothTradersOwners pins the trade's wiring of
@@ -32,7 +32,7 @@ func TestSettleConfirmedTradeHoldsBothTradersOwners(t *testing.T) {
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: giverStack, Count: 10})
 	link.handleTradeDone(context.Background(), second, clientpackets.TradeDone{Response: 1})
 	ready := link.trades.Confirm(first.ObjectID())
-	if ready.Status != tradebook.DoneReady {
+	if ready.Status != request.DoneReady {
 		t.Fatalf("Confirm status = %v, want ready", ready.Status)
 	}
 

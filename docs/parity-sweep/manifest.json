@@ -2091,18 +2091,18 @@
    "java_start": "TradeList, TradeRequest, PrivateStore*, warehouse deposit/withdraw",
    "evidence": "tests/trade, tests/items",
    "evidence_packages": [
-    "./internal/gameserver/exchange",
+    "./internal/gameserver/multisell",
     "./internal/gameserver/inventory",
     "./internal/gameserver/model/actor/player",
     "./internal/gameserver/privatestore",
-    "./internal/gameserver/trade",
+    "./internal/gameserver/request",
     "./tests/items",
     "./tests/trade"
    ],
    "prod_lines": 4799,
    "generated_lines": 0,
    "files": [
-    "internal/gameserver/exchange/exchange.go",
+    "internal/gameserver/multisell/multisell.go",
     "internal/gameserver/inventory/warehouse.go",
     "internal/gameserver/model/actor/player/character_privatestore.go",
     "internal/gameserver/model/actor/player/character_script_warehouse.go",
@@ -2116,8 +2116,8 @@
     "internal/gameserver/privatestore/open.go",
     "internal/gameserver/privatestore/store.go",
     "internal/gameserver/privatestore/views.go",
-    "internal/gameserver/trade/book.go",
-    "internal/gameserver/trade/result.go"
+    "internal/gameserver/request/book.go",
+    "internal/gameserver/request/result.go"
    ],
    "routed_handlers": [
     "client_ingame.go:handleRequestPackageItemList"

@@ -8,7 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/clientwire"
 )
@@ -26,7 +26,7 @@ func TestLogoutHoldingPartyInviteCancelsTrade(t *testing.T) {
 		elapsed time.Duration
 	}{
 		{"pending", 0},
-		{"past expiry", trade.RequestTimeout + time.Second},
+		{"past expiry", request.RequestTimeout + time.Second},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var clock atomic.Int64

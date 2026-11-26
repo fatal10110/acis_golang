@@ -1,4 +1,4 @@
-package trade
+package request
 
 import (
 	"testing"

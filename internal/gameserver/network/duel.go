@@ -13,9 +13,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
 
 // partyView is a copy of one live players' party.
@@ -53,7 +53,7 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 		}
 		l.leavePartyMatch(live)
 		l.leavePartyMatch(target)
-		if !l.challengeToDuel(live, target, tradebook.KindDuel) {
+		if !l.challengeToDuel(live, target, request.KindDuel) {
 			return
 		}
 		target.SendFrame(serverpackets.FrameExDuelAskStart(live.CharacterName(), false))
@@ -73,7 +73,7 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 		return
 	}
 	l.prepareDuelParties(own.Members, targetParty.Members)
-	if !l.challengeToDuel(live, leader, tradebook.KindPartyDuel) {
+	if !l.challengeToDuel(live, leader, request.KindPartyDuel) {
 		return
 	}
 	leader.SendFrame(serverpackets.FrameExDuelAskStart(live.CharacterName(), true))
@@ -84,8 +84,8 @@ func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.Re
 // challengeToDuel records live's challenge of target, of kind. A target
 // that became busy since it was checked is reported busy and challenged by
 // no one.
-func (l *GameClientLink) challengeToDuel(live, target *livePlayer, kind tradebook.RequestKind) bool {
-	if l.tradeBook().Invite(kind, live.ObjectID(), target.ObjectID(), false).Status != tradebook.RequestStarted {
+func (l *GameClientLink) challengeToDuel(live, target *livePlayer, kind request.RequestKind) bool {
+	if l.tradeBook().Invite(kind, live.ObjectID(), target.ObjectID(), false).Status != request.RequestStarted {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return false
 	}
@@ -144,10 +144,10 @@ func (l *GameClientLink) prepareDuelParties(a, b []*livePlayer) {
 // asked for, whatever kind the answer names.
 func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpackets.RequestDuelAnswerStart) {
 	party := false
-	requesterID, ok := l.tradeBook().TakeInvite(tradebook.KindDuel, live.ObjectID())
+	requesterID, ok := l.tradeBook().TakeInvite(request.KindDuel, live.ObjectID())
 	if !ok {
 		party = true
-		if requesterID, ok = l.tradeBook().TakeInvite(tradebook.KindPartyDuel, live.ObjectID()); !ok {
+		if requesterID, ok = l.tradeBook().TakeInvite(request.KindPartyDuel, live.ObjectID()); !ok {
 			return
 		}
 	}

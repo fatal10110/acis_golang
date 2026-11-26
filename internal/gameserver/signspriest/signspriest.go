@@ -649,12 +649,9 @@ func (h *handler) reduceAdena(count int, say bool) bool {
 		}
 		return false
 	}
-	if count <= 0 {
-		return true
-	}
-	taken := inv.DestroyByTemplateID(item.AdenaID, count)
+	taken, ok := inv.PayAdena(count)
 	if taken == nil {
-		return false
+		return ok
 	}
 	h.reply.Taken = append(h.reply.Taken, taken)
 	if say {

@@ -9,8 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
 
 // requestAskJoinChannel invites the named player's party into the command
@@ -35,7 +35,7 @@ func (l *GameClientLink) requestAskJoinChannel(live *livePlayer, req clientpacke
 	if !l.commandChannelAuthority(live, false) {
 		return
 	}
-	if l.tradeBook().Invite(tradebook.KindCommandChannel, live.ObjectID(), targetLeader.ObjectID(), false).Status != tradebook.RequestStarted {
+	if l.tradeBook().Invite(request.KindCommandChannel, live.ObjectID(), targetLeader.ObjectID(), false).Status != request.RequestStarted {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, targetLeader.CharacterName()))
 		return
 	}
@@ -48,7 +48,7 @@ func (l *GameClientLink) requestAskJoinChannel(live *livePlayer, req clientpacke
 // either side no longer leading as it did at the invitation, nothing
 // answers and no Strategy Guide is spent.
 func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpackets.Response) {
-	requesterID, ok := l.tradeBook().TakeInvite(tradebook.KindCommandChannel, live.ObjectID())
+	requesterID, ok := l.tradeBook().TakeInvite(request.KindCommandChannel, live.ObjectID())
 	if !ok {
 		return
 	}

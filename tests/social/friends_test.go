@@ -11,7 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -227,7 +227,7 @@ func TestFriendInviteExpires(t *testing.T) {
 
 	p.alice.Send(encodeFriendInvite("Bobby"))
 	assertOpcode(t, p.bobby.Read(), serverpackets.OpcodeFriendAddRequest, "FriendAddRequest")
-	clock.Add(int64(trade.RequestTimeout))
+	clock.Add(int64(request.RequestTimeout))
 
 	p.bobby.Send(encodeAnswerFriendInvite(1))
 	assertSilent(t, p.bobby, "target answering an expired invitation")

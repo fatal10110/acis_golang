@@ -12,8 +12,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/rs/zerolog"
 )
 
@@ -64,13 +64,13 @@ func (l *GameClientLink) stopLiveActivity(live *livePlayer) {
 // closeLiveSessionState closes the session's open requests, windows and
 // timers before the saves are enqueued. It returns the trade cancel to
 // announce once live has left its party.
-func (l *GameClientLink) closeLiveSessionState(live *livePlayer) tradebook.CancelResult {
+func (l *GameClientLink) closeLiveSessionState(live *livePlayer) request.CancelResult {
 	// Leaving while holding a request still to answer, of any kind,
 	// cancels the open trade; otherwise it stays open on the partner's
 	// side. The session closes here, before the saves below, so the partner
 	// can no longer settle against live's inventory; both sides hear of the
 	// cancel only after the party leave below.
-	var canceledTrade tradebook.CancelResult
+	var canceledTrade request.CancelResult
 	if l.trades != nil && l.trades.HoldsRequest(live.ObjectID()) {
 		canceledTrade = l.trades.Cancel(live.ObjectID())
 	}
@@ -226,13 +226,13 @@ func (l *GameClientLink) dropLiveAttackStance(live *livePlayer) {
 }
 
 // leaveLiveWorld runs while live is out of sight but still listed online.
-func (l *GameClientLink) leaveLiveWorld(live *livePlayer, canceledTrade tradebook.CancelResult) {
+func (l *GameClientLink) leaveLiveWorld(live *livePlayer, canceledTrade request.CancelResult) {
 	// Out of sight, still listed online: out of its party and the
 	// Olympiad's waiting list, then the trade cancel decided above, then
 	// its friends told it left.
 	l.leaveParty(live)
 	l.dropOlympiadCompetitor(live)
-	if canceledTrade.Status == tradebook.CancelDone {
+	if canceledTrade.Status == request.CancelDone {
 		l.announceTradeCanceled(canceledTrade.Session, live)
 	}
 	if l.world != nil {

@@ -159,14 +159,11 @@ func (c *Character) reduceScriptAdena(count int) bool {
 		c.emit(event.ItemsTaken{ItemID: item.AdenaID, Short: true})
 		return false
 	}
-	if count <= 0 {
-		return true
+	paid, ok := c.inventory.PayAdena(count)
+	if paid != nil {
+		c.emit(event.ItemsTaken{ItemID: item.AdenaID, Count: count})
 	}
-	if c.inventory.DestroyByTemplateID(item.AdenaID, count) == nil {
-		return false
-	}
-	c.emit(event.ItemsTaken{ItemID: item.AdenaID, Count: count})
-	return true
+	return ok
 }
 
 // unequipForTake takes inst off when c wears it.

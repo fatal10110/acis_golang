@@ -1,4 +1,9 @@
-package trade
+// Package request holds the one request slot every player shares between
+// the requests it sends and answers: trade, party, command channel, party
+// room, friend, duel and party-duel invitations. It also runs the trade
+// session an accepted trade request opens. Clan and alliance invitations
+// keep their own book, with different busy rules.
+package request
 
 import (
 	"math"

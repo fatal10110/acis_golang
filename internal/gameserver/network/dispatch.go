@@ -26,7 +26,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
-	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
@@ -50,7 +49,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	modelmultisell "github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
@@ -60,12 +59,14 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/multisell"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
+	"github.com/fatal10110/acis_golang/internal/gameserver/request"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -79,7 +80,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -323,7 +323,7 @@ type GameClientLink struct {
 	merchant      *merchant.Service
 	symbols       *symbolmaker.Service
 	gatekeeper    *gatekeeper.Service
-	exchange      *exchange.Service
+	multisell     *multisell.Service
 	augment       *augment.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
@@ -398,7 +398,7 @@ type GameClientLink struct {
 	showSummonCrest  bool
 	wyvern           npc.WyvernRules
 	inventory        *invops.Service
-	trades           *tradebook.Book
+	trades           *request.Book
 	parties          *partyRegistry
 	groupNotices     inorder.Delivery[groupNotice]
 	rooms            *roomRegistry
@@ -587,7 +587,7 @@ type GameClientLinkConfig struct {
 	Merchant *merchant.Service // nil: every buylist is unknown
 	// Multisells is the loaded multisell table; nil loads none, so no list
 	// opens.
-	Multisells    *multisell.Table
+	Multisells    *modelmultisell.Table
 	Templates     *player.TemplateTable
 	ItemTemplates *item.Table
 	HTML          *datacache.HTML
@@ -935,7 +935,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		wyvern:           wyvernRules(cfg.Wyvern),
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},
 		inventory:        invops.NewService(cfg.IDs),
-		trades:           tradebook.NewBook(cfg.TradeClock),
+		trades:           request.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		rooms:            partymatch.NewRegistry[*livePlayer](),
 		duels:            duel.NewManager[*livePlayer](),
@@ -1016,7 +1016,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.castles = cfg.Castles
 	link.castleManor = cfg.CastleManor
 	link.sieges = cfg.Sieges
-	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID, link.clans)
+	link.multisell = multisell.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID, link.clans)
 	if link.roster != nil {
 		clans, couples, schemes := link.clans, link.wedding, link.schemeBuffer
 		// A purged character's marriage and schemes leave memory with its
