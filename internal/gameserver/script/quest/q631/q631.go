@@ -20,10 +20,10 @@ const tunatun = 31537
 // Items.
 const topQualityMeat = 7546
 
-// rewards returns the scroll and its count the page picks by index.
 // reward is an item and the count of it one choice gives.
 type reward struct{ itemID, count int32 }
 
+// rewards returns the scroll and its count the page picks by index.
 func rewards() []reward {
 	return []reward{
 		{4039, 15},

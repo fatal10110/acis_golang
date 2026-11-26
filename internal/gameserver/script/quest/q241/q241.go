@@ -114,8 +114,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(11)
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, poetryBook, 1)
-	// Gabrielle.
-	// Gilmore.
 	// Kantabilon.
 	case strings.EqualFold(e.Name, "31042-05.htm"):
 		st.SetCond(8)
@@ -127,8 +125,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		st.SetCond(10)
 		s.PlaySound(p, script.SoundMiddle)
 		s.GiveItems(p, poetryBook, 1)
-	// Virgil.
-	// Ogmar.
 	// Rahorakti.
 	case strings.EqualFold(e.Name, "31336-05.htm"):
 		st.SetCond(16)

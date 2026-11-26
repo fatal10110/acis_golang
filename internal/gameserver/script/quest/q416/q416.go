@@ -143,8 +143,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		s.PlaySound(p, script.SoundMiddle)
 		s.TakeItems(p, bloodCauldron, 1)
 		s.GiveItems(p, spiritNet, 1)
-	// Totem Spirit of Gandi
-	// Dead Leopard Carcass
 	// Umos
 	case strings.EqualFold(e.Name, "30502-07.htm"):
 		s.TakeItems(p, totemSpiritBlood, -1)

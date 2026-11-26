@@ -19,10 +19,10 @@ const karuda = 32017
 // Items.
 const orcGraveGoods = 8088
 
-// rewards returns the item and its count the page picks by index.
 // reward is an item and the count of it one choice gives.
 type reward struct{ itemID, count int32 }
 
+// rewards returns the item and its count the page picks by index.
 func rewards() []reward {
 	return []reward{
 		{1865, 30},

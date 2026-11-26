@@ -90,9 +90,6 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 		return htmltext
 	}
 	switch {
-	// Kassandra.
-	// Ogmar.
-	// Mysterious Knight.
 	// Kalis.
 	case strings.EqualFold(e.Name, "30759-05.htm"):
 		if p.HasItem(sorceryIngredient) {

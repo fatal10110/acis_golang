@@ -17,11 +17,11 @@ const (
 	iceShard   = 1021
 )
 
-// droplist returns, per monster, its NPC id, the shard it drops and the
-// drop chance.
 // drop is the shard a monster drops and the chance it drops it at.
 type drop struct{ npcID, itemID, chance int32 }
 
+// droplist returns, per monster, its NPC id, the shard it drops and the
+// drop chance.
 func droplist() []drop {
 	return []drop{
 		{20109, flameShard, 300000},

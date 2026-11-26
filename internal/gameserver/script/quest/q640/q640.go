@@ -22,11 +22,11 @@ const kahman = 31554
 // Items.
 const fangOfStakato = 8085
 
-// rewards returns the price in fangs, the item and its count the page picks
-// by index.
 // reward is one choice: the fangs it costs and the item and count it gives.
 type reward struct{ fangs, itemID, count int32 }
 
+// rewards returns the price in fangs, the item and its count the page picks
+// by index.
 func rewards() []reward {
 	return []reward{
 		{12, 4042, 1},
