@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // silentMoveDetectRange is how close a silently moving player must come
@@ -256,65 +255,6 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 	}
 
 	return h.CanSee(target)
-}
-
-// ReconsiderTarget is in-range target reconsideration, used
-// when this NPC can no longer act on its current target (e.g. an
-// immobilize state): first tries to pick a replacement from its own hate
-// list (see ai.Attackable.ReconsiderTarget / attackable.ThreatTable.
-// ReconsiderTarget), gated by the auto-attack rule (AutoAttackTargetValid,
-// or the siege guard's own rule) — this NPC's template aggro range,
-// allowPeaceful false — plus rangeVal as an extra distance filter applied
-// only when rangeVal > 0 (0 disables it). If the hate list yields nothing and this
-// NPC isn't a SiegeGuard and is aggressive, it falls back to scanning known
-// creatures within its template aggro range for the first (lowest
-// ObjectID, for a reproducible pick under Go's unordered world scan)
-// auto-attack-valid candidate, granting it 1 hate to simulate an
-// aggro-range entrance. Reports the new target and whether one was found.
-//
-// No live path calls target reconsideration yet, although the immobilize
-// case is its intended use; it ships as an available, unwired API (see
-// acis_golang#977).
-func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
-	valid := h.CanAutoAttack
-	inRange := func(target attackable.Combatant) bool {
-		if rangeVal <= 0 {
-			return true
-		}
-		return h.withinDistance(target, rangeVal)
-	}
-
-	if chosen, ok := h.brain.ReconsiderTarget(inRange, valid); ok {
-		return chosen, true
-	}
-
-	if h.SiegeGuard() || !h.Aggressive() || h.world == nil {
-		return nil, false
-	}
-
-	var candidates []attackable.Combatant
-	h.world.ForEachKnownInRadius(h, h.Instance.Template.AggroRange, func(obj world.Tracked) {
-		other, ok := obj.(attackable.Combatant)
-		if !ok {
-			return
-		}
-		if rangeVal > 0 && !h.withinDistance(other, rangeVal) {
-			return
-		}
-		if !valid(other) {
-			return
-		}
-		candidates = append(candidates, other)
-	})
-	if len(candidates) == 0 {
-		return nil, false
-	}
-	slices.SortFunc(candidates, func(a, b attackable.Combatant) int {
-		return int(a.ObjectID() - b.ObjectID())
-	})
-	chosen := candidates[0]
-	h.brain.AddDamageHate(chosen, 0, 1)
-	return chosen, true
 }
 
 // withinDistance reports whether target sits within rangeVal 3D units of h.

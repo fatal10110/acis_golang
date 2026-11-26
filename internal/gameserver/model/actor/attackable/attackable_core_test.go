@@ -149,24 +149,24 @@ func TestHateTable_MostHatedNoneWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestHateTable_StopHateDropsEntry(t *testing.T) {
-	// Unlike ThreatTable.StopHate (zeroes, keeps entry), HateTable.StopHate
+func TestHateTable_RemoveDropsEntry(t *testing.T) {
+	// Unlike ThreatTable.StopHate (zeroes, keeps entry), HateTable.Remove
 	// removes the entry entirely.
 	table := NewHateTable(combatant(1))
 	attacker := combatant(2)
 	table.Add(attacker, 100)
 
-	table.StopHate(attacker)
+	table.Remove(attacker)
 
 	if len(table.Snapshot()) != 0 {
-		t.Errorf("Snapshot has %d entries after StopHate, want 0 (entry dropped)", len(table.Snapshot()))
+		t.Errorf("Snapshot has %d entries after Remove, want 0 (entry dropped)", len(table.Snapshot()))
 	}
 	if got := table.Hate(attacker); got != 0 {
-		t.Errorf("Hate = %v after StopHate, want 0", got)
+		t.Errorf("Hate = %v after Remove, want 0", got)
 	}
 }
 
-func TestHateTable_RefreshDropsDeadAndLostEntries(t *testing.T) {
+func TestHateTable_RefreshDropDeadDropsDeadAndLostEntries(t *testing.T) {
 	table := NewHateTable(combatant(1))
 	dead := &fakeCombatant{id: 2, alikeDead: true}
 	lost := combatant(3)
@@ -175,7 +175,7 @@ func TestHateTable_RefreshDropsDeadAndLostEntries(t *testing.T) {
 	table.Add(lost, 110)
 	table.Add(kept, 120)
 
-	changed := table.Refresh(func(c Combatant) bool {
+	changed := table.RefreshDropDead(func(c Combatant) bool {
 		return c.ObjectID() != lost.ObjectID()
 	})
 
@@ -249,7 +249,7 @@ func TestHateTable_ConcurrentAccess(t *testing.T) {
 			table.MostHated()
 			table.Snapshot()
 			table.ReduceAllHate(1)
-			table.StopHate(attacker)
+			table.Remove(attacker)
 		}(i)
 	}
 	wg.Wait()

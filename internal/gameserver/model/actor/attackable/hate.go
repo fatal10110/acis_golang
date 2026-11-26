@@ -1,7 +1,5 @@
 package attackable
 
-import "sync"
-
 const (
 	defaultHateAmount          = 100
 	openingTerritoryHateAmount = 300
@@ -13,50 +11,41 @@ type HateEntry struct {
 	Hate     float64
 }
 
+func (e *HateEntry) bind(attacker Combatant) { e.Attacker = attacker }
+func (e *HateEntry) attacker() Combatant     { return e.Attacker }
+func (e *HateEntry) hateRef() *float64       { return &e.Hate }
+
 // HateTable accumulates per-attacker hate for one NPC and selects the most
 // hated attacker as its spell-cast target. Unlike ThreatTable, hate here is
 // not capped and carries no separate damage figure: it exists purely to
 // rank casters by how provoked the NPC is. A HateTable never builds hate
 // between two siege guards, and reports no most-hated attacker while its
-// owner is alike dead.
-//
-// mu guards entries. An attacker's hit adds hate from the attacker's queue
-// while the owner's AI reads it.
+// owner is alike dead. It is safe for concurrent use.
 //
 // A nil table is an empty one: it holds no hate and every method but Add
 // and AddDefault reads nothing from it and changes nothing.
 type HateTable struct {
-	owner Combatant
-
-	mu      sync.RWMutex
-	entries map[int32]*HateEntry
+	t table[HateEntry, *HateEntry]
 }
 
 // NewHateTable returns an empty HateTable for owner.
 func NewHateTable(owner Combatant) *HateTable {
-	return &HateTable{owner: owner, entries: make(map[int32]*HateEntry)}
+	h := &HateTable{}
+	h.t.init(owner)
+	return h
 }
 
 // Add raises attacker's hate by amount, uncapped. A nil attacker, or an
 // attacker that is a siege guard attacking another siege guard, is a
 // no-op.
 func (h *HateTable) Add(attacker Combatant, amount float64) {
-	if attacker == nil {
+	if h.t.ignores(attacker) {
 		return
 	}
-	if h.owner.SiegeGuard() && attacker.SiegeGuard() {
-		return
-	}
+	h.t.mu.Lock()
+	defer h.t.mu.Unlock()
 
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	e, ok := h.entries[attacker.ObjectID()]
-	if !ok {
-		e = &HateEntry{Attacker: attacker}
-		h.entries[attacker.ObjectID()] = e
-	}
-	e.Hate += amount
+	h.t.entryLocked(attacker).Hate += amount
 }
 
 // AddDefault raises attacker's hate by the default amount used when an NPC
@@ -64,27 +53,17 @@ func (h *HateTable) Add(attacker Combatant, amount float64) {
 // territory gets a larger opening value; all later targets use the base
 // value.
 func (h *HateTable) AddDefault(attacker Combatant, inTerritory bool) {
-	if attacker == nil {
+	if h.t.ignores(attacker) {
 		return
 	}
-	if h.owner.SiegeGuard() && attacker.SiegeGuard() {
-		return
-	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.t.mu.Lock()
+	defer h.t.mu.Unlock()
 
 	amount := float64(defaultHateAmount)
-	if inTerritory && len(h.entries) == 0 {
+	if inTerritory && len(h.t.entries) == 0 {
 		amount = openingTerritoryHateAmount
 	}
-
-	e, ok := h.entries[attacker.ObjectID()]
-	if !ok {
-		e = &HateEntry{Attacker: attacker}
-		h.entries[attacker.ObjectID()] = e
-	}
-	e.Hate += amount
+	h.t.entryLocked(attacker).Hate += amount
 }
 
 // MostHated returns the attacker with the highest hate. Unlike
@@ -95,20 +74,7 @@ func (h *HateTable) MostHated() (entry HateEntry, ok bool) {
 	if h == nil {
 		return HateEntry{}, false
 	}
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	if len(h.entries) == 0 || h.owner.AlikeDead() {
-		return HateEntry{}, false
-	}
-
-	var best *HateEntry
-	for _, e := range h.entries {
-		if best == nil || e.Hate > best.Hate {
-			best = e
-		}
-	}
-	return *best, true
+	return h.t.mostHated(false)
 }
 
 // Hate returns the owner's hate against target, or 0 if target is not in
@@ -117,59 +83,27 @@ func (h *HateTable) Hate(target Combatant) float64 {
 	if h == nil {
 		return 0
 	}
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	e, ok := h.entries[target.ObjectID()]
-	if !ok {
-		return 0
-	}
-	return e.Hate
+	return h.t.hate(target)
 }
 
-// StopHate drops target's entry entirely.
-func (h *HateTable) StopHate(target Combatant) {
+// Remove drops target's entry entirely.
+func (h *HateTable) Remove(target Combatant) {
 	if h == nil {
 		return
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	delete(h.entries, target.ObjectID())
+	h.t.remove(target)
 }
 
-// ReduceAllHate subtracts amount from every entry's hate, uncapped in
-// either direction. Entries are kept even once negative.
-func (h *HateTable) ReduceAllHate(amount float64) {
-	if h == nil {
-		return
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	for _, e := range h.entries {
-		e.Hate -= amount
-	}
-}
-
-// Refresh drops dead-equivalent attackers and attackers the owner no longer
-// sees. It returns the attackers whose queued target desires should be
-// removed.
-func (h *HateTable) Refresh(visible func(Combatant) bool) []Combatant {
+// RefreshDropDead drops dead-equivalent attackers and attackers the owner
+// no longer sees. It returns the attackers whose queued target desires
+// should be removed.
+func (h *HateTable) RefreshDropDead(visible func(Combatant) bool) []Combatant {
 	if h == nil {
 		return nil
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	var changed []Combatant
-	for id, e := range h.entries {
-		if e.Attacker.AlikeDead() || (visible != nil && !visible(e.Attacker)) {
-			delete(h.entries, id)
-			changed = append(changed, e.Attacker)
-		}
-	}
-	return changed
+	return h.t.removeIf(func(a Combatant) bool {
+		return a.AlikeDead() || (visible != nil && !visible(a))
+	})
 }
 
 // RemoveIf drops every entry whose attacker drop reports, and returns
@@ -178,17 +112,7 @@ func (h *HateTable) RemoveIf(drop func(Combatant) bool) []Combatant {
 	if h == nil {
 		return nil
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	var removed []Combatant
-	for id, e := range h.entries {
-		if drop(e.Attacker) {
-			delete(h.entries, id)
-			removed = append(removed, e.Attacker)
-		}
-	}
-	return removed
+	return h.t.removeIf(drop)
 }
 
 // ZeroHate zeroes every entry's hate without dropping any entries.
@@ -196,12 +120,7 @@ func (h *HateTable) ZeroHate() {
 	if h == nil {
 		return
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	for _, e := range h.entries {
-		e.Hate = 0
-	}
+	h.t.zeroAll()
 }
 
 // Clear drops every entry.
@@ -209,32 +128,18 @@ func (h *HateTable) Clear() {
 	if h == nil {
 		return
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	clear(h.entries)
+	h.t.clear()
 }
 
 // IsEmpty reports whether the table has no entries.
-func (h *HateTable) IsEmpty() bool {
-	if h == nil {
-		return true
-	}
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	return len(h.entries) == 0
-}
+func (h *HateTable) IsEmpty() bool { return h.Len() == 0 }
 
 // Len returns the number of entries.
 func (h *HateTable) Len() int {
 	if h == nil {
 		return 0
 	}
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	return len(h.entries)
+	return h.t.len()
 }
 
 // Snapshot returns a copy of every entry, in no particular order.
@@ -242,12 +147,5 @@ func (h *HateTable) Snapshot() []HateEntry {
 	if h == nil {
 		return nil
 	}
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	out := make([]HateEntry, 0, len(h.entries))
-	for _, e := range h.entries {
-		out = append(out, *e)
-	}
-	return out
+	return h.t.snapshot()
 }

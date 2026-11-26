@@ -133,10 +133,17 @@ func (ep *EffectPoint) StatFuncsAttached([]effect.Mod)     {}
 func (ep *EffectPoint) RemoveStatsByOwner(effect.ModOwner) {}
 func (ep *EffectPoint) MaxBuffCount() int                  { return 0 }
 
-// Attach installs rt's World (the world this actor spawns into), Log (where
-// a failure from its own periodic tick is logged) and Sink. Call it once,
-// before Spawn; the other Runtime fields do not apply to an effect point.
-func (ep *EffectPoint) Attach(rt Runtime) {
+// EffectPointRuntime is what an effect point lives in: the world it spawns
+// into, where a failure from its own periodic tick is logged (nil logs
+// nowhere) and the sink its observers are told of its changes through.
+type EffectPointRuntime struct {
+	World *world.State
+	Log   *zerolog.Logger
+	Sink  event.Sink
+}
+
+// Attach installs rt. Call it once, before Spawn.
+func (ep *EffectPoint) Attach(rt EffectPointRuntime) {
 	ep.world = rt.World
 	ep.log = rt.Log
 	ep.sink = rt.Sink

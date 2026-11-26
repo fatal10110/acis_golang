@@ -34,7 +34,7 @@ func TestEffectPointRemovedWhileSpawningLeavesNoZoneOccupant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ep.Attach(Runtime{World: w})
+	ep.Attach(EffectPointRuntime{World: w})
 	ep.SetZones(ix)
 
 	removed := make(chan struct{})

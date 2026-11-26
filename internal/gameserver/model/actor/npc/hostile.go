@@ -828,7 +828,7 @@ var (
 
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {
-	h.brain.HatesIfBuilt().StopHate(attacker)
+	h.brain.HatesIfBuilt().Remove(attacker)
 }
 
 // ClearAggroTables drops every threat and skill-cast hate entry.
@@ -839,9 +839,8 @@ func (h *Hostile) ClearAggroTables() {
 
 // RandomizeHate is attack randomization, the behavior behind the
 // randomize-hate effect: swaps a random valid attacker into the most-hated
-// slot ahead of the current target, gated by the same AutoAttackTargetValid
-// rule ReconsiderTarget uses, here at the party range in force with
-// peaceful targets allowed.
+// slot ahead of the current target, gated by AutoAttackTargetValid at the
+// party range in force with peaceful targets allowed.
 // Reports whether a swap happened.
 func (h *Hostile) RandomizeHate() bool {
 	partyRange := h.partyRange()

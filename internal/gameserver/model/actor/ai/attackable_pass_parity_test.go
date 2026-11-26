@@ -199,7 +199,7 @@ func TestBackToPeaceKeepsScriptDesires(t *testing.T) {
 	brain.Desires().AddOrUpdate(curse)
 	brain.Desires().AddOrUpdate(flee)
 	brain.Desires().AddOrUpdate(walk)
-	brain.Hates().StopHate(target)
+	brain.Hates().Remove(target)
 	stops := move.stopCount
 
 	brain.StopAggroHate(target)

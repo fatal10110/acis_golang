@@ -40,7 +40,7 @@ func (l HateList) MostHated() Creature {
 
 // Refresh drops the creatures that are dead or play dead, and the ones the
 // NPC no longer knows or sees. It touches no desire.
-func (l HateList) Refresh() { l.h.AI().HatesIfBuilt().Refresh(l.h.Knows) }
+func (l HateList) Refresh() { l.h.AI().HatesIfBuilt().RefreshDropDead(l.h.Knows) }
 
 // RemoveIfOutOfRange drops the creatures standing distance or farther from
 // the NPC, in 3D, and the cast desires aimed at them.

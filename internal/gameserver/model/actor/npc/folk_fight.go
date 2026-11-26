@@ -265,7 +265,7 @@ func (f *Folk) refreshAggro() {
 		f.cast.desires.RemoveKind(ai.IntentionAttack)
 		return
 	}
-	for _, c := range f.fight.aggro.Refresh(f.Knows) {
+	for _, c := range f.fight.aggro.RefreshZeroDead(f.Knows) {
 		f.cast.desires.Remove(ai.IntentionAttack, c)
 	}
 }
