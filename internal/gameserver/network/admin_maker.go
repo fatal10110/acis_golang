@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -39,10 +40,10 @@ func (l *GameClientLink) adminMaker(gm *livePlayer, line string) {
 		l.sendMakersPage(gm, npcs, 1)
 		return
 	case 1:
-		if isDigits(args[0]) {
+		if handleradmin.IsDigits(args[0]) {
 			// A page number past int32 answers nothing either: the command
 			// has always failed on it before showing a page.
-			if page, ok := parseInt32(args[0]); ok {
+			if page, ok := commons.ParseInt32(args[0]); ok {
 				l.sendMakersPage(gm, npcs, int(page))
 			}
 			return
@@ -210,19 +211,15 @@ func (l *GameClientLink) sendMakersPage(gm *livePlayer, npcs *manager.Npcs, numb
 			if m.Territory == nil || m.Territory.Name != t.Name {
 				continue
 			}
-			if row%2 == 0 {
-				b.WriteString("<table width=280 bgcolor=000000><tr>")
-			} else {
-				b.WriteString("<table width=280><tr>")
-			}
+			handleradmin.OpenStripedRow(&b, row, "")
 			b.WriteString(`<td width=10></td><td width=270><a action="bypass -h admin_maker ` + m.Maker.Name + `">` + m.Maker.Name + "</a></td>")
-			b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+			handleradmin.CloseStripedRow(&b)
 			row++
 		}
 	}
 	pg.Links(&b, "bypass admin_maker %page%")
 	const file = "spawnlist/maker_check.htm"
-	l.sendFilePage(gm, 0, adminFile(file), fillPage(l.adminHTML(file), "%TERRITORIESLIST%", b.String()), 0)
+	l.sendFilePage(gm, 0, adminFile(file), fillPage(l.adminPage(file, true), "%TERRITORIESLIST%", b.String()), 0)
 }
 
 func containsTerritory(list []*spawn.Territory, t *spawn.Territory) bool {
@@ -252,7 +249,7 @@ func (l *GameClientLink) sendMakerPage(gm *livePlayer, m manager.MakerState) {
 		b.WriteString("</table>")
 		list = b.String()
 	}
-	page := fillPage(l.adminHTML("spawnlist/maker_info.htm"),
+	page := fillPage(l.adminPage("spawnlist/maker_info.htm", true),
 		"%TERRNAME%", territoryName(m.Territory),
 		"%BANTERRNAME%", territoryName(m.Banned),
 		"%MAKERNAME%", m.Maker.Name,
@@ -271,7 +268,7 @@ func (l *GameClientLink) sendMakerPage(gm *livePlayer, m manager.MakerState) {
 // sendMakerScriptsPage sends gm the scripts npcmaker m tells when its last
 // NPC is killed. No script listens for that, so the list is always empty.
 func (l *GameClientLink) sendMakerScriptsPage(gm *livePlayer, m manager.MakerState) {
-	page := fillPage(l.adminHTML("spawnlist/maker_scripts.htm"),
+	page := fillPage(l.adminPage("spawnlist/maker_scripts.htm", true),
 		"%MAKERNAME%", m.Maker.Name,
 		"%MAKERSPAWN%", m.Script,
 		"%MAKEREVENT%", m.Maker.EventName(),

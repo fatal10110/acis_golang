@@ -5,7 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -56,22 +58,22 @@ func (n ShutdownNotices) Announce(text string, critical bool) {
 // A missing or malformed number is answered with the usage line; an
 // unknown argument with the page alone.
 func (l *GameClientLink) adminServer(gm *livePlayer, line string) {
-	tokens := spaceTokens(line)
-	if len(tokens) < 2 {
+	args := handleradmin.SpaceArgs(line)
+	if len(args) == 0 {
 		l.sendMaintenancePage(gm)
 		return
 	}
 	number := func() (int32, bool) {
-		if len(tokens) < 3 {
+		if len(args) < 2 {
 			return 0, false
 		}
-		return parseInt32(tokens[2])
+		return commons.ParseInt32(args[1])
 	}
 	usage := false
-	switch tokens[1] {
+	switch args[0] {
 	case "shutdown", "restart":
 		if seconds, ok := number(); ok {
-			l.shutdown.Start(gm.CharacterName(), seconds, tokens[1] == "restart")
+			l.shutdown.Start(gm.CharacterName(), seconds, args[0] == "restart")
 		} else {
 			usage = true
 		}
@@ -111,7 +113,7 @@ func (l *GameClientLink) sendMaintenancePage(gm *livePlayer) {
 	}
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
-	page := l.adminHTML("maintenance.htm")
+	page := l.adminPage("maintenance.htm", true)
 	for _, r := range [...][2]string{
 		{"%count%", strconv.Itoa(online)},
 		{"%used%", strconv.FormatUint(mem.HeapAlloc/(1<<20), 10)},

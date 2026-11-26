@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 )
@@ -28,7 +29,7 @@ func (l *GameClientLink) adminEnchant(gm *livePlayer, line string) {
 		sendText(gm, "Unknown paperdoll slot.")
 		return
 	}
-	level, ok := parseInt32(args[1])
+	level, ok := commons.ParseInt32(args[1])
 	if !ok {
 		sendText(gm, "Please specify a new enchant value.")
 		return

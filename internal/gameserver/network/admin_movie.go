@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -87,7 +89,7 @@ const (
 // as the one before ends; no parameter opens the movie panel, any other
 // is ignored.
 func (l *GameClientLink) adminMovie(gm *livePlayer, line string) {
-	args := spaceTokens(line)[1:]
+	args := handleradmin.SpaceArgs(line)
 	if len(args) == 0 {
 		l.sendMoviePanel(gm)
 		return
@@ -134,7 +136,7 @@ func (l *GameClientLink) showShot(gm *livePlayer, s movieShot, broadcast bool) {
 func (l *GameClientLink) sendMoviePanel(gm *livePlayer) {
 	shots := l.movies.all()
 	if len(shots) == 0 {
-		l.sendFilePage(gm, 0, adminFile("movie/main_empty.htm"), l.adminHTML("movie/main_empty.htm"), 0)
+		l.sendFilePage(gm, 0, adminFile("movie/main_empty.htm"), l.adminPage("movie/main_empty.htm", true), 0)
 		return
 	}
 	var b strings.Builder
@@ -145,7 +147,7 @@ func (l *GameClientLink) sendMoviePanel(gm *livePlayer) {
 		}
 		b.WriteString("</tr>")
 	}
-	html := strings.ReplaceAll(l.adminHTML("movie/main_notempty.htm"), "%sequences%", b.String())
+	html := strings.ReplaceAll(l.adminPage("movie/main_notempty.htm", true), "%sequences%", b.String())
 	l.sendFilePage(gm, 0, adminFile("movie/main_notempty.htm"), html, 0)
 }
 
@@ -153,7 +155,7 @@ func (l *GameClientLink) sendMoviePanel(gm *livePlayer) {
 // trying the movie's shots; no parameter opens the movie panel, any other
 // is ignored.
 func (l *GameClientLink) adminSequence(gm *livePlayer, line string) {
-	args := spaceTokens(line)[1:]
+	args := handleradmin.SpaceArgs(line)
 	if len(args) == 0 {
 		l.sendMoviePanel(gm)
 		return
@@ -192,7 +194,7 @@ func sequenceID(args []string) (int32, bool) {
 	if len(args) == 0 {
 		return 0, false
 	}
-	return parseInt32(args[0])
+	return commons.ParseInt32(args[0])
 }
 
 // addSequence answers //sequence add [id [dist yaw pitch time duration turn
@@ -202,10 +204,10 @@ func sequenceID(args []string) (int32, bool) {
 // shot.
 func (l *GameClientLink) addSequence(gm *livePlayer, args []string) {
 	if len(args) == 0 {
-		l.sendFilePage(gm, 0, adminFile("movie/add_sequence.htm"), l.adminHTML("movie/add_sequence.htm"), 0)
+		l.sendFilePage(gm, 0, adminFile("movie/add_sequence.htm"), l.adminPage("movie/add_sequence.htm", true), 0)
 		return
 	}
-	id, ok := parseInt32(args[0])
+	id, ok := commons.ParseInt32(args[0])
 	if !ok {
 		l.sendMoviePanel(gm)
 		return
@@ -233,7 +235,7 @@ func (l *GameClientLink) addSequence(gm *livePlayer, args []string) {
 	}
 	var v [8]int32
 	for i, text := range values {
-		if v[i], ok = parseInt32(text); !ok {
+		if v[i], ok = commons.ParseInt32(text); !ok {
 			l.sendMoviePanel(gm)
 			return
 		}
@@ -251,7 +253,7 @@ func (l *GameClientLink) addSequence(gm *livePlayer, args []string) {
 // sendSequenceForm opens the edit form of shot s.
 func (l *GameClientLink) sendSequenceForm(gm *livePlayer, s movieShot) {
 	itoa := func(v int32) string { return strconv.Itoa(int(v)) }
-	html := fillPage(l.adminHTML("movie/edit_sequence.htm"),
+	html := fillPage(l.adminPage("movie/edit_sequence.htm", true),
 		"%sId%", itoa(s.id),
 		"%sDist%", itoa(s.shot.Distance),
 		"%sYaw%", itoa(s.shot.Yaw),

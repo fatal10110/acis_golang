@@ -26,12 +26,12 @@ const (
 // named, after one of the actions join, reject, reset, show and unfollow
 // on a petition; view opens one petition instead.
 func (l *GameClientLink) adminPetition(gm *livePlayer, line string) {
-	args := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })[1:]
+	args := handleradmin.SpaceArgs(line)
 	page := int32(1)
 	if len(args) > 0 {
-		if isDigits(args[0]) {
+		if handleradmin.IsDigits(args[0]) {
 			var ok bool
-			if page, ok = parseInt32(args[0]); !ok {
+			if page, ok = commons.ParseInt32(args[0]); !ok {
 				// A page number past the int range opens nothing.
 				return
 			}
@@ -49,7 +49,7 @@ func (l *GameClientLink) adminPetitionAction(gm *livePlayer, action string, args
 		if len(args) == 0 {
 			return 0, false
 		}
-		return parseInt32(args[0])
+		return commons.ParseInt32(args[0])
 	}
 	pres := petitionPresence{l}
 	switch action {
@@ -159,19 +159,15 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 		if !p.Unread {
 			read = "party_styleicon1_2"
 		}
-		if i%2 == 0 {
-			b.WriteString("<table width=280 height=40 bgcolor=000000>")
-		} else {
-			b.WriteString("<table width=280 height=40>")
-		}
-		fmt.Fprintf(&b, `<tr><td width=20 align=center><img src="L2UI_CH3.msnicon%s" width=12 height=16><img src="L2UI_CH3.%s" width=11 height=16></td>`, status, read)
+		handleradmin.OpenStripedRow(&b, i, " height=40")
+		fmt.Fprintf(&b, `<td width=20 align=center><img src="L2UI_CH3.msnicon%s" width=12 height=16><img src="L2UI_CH3.%s" width=11 height=16></td>`, status, read)
 		details := fmt.Sprintf(`<br1><font color=B09878>Type:</font> %s <font color=B09878>State:</font> %s</td>`, p.Type, p.State)
 		if isAnswering && answering == p.ID {
 			fmt.Fprintf(&b, "<td width=260>#%d by %s%s", p.ID, name, details)
 		} else {
 			fmt.Fprintf(&b, `<td width=260><a action="bypass -h admin_petition view %d">#%d by %s</a>%s`, p.ID, p.ID, name, details)
 		}
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 41)
 	pg.Links(&b, "bypass admin_petition %page%")
@@ -179,7 +175,7 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 	if isAnswering {
 		unfollow = petitionUnfollowButton
 	}
-	html := l.adminHTML("petitions.htm")
+	html := l.adminPage("petitions.htm", true)
 	html = strings.ReplaceAll(html, "%unfollow%", unfollow)
 	html = strings.ReplaceAll(html, "%content%", b.String())
 	l.sendFilePage(gm, 0, adminFile("petitions.htm"), html, 0)
@@ -200,7 +196,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	if petitioner, ok := l.livePlayerByID(d.Petitioner); ok && !petitioner.detached() {
 		status = "online"
 	}
-	html := l.adminHTML("petition.htm")
+	html := l.adminPage("petition.htm", true)
 	for _, r := range []struct{ key, value string }{
 		{"%submitDate%", time.UnixMilli(d.SubmitDate).Format("02-01-2006 15:04")},
 		{"%petitionerName%", d.PetitionerName},
@@ -231,11 +227,14 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	l.sendFilePage(gm, 0, adminFile("petition.htm"), html, 0)
 }
 
-// adminHTML returns admin panel page name as set, before its placeholders
-// are filled: the page limited, or the missing-page notice when there is
-// none.
-func (l *GameClientLink) adminHTML(name string) string {
-	return l.setPage(adminFile(name))
+// adminPage returns admin panel page name before its placeholders are
+// filled, or the missing-page notice when there is none: as set, with the
+// page limit applied, when limited, else as the cache holds it.
+func (l *GameClientLink) adminPage(name string, limited bool) string {
+	if limited {
+		return l.setPage(adminFile(name))
+	}
+	return l.rawPage(adminFile(name))
 }
 
 // adminFile is the datapack file of admin page name.

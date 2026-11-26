@@ -18,7 +18,7 @@ func (l *GameClientLink) doorInfoPage(d *door.Object) string {
 	if t.Opened {
 		initial = "Opened"
 	}
-	return fillPage(l.adminHTML("doorinfo.htm"),
+	return fillPage(l.adminPage("doorinfo.htm", true),
 		"%name%", t.Name,
 		"%objid%", strconv.Itoa(int(d.ObjectID())),
 		"%doorid%", strconv.Itoa(t.ID),

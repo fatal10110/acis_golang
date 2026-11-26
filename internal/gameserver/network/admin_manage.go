@@ -2,9 +2,9 @@ package network
 
 import (
 	"strconv"
-	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -51,7 +51,7 @@ func (l *GameClientLink) adminRes(gm *livePlayer, line string) {
 // is only logged, as the client is told nothing about it either: neither
 // the chat command nor the link leaves a client action pending.
 func (l *GameClientLink) adminManage(gm *livePlayer, line string, act adminManageAction) {
-	args := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })[1:]
+	args := handleradmin.SpaceArgs(line)
 	var name string
 	radius := 0
 	radiusText := ""

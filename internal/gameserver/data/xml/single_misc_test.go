@@ -136,15 +136,16 @@ func TestLoadAdminData(t *testing.T) {
 		t.Fatalf("LoadAdminData(%q) error: %v", dir, err)
 	}
 
-	if got := data.AccessLevelCount(); got != 10 {
-		t.Fatalf("AccessLevelCount() = %d, want 10", got)
+	for level := -1; level <= 8; level++ {
+		if !data.DefinesLevel(level) {
+			t.Fatalf("DefinesLevel(%d) = false", level)
+		}
 	}
-	if got := data.CommandCount(); got != 93 {
-		t.Fatalf("CommandCount() = %d, want 93", got)
+	if got := len(data.Commands()); got != 93 {
+		t.Fatalf("len(Commands()) = %d, want 93", got)
 	}
-	level, ok := data.AccessLevel(7)
-	if !ok || !level.IsGM || level.Name != "Admin" {
-		t.Fatalf("AccessLevel(7) = %+v, %v", level, ok)
+	if level := data.Resolve(7); !level.IsGM || level.Name != "Admin" {
+		t.Fatalf("Resolve(7) = %+v", level)
 	}
 	cmd, ok := data.Command("admin_ann")
 	if !ok || cmd.AccessLevel != 7 {

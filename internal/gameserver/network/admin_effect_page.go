@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
@@ -66,8 +67,8 @@ func (l *GameClientLink) adminEffect(gm *livePlayer, line string) {
 		run(true)
 		return
 	}
-	if isDigits(param) {
-		n, ok := parseInt32(param)
+	if handleradmin.IsDigits(param) {
+		n, ok := commons.ParseInt32(param)
 		if !ok {
 			return
 		}
@@ -98,7 +99,7 @@ func (l *GameClientLink) adminEffect(gm *livePlayer, line string) {
 		}
 	case "visual":
 		tok, _ := next()
-		id, ok := parseInt32(tok)
+		id, ok := commons.ParseInt32(tok)
 		change = func() {
 			if !ok {
 				sendText(gm, "Usage: //effect visual id")
@@ -107,8 +108,8 @@ func (l *GameClientLink) adminEffect(gm *livePlayer, line string) {
 			l.showAdminVisual(gm, target, id)
 		}
 	}
-	if tok, ok := next(); ok && isDigits(tok) {
-		n, ok := parseInt32(tok)
+	if tok, ok := next(); ok && handleradmin.IsDigits(tok) {
+		n, ok := commons.ParseInt32(tok)
 		if !ok {
 			run(false)
 			return
@@ -128,7 +129,7 @@ func (l *GameClientLink) adminEffectSkill(next func() (string, bool)) (def *mode
 	if !ok {
 		return nil, usage, true
 	}
-	id, ok := parseInt32(idTok)
+	id, ok := commons.ParseInt32(idTok)
 	if !ok {
 		return nil, usage, true
 	}
@@ -136,7 +137,7 @@ func (l *GameClientLink) adminEffectSkill(next func() (string, bool)) (def *mode
 	if !ok {
 		return nil, usage, true
 	}
-	level, ok := parseInt32(levelTok)
+	level, ok := commons.ParseInt32(levelTok)
 	if !ok {
 		return nil, usage, true
 	}
@@ -164,7 +165,7 @@ func adminEffectRemoval(gm *livePlayer, target world.Tracked, next func() (strin
 			}
 		}, true
 	}
-	id, ok := parseInt32(tok)
+	id, ok := commons.ParseInt32(tok)
 	if !ok {
 		return usage, true
 	}
@@ -266,17 +267,13 @@ func (l *GameClientLink) showAdminEffects(gm *livePlayer, target world.Tracked, 
 	now := gm.Queue().Now()
 	var b strings.Builder
 	for row, e := range effects[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		left := "toggle"
 		if !e.Skill.Toggle {
 			left = strconv.Itoa(e.PeriodRemaining(now)) + "s"
 		}
 		fmt.Fprintf(&b, `<td width=220><a action="bypass -h admin_effect remove %d">%s</a></td><td width=60>%s</td>`, e.Skill.ID, e.Skill.Name, left)
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_effect %page%")

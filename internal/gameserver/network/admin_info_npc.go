@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -68,8 +69,8 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 		send("npcinfo/stat.htm", l.npcStatPage(npcStatusOf(obj), inst.Template))
 	default:
 		page := 0
-		if isDigits(sub) {
-			n, ok := parseInt32(sub)
+		if handleradmin.IsDigits(sub) {
+			n, ok := commons.ParseInt32(sub)
 			if !ok {
 				// A page number past the int range aborts: the command
 				// ends with nothing sent.
@@ -84,7 +85,7 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 
 // npcDefaultPage is npcinfo/default.htm showing content.
 func (l *GameClientLink) npcDefaultPage(content string) string {
-	return strings.ReplaceAll(l.adminHTML(npcDefaultFile), "%content%", content)
+	return strings.ReplaceAll(l.adminPage(npcDefaultFile, true), "%content%", content)
 }
 
 // npcGeneralPage is general page index of NPC obj: page 1 its rewards,
@@ -113,7 +114,7 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 		if t.IgnoredIDs != nil {
 			ignored = formatIntArray(t.IgnoredIDs)
 		}
-		return fillPage(l.adminHTML(npcGeneralFile(1)),
+		return fillPage(l.adminPage(npcGeneralFile(1), true),
 			"%exp%", commons.FormatDouble(t.RewardExp),
 			"%sp%", commons.FormatDouble(t.RewardSp),
 			"%baseAttackRange%", strconv.Itoa(t.BaseAttackRange),
@@ -125,7 +126,7 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 			"%ignoredIds%", ignored,
 		)
 	case 2:
-		return fillPage(l.adminHTML(npcGeneralFile(2)),
+		return fillPage(l.adminPage(npcGeneralFile(2), true),
 			"%isUndying%", strconv.FormatBool(t.Undying),
 			"%canBeAttacked%", strconv.FormatBool(t.CanBeAttacked),
 			"%isNoSleepMode%", strconv.FormatBool(t.NoSleepMode),
@@ -135,7 +136,7 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 			"%residence%", l.npcResidenceName(inst),
 		)
 	default:
-		return fillPage(l.adminHTML(npcGeneralFile(0)),
+		return fillPage(l.adminPage(npcGeneralFile(0), true),
 			"%objectId%", strconv.Itoa(int(obj.ObjectID())),
 			"%npcId%", strconv.Itoa(t.ID),
 			"%idTemplate%", strconv.Itoa(t.TemplateID),
@@ -231,7 +232,7 @@ func npcStatusOf(obj world.Tracked) npcStatus {
 func (l *GameClientLink) npcStatPage(s npcStatus, t *npc.Template) string {
 	itoa := strconv.Itoa
 	element := func(res stat.Stat) string { return commons.FormatDouble(s.CalcStat(res, 1)) }
-	return fillPage(l.adminHTML("npcinfo/stat.htm"),
+	return fillPage(l.adminPage("npcinfo/stat.htm", true),
 		"%hp%", itoa(int(s.HP())),
 		"%hpmax%", itoa(int(s.MaxHPValue())),
 		"%mp%", itoa(int(s.MPValue())),

@@ -42,7 +42,7 @@ func TestHasAccess(t *testing.T) {
 		{"admin_unlisted", 8, false},
 		{"admin_admin", 20, false},
 	} {
-		access, _ := data.AccessLevel(tc.level)
+		access := data.load().accessLevels[tc.level]
 		if got := data.HasAccess(tc.command, access); got != tc.want {
 			t.Errorf("HasAccess(%q, level %d) = %v, want %v", tc.command, tc.level, got, tc.want)
 		}

@@ -75,10 +75,7 @@ func (l *GameClientLink) adminSiege(gm *livePlayer, line string) {
 // window, and where its siege stands.
 func (l *GameClientLink) showAdminCastles(gm *livePlayer) {
 	const file = "data/html/admin/castles.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("castles.htm", false)
 	var rows strings.Builder
 	for i, c := range l.castles.All() {
 		if i%2 == 0 {

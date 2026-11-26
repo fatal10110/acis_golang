@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -40,7 +41,7 @@ func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 	}
 	respawn := time.Minute
 	if len(args) > 1 {
-		secs, ok := parseInt32(args[1])
+		secs, ok := commons.ParseInt32(args[1])
 		if !ok {
 			l.sendAdminFile(gm, "spawns.htm")
 			return
@@ -49,8 +50,8 @@ func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 	}
 	var tmpl *npc.Template
 	ok := false
-	if idOrName := args[0]; isDigits(idOrName) {
-		id, valid := parseInt32(idOrName)
+	if idOrName := args[0]; handleradmin.IsDigits(idOrName) {
+		id, valid := commons.ParseInt32(idOrName)
 		if !valid {
 			l.sendAdminFile(gm, "spawns.htm")
 			return
@@ -137,7 +138,7 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	page := int32(1)
 	if len(args) > 1 {
-		p, ok := parseInt32(args[1])
+		p, ok := commons.ParseInt32(args[1])
 		if !ok {
 			return
 		}
@@ -152,8 +153,8 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 			return
 		}
 		npcID = int32(inst.Template.ID)
-	case isDigits(args[0]):
-		id, ok := parseInt32(args[0])
+	case handleradmin.IsDigits(args[0]):
+		id, ok := commons.ParseInt32(args[0])
 		if !ok {
 			return
 		}
@@ -186,11 +187,7 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 	// Rows count from the page asked for, even past the last page shown.
 	row := adminListSpawnsPageLimit * (page - 1)
 	for _, obj := range found[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 height=41 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280 height=41><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, int(row), " height=41")
 		at := obj.(positioned)
 		x, y, z := at.Position()
 		fmt.Fprintf(&b, `<td><a action="bypass -h admin_teleport %d %d %d">%d`, x, y, z, row)
@@ -199,7 +196,8 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 		} else {
 			fmt.Fprintf(&b, " - (%d, %d, %d, %d)</a>", x, y, z, at.Heading())
 		}
-		b.WriteString(`</td></tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		b.WriteString("</td>")
+		handleradmin.CloseStripedRow(&b)
 		row++
 	}
 	pg.Space(&b, 42)
@@ -234,14 +232,4 @@ func npcInstanceOf(obj world.Tracked) *npc.Instance {
 		return o.Instance
 	}
 	return nil
-}
-
-// trimAndDress cuts s longer than maxWidth characters to its first
-// maxWidth-3, followed by "...".
-func trimAndDress(s string, maxWidth int) string {
-	r := []rune(s)
-	if len(r) <= maxWidth {
-		return s
-	}
-	return string(r[:maxWidth-3]) + "..."
 }

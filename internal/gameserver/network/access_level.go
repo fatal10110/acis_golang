@@ -15,8 +15,9 @@ type accessLevelStore interface {
 	SetAccessLevelKeepingTitle(ctx context.Context, objectID int32, level int) error
 }
 
-// accessLevelWriteTimeout bounds one access-level write.
-const accessLevelWriteTimeout = 5 * time.Second
+// characterWriteTimeout bounds one admin write of a character's stored
+// row.
+const characterWriteTimeout = 5 * time.Second
 
 // accessLevel is the access level p plays under.
 func (p *livePlayer) accessLevel() admin.AccessLevel {
@@ -101,16 +102,10 @@ func (l *GameClientLink) storeAccessLevel(objectID int32, level int, title strin
 	if l.accessLevels == nil {
 		return
 	}
-	store, log := l.accessLevels, l.log
-	if !l.persist.Enqueue(objectID, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
-		defer cancel()
-		if err := store.SetAccessLevel(ctx, objectID, level, title); err != nil {
-			log.Error().Err(err).Int32("object_id", objectID).Msg("store access level")
-		}
-	}) {
-		log.Error().Int32("object_id", objectID).Msg("store access level: persistence closed")
-	}
+	store := l.accessLevels
+	l.enqueueCharacterWrite(objectID, "store access level", func(ctx context.Context) error {
+		return store.SetAccessLevel(ctx, objectID, level, title)
+	}, nil)
 }
 
 // Range of the stored access level column (MEDIUMINT).
@@ -132,22 +127,10 @@ func (l *GameClientLink) storeOfflineAccessLevel(objectID int32, level int, fail
 	if l.accessLevels == nil {
 		return
 	}
-	store, log := l.accessLevels, l.log
-	if !l.persist.Enqueue(objectID, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
-		defer cancel()
-		if err := store.SetAccessLevelKeepingTitle(ctx, objectID, level); err != nil {
-			log.Error().Err(err).Int32("object_id", objectID).Msg("store access level")
-			if failed != nil {
-				failed()
-			}
-		}
-	}) {
-		log.Error().Int32("object_id", objectID).Msg("store access level: persistence closed")
-		if failed != nil {
-			failed()
-		}
-	}
+	store := l.accessLevels
+	l.enqueueCharacterWrite(objectID, "store access level", func(ctx context.Context) error {
+		return store.SetAccessLevelKeepingTitle(ctx, objectID, level)
+	}, failed)
 }
 
 // errNoLoginLink is the failure of a request to the login server while no

@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -252,12 +251,7 @@ func sendText(live *livePlayer, text string) {
 // sendAdminFile opens the admin panel page name, the missing-page notice
 // when there is none.
 func (l *GameClientLink) sendAdminFile(live *livePlayer, name string) {
-	file := "data/html/admin/" + name
-	html, ok := l.html.Get(file)
-	if !ok {
-		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
-	}
-	l.sendValidatedFile(live, 0, file, html, 0)
+	l.sendValidatedFile(live, 0, adminFile(name), l.adminPage(name, false), 0)
 }
 
 // adminTargetPlayer resolves the player a command acts on: gm's selected

@@ -2,8 +2,8 @@ package network
 
 import (
 	"strconv"
-	"strings"
 
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -86,12 +86,12 @@ func (l *GameClientLink) adminPolymorphForm(gm *livePlayer, line string) (*playe
 // adminPolymorphTemplate reads the NPC the //polymorph line names. A
 // missing or unreadable id gets gm the usage, an id no NPC has the refusal.
 func (l *GameClientLink) adminPolymorphTemplate(gm *livePlayer, line string) (*npc.Template, bool) {
-	args := strings.FieldsFunc(line, func(r rune) bool { return strings.ContainsRune(" \t\n\r\f", r) })
-	if len(args) < 2 {
+	args := handleradmin.Args(line)
+	if len(args) == 0 {
 		sendText(gm, adminPolymorphUsage)
 		return nil, false
 	}
-	id, err := strconv.ParseInt(args[1], 10, 32)
+	id, err := strconv.ParseInt(args[0], 10, 32)
 	if err != nil {
 		sendText(gm, adminPolymorphUsage)
 		return nil, false

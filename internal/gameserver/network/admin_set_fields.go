@@ -323,7 +323,7 @@ func (l *GameClientLink) storeName(ctx context.Context, objectID int32, name str
 	if l.characterEdits == nil {
 		return true
 	}
-	ctx, cancel := context.WithTimeout(ctx, accessLevelWriteTimeout)
+	ctx, cancel := context.WithTimeout(ctx, characterWriteTimeout)
 	defer cancel()
 	if err := l.characterEdits.SetName(ctx, objectID, name); err != nil {
 		l.log.Error().Err(err).Int32("object_id", objectID).Str("name", name).Msg("admin: //set name: store name")

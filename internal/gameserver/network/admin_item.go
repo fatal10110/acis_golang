@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -24,7 +25,7 @@ func (l *GameClientLink) adminItem(gm *livePlayer, line string) {
 	target := adminTargetPlayer(gm, true)
 	page := func() { l.sendAdminFile(gm, "itemcreation.htm") }
 	switch param := args[0]; {
-	case isDigits(param):
+	case handleradmin.IsDigits(param):
 		// An id, count or radius out of the int range or not a number
 		// answers nothing by design; the link leaves no client action
 		// pending.
@@ -47,7 +48,7 @@ func (l *GameClientLink) adminItem(gm *livePlayer, line string) {
 // the item go to the selected player, else to gm.
 func (l *GameClientLink) adminGive(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
-	if len(args) == 0 || !isDigits(args[0]) {
+	if len(args) == 0 || !handleradmin.IsDigits(args[0]) {
 		sendText(gm, "Usage: //give itemId count")
 		return
 	}
@@ -68,7 +69,7 @@ func (l *GameClientLink) adminGive(gm *livePlayer, line string) {
 // parseItemArgs reads an item id, then the optional count and radius that
 // follow it as parseCountRadius reads them.
 func parseItemArgs(idArg string, rest []string) (id int32, count, radius int, ok bool) {
-	id, ok = parseInt32(idArg)
+	id, ok = commons.ParseInt32(idArg)
 	if !ok {
 		return 0, 0, 0, false
 	}
@@ -84,7 +85,7 @@ func parseCountRadius(args []string) (count, radius int, ok bool) {
 		if i >= len(args) {
 			break
 		}
-		v, ok := parseInt32(args[i])
+		v, ok := commons.ParseInt32(args[i])
 		if !ok {
 			return 0, 0, false
 		}
@@ -131,7 +132,7 @@ func (l *GameClientLink) adminItemSet(gm, target *livePlayer, args []string) {
 		list()
 		return
 	}
-	chest, ok := parseInt32(args[0])
+	chest, ok := commons.ParseInt32(args[0])
 	if !ok {
 		sendText(gm, "Usage: //item set [chestId]")
 		list()
@@ -174,9 +175,9 @@ func (l *GameClientLink) sendArmorSets(gm *livePlayer) {
 			sb.WriteString("</tr>")
 		}
 	}
-	const file = "data/html/admin/itemsets.htm"
-	page := strings.ReplaceAll(l.setPage(file), "%sets%", sb.String())
-	l.sendFilePage(gm, 0, file, page, 0)
+	const file = "itemsets.htm"
+	page := strings.ReplaceAll(l.adminPage(file, true), "%sets%", sb.String())
+	l.sendFilePage(gm, 0, adminFile(file), page, 0)
 }
 
 // createItem gives count units of item id to target, or with a radius to

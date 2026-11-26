@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -310,8 +311,8 @@ func (l *GameClientLink) walkerRoutes() (route.WalkerRoutes, *task.Walker) {
 // the usage, one unknown or empty that no walker route links the name.
 func (l *GameClientLink) showWalker(gm *livePlayer, args []string) {
 	page := 1
-	if len(args) > 0 && isDigits(args[0]) {
-		n, ok := parseInt32(args[0])
+	if len(args) > 0 && handleradmin.IsDigits(args[0]) {
+		n, ok := commons.ParseInt32(args[0])
 		if !ok {
 			sendText(gm, showUsage)
 			return
@@ -390,11 +391,7 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 	}
 	var b strings.Builder
 	for row, e := range rows[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		show := `<td width=40 align=right><a action="bypass admin_show walker ` + strconv.Itoa(page) + " " + e.NPC + `">Show</a></td>`
 		name, index, reverse, spawned := l.walkerRowNPC(e.NPC, walker)
 		if !spawned {
@@ -408,17 +405,14 @@ func (l *GameClientLink) sendWalkerPanel(gm *livePlayer, page int) {
 			if reverse {
 				direction = "Reverse"
 			}
-			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.Nodes[index].Location) + `">` + trimAndDress(name, 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.Nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
+			b.WriteString(`<td width=150><a action="bypass admin_teleport ` + teleportLoc(e.Nodes[index].Location) + `">` + handleradmin.TrimAndDress(name, 25) + "</a></td><td width=40>" + strconv.Itoa(index) + " / " + strconv.Itoa(len(e.Nodes)) + "</td><td width=50 align=right>" + direction + "</td>" + show)
 		}
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_show walker %page%")
 	const file = "data/html/admin/walker.htm"
-	html, found := l.html.Get(file)
-	if !found {
-		html = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	html := l.adminPage("walker.htm", false)
 	l.sendValidatedFile(gm, 0, file, strings.ReplaceAll(html, "%content%", b.String()), 0)
 }
 

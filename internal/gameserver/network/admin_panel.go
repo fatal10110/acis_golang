@@ -1,8 +1,7 @@
 package network
 
 import (
-	"strconv"
-
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -14,8 +13,8 @@ func (l *GameClientLink) adminMainPage(gm *livePlayer, line string) {
 	name := "main"
 	if args := handleradmin.Args(line); len(args) > 0 {
 		param := args[0]
-		if isDigits(param) {
-			mode, ok := parseInt32(param)
+		if handleradmin.IsDigits(param) {
+			mode, ok := commons.ParseInt32(param)
 			if !ok {
 				// A panel number past the int range opens nothing.
 				return
@@ -54,36 +53,10 @@ func (l *GameClientLink) adminSystemMessage(gm *livePlayer, line string) {
 		sendText(gm, "Usage: //msg sysMsgId")
 		return
 	}
-	id, ok := parseInt32(args[0])
+	id, ok := commons.ParseInt32(args[0])
 	if !ok {
 		sendText(gm, "Usage: //msg sysMsgId")
 		return
 	}
 	gm.SendFrame(serverpackets.FrameSystemMessage(int(id)))
-}
-
-// isDigits reports whether s is one or more ASCII digits.
-func isDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// parseInt32 parses s as a signed decimal int: an optional sign, then
-// ASCII decimal digits, in int32 range.
-func parseInt32(s string) (int32, bool) {
-	if s == "" || s == "+" || s == "-" {
-		return 0, false
-	}
-	v, err := strconv.ParseInt(s, 10, 32)
-	if err != nil {
-		return 0, false
-	}
-	return int32(v), true
 }

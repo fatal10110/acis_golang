@@ -3,6 +3,7 @@ package network
 import (
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
@@ -26,8 +27,8 @@ func (l *GameClientLink) adminKnownlist(gm *livePlayer, line string) {
 		target = t
 	}
 	page := int32(1)
-	if args := spaceTokens(line)[1:]; len(args) > 0 {
-		if n, ok := parseInt32(args[0]); ok {
+	if args := handleradmin.SpaceArgs(line); len(args) > 0 {
+		if n, ok := commons.ParseInt32(args[0]); ok {
 			page = n
 		} else {
 			sendText(gm, "Usage: //knownlist [page]")
@@ -49,21 +50,17 @@ func (l *GameClientLink) adminKnownlist(gm *livePlayer, line string) {
 	}
 	var b strings.Builder
 	for row, obj := range known[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		name, ok := l.objectName(obj)
 		if !ok {
 			name = "null"
 		}
 		b.WriteString("<td width=160>" + name + "</td><td width=120>" + objectClassName(obj) + "</td>")
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_knownlist %page%")
-	html := fillPage(l.adminHTML("knownlist.htm"), "%target%", name, "%content%", b.String())
+	html := fillPage(l.adminPage("knownlist.htm", true), "%target%", name, "%content%", b.String())
 	l.sendFilePage(gm, 0, adminFile("knownlist.htm"), html, 0)
 }
 

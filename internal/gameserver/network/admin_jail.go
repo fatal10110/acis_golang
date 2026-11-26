@@ -3,6 +3,7 @@ package network
 import (
 	"strconv"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -138,7 +139,7 @@ func (l *GameClientLink) adminJail(gm *livePlayer, line string) {
 		target, _ = l.livePlayerByName(name)
 		if len(args) > 1 {
 			var ok bool
-			if minutes, ok = parseInt32(args[1]); !ok {
+			if minutes, ok = commons.ParseInt32(args[1]); !ok {
 				l.log.Warn().Str("minutes", args[1]).Msg("admin: //jail minutes not a number")
 				return
 			}

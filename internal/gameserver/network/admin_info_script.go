@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -40,7 +41,7 @@ func (l *GameClientLink) npcScriptPage(obj world.Tracked, t *npc.Template) strin
 			b.WriteString(name + "<br1>")
 		}
 	}
-	page := strings.ReplaceAll(l.adminHTML("npcinfo/script.htm"), "%scripts%", b.String())
+	page := strings.ReplaceAll(l.adminPage("npcinfo/script.htm", true), "%scripts%", b.String())
 
 	b.Reset()
 	for _, st := range timers {
@@ -131,5 +132,5 @@ func creatureDescription(c npc.ScratchCreature) string {
 	}
 	x, y, z := cb.Position()
 	loc := strconv.Itoa(x) + " " + strconv.Itoa(y) + " " + strconv.Itoa(z) + " " + strconv.Itoa(cb.Heading())
-	return `<a action="bypass admin_teleport ` + loc + `">` + trimAndDress(attackerName(cb), 12) + "</a>"
+	return `<a action="bypass admin_teleport ` + loc + `">` + handleradmin.TrimAndDress(attackerName(cb), 12) + "</a>"
 }

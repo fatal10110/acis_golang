@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -20,9 +19,6 @@ type punishmentStore interface {
 	SetPunishmentAt(ctx context.Context, objectID int32, level int, timer int64, at location.Location) error
 	ReplacePunishment(ctx context.Context, objectID int32, expected, level int, timer int64) (int, error)
 }
-
-// punishmentWriteTimeout bounds one punishment write.
-const punishmentWriteTimeout = 5 * time.Second
 
 var (
 	// jailLocation is where a jailed player is held.
@@ -192,11 +188,7 @@ func (p *livePlayer) stopPunishTimer(save bool) {
 
 // sendPunishmentPage opens the page file for live.
 func (l *GameClientLink) sendPunishmentPage(live *livePlayer, file string) {
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
-	}
-	l.sendValidatedFile(live, 0, file, page, 0)
+	l.sendValidatedFile(live, 0, file, l.rawPage(file), 0)
 }
 
 // storePunishment writes live's punishment on its persistence lane.
@@ -217,22 +209,13 @@ func (l *GameClientLink) storePunishmentAt(objectID int32, kind player.Punishmen
 	if l.punishments == nil {
 		return
 	}
-	store, log := l.punishments, l.log
-	if !l.persist.Enqueue(objectID, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), punishmentWriteTimeout)
-		defer cancel()
-		var err error
+	store := l.punishments
+	l.enqueueCharacterWrite(objectID, "store punishment", func(ctx context.Context) error {
 		if at != nil {
-			err = store.SetPunishmentAt(ctx, objectID, int(kind), timer, *at)
-		} else {
-			err = store.SetPunishment(ctx, objectID, int(kind), timer)
+			return store.SetPunishmentAt(ctx, objectID, int(kind), timer, *at)
 		}
-		if err != nil {
-			log.Error().Err(err).Int32("object_id", objectID).Msg("store punishment")
-		}
-	}) {
-		log.Error().Int32("object_id", objectID).Msg("store punishment: persistence closed")
-	}
+		return store.SetPunishment(ctx, objectID, int(kind), timer)
+	}, nil)
 }
 
 // replaceStoredPunishment stores kind and timer as objectID's punishment
@@ -245,19 +228,15 @@ func (l *GameClientLink) replaceStoredPunishment(objectID int32, expected, kind 
 	if l.punishments == nil {
 		return
 	}
-	store, log := l.punishments, l.log
-	if !l.persist.Enqueue(objectID, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), punishmentWriteTimeout)
-		defer cancel()
+	store := l.punishments
+	l.enqueueCharacterWrite(objectID, "replace punishment", func(ctx context.Context) error {
 		stored, err := store.ReplacePunishment(ctx, objectID, int(expected), int(kind), timer)
 		if err != nil {
-			log.Error().Err(err).Int32("object_id", objectID).Msg("replace punishment")
-			return
+			return err
 		}
 		report(player.Punishment(stored))
-	}) {
-		log.Error().Int32("object_id", objectID).Msg("replace punishment: persistence closed")
-	}
+		return nil
+	}, nil)
 }
 
 // punishTarget applies kind to the online target for minutes on target's

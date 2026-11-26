@@ -7,6 +7,19 @@ import (
 	"strings"
 )
 
+// ParseInt32 parses s as a signed decimal int: an optional sign, then
+// ASCII decimal digits, in int32 range.
+func ParseInt32(s string) (int32, bool) {
+	if s == "" || s == "+" || s == "-" {
+		return 0, false
+	}
+	v, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return 0, false
+	}
+	return int32(v), true
+}
+
 // DecodeInt32 parses s as a data-file integer literal: an optional sign,
 // then a decimal number, a hexadecimal number after "0x", "0X" or "#", or an
 // octal number after a leading "0" ("010" is 8), in ASCII digits and

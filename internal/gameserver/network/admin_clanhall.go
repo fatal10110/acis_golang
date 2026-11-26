@@ -4,8 +4,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -36,10 +38,7 @@ var adminClanHallTowns = []string{"Aden", "Dion", "Giran", "Gludin", "Gludio", "
 // opens instead. An id that does not parse, or a siege start on a hall no
 // script runs the siege of, is answered with the usage alone.
 func (l *GameClientLink) adminClanHall(gm *livePlayer, line string) {
-	args := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })
-	if len(args) > 0 {
-		args = args[1:]
-	}
+	args := handleradmin.SpaceArgs(line)
 	var param, param2 string
 	switch len(args) {
 	case 2:
@@ -52,7 +51,7 @@ func (l *GameClientLink) adminClanHall(gm *livePlayer, line string) {
 		ok   bool
 	)
 	if n := len(args); n >= 1 && n <= 3 {
-		id, valid := parseInt32(args[n-1])
+		id, valid := commons.ParseInt32(args[n-1])
 		if !valid {
 			sendText(gm, adminClanHallUsage)
 			return
@@ -128,7 +127,7 @@ func (l *GameClientLink) adminClanHallSet(gm *livePlayer, hallID int32) {
 // siege to start or end: no script runs it.
 func (l *GameClientLink) adminClanHallSiege(gm *livePlayer, hallID int32, action string) bool {
 	switch {
-	case action == "" || isDigits(action):
+	case action == "" || handleradmin.IsDigits(action):
 		sendText(gm, "Usage: //ch siege start|end chId.")
 		return true
 	case !l.clanHallData.Siegable(int(hallID)):
@@ -156,10 +155,7 @@ func (l *GameClientLink) adminClanHallSiege(gm *livePlayer, hallID int32, action
 // showAdminClanHall opens hall v's page for gm.
 func (l *GameClientLink) showAdminClanHall(gm *livePlayer, v clanhall.HallView) {
 	const file = "data/html/admin/clanhall.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("clanhall.htm", false)
 	owner := "None"
 	if v.OwnerID != 0 {
 		if cl, found := l.clanService().Table().Get(v.OwnerID); found {
@@ -205,10 +201,7 @@ func (l *GameClientLink) showAdminClanHall(gm *livePlayer, v clanhall.HallView) 
 // auction with its bid count, end date and minimum bid.
 func (l *GameClientLink) showAdminClanHalls(gm *livePlayer) {
 	const file = "data/html/admin/clanhalls.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("clanhalls.htm", false)
 	halls := l.halls.All()
 	var b strings.Builder
 	for _, town := range adminClanHallTowns {

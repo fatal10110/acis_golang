@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
@@ -24,8 +23,8 @@ type Announcer interface {
 
 // Store reads and rewrites the announcement file.
 type Store interface {
-	Load() ([]admin.Announcement, error)
-	Save([]admin.Announcement) error
+	Load() ([]Announcement, error)
+	Save([]Announcement) error
 }
 
 // Reasons Add refuses an announcement.
@@ -39,10 +38,21 @@ var (
 	ErrLimit = errors.New("announcement: negative automatic limit")
 )
 
+// Announcement is one announcement. InitialDelay, Delay and Limit apply only
+// to an automatic one.
+type Announcement struct {
+	Message      string
+	Critical     bool
+	Auto         bool
+	InitialDelay int
+	Delay        int
+	Limit        int
+}
+
 // Indexed is an announcement with the index a game master deletes it by.
 type Indexed struct {
 	Index int
-	admin.Announcement
+	Announcement
 }
 
 // Registry holds the announcements by index and runs the automatic ones'
@@ -77,7 +87,7 @@ type Registry struct {
 
 // entry is one held announcement and its schedule.
 type entry struct {
-	admin.Announcement
+	Announcement
 	timer *sim.Timer
 	// run identifies the schedule a fired timer belongs to; stopping or
 	// restarting the schedule moves it on, so a timer of an earlier run
@@ -114,7 +124,7 @@ func (r *Registry) Load() error {
 		r.mu.Lock()
 		change := r.change
 		r.mu.Unlock()
-		var list []admin.Announcement
+		var list []Announcement
 		if r.store != nil {
 			var err error
 			if list, err = r.store.Load(); err != nil {
@@ -133,7 +143,7 @@ func (r *Registry) Load() error {
 }
 
 // loadLocked holds list in place of the announcements held.
-func (r *Registry) loadLocked(list []admin.Announcement) {
+func (r *Registry) loadLocked(list []Announcement) {
 	for _, e := range r.entries {
 		e.stop()
 	}
@@ -155,10 +165,10 @@ func (r *Registry) loadLocked(list []admin.Announcement) {
 
 // Login returns the announcements read to a player entering the world: the
 // ones that are not automatic, by index.
-func (r *Registry) Login() []admin.Announcement {
+func (r *Registry) Login() []Announcement {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var out []admin.Announcement
+	var out []Announcement
 	for _, i := range r.indexesLocked() {
 		if e := r.entries[i]; !e.Auto {
 			out = append(out, e.Announcement)
@@ -193,12 +203,12 @@ func (r *Registry) RestartAuto() {
 // schedule values. It refuses, changing nothing, an empty message
 // (ErrEmptyMessage), and an automatic announcement with a delay under a
 // second (ErrDelay) or a negative limit (ErrLimit).
-func (r *Registry) Add(a admin.Announcement) error {
+func (r *Registry) Add(a Announcement) error {
 	if err := check(a); err != nil {
 		return err
 	}
 	if !a.Auto {
-		a = admin.Announcement{Message: a.Message, Critical: a.Critical}
+		a = Announcement{Message: a.Message, Critical: a.Critical}
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -209,7 +219,7 @@ func (r *Registry) Add(a admin.Announcement) error {
 
 // check reports why a cannot be held, or nil when it can. Only an automatic
 // announcement's schedule values count: the others keep none.
-func check(a admin.Announcement) error {
+func check(a Announcement) error {
 	switch {
 	case a.Message == "":
 		return ErrEmptyMessage
@@ -253,7 +263,7 @@ func (r *Registry) Stop() {
 
 // putLocked holds a at the next index, one no announcement has held since
 // the last load (#4707), and starts its schedule.
-func (r *Registry) putLocked(a admin.Announcement) {
+func (r *Registry) putLocked(a Announcement) {
 	e := &entry{Announcement: a}
 	r.entries[r.next] = e
 	r.next++
@@ -283,7 +293,7 @@ func (r *Registry) saveFile() {
 		r.mu.Unlock()
 		return
 	}
-	list := make([]admin.Announcement, 0, len(r.entries))
+	list := make([]Announcement, 0, len(r.entries))
 	for _, i := range r.indexesLocked() {
 		list = append(list, r.entries[i].Announcement)
 	}

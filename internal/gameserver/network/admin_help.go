@@ -3,6 +3,7 @@ package network
 import (
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
@@ -20,7 +21,7 @@ func (l *GameClientLink) adminHelp(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	page, search := 1, ""
 	if len(args) > 0 {
-		n, ok := parseInt32(args[0])
+		n, ok := commons.ParseInt32(args[0])
 		if !ok {
 			l.sendAdminHelp(gm, 1, "")
 			return
@@ -52,17 +53,13 @@ func (l *GameClientLink) sendAdminHelp(gm *livePlayer, page int, search string) 
 	b.WriteString("<html><body>")
 	handleradmin.Search(&b, "bypass admin_help", 45, len(found))
 	for row, cmd := range found[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 height=41 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280 height=41><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, " height=41")
 		b.WriteString(`<td width=280 height=34><font color="LEVEL">//` + commandWord(cmd.Name) + "</font>")
 		if strings.TrimSpace(cmd.Params) != "" {
 			b.WriteString(` <font color="33cccc">` + cmd.Params + "</font>")
 		}
 		b.WriteString("<br1>" + cmd.Description + "</td>")
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 42)
 	pg.Links(&b, "bypass admin_help %page% "+search)

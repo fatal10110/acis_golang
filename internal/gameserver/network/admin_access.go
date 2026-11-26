@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -35,7 +36,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 	const usage = "Usage: //set access <level> | <name> <level>"
 	switch len(args) {
 	case 1:
-		level, ok := parseInt32(args[0])
+		level, ok := commons.ParseInt32(args[0])
 		if !ok {
 			sendText(gm, usage)
 			return
@@ -50,7 +51,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 		})
 	case 2:
 		name := args[0]
-		level, ok := parseInt32(args[1])
+		level, ok := commons.ParseInt32(args[1])
 		if !ok {
 			sendText(gm, usage)
 			return
@@ -172,7 +173,7 @@ func (l *GameClientLink) gmOffLeaveState(live *livePlayer, st *player.SaveState)
 func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 	minutes := int32(1)
 	if args := handleradmin.Args(line); len(args) > 0 {
-		if v, ok := parseInt32(args[0]); ok {
+		if v, ok := commons.ParseInt32(args[0]); ok {
 			minutes = v
 		} else {
 			sendText(gm, "Invalid timer set for //gm ; default time is used.")
@@ -227,7 +228,7 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 		target, _ = l.livePlayerByName(name)
 		if len(args) > 2 {
 			var ok bool
-			if minutes, ok = parseInt32(args[2]); !ok {
+			if minutes, ok = commons.ParseInt32(args[2]); !ok {
 				sendText(gm, usage)
 				return
 			}

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 	"time"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
 
 // brokenStore fails every Load once broken is set.
@@ -14,7 +12,7 @@ type brokenStore struct {
 	broken bool
 }
 
-func (s *brokenStore) Load() ([]admin.Announcement, error) {
+func (s *brokenStore) Load() ([]Announcement, error) {
 	if s.broken {
 		return nil, errors.New("malformed")
 	}
@@ -24,7 +22,7 @@ func (s *brokenStore) Load() ([]admin.Announcement, error) {
 // A load that fails leaves the announcements held before, and their
 // schedules, as they were.
 func TestFailedLoadKeepsHeldAnnouncements(t *testing.T) {
-	store := &brokenStore{fakeStore: fakeStore{list: []admin.Announcement{{Message: "login"}, auto("auto", 5, 10, 0)}}}
+	store := &brokenStore{fakeStore: fakeStore{list: []Announcement{{Message: "login"}, auto("auto", 5, 10, 0)}}}
 	r, clock, rec := newTestRegistry(t, store)
 	if err := r.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)

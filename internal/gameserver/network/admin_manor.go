@@ -20,10 +20,7 @@ func (l *GameClientLink) adminManor(gm *livePlayer, _ string) {
 		return
 	}
 	const file = "data/html/admin/manor.htm"
-	page, ok := l.html.Get(file)
-	if !ok {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
+	page := l.adminPage("manor.htm", false)
 	var info strings.Builder
 	for _, c := range l.castles.All() {
 		info.WriteString("<tr><td width=110>Name:</td><td width=160><font color=008000>" + c.Name + "</font></td></tr>")

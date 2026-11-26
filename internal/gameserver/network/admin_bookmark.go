@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/bookmark"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -25,10 +26,10 @@ const adminBookmarkPageLimit = 15
 // it, then the first page of gm's bookmarks opens; digits open that page.
 func (l *GameClientLink) adminBookmark(gm *livePlayer, line string) {
 	page := int32(1)
-	if args := spaceTokens(line)[1:]; len(args) > 0 {
+	if args := handleradmin.SpaceArgs(line); len(args) > 0 {
 		param := args[0]
-		if isDigits(param) {
-			n, ok := parseInt32(param)
+		if handleradmin.IsDigits(param) {
+			n, ok := commons.ParseInt32(param)
 			if !ok {
 				l.log.Warn().Str("page", param).Msg("admin: //bk page out of range")
 				return
@@ -62,7 +63,7 @@ func (l *GameClientLink) adminBookmark(gm *livePlayer, line string) {
 // adminDeleteBookmark answers //delbk name: it deletes gm's bookmark so
 // called, then opens the first page of gm's bookmarks.
 func (l *GameClientLink) adminDeleteBookmark(gm *livePlayer, line string) {
-	args := spaceTokens(line)[1:]
+	args := handleradmin.SpaceArgs(line)
 	if len(args) == 0 {
 		sendText(gm, "The command delbk must be followed by a valid name.")
 		return
@@ -126,18 +127,14 @@ func (l *GameClientLink) sendBookmarks(gm *livePlayer, book *bookmark.Book, page
 	}
 	var b strings.Builder
 	for row, m := range marks[pg.Start:pg.End] {
-		if row%2 == 0 {
-			b.WriteString("<table width=280 bgcolor=000000><tr>")
-		} else {
-			b.WriteString("<table width=280><tr>")
-		}
+		handleradmin.OpenStripedRow(&b, row, "")
 		at := strconv.Itoa(int(m.X)) + " " + strconv.Itoa(int(m.Y)) + " " + strconv.Itoa(int(m.Z))
 		b.WriteString(`<td width=230><a action="bypass -h admin_teleport ` + at + `">` + m.Name + " (" + at + `)</a></td>`)
 		b.WriteString(`<td width=50><a action="bypass -h admin_delbk ` + m.Name + `">Remove</a></td>`)
-		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)
+		handleradmin.CloseStripedRow(&b)
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_bk %page%")
-	html := strings.ReplaceAll(l.adminHTML("bk.htm"), "%content%", b.String())
+	html := strings.ReplaceAll(l.adminPage("bk.htm", true), "%content%", b.String())
 	l.sendFilePage(gm, 0, adminFile("bk.htm"), html, 0)
 }

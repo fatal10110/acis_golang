@@ -2,20 +2,15 @@ package network
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-)
-
-// The clan skills are the skill ids from firstClanSkillID to
-// lastClanSkillID, each at its highest level.
-const (
-	firstClanSkillID = 370
-	lastClanSkillID  = 391
 )
 
 // adminClanSkillPageLimit is how many skills a page of //clan_skill shows.
@@ -61,17 +56,17 @@ func (l *GameClientLink) runAdminClanSkill(gm, target *livePlayer, args []string
 	// readPage takes tok as the page number when it is one, and reports
 	// false when that number is past the int range.
 	readPage := func(tok string) bool {
-		if !isDigits(tok) {
+		if !handleradmin.IsDigits(tok) {
 			return true
 		}
-		n, ok := parseInt32(tok)
+		n, ok := commons.ParseInt32(tok)
 		page = int(n)
 		return ok
 	}
 
 	var report string
 	if param, ok := next(); ok {
-		if isDigits(param) {
+		if handleradmin.IsDigits(param) {
 			if !readPage(param) {
 				return
 			}
@@ -118,16 +113,16 @@ func (l *GameClientLink) adminClanSkillSet(leader *livePlayer, cl *clan.Clan, ne
 		l.sendClanSkillsRaised(cl, leader)
 		return "You gave all available skills to " + cl.Name() + " clan.", false
 	}
-	id, ok := parseInt32(param)
+	id, ok := commons.ParseInt32(param)
 	if !ok {
 		return usage, false
 	}
 	levelParam, _ := next()
-	level, ok := parseInt32(levelParam)
+	level, ok := commons.ParseInt32(levelParam)
 	if !ok {
 		return usage, false
 	}
-	if id < firstClanSkillID || id > lastClanSkillID || level < 1 || level > 3 || l.skills == nil {
+	if !slices.Contains(l.clanSkillIDs(), modelskill.ID(id)) || level < 1 || level > 3 || l.skills == nil {
 		return usage, true
 	}
 	def, ok := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: int(level)})
@@ -163,7 +158,7 @@ func (l *GameClientLink) adminClanSkillRemove(leader *livePlayer, cl *clan.Clan,
 		l.sendClanSkillsRemoved(cl, ids, leader)
 		return "You removed all skills from " + cl.Name() + " clan."
 	}
-	id, ok := parseInt32(param)
+	id, ok := commons.ParseInt32(param)
 	if !ok {
 		return usage
 	}
@@ -229,13 +224,28 @@ func (l *GameClientLink) replyAdminClanSkills(gm, leader *livePlayer, cl *clan.C
 	})
 }
 
-// clanSkillCatalog returns every clan skill at its highest level, by id.
+// clanSkillIDs returns the distinct skill ids of the clan skill tree, in
+// ascending order.
+func (l *GameClientLink) clanSkillIDs() []modelskill.ID {
+	if l.skillTrees == nil {
+		return nil
+	}
+	ids := make([]modelskill.ID, 0, len(l.skillTrees.Clan))
+	for _, node := range l.skillTrees.Clan {
+		ids = append(ids, node.ID)
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids)
+}
+
+// clanSkillCatalog returns every clan skill of the clan skill tree at its
+// highest level, by id.
 func (l *GameClientLink) clanSkillCatalog() []modelskill.Definition {
 	if l.skills == nil {
 		return nil
 	}
 	var out []modelskill.Definition
-	for id := modelskill.ID(firstClanSkillID); id <= lastClanSkillID; id++ {
+	for _, id := range l.clanSkillIDs() {
 		if def, ok := l.skills.Definition(modelskill.Ref{ID: id, Level: l.skills.MaxLevel(id)}); ok {
 			out = append(out, *def)
 		}

@@ -4,8 +4,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -30,7 +32,7 @@ const adminPledgeUsage = "Usage: //pledge create|dismiss|info|level|rep|transfer
 // gm is then shown the game menu, except after a refused transfer. The
 // command runs on the player's queue, where its clan membership changes.
 func (l *GameClientLink) adminPledge(gm *livePlayer, line string) {
-	l.adminPledgeOn(gm, adminTargetPlayer(gm, true), spaceTokens(line)[1:])
+	l.adminPledgeOn(gm, adminTargetPlayer(gm, true), handleradmin.SpaceArgs(line))
 }
 
 // adminPledgeOn runs //pledge with args on target. A dismiss destroys the
@@ -110,7 +112,7 @@ func (l *GameClientLink) adminPledgeLevel(gm *livePlayer, cl *clan.Clan, args []
 	var level int32
 	ok := len(args) > 0
 	if ok {
-		level, ok = parseInt32(args[0])
+		level, ok = commons.ParseInt32(args[0])
 	}
 	switch {
 	case !ok:
@@ -165,7 +167,7 @@ func (l *GameClientLink) adminPledgeReputation(gm, target *livePlayer, cl *clan.
 	var points int32
 	ok := len(args) > 0
 	if ok {
-		points, ok = parseInt32(args[0])
+		points, ok = commons.ParseInt32(args[0])
 	}
 	if !ok {
 		sendText(gm, "Invalid number parameter for //pledge rep.")
