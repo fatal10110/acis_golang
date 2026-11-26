@@ -19,8 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
-
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
@@ -38,6 +36,7 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"

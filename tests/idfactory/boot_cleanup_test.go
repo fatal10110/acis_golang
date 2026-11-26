@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/rs/zerolog"
 )

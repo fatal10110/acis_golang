@@ -11,11 +11,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/fatal10110/acis_golang/internal/testsupport"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 

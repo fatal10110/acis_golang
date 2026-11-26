@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
-
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/config"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )

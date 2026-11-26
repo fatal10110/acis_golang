@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/testsupport"
-
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"

@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
-
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/objectids"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"

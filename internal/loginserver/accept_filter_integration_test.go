@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/testsupport"
-
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 

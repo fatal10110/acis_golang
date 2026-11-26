@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/testsupport"
-
 	"github.com/rs/zerolog"
 
 	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
@@ -21,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func TestGameServerLinkBlowFishKeyFailureDropsConnection(t *testing.T) {

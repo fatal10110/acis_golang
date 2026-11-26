@@ -19,14 +19,13 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/fatal10110/acis_golang/internal/testsupport"
-
 	"github.com/fatal10110/acis_golang/internal/commons/crypt"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 

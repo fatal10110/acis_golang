@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/testsupport"
-
 	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
 
@@ -24,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/loginserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // --- fake account store: no DB needed to exercise ClientLink's own logic ---
