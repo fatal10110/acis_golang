@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -68,8 +69,8 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 		send("npcinfo/stat.htm", l.npcStatPage(npcStatusOf(obj), inst.Template))
 	default:
 		page := 0
-		if isDigits(sub) {
-			n, ok := parseInt32(sub)
+		if handleradmin.IsDigits(sub) {
+			n, ok := commons.ParseInt32(sub)
 			if !ok {
 				// A page number past the int range aborts: the command
 				// ends with nothing sent.

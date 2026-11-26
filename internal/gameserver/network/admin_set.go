@@ -105,7 +105,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		})
 	case "karma":
 		edit(func() {
-			karma, ok := parseInt32(value)
+			karma, ok := commons.ParseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set karma <number>")
 				return
@@ -119,7 +119,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		})
 	case "level":
 		edit(func() {
-			level, ok := parseInt32(value)
+			level, ok := commons.ParseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set level <number>")
 				return
@@ -143,7 +143,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		})
 	case "rec":
 		edit(func() {
-			rec, ok := parseInt32(value)
+			rec, ok := commons.ParseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set rec <number>")
 				return
@@ -154,7 +154,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		})
 	case "sp":
 		edit(func() {
-			sp, ok := parseInt32(value)
+			sp, ok := commons.ParseInt32(value)
 			if !ok {
 				sendText(gm, "Usage: //set sp <number>")
 				return

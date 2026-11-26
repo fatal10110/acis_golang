@@ -3,6 +3,7 @@ package network
 import (
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
@@ -26,8 +27,8 @@ func (l *GameClientLink) adminKnownlist(gm *livePlayer, line string) {
 		target = t
 	}
 	page := int32(1)
-	if args := spaceTokens(line)[1:]; len(args) > 0 {
-		if n, ok := parseInt32(args[0]); ok {
+	if args := handleradmin.SpaceArgs(line); len(args) > 0 {
+		if n, ok := commons.ParseInt32(args[0]); ok {
 			page = n
 		} else {
 			sendText(gm, "Usage: //knownlist [page]")

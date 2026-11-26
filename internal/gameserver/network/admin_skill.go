@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -43,10 +44,10 @@ func (l *GameClientLink) adminSkill(gm *livePlayer, line string) {
 	page := 1
 	readPage := func() bool {
 		tok, ok := next()
-		if !ok || !isDigits(tok) {
+		if !ok || !handleradmin.IsDigits(tok) {
 			return true
 		}
-		n, ok := parseInt32(tok)
+		n, ok := commons.ParseInt32(tok)
 		page = int(n)
 		return ok
 	}
@@ -67,8 +68,8 @@ func (l *GameClientLink) adminSkill(gm *livePlayer, line string) {
 				return
 			}
 		default:
-			if isDigits(param) {
-				n, ok := parseInt32(param)
+			if handleradmin.IsDigits(param) {
+				n, ok := commons.ParseInt32(param)
 				if !ok {
 					return
 				}
@@ -95,13 +96,13 @@ func (l *GameClientLink) adminSkillSet(gm, target *livePlayer, next func() (stri
 	if param == "all" {
 		return onPlayer(gm, target, func() { l.rewardAdminSkills(gm, target) })
 	}
-	id, ok := parseInt32(param)
+	id, ok := commons.ParseInt32(param)
 	if !ok {
 		sendText(gm, usage)
 		return true
 	}
 	levelParam, _ := next()
-	level, ok := parseInt32(levelParam)
+	level, ok := commons.ParseInt32(levelParam)
 	if !ok {
 		sendText(gm, usage)
 		return true
@@ -127,7 +128,7 @@ func (l *GameClientLink) adminSkillRemove(gm, target *livePlayer, next func() (s
 	if param == "all" {
 		return onPlayer(gm, target, func() { l.removeAdminSkills(gm, target) })
 	}
-	id, ok := parseInt32(param)
+	id, ok := commons.ParseInt32(param)
 	if !ok {
 		sendText(gm, usage)
 		return true

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -14,7 +15,7 @@ func (l *GameClientLink) adminBuy(gm *livePlayer, line string) {
 		l.sendAdminFile(gm, "gmshops.htm")
 		return
 	}
-	id, ok := parseInt32(args[0])
+	id, ok := commons.ParseInt32(args[0])
 	if !ok {
 		sendText(gm, "Invalid buylist id.")
 		return

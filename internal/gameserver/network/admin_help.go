@@ -3,6 +3,7 @@ package network
 import (
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
@@ -20,7 +21,7 @@ func (l *GameClientLink) adminHelp(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	page, search := 1, ""
 	if len(args) > 0 {
-		n, ok := parseInt32(args[0])
+		n, ok := commons.ParseInt32(args[0])
 		if !ok {
 			l.sendAdminHelp(gm, 1, "")
 			return

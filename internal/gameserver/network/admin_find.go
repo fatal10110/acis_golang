@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/hashorder"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -47,11 +48,11 @@ func (l *GameClientLink) adminFind(gm *livePlayer, line string) {
 		switch {
 		case len(args) < 2:
 			l.findPlayers(gm, 1, "")
-		case !isDigits(nameIPOrPage):
+		case !handleradmin.IsDigits(nameIPOrPage):
 			// The name is matched as typed against lower-cased names.
 			l.findPlayers(gm, 1, nameIPOrPage)
 		default:
-			if page, ok := parseInt32(nameIPOrPage); !ok || !l.findPlayers(gm, int(page), search) {
+			if page, ok := commons.ParseInt32(nameIPOrPage); !ok || !l.findPlayers(gm, int(page), search) {
 				sendText(gm, "Usage: //find player name")
 				l.findPlayers(gm, 1, "")
 			}
@@ -74,7 +75,7 @@ func (l *GameClientLink) adminFind(gm *livePlayer, line string) {
 		l.findAccount(gm, name)
 	case "dualbox":
 		multibox := int32(2)
-		if n, ok := parseInt32(nameIPOrPage); ok {
+		if n, ok := commons.ParseInt32(nameIPOrPage); ok {
 			if n < 1 {
 				sendText(gm, "Usage: //find dualbox [number > 0]")
 				return
@@ -95,8 +96,8 @@ func (l *GameClientLink) adminFind(gm *livePlayer, line string) {
 		// leads it, else past the list word, the page then searched too
 		// when it shows no page.
 		rest := textAfter(line, param)
-		if isDigits(nameIPOrPage) {
-			if page, ok := parseInt32(nameIPOrPage); ok && list(gm, int(page), textAfter(line, nameIPOrPage)) {
+		if handleradmin.IsDigits(nameIPOrPage) {
+			if page, ok := commons.ParseInt32(nameIPOrPage); ok && list(gm, int(page), textAfter(line, nameIPOrPage)) {
 				return
 			}
 		}
@@ -272,7 +273,7 @@ func (l *GameClientLink) findItems(gm *livePlayer, page int, search string) bool
 			quest = " (Quest)"
 		}
 		b.WriteString("<td width=36 height=41 align=center><table><tr><td><img src=icon.noimage width=32 height=32></td></tr></table></td>")
-		b.WriteString("<td width=160>" + trimAndDress(tpl.Name, 28) + `<br1><font color="B09878">Item Id:</font> <font color=BDB76B>` + id + quest + "</font></td>")
+		b.WriteString("<td width=160>" + handleradmin.TrimAndDress(tpl.Name, 28) + `<br1><font color="B09878">Item Id:</font> <font color=BDB76B>` + id + quest + "</font></td>")
 		b.WriteString(`<td><edit var="amount_` + id + `" width=52 type=number></td>`)
 		b.WriteString(`<td><button action="bypass admin_give ` + id + " $amount_" + id + `" width=32 height=32 back=L2UI_CH3.mapbutton_zoomin2 fore=L2UI_CH3.mapbutton_zoomin1></td>`)
 		b.WriteString(`</tr></table><img src="L2UI.SquareGray" width=280 height=1>`)

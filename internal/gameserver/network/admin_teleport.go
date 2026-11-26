@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -84,7 +85,7 @@ func (l *GameClientLink) adminInstantMove(gm *livePlayer, args []string) {
 		gm.teleportMode = teleportModeOnce
 		return
 	}
-	mode, ok := parseInt32(args[0])
+	mode, ok := commons.ParseInt32(args[0])
 	if !ok || mode < int32(teleportModeNone) || mode > int32(teleportModeAlways) {
 		sendText(gm, "Usage: //instant_move [0|1|2]")
 		return
@@ -198,7 +199,7 @@ func (l *GameClientLink) adminTeleportTo(gm *livePlayer, args []string) {
 	var coords [3]int32
 	n := min(len(args), 3)
 	for i := range n {
-		v, ok := parseInt32(args[i])
+		v, ok := commons.ParseInt32(args[i])
 		if !ok {
 			l.sendAdminFile(gm, "teleports.htm")
 			return

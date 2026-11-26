@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -93,10 +94,10 @@ func (l *GameClientLink) adminEarthquake(gm *livePlayer, line string) {
 	var intensity, duration int32
 	ok := len(args) >= 2
 	if ok {
-		intensity, ok = parseInt32(args[0])
+		intensity, ok = commons.ParseInt32(args[0])
 	}
 	if ok {
-		duration, ok = parseInt32(args[1])
+		duration, ok = commons.ParseInt32(args[1])
 	}
 	if !ok {
 		sendText(gm, "Use: //earthquake <intensity> <duration>")
@@ -150,7 +151,7 @@ func (l *GameClientLink) adminSocial(gm *livePlayer, line string) {
 	var action int32
 	ok := len(args) > 0
 	if ok {
-		action, ok = parseInt32(args[0])
+		action, ok = commons.ParseInt32(args[0])
 	}
 	if !ok {
 		sendText(gm, "Usage: //social actionId")
@@ -217,7 +218,7 @@ func (l *GameClientLink) adminGMSpeed(gm *livePlayer, line string) {
 	var level int32
 	ok := len(args) > 0
 	if ok {
-		level, ok = parseInt32(args[0])
+		level, ok = commons.ParseInt32(args[0])
 	}
 	if !ok {
 		sendText(gm, usage)

@@ -2,7 +2,6 @@ package network
 
 import (
 	"strconv"
-	"strings"
 
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -26,7 +25,7 @@ func (l *GameClientLink) adminRide(gm *livePlayer, line string) {
 		return
 	}
 	// The mount is read from words split at spaces alone.
-	args := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })[1:]
+	args := handleradmin.SpaceArgs(line)
 	if len(args) == 0 {
 		sendText(gm, "You must enter a parameter for that command.")
 		return

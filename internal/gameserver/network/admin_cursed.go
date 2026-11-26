@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/cursedweapon"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 )
@@ -67,8 +68,8 @@ func (l *GameClientLink) adminCursedWeapons(gm *livePlayer, line string) {
 // digits that are no int; a name no weapon has resolves to 0, which no
 // weapon is.
 func (l *GameClientLink) cursedWeaponNamed(param string) (int32, bool) {
-	if isDigits(param) {
-		return parseInt32(param)
+	if handleradmin.IsDigits(param) {
+		return commons.ParseInt32(param)
 	}
 	name := strings.ToLower(strings.ReplaceAll(param, "_", " "))
 	for _, w := range l.cursed.Weapons() {

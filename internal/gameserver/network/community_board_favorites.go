@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 )
 
@@ -23,7 +24,7 @@ func (l *GameClientLink) boardFavorites(live *livePlayer, command string) {
 		if len(tokens) < 3 {
 			return
 		}
-		id, ok := parseInt32(tokens[2])
+		id, ok := commons.ParseInt32(tokens[2])
 		if !ok {
 			return
 		}

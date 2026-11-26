@@ -20,12 +20,45 @@ func Args(command string) []string {
 	return tokens[1:]
 }
 
+// SpaceArgs returns the arguments after command's word, split on runs of
+// spaces alone: any other whitespace stays inside an argument.
+func SpaceArgs(command string) []string {
+	tokens := strings.FieldsFunc(command, func(r rune) bool { return r == ' ' })
+	if len(tokens) == 0 {
+		return nil
+	}
+	return tokens[1:]
+}
+
 func isDelimiter(r rune) bool {
 	switch r {
 	case ' ', '\t', '\n', '\r', '\f':
 		return true
 	}
 	return false
+}
+
+// IsDigits reports whether s is one or more ASCII digits.
+func IsDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// TrimAndDress cuts s longer than maxWidth characters to its first
+// maxWidth-3, followed by "...".
+func TrimAndDress(s string, maxWidth int) string {
+	r := []rune(s)
+	if len(r) <= maxWidth {
+		return s
+	}
+	return string(r[:maxWidth-3]) + "..."
 }
 
 // paperdollSlots are the equip-slot names an admin command takes, in the

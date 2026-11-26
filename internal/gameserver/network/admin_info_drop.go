@@ -119,7 +119,7 @@ func (l *GameClientLink) writeDropRow(b *strings.Builder, d item.Drop, row int) 
 	if rest, found := strings.CutPrefix(name, "Recipe: "); found {
 		name = "R: " + rest
 	}
-	name = trimAndDress(name, 45)
+	name = handleradmin.TrimAndDress(name, 45)
 	color := "F08080"
 	switch {
 	case d.Chance > 80:

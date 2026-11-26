@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
@@ -69,7 +70,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		}
 		var numbers [3]int
 		for i, arg := range args[2:5] {
-			n, ok := parseInt32(arg)
+			n, ok := commons.ParseInt32(arg)
 			if !ok {
 				return false
 			}
@@ -88,7 +89,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		if len(tokens) < 3 {
 			return false
 		}
-		index, ok := parseInt32(tokens[2])
+		index, ok := commons.ParseInt32(tokens[2])
 		if !ok || !l.announcements.Delete(int(index)) {
 			return false
 		}

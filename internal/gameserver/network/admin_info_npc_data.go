@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -262,7 +263,7 @@ func spawnDescription(rec manager.SpawnRecord, npcID int) (label, desc string) {
 	case rec.Maker != "":
 		return "MultiSpawn [id=" + id + "]", "NpcMaker: " + rec.Maker
 	case rec.MasterID != 0:
-		return "Spawn [id=" + id + "]", "Master: " + trimAndDress(rec.MasterName, 20) + " [objId=" + strconv.Itoa(int(rec.MasterID)) + "]"
+		return "Spawn [id=" + id + "]", "Master: " + handleradmin.TrimAndDress(rec.MasterName, 20) + " [objId=" + strconv.Itoa(int(rec.MasterID)) + "]"
 	}
 	return "Spawn [id=" + id + "]", "Location: " + spawnPoint(rec.At, rec.Heading)
 }

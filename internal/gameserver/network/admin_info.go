@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
@@ -27,7 +28,7 @@ func (l *GameClientLink) adminInfo(gm *livePlayer, line string) {
 		l.sendFilePage(gm, 0, adminFile("staticinfo.htm"), l.staticInfoPage(target), 0)
 	default:
 		if inst := npcInstanceOf(target); inst != nil {
-			l.adminNpcInfo(gm, target, inst, spaceTokens(line)[1:])
+			l.adminNpcInfo(gm, target, inst, handleradmin.SpaceArgs(line))
 			return
 		}
 		sendFilledHTML(gm, 0, "", 0)
@@ -46,17 +47,6 @@ func (l *GameClientLink) staticInfoPage(obj *staticobject.Object) string {
 		"%staticid%", strconv.Itoa(obj.StaticObjectID()),
 		"%class%", "StaticObject",
 	)
-}
-
-// spaceTokens splits line on spaces: runs of spaces separate tokens, and
-// any other whitespace stays inside one. The first token is the command
-// word, so the result always holds at least one entry.
-func spaceTokens(line string) []string {
-	tokens := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })
-	if len(tokens) == 0 {
-		return []string{""}
-	}
-	return tokens
 }
 
 // formatPercent formats v with at most three fraction digits, rounded

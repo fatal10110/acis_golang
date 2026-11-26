@@ -1,7 +1,6 @@
 package network
 
 import (
-	"slices"
 	"testing"
 )
 
@@ -34,24 +33,6 @@ func TestFormatPercentMatchesDecimalFormat(t *testing.T) {
 	} {
 		if got := formatPercent(tc.in); got != tc.want {
 			t.Errorf("formatPercent(%v) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
-// TestSpaceTokensSplitsOnSpacesOnly pins spaceTokens to a StringTokenizer
-// with a space delimiter: other whitespace stays inside a token.
-func TestSpaceTokensSplitsOnSpacesOnly(t *testing.T) {
-	for _, tc := range []struct {
-		in   string
-		want []string
-	}{
-		{"", []string{""}},
-		{"admin_info", []string{"admin_info"}},
-		{"admin_info  drop 2 ", []string{"admin_info", "drop", "2"}},
-		{"admin_info\tdrop", []string{"admin_info\tdrop"}},
-	} {
-		if got := spaceTokens(tc.in); !slices.Equal(got, tc.want) {
-			t.Errorf("spaceTokens(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }

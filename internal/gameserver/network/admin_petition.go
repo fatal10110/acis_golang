@@ -26,12 +26,12 @@ const (
 // named, after one of the actions join, reject, reset, show and unfollow
 // on a petition; view opens one petition instead.
 func (l *GameClientLink) adminPetition(gm *livePlayer, line string) {
-	args := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })[1:]
+	args := handleradmin.SpaceArgs(line)
 	page := int32(1)
 	if len(args) > 0 {
-		if isDigits(args[0]) {
+		if handleradmin.IsDigits(args[0]) {
 			var ok bool
-			if page, ok = parseInt32(args[0]); !ok {
+			if page, ok = commons.ParseInt32(args[0]); !ok {
 				// A page number past the int range opens nothing.
 				return
 			}
@@ -49,7 +49,7 @@ func (l *GameClientLink) adminPetitionAction(gm *livePlayer, action string, args
 		if len(args) == 0 {
 			return 0, false
 		}
-		return parseInt32(args[0])
+		return commons.ParseInt32(args[0])
 	}
 	pres := petitionPresence{l}
 	switch action {

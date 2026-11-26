@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -39,10 +40,10 @@ func (l *GameClientLink) adminMaker(gm *livePlayer, line string) {
 		l.sendMakersPage(gm, npcs, 1)
 		return
 	case 1:
-		if isDigits(args[0]) {
+		if handleradmin.IsDigits(args[0]) {
 			// A page number past int32 answers nothing either: the command
 			// has always failed on it before showing a page.
-			if page, ok := parseInt32(args[0]); ok {
+			if page, ok := commons.ParseInt32(args[0]); ok {
 				l.sendMakersPage(gm, npcs, int(page))
 			}
 			return

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -61,17 +62,17 @@ func (l *GameClientLink) runAdminClanSkill(gm, target *livePlayer, args []string
 	// readPage takes tok as the page number when it is one, and reports
 	// false when that number is past the int range.
 	readPage := func(tok string) bool {
-		if !isDigits(tok) {
+		if !handleradmin.IsDigits(tok) {
 			return true
 		}
-		n, ok := parseInt32(tok)
+		n, ok := commons.ParseInt32(tok)
 		page = int(n)
 		return ok
 	}
 
 	var report string
 	if param, ok := next(); ok {
-		if isDigits(param) {
+		if handleradmin.IsDigits(param) {
 			if !readPage(param) {
 				return
 			}
@@ -118,12 +119,12 @@ func (l *GameClientLink) adminClanSkillSet(leader *livePlayer, cl *clan.Clan, ne
 		l.sendClanSkillsRaised(cl, leader)
 		return "You gave all available skills to " + cl.Name() + " clan.", false
 	}
-	id, ok := parseInt32(param)
+	id, ok := commons.ParseInt32(param)
 	if !ok {
 		return usage, false
 	}
 	levelParam, _ := next()
-	level, ok := parseInt32(levelParam)
+	level, ok := commons.ParseInt32(levelParam)
 	if !ok {
 		return usage, false
 	}
@@ -163,7 +164,7 @@ func (l *GameClientLink) adminClanSkillRemove(leader *livePlayer, cl *clan.Clan,
 		l.sendClanSkillsRemoved(cl, ids, leader)
 		return "You removed all skills from " + cl.Name() + " clan."
 	}
-	id, ok := parseInt32(param)
+	id, ok := commons.ParseInt32(param)
 	if !ok {
 		return usage
 	}
