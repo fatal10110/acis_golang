@@ -260,14 +260,29 @@ func (l *GameClientLink) storeCharacterEdit(objectID int32, what string, write f
 	if l.characterEdits == nil {
 		return
 	}
-	store, log := l.characterEdits, l.log
+	store := l.characterEdits
+	l.enqueueCharacterWrite(objectID, what, func(ctx context.Context) error { return write(ctx, store) }, nil)
+}
+
+// enqueueCharacterWrite runs write on objectID's persistence lane, ahead of
+// any save its logout queues after, under characterWriteTimeout. A failed
+// write is logged under what, a closed lane as well; either then runs
+// failed, when given.
+func (l *GameClientLink) enqueueCharacterWrite(objectID int32, what string, write func(context.Context) error, failed func()) {
+	log := l.log
 	if !l.persist.Enqueue(objectID, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), characterWriteTimeout)
 		defer cancel()
-		if err := write(ctx, store); err != nil {
+		if err := write(ctx); err != nil {
 			log.Error().Err(err).Int32("object_id", objectID).Msg(what)
+			if failed != nil {
+				failed()
+			}
 		}
 	}) {
 		log.Error().Int32("object_id", objectID).Msg(what + ": persistence closed")
+		if failed != nil {
+			failed()
+		}
 	}
 }
