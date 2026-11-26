@@ -37,10 +37,10 @@ type Client struct {
 	accountName string
 	sessionKey  link.SessionKey
 
-	underflowCount       int
-	underflowWindowStart time.Time
-	unknownCount         int
-	unknownWindowStart   time.Time
+	underflowCount         int
+	underflowWindowStart   time.Time
+	unknownCount           int
+	unknownWindowStart     time.Time
 	decodeErrorCount       int
 	decodeErrorWindowStart time.Time
 

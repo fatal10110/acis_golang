@@ -22,7 +22,7 @@ import (
 func TestSessionEmptyFrameKeepsReadDeadline(t *testing.T) {
 	server, client := net.Pipe()
 	tracked := &deadlineConn{Conn: server, readDeadline: make(chan time.Time, 8)}
-	conn := newConn(tracked, zerolog.Nop())
+	conn := newConn(tracked, zerolog.Nop(), testRejects())
 	t.Cleanup(func() {
 		_ = client.Close()
 		_ = conn.Close()
