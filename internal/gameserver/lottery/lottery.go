@@ -28,11 +28,6 @@ import (
 // TaskTimeout bounds one database read or write.
 const TaskTimeout = persist.ServiceTaskTimeout
 
-// writeLane is the persistence owner every lottery write is queued under:
-// one lane keeps them in the order they were made, and no player's saves
-// wait behind them.
-const writeLane = persist.ServiceOwner
-
 const (
 	minuteMillis = int64(time.Minute / time.Millisecond)
 	weekMillis   = int64(7 * 24 * time.Hour / time.Millisecond)
@@ -413,7 +408,9 @@ func (l *Lottery) finish() {
 			}
 		})
 	}
-	if !l.writes.Enqueue(writeLane, job) {
+	// The read shares persist.ServiceWrite's lane, persist.ServiceOwner, so
+	// it runs behind every ticket write already queued.
+	if !l.writes.Enqueue(persist.ServiceOwner, job) {
 		l.log.Error().Int32("round", round).Msg("lottery: read tickets: job dropped")
 	}
 }

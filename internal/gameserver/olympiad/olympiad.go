@@ -34,12 +34,6 @@ import (
 // TaskTimeout bounds one database write.
 const TaskTimeout = persist.ServiceTaskTimeout
 
-// writeLane is the persistence owner every Olympiad write is queued under:
-// one lane keeps the writes in the order the calendar made them, so a
-// truncate never lands after the records saved behind it, and no player's
-// saves wait behind them.
-const writeLane = persist.ServiceOwner
-
 // Period is the part of the calendar the Olympiad is in.
 type Period int
 
@@ -369,7 +363,11 @@ func (o *Olympiad) Stop(ctx context.Context) {
 	if o.writes == nil {
 		return
 	}
-	if err := o.writes.Flush(ctx, writeLane); err != nil {
+	// Every write goes through persist.ServiceWrite on persist.ServiceOwner:
+	// one lane keeps them in the order the calendar made them, so a truncate
+	// never lands after the records saved behind it, and flushing that lane
+	// waits for all of them.
+	if err := o.writes.Flush(ctx, persist.ServiceOwner); err != nil {
 		o.log.Error().Err(err).Msg("olympiad: wait for the final save")
 	}
 }
