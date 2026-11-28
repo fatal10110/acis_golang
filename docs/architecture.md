@@ -1,233 +1,260 @@
 # Architecture
 
-This page explains how the Go servers are put together: the processes, the protocols between
-them, how the game server boots, which goroutines own which state, and where each kind of code
-lives. It describes the code as it is today. For how to build and test it, see
-[development.md](development.md). For how to run it, see [run-servers.md](run-servers.md).
+This page explains how the servers work, from the big picture down to the main packages. Read it
+before you change code. Words in *italics* on first use are defined in the [glossary](glossary.md).
+The [decision records](decisions/README.md) explain why things are built this way.
 
-## The system at a glance
+## What the system does
 
-The project is a Go port of the aCis server for the Lineage II Interlude client (protocol revision
-746). It has two server processes and one shared MariaDB database:
+Lineage II is an online role-playing game. Players run a game *client* that connects to two servers:
+
+- the **login server** checks the account and shows the list of game servers;
+- the **game server** runs the game world: characters, monsters, fights, items, quests, clans and
+  everything else.
+
+This project is a Go version of *aCis*, an existing Java server for the *Interlude* client. It
+behaves like the Java server, uses the same database, config files and game data, and talks to the
+same unmodified client ([decision 0001](decisions/0001-stay-compatible-with-acis.md)).
+
+## The big picture
 
 ```text
-                    ┌──────────────────────┐
-  game client ─────►│ loginserver  :2106   │  accounts, server list, session keys
-  (login phase)     │                      │◄──────────┐
-                    └──────────┬───────────┘           │ GS-LS link :9014
-                               │ MariaDB               │ (registration, session-key checks,
-                    ┌──────────▼───────────┐           │  online players, kicks, access levels)
-                    │   acis database      │           │
-                    └──────────▲───────────┘           │
-                               │                       │
-  game client ─────►┌──────────┴───────────┐           │
-  (game phase)      │ gameserver   :7777   │───────────┘
-                    │ datapack (XML, HTML) │
-                    │ geodata              │
-                    └──────────────────────┘
+               ┌─────────────────────────┐
+  client ─────►│ login server   :2106    │  accounts, server list, session keys
+  (logging in) └───────────┬─────────────┘
+                           │                ▲
+                           │                │ GS-LS link :9014
+                           ▼                │
+                ┌─────────────────────┐     │
+                │  MariaDB database   │     │
+                └─────────────────────┘     │
+                           ▲                │
+                           │                │
+               ┌───────────┴─────────────┐  │
+  client ─────►│ game server    :7777    │──┘
+  (playing)    │ + datapack + geodata    │
+               └─────────────────────────┘
 ```
 
-| Process | Binary | Listens on | Reads |
-| --- | --- | --- | --- |
-| Login server | `cmd/loginserver` | client port (`LoginserverPort`, 2106) and GS-LS link port (`LoginPort`, 9014) | `loginserver.properties`, `serverNames.xml`, `banned_ips.properties`, the `accounts` and `gameservers` tables |
-| Game server | `cmd/gameserver` | game client port (`GameserverPort`, 7777); connects out to the login server's link port | the game `.properties` files, `hexid.txt`, the datapack under `-data-root`, geodata, every game table |
+There are two programs and one database:
 
-Both processes use the same database schema, the same config files and the same datapack layout as
-the aCis Java server, so an existing installation can switch over; see
-[ops/migrating-from-java.md](ops/migrating-from-java.md).
+| Program | What it does | Reads |
+| --- | --- | --- |
+| `cmd/loginserver` | Accepts client logins on port 2106. Accepts game servers on the *GS-LS link* port 9014. | `loginserver.properties`, `serverNames.xml`, banned IPs, the account tables |
+| `cmd/gameserver` | Accepts players on port 7777. Connects to the login server's link port. | the game `.properties` files, `hexid.txt`, the *datapack*, the *geodata*, all game tables |
 
-## Protocols
+Both programs use the same MariaDB database. One login server can serve several game servers.
 
-There are three wire protocols. All of them use little-endian framing with a 2-byte length prefix,
-and they share the primitives in `internal/commons/wire`.
+## A player's journey
+
+1. **Log in.** The client connects to the login server and sends the account name and password. The
+   login server checks them and sends back the list of game servers.
+2. **Pick a server.** The login server gives the client a one-time *session key* for that server.
+3. **Connect to the game server.** The client sends the session key to the game server. The game
+   server asks the login server over the GS-LS link whether the key is valid, and waits for the
+   answer.
+4. **Choose a character.** The game server shows the account's characters. The player picks one and
+   enters the world.
+5. **Play.** While the player is online, the game server tells the login server which accounts are
+   in the game. If the same account logs in somewhere else, the login server asks the game server
+   to disconnect the first session.
+
+The game server proves who it is to the login server with the server id and key stored in
+`hexid.txt`. You create that file once with `cmd/gsregister`. If the link drops, the game server
+keeps running and reconnects in the background.
+
+### The three protocols
+
+All three use small binary messages, called *packets*, each with a 2-byte length in front. The
+shared encoding code is in `internal/commons/wire`.
 
 | Protocol | Between | Code | Encryption |
 | --- | --- | --- | --- |
-| Login | client ↔ login server | `internal/loginserver/network` (`clientpackets`, `serverpackets`), `internal/loginserver/crypt` | RSA for the credentials block, Blowfish for the stream |
-| GS-LS link | game server ↔ login server | `internal/link` (shared message encode/decode), `internal/loginserver/gameserverlink.go`, `internal/gameserver/network/loginlink.go` | RSA key exchange, then Blowfish (`internal/commons/crypt`) |
-| Game | client ↔ game server | `internal/gameserver/network` (`clientpackets`, `serverpackets`, `cipher`) | XOR rolling-stream cipher, keyed by `ProtocolVersion` |
+| Login | client and login server | `internal/loginserver/network`, `internal/loginserver/crypt` | RSA for the password, then Blowfish |
+| GS-LS link | game server and login server | `internal/link` (shared by both sides) | RSA key exchange, then Blowfish |
+| Game | client and game server | `internal/gameserver/network` | a rolling XOR cipher, keyed when the client says hello |
 
-A player's session crosses both servers:
+## Inside the game server
 
-1. The client logs in to the login server, which checks the account and returns the server list.
-2. The client picks a server. The login server issues a play session key.
-3. The client connects to the game server with that key. The game server asks the login server
-   over the link (`PlayerAuthRequest`) whether the key is valid, and waits for the answer before it
-   shows character selection.
-4. While the player is in the game, the game server reports online accounts to the login server
-   (`PlayerInGame`, `PlayerLogout`). The login server can kick a player (`KickPlayer`) when the
-   account logs in again elsewhere.
-
-The game server registers with the login server using the server id and key in `hexid.txt`, which
-`cmd/gsregister` writes. If the link drops, the game server keeps running and reconnects in the
-background.
-
-## Repository layout
+The game server is organized in layers. Code calls down into lower layers. Lower layers report
+back up through events and interfaces, never by importing a higher layer:
 
 ```text
-cmd/                 binaries: the two servers and their command-line tools (see tools.md)
-internal/
-  commons/           shared by both servers: wire, crypt, db pool, logging, scheduler, id factory, ...
-  config/            .properties parsing and typed config keys
-  link/              GS-LS link messages, shared by both servers
-  loginserver/       login server: client link, game server link, accounts, bans
-  gameserver/        game server (see the package map below)
-  gameservertest/    boots a full game server inside a test
-  testsupport/       scripted game client and shared test helpers
-  dbtest/            the shared test MariaDB and per-test databases
-  botclient/         simulated players used by cmd/botswarm
-  datadiff/          canonical dumps used to compare loaders
-  provenance/        a repository check on production comments and names
-tests/<domain>/      behavior suites: full flows through real packets and a real database
-aCis_datapack/       test copy of the datapack (XML, HTML, SQL), without geodata
-ops/                 Docker, systemd and datapack-manifest files
-docs/                this documentation
+┌──────────────────────────────────────────────────────────────┐
+│ Network     decode packets, check them, call the game rules, │  internal/gameserver/network
+│             turn results and events into packets             │
+├──────────────────────────────────────────────────────────────┤
+│ Game rules  combat, skills, items, clans, quests, sieges, ...│  internal/gameserver/<system>,
+│             live characters and monsters                     │  model/, skill/, handler/, script/
+├──────────────────────────────────────────────────────────────┤
+│ World       who is where, who can see whom, terrain          │  world/, geo/
+├──────────────────────────────────────────────────────────────┤
+│ Data        game data from files, saved data in MariaDB      │  data/xml, data/sql, persist/
+└──────────────────────────────────────────────────────────────┘
 ```
 
-## Game server boot and shutdown
+The network layer handles the protocol only. It does not decide game rules: a handler decodes a
+request, calls a game-rule function, and turns the result into packets. Game-rule code never builds
+packets itself ([decision 0005](decisions/0005-domain-events-to-packets.md)).
 
-`cmd/gameserver` builds the process as a [uber-go/fx](https://github.com/uber-go/fx) dependency
-graph:
+## How a request is handled
 
-- **Providers** (`fx.Provide`) construct each service: config, logger, database pool, the loaded
-  game data, the object id allocator, stores, the world, the actor pool, and each game system. The
-  providers shared with the test harness live in `internal/gameserver/app`; the rest are still in
-  `cmd/gameserver`, one file per system.
-- **Invokes** (`fx.Invoke`) start things in a fixed order: scripts, residences and sieges, then the
-  periodic tasks, then the debug listener, and last the game client listener (`startGameServer`).
-  Clients can connect only once everything else is up.
-- **Shutdown** runs the stop hooks in reverse order. The game listener stops first and sends each
-  client its close frame, and each connection waits for its player's saves. After that the tickers
-  stop, the actor pool drains, the item saves and the persistence lanes are flushed, the game
-  systems (spawns, Seven Signs, Olympiad, ground items, ...) save their state, and the database pool
-  closes last. The total time is
-  capped by `gameServerStopTimeout` in `cmd/gameserver/main.go`. That cap is the sum of each step's
-  own limit, and a test checks it. This is why `docker-compose.yml` gives the game server a long
-  `stop_grace_period`.
+Here is what happens when a player clicks a monster to attack it.
 
-Boot I/O that runs while the graph is built (the database ping, the object id scan, restoring
-spawn state) is limited by `gameServerBootTimeout`. A database that does not answer fails boot
-instead of hanging it.
+1. **Read.** The connection's read loop (one goroutine per player) reads the packet, decrypts it
+   and decodes it into a Go struct.
+2. **Check.** It checks that this kind of packet is allowed right now (a player cannot attack from
+   the character selection screen) and that the client is not flooding the server.
+3. **Queue.** The handler for this packet is put on the player's *actor queue*. The read loop waits
+   until the handler is done before it reads the next packet, so a player's requests are always
+   handled in order.
+4. **Run the rules.** A worker goroutine runs the handler. It calls into the combat code, which
+   checks the target, starts the attack and later applies damage to the monster.
+5. **Report.** The combat code reports what happened as *events*, for example "attacked" or "died".
+   The network layer turns each event into packets for the attacker and for every player who can
+   see the fight.
+6. **Send.** Each client's packets go into that client's outbound queue. A writer goroutine for each
+   client encrypts them and sends them, in order.
+7. **Save.** If the fight changes something that must be saved (experience, a dropped item), the
+   change goes to the *persistence lanes*, which write it to the database in the background.
 
-The login server is a smaller fx graph built the same way in `cmd/loginserver`.
+## Running many players at once
 
-## Concurrency model
+The game server must use every CPU core, without two goroutines changing the same character at the
+same time.
 
-The game server keeps game state off locks wherever it can. Each kind of work runs on a known kind
-of goroutine:
+**Each actor has its own queue.** An *actor* is a live player, monster or NPC. Each one owns a
+first-in, first-out task queue (`sim.Queue`). Everything that changes the actor runs as a task on
+that queue: its packet handlers, its timers and its regular ticks. Pets, summons and cubics use
+their owner's queue.
 
-| Goroutine | Owns | Code |
-| --- | --- | --- |
-| Connection read loop, one per client | decoding, the opcode state gate, flood protection | `network/client_loop.go` |
-| Connection writer, one per client | the outbound queue, encryption, send order | `network/conn.go` |
-| Actor pool workers, `GOMAXPROCS` of them | running the tasks posted to actor queues | `internal/gameserver/sim` |
-| Tickers, one per periodic system | fixed-rate ticks (regeneration, AI, decay, autosave, ...) | `internal/commons/scheduler` |
-| Persistence lanes, five of them | database writes, in order per owner | `internal/gameserver/persist` |
-| Login link reader | the GS-LS link | `network/loginlink.go` |
+**A pool of workers runs the queues.** There is one worker goroutine per CPU core. A worker takes a
+queue that has work and runs its tasks. Two workers never run the same queue at once, so an
+actor's tasks run one at a time. Different actors run in parallel.
 
-### Actor queues
+This means most actor state needs no locks. A few values that other actors must change directly,
+such as HP when someone hits you, have small locks of their own. `sim.AssertOwner` checks that
+queue-owned state is only touched from its own queue.
 
-Each live actor (a player, a summon, an NPC) owns a `sim.Queue`. A queue's tasks run one at a time
-and in the order they were posted, on a pool worker. State that a queue owns is touched only from
-that queue's tasks, and `sim.AssertOwner` checks this. Because two goroutines never run the same
-actor's work at once, most actor state needs no mutex. The few values that other actors must read
-(position, vitals, status flags) use atomics or small leaf locks.
+A task must never wait on something slow, such as the database, because it would hold a worker that
+other actors need. Database reads that a request needs run on the connection's goroutine, and the
+result is posted back to the queue. Database writes go to the persistence lanes.
+[Decision 0003](decisions/0003-per-actor-queues.md) explains why we chose queues over locks.
 
-A client packet for a player in the world goes through these steps:
+The goroutines in a running game server:
 
-1. The read loop decodes the frame and checks the opcode against the connection's state
-   (`state.go`).
-2. The handler registry (`client_dispatch.go`) finds the handler. Handlers wrapped in `whenLive`
-   are posted to the player's queue.
-3. The read loop waits for that task to finish before it reads the next frame. This keeps each
-   client's requests and replies in order.
-4. Database reads that a request needs run back on the connection goroutine (`whenLiveStaged`,
-   `deferLookup`). Their result is posted back to the queue, so a slow database never blocks a pool
-   worker.
+| Goroutine | How many | Job | Code |
+| --- | --- | --- | --- |
+| Read loop | one per client | read, decrypt, decode, check, hand to the queue | `network/client_loop.go` |
+| Writer | one per client | encrypt and send packets in order | `network/conn.go` |
+| Worker | one per CPU core | run actor queue tasks | `sim/pool.go` |
+| Ticker | one per periodic system | regular jobs: regeneration, AI, decay, autosave, ... | `commons/scheduler` |
+| Persistence lane | five | write to the database | `persist/worker.go` |
+| Login link | one | talk to the login server | `network/loginlink.go` |
 
-In tests, the same queues run on `sim.Inline`, a single-goroutine executor with a virtual clock.
-Tests are deterministic and never sleep. CI also runs every behavior suite on the real pool
-(`ACIS_SIM_EXECUTOR=pool`).
+## Saving data
 
-### Persistence
+Game code does not write to the database directly. It builds a snapshot of what to save and hands
+it to `persist.Worker`, which has five *lanes*:
 
-Database writes caused by game state changes do not run on actor queues. They are enqueued as jobs
-on `persist.Worker`, which has four lanes for owner ids (characters, items, clans) and one lane for game-wide services
-(Olympiad, heroes, raid points, lottery, ...). Jobs for one owner run in the order they were
-enqueued, so a later save can never land before an earlier one. `Enqueue` never blocks. Shutdown
-flushes every lane before the database pool closes.
+- four lanes for players, items, clans and other owners. All saves for one owner go to the same
+  lane, so they reach the database in the order they were made;
+- one lane for game-wide systems (Olympiad, heroes, raid points, lottery), so a slow write there
+  never delays a player's save.
 
-The SQL itself lives in stores in `internal/gameserver/data/sql` (and `internal/loginserver/data/sql`),
-which the fx graph builds once.
+Handing over a save never blocks. When the server shuts down, every lane finishes its work before
+the database connection closes. The SQL lives in one *store* per group of tables, in
+`internal/gameserver/data/sql`. [Decision 0004](decisions/0004-ordered-persistence-lanes.md) has
+the details.
 
-### Domain events and packets
+## Game data, terrain and scripts
 
-Domain code does not build packets. When something happens to an actor that clients must see, the
-domain code emits a typed `event.Event` (`internal/gameserver/model/actor/event`) to the actor's
-sink. In the network package, a type switch maps each event to packets, in the order clients
-expect. Inbound handlers call domain APIs and turn the typed result into packets. Every rejection
-must answer the client; see
-[agents/action-response-contract.md](agents/action-response-contract.md).
+**Game data** (the datapack) stays as files on disk: XML for items, skills, NPCs, spawns, zones and
+shops, and HTML for NPC dialogs. Loaders in `internal/gameserver/data/xml` read them at boot. Some
+can be reloaded while the server runs with the `//reload` admin command.
 
-The full ownership rules for the network package are in
-[`internal/gameserver/network/AGENTS.md`](../internal/gameserver/network/AGENTS.md) and
-[network-ownership-map.md](network-ownership-map.md).
+**Terrain** (geodata) says how high the ground is and where the walls are. The server uses it for
+movement, line of sight and pathfinding (`internal/gameserver/geo`). It is large, so the server
+keeps it in a cache file mapped into memory instead of on the Go heap. `cmd/geopack` builds the
+cache ([decision 0008](decisions/0008-memory-mapped-geodata.md)). Doors add temporary walls on top.
 
-## World, geodata and data
+**The world** (`internal/gameserver/world`) splits the map into a grid of regions. It answers "what
+is near this point" and tracks which objects can see each other. When an object comes into or goes
+out of view, players get the packets that make it appear or disappear.
 
-- **World** (`internal/gameserver/world`): the map is split into a grid of regions. The world
-  answers spatial lookups and tracks which objects can see each other as they spawn, move and
-  despawn. Visibility changes are what make the server send appear and disappear packets.
-- **Geodata** (`internal/gameserver/geo`): height, movement, line-of-sight and pathfinding queries.
-  It reads L2OFF or L2J region files. At boot it maps a packed cache file into memory
-  (`-geodata-cache`, built by `cmd/geopack`). Doors add temporary blockers on top of the static
-  regions (`geo/dynamic`).
-- **Static data** (`internal/gameserver/data/xml`, `data/cache`): XML loaders for the datapack
-  (items, skills, NPCs, spawns, zones, multisells, ...) and the HTML page cache. The data stays on
-  disk and is never imported into the database. Some tables can be reloaded at runtime with the
-  `//reload` admin command.
-- **Persistent data** (`internal/gameserver/data/sql`): one store per table group.
-- **Object ids** (`internal/commons/idfactory`): unique ids for characters, items, clans and other
-  persisted objects. At boot it scans the ids already stored.
+**Scripts** hold most game content: quests, NPC behavior, teleporters, special NPCs, scheduled
+events and spawn rules. They are plain Go code in `internal/gameserver/script`, not a separate
+scripting language. `data/xml/scripts.xml` still decides which scripts run
+([decision 0006](decisions/0006-scripts-as-compiled-go.md)).
 
-## Scripts
+**Object ids** for characters, items, clans and other saved objects come from
+`internal/commons/idfactory`, which scans the ids already in the database at boot.
 
-Quests, NPC behaviors, feature NPCs, teleporters, scheduled tasks and spawn makers are Go code in
-`internal/gameserver/script`. Each script is a `Script` value built by a Go constructor.
-`script/catalog` maps each `data/xml/scripts.xml` entry to its constructor, and `scripts.xml`
-decides which scripts run. The engine calls a script's hooks (talk, kill, attack, see, timers, ...)
-when those events happen in the game. The design and its rules are in
-[script-engine-plan.md](script-engine-plan.md).
+## Start and stop
 
-## Game server package map
+Each program is assembled with [Uber Fx](https://github.com/uber-go/fx), a library that builds
+each service from the services it depends on and runs start and stop steps in order
+([decision 0002](decisions/0002-wire-servers-with-uber-fx.md)).
+
+**Start.** The game server loads config, connects to the database, loads the game data and
+geodata, builds the world and every game system, starts the regular jobs, and only then opens the
+game port. The parts shared with the test harness live in `internal/gameserver/app`; the rest are in
+`cmd/gameserver`, one file per system. If the database does not answer, start-up fails after a
+time limit instead of hanging.
+
+**Stop.** Shutdown runs the start steps in reverse:
+
+1. The game port closes. Every client gets a goodbye packet, and each player is saved.
+2. The regular jobs stop and the worker pool finishes its queued tasks.
+3. Items and the persistence lanes are flushed, and each game system saves its state.
+4. The database connection closes last.
+
+The whole shutdown has a time limit (`gameServerStopTimeout` in `cmd/gameserver/main.go`) that adds
+up the limit of every step. A test checks the sum. Give the process at least that long to stop:
+`docker-compose.yml` allows 240 seconds.
+
+## Package map
+
+Each package's `doc.go` says what it owns. `go doc ./internal/gameserver/<package>` prints it.
 
 | Area | Packages under `internal/gameserver/` |
 | --- | --- |
-| Composition and runtime | `app` (shared fx graph), `sim` (actor queues), `persist` (write lanes), `task` (periodic work), `shutdown` (timed shutdown and restart) |
-| Network | `network` (connections, dispatch, login link, event-to-packet mapping), `network/clientpackets`, `network/serverpackets`, `network/cipher` |
-| Live objects | `model/actor/...` (creature, player, npc, summon, pet, cubic, ai, attack, cast, move, event), `model/item`, `model/itemcontainer`, `model/zone`, and the other `model/*` static data types |
+| Start-up and runtime | `app` (shared start-up wiring), `sim` (actor queues), `persist` (database write lanes), `task` (regular jobs), `shutdown` (timed shutdown and restart) |
+| Network | `network`, `network/clientpackets` (decoders), `network/serverpackets` (encoders), `network/cipher` |
+| Live objects | `model/actor/...` (players, NPCs, summons, pets, cubics, AI, attack, cast, movement, events), `model/item`, `model/itemcontainer`, `model/zone`, and the static data types in `model/*` |
 | World and terrain | `world`, `geo/...`, `zonepulse`, `fence` |
-| Data | `data/xml`, `data/sql`, `data/cache`, `data/manager` |
-| Rules entry points | `handler/...` (chat, item use, skill use, targeting, admin command parsing), `skill/...` (definitions, effects, formulas, stats) |
-| Items and economy | `inventory`, `enchant`, `augment`, `craft`, `multisell`, `merchant`, `privatestore`, `petitem`, `symbolmaker`, `itemapi` (debug-listener item API) |
+| Data | `data/xml` (file loaders), `data/sql` (database stores), `data/cache`, `data/manager` |
+| Rule entry points | `handler/...` (chat, item use, skill use, targeting, admin command parsing), `skill/...` (skill definitions, effects, formulas, stats) |
+| Items and trade | `inventory`, `enchant`, `augment`, `craft`, `multisell`, `merchant`, `privatestore`, `petitem`, `symbolmaker`, `itemapi` |
 | Social | `clan`, `party`, `partymatch`, `request`, `social/relation`, `social/petition`, `bbs`, `wedding`, `duel`, `announcement` |
-| Residences and PvP | `castle`, `castlemanor`, `clanhall`, `siege`, `cursedweapon`, `hero`, `olympiad`, `raidpoint` |
+| Castles and PvP | `castle`, `castlemanor`, `clanhall`, `siege`, `cursedweapon`, `hero`, `olympiad`, `raidpoint` |
 | Seven Signs | `sevensigns`, `festival`, `signspriest` |
 | Activities and NPC services | `boat`, `derby`, `fishing`, `fishchamp`, `lottery`, `gatekeeper`, `classmaster`, `schemebuffer` |
-| Scripted content | `script` (engine), `script/catalog`, `script/quest`, `script/ai`, `script/feature`, `script/maker`, `script/task`, `script/teleport` |
+| Scripts | `script` (engine), `script/catalog`, `script/quest`, `script/ai`, `script/feature`, `script/maker`, `script/task`, `script/teleport` |
 
-Each package's `doc.go` (or package comment) says what it owns; `go doc ./internal/gameserver/<pkg>`
-prints it.
+Outside the game server:
 
-## Observability and operations
+| Path | Contents |
+| --- | --- |
+| `internal/loginserver` | the login server: client logins, the game server link, accounts, bans |
+| `internal/link` | GS-LS link messages, shared by both servers |
+| `internal/commons` | shared code: wire encoding, ciphers, database pool, logging, regular jobs, object ids |
+| `internal/config` | `.properties` file parsing |
+| `internal/gameservertest`, `internal/testsupport`, `internal/dbtest` | the test harness ([decision 0007](decisions/0007-behavior-first-tests.md)) |
 
-- Structured logs (zerolog) go to the files configured in `logging.properties`, under `-log-root`.
-  See [observability.md](observability.md).
-- `-debug-addr` serves `pprof`, `expvar` metrics (connections, players online, ticker timings), the
-  IP ban API and the character item API. Bind it to loopback only. See
-  [run-servers.md](run-servers.md#debug-endpoints) and [profiling.md](profiling.md).
+## Logs, metrics and debugging
 
-## Further reading
+Both servers write structured logs to the files set in `logging.properties`
+([observability.md](observability.md)). With `-debug-addr 127.0.0.1:6060`, a server also serves
+profiling data (`pprof`), metrics (`expvar`), an IP ban API and, on the game server, an item API.
+Bind it to loopback only ([decision 0010](decisions/0010-secure-defaults.md),
+[run-servers.md](run-servers.md#debug-endpoints), [profiling.md](profiling.md)).
 
-The design plans in this directory record why the code looks the way it does and what is still
-planned. [docs/README.md](README.md) lists them and their status.
+## Where to go next
+
+- [development.md](development.md): build, test and contribute.
+- [decisions/](decisions/README.md): why the system is built this way.
+- [network-ownership-map.md](network-ownership-map.md) and
+  [`internal/gameserver/network/AGENTS.md`](../internal/gameserver/network/AGENTS.md): the rules for
+  the network package.
+- [script-engine-plan.md](script-engine-plan.md): the full design of the script engine.

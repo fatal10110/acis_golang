@@ -1,7 +1,12 @@
 # Documentation
 
-Start with the guide for what you want to do. The plans and audits at the end record design
-decisions and past reviews; they describe the code at the time they were written.
+Find the guide for what you want to do below. New to the project? Read
+[architecture.md](architecture.md) first, and keep the [glossary](glossary.md) open for unfamiliar
+terms.
+
+The [decision records](decisions/README.md) explain why the system is built the way it is. The
+plans and audits at the end are the longer design documents behind those decisions; each one
+describes the code at the time it was written.
 
 ## Run a server
 
@@ -19,8 +24,11 @@ decisions and past reviews; they describe the code at the time they were written
 
 | Page | Covers |
 | --- | --- |
-| [architecture.md](architecture.md) | processes, protocols, boot and shutdown, the concurrency model, package map |
-| [development.md](development.md) | setup, build, tests, lint, conventions, CI |
+| [architecture.md](architecture.md) | how the servers work: processes, protocols, request handling, concurrency, saving, package map |
+| [development.md](development.md) | first build, tests, lint, code rules, CI |
+| [decisions/](decisions/README.md) | architecture decision records: what was decided, why, and the trade-offs |
+| [glossary.md](glossary.md) | the terms used in the code and docs |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | how to report issues and propose changes |
 | [network-ownership-map.md](network-ownership-map.md) | what each file family in the game network package owns |
 | [`internal/gameserver/network/AGENTS.md`](../internal/gameserver/network/AGENTS.md) | rules for changes to the game network package |
 
@@ -43,6 +51,9 @@ repository root points to the workspace rules they build on.
 | [parity-sweep/README.md](parity-sweep/README.md) | procedure for the behavioral parity sweep |
 
 ## Design plans and audits
+
+These are long working documents. For the short version of each decision, see the
+[decision records](decisions/README.md).
 
 | Page | Status |
 | --- | --- |
