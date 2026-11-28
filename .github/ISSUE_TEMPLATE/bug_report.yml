@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in the servers or tools does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Security problems go through SECURITY.md, not here.
+        Some differences from the aCis Java server are deliberate: check the parity exceptions in
+        docs/agents/porting-playbook.md first.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, step by step, and what happened.
+      placeholder: |
+        1. Log in with a level 20 character.
+        2. Open the warehouse at Gludio.
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should have happened. If you know what the aCis Java server does here, say so.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The commit or release you ran.
+      placeholder: v1.2.3 or 0f0ef4c0
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How you run the servers
+      options:
+        - Docker Compose
+        - Binaries run directly
+        - Test suite only
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log lines. Remove account names, passwords and IP addresses.
+      render: text

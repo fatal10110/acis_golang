@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/fatal10110/acis_golang/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Documentation
+    url: https://github.com/fatal10110/acis_golang/blob/main/docs/README.md
+    about: Guides for running, developing and understanding the servers.
